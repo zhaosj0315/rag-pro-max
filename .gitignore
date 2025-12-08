@@ -130,7 +130,6 @@ docs/
 scripts/check_push.sh
 scripts/add_to_gitignore.sh
 DEV_RULES.md
-tests/
 
 # ⬇️ 新增临时材料添加到此处 ⬇️
 # 格式：文件名或目录名/
