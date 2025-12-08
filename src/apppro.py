@@ -140,6 +140,9 @@ from src.ui.model_selectors import (
 # 引入 UI 高级配置 (Stage 3.2.3)
 from src.ui.advanced_config import render_advanced_features
 
+# 引入 UI 配置表单 (Stage 3.2.2)
+from src.ui.config_forms import render_basic_config
+
 # ⚠️ 关键修复：强制使用本地模型，避免 OpenAI 默认
 # 临时设置环境变量，让 LlamaIndex 使用本地模型
 os.environ['LLAMA_INDEX_EMBED_MODEL'] = 'local'
@@ -559,183 +562,18 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # P0改进3: 侧边栏分组 - 基础配置（默认折叠）
-    with st.expander("⚙️ 基础配置", expanded=False):
-        st.markdown("**LLM 对话模型**")
-        
-        # LLM配置内容移到这里（稍后处理）
-        llm_provider_choice = st.radio("供应商", ["Ollama (本地)", "OpenAI-Compatible (云端)"], horizontal=True, label_visibility="collapsed")
-        
-        if llm_provider_choice.startswith("Ollama"):
-            llm_provider = "Ollama"
-            llm_url = st.text_input("Ollama URL", defaults.get("llm_url_ollama", "http://localhost:11434"))
-            
-            # 检测 Ollama 状态
-            ollama_ok = check_ollama_status(llm_url)
-            
-            col_status, _ = st.columns([3, 1])
-            with col_status:
-                if ollama_ok:
-                    st.success("✅ Ollama 已连接")
-                else:
-                    st.warning("⚠️ Ollama 未运行")
-            
-            # 模型选择/输入 - 使用新组件 (Stage 3.2.1)
-            saved_model = defaults.get("llm_model_ollama", "qwen2.5:7b")
-            llm_model, save_as_default = render_ollama_model_selector(llm_url, saved_model, ollama_ok)
-            
-            # 处理"设为默认"按钮
-            if save_as_default:
-                config = load_config()
-                config["llm_model_ollama"] = llm_model
-                save_config(config)
-                st.success(f"✅ 已设为默认: {llm_model}")
-                time.sleep(1)
-                st.rerun()
-            
-            llm_key = ""
-        else:
-            llm_provider = "OpenAI-Compatible"
-            llm_url = st.text_input("Base URL", defaults.get("llm_url_openai", "https://api.deepseek.com"))
-            
-            # 优先从环境变量获取 Key
-            env_key = os.getenv('OPENAI_API_KEY', "")
-            default_key = defaults.get("llm_key", "") or env_key
-            
-            llm_key = st.text_input("API Key", value=default_key, type="password", help="可从环境变量 OPENAI_API_KEY 自动加载")
-            if st.button("🔄 刷新列表", use_container_width=True):
-                with st.spinner("正在连接模型列表..."):
-                    mods, err = fetch_remote_models(llm_url, llm_key)
-                    if mods: st.session_state.model_list = mods
-                    else: st.error(err)
-            
-            if st.session_state.model_list:
-                saved_model = defaults.get("llm_model_openai", "deepseek-chat")
-                idx = st.session_state.model_list.index(saved_model) if saved_model in st.session_state.model_list else 0
-                llm_model = st.selectbox("选择模型", st.session_state.model_list, index=idx)
-            else:
-                llm_model = st.text_input("输入模型名", defaults.get("llm_model_openai", "deepseek-chat"), key="llm_openai_1")
-
-        st.markdown("---")
-        st.markdown("**Embedding 向量模型**")
-        st.caption("💡 用于理解文档语义")
-        
-        embed_idx = defaults.get("embed_provider_idx", 0)
-        if embed_idx > 2: embed_idx = 0
-        embed_provider = st.selectbox("供应商", ["HuggingFace (本地/极速)", "OpenAI-Compatible", "Ollama"], index=embed_idx, key="embed_provider_1")
-        
-        if embed_provider.startswith("HuggingFace"):
-            # 预设优秀模型列表
-            preset_models = [
-                "BAAI/bge-small-zh-v1.5",      # 小型，快速
-                "BAAI/bge-large-zh-v1.5",      # 大型，准确
-                "BAAI/bge-m3",                 # 多语言最强
-                "BAAI/bge-base-zh-v1.5",       # 中型，平衡
-                "moka-ai/m3e-base",            # M3E 中文优化
-                "shibing624/text2vec-base-chinese",  # Text2Vec 中文
-                "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",  # 多语言轻量
-                "自定义模型..."
-            ]
-            
-            model_descriptions = {
-                "BAAI/bge-small-zh-v1.5": "🚀 小型快速版 | 90MB | 适合实时应用、资源受限场景",
-                "BAAI/bge-large-zh-v1.5": "🎯 中文最强版 | 1.3GB | 最高准确度，推荐用于精准检索",
-                "BAAI/bge-m3": "🌍 多语言最强 | 2GB | 支持100+语言，跨语言检索最佳",
-                "BAAI/bge-base-zh-v1.5": "⚖️ 平衡版本 | 400MB | 速度与准确度的完美平衡",
-                "moka-ai/m3e-base": "🔤 M3E中文优化 | 400MB | 中文语义理解优化",
-                "shibing624/text2vec-base-chinese": "📝 Text2Vec中文 | 400MB | 中文文本向量化专家",
-                "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2": "💡 轻量多语言 | 400MB | 资源受限时的多语言方案"
-            }
-            
-            # 从配置读取默认模型
-            saved_model = defaults.get("embed_model_hf", "BAAI/bge-small-zh-v1.5")
-            try:
-                default_idx = preset_models.index(saved_model) if saved_model in preset_models else 0
-            except:
-                default_idx = 0
-            
-            col1, col2 = st.columns([5, 1])
-            with col1:
-                selected = st.selectbox(
-                    "HF 模型",
-                    options=preset_models,
-                    index=default_idx,
-                    help=model_descriptions.get(preset_models[default_idx], ""),
-                    label_visibility="collapsed"
-                )
-            
-            # 如果选择自定义，显示输入框
-            if selected == "自定义模型...":
-                embed_model = st.text_input(
-                    "输入模型名称",
-                    placeholder="例如: sentence-transformers/all-MiniLM-L6-v2",
-                    help="输入任意 HuggingFace 模型 ID"
-                )
-                if not embed_model:
-                    embed_model = "BAAI/bge-small-zh-v1.5"  # 默认值
-            else:
-                embed_model = selected
-            
-            # 检查模型是否存在并显示状态
-            model_exists = check_hf_model_exists(embed_model)
-            
-            with col2:
-                button_label = "✅ ⭐" if model_exists else "⭐"
-                if st.button(button_label, key="set_default_embed", use_container_width=True, help="设为默认模型"):
-                    config = load_config()
-                    config["embed_model_hf"] = embed_model
-                    save_config(config)
-                    st.success(f"✅ 已设为默认")
-                    time.sleep(1)
-                    st.rerun()
-            
-            if not model_exists:
-                st.warning("⚠️ 模型未下载")
-                if st.button("📥 下载模型", key="download_hf_model", type="primary", use_container_width=True):
-                    with st.spinner(f"正在下载 {embed_model}..."):
-                        try:
-                            import subprocess
-                            download_script = f"""
-import os
-os.environ['HF_HUB_OFFLINE'] = '0'
-os.environ['TRANSFORMERS_OFFLINE'] = '0'
-from huggingface_hub import snapshot_download
-snapshot_download(
-    repo_id="{embed_model}",
-    cache_dir="./hf_cache",
-    local_dir="./hf_cache/{embed_model.replace('/', '--')}",
-    local_dir_use_symlinks=False
-)
-print("SUCCESS")
-"""
-                            result = subprocess.run(
-                                [sys.executable, "-c", download_script],
-                                capture_output=True,
-                                text=True,
-                                timeout=600
-                            )
-                            
-                            if result.returncode == 0 and "SUCCESS" in result.stdout:
-                                st.success(f"✅ 下载完成: {embed_model}")
-                                time.sleep(1)
-                                st.rerun()
-                            else:
-                                st.error(f"下载失败: {result.stderr}")
-                        except Exception as e:
-                            st.error(f"下载失败: {e}")
-            else:
-                st.success("✅ 模型已就绪")
-            
-            embed_url = ""
-            embed_key = ""
-        elif embed_provider.startswith("OpenAI"):
-            embed_model = st.text_input("模型名", defaults.get("embed_model_openai", "text-embedding-3-small"))
-            embed_url = st.text_input("Base URL", defaults.get("embed_url_openai", "https://api.openai.com/v1"))
-            embed_key = st.text_input("API Key", defaults.get("embed_key", ""), type="password")
-        else:  # Ollama
-            embed_model = st.text_input("模型名", defaults.get("embed_model_ollama", "nomic-embed-text"))
-            embed_url = st.text_input("URL", defaults.get("embed_url_ollama", "http://localhost:11434"))
-            embed_key = ""
+    # P0改进3: 侧边栏分组 - 基础配置（默认折叠）- 使用新组件 (Stage 3.2.2)
+    config_values = render_basic_config(defaults)
+    
+    # 提取配置值
+    llm_provider = config_values['llm_provider']
+    llm_url = config_values['llm_url']
+    llm_model = config_values['llm_model']
+    llm_key = config_values['llm_key']
+    embed_provider = config_values['embed_provider']
+    embed_model = config_values['embed_model']
+    embed_url = config_values['embed_url']
+    embed_key = config_values['embed_key']
     
     # P0改进3: 高级功能（默认折叠）- 使用新组件 (Stage 3.2.3)
     advanced_config = render_advanced_features()

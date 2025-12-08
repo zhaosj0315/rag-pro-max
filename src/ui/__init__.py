@@ -23,6 +23,12 @@ from .advanced_config import (
     render_advanced_features
 )
 
+from .config_forms import (
+    render_llm_config,
+    render_embedding_config,
+    render_basic_config
+)
+
 __all__ = [
     # Display components
     'render_message_stats',
@@ -37,5 +43,9 @@ __all__ = [
     # Advanced config
     'render_rerank_config',
     'render_bm25_config',
-    'render_advanced_features'
+    'render_advanced_features',
+    # Config forms
+    'render_llm_config',
+    'render_embedding_config',
+    'render_basic_config'
 ]
