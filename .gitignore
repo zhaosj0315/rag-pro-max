@@ -110,7 +110,11 @@ FAQ.md
 DEPLOYMENT.md
 CONTRIBUTING.md
 FIRST_TIME_GUIDE.md
+PUSH_CHECKLIST.md
 docs/
+
+# 开发工具（非必要不推送）
+scripts/check_push.sh
 
 # ============================================================
 # 备份和临时文件
@@ -134,6 +138,13 @@ htmlcov/
 # ============================================================
 # 注意：config/ 目录中的模板文件应该推送
 # 但用户修改的本地配置不应推送
+
+# 根目录的用户配置（不推送）
+/app_config.json
+/rag_config.json
+/projects_config.json
+
+# 其他本地配置
 local_config.json
 user_config.json
 
