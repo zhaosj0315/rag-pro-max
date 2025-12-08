@@ -953,20 +953,20 @@ with st.sidebar:
         col1, col2 = st.columns(2)
         
         # 撤销按钮
-        if col1.button("↩️ 撤销提问", use_container_width=True, disabled=len(st.session_state.messages) < 2, help="撤销最后一组问答"):
-            if len(st.session_state.messages) >= 2:
+        if col1.button("↩️ 撤销提问", use_container_width=True, disabled=len(state.get_messages()) < 2, help="撤销最后一组问答"):
+            if len(state.get_messages()) >= 2:
                 # 弹出最后两条消息 (User + Assistant)
                 st.session_state.messages.pop()
                 st.session_state.messages.pop()
                 # 保存更新后的历史
                 if current_kb_name:
-                    save_chat_history(current_kb_name, st.session_state.messages)
+                    save_chat_history(current_kb_name, state.get_messages())
                 st.toast("✅ 已撤销上一条消息")
                 time.sleep(0.5)
                 st.rerun()
         
         # 清空按钮
-        if col2.button("🧹 清空对话", use_container_width=True, disabled=len(st.session_state.messages) == 0):
+        if col2.button("🧹 清空对话", use_container_width=True, disabled=len(state.get_messages()) == 0):
             st.session_state.messages = []
             st.session_state.suggestions_history = []
             if current_kb_name:
@@ -976,7 +976,7 @@ with st.sidebar:
             st.rerun()
         
         # 对话历史管理
-        if len(st.session_state.messages) > 0:
+        if len(state.get_messages()) > 0:
             col3, col4 = st.columns(2)
             
             # 导出对话
@@ -999,7 +999,7 @@ with st.sidebar:
             
             # 对话统计
             if col4.button("📊 对话统计", use_container_width=True):
-                qa_count = len(st.session_state.messages) // 2
+                qa_count = len(state.get_messages()) // 2
                 total_chars = sum(len(msg["content"]) for msg in st.session_state.messages)
                 st.info(f"💬 问答轮次: {qa_count}\n\n📝 总字符数: {total_chars}")
             
@@ -2782,7 +2782,7 @@ if active_kb_name and st.session_state.chat_engine and not st.session_state.mess
                 sug = [re.sub(r'^\d+\.\s*', '', q.strip()) for q in summary_lines[1:] if q.strip()][:3]
 
                 st.session_state.messages.append({"role": "assistant", "content": summary, "suggestions": sug})
-                save_chat_history(active_kb_name, st.session_state.messages)
+                save_chat_history(active_kb_name, state.get_messages())
                 st.rerun()
             except Exception as e:
                 error_msg = str(e)
@@ -2795,7 +2795,7 @@ if active_kb_name and st.session_state.chat_engine and not st.session_state.mess
                 st.session_state.messages.append({"role": "assistant", "content": "👋 知识库已就绪。"})
 
 # 渲染消息
-for msg_idx, msg in enumerate(st.session_state.messages):
+for msg_idx, msg in enumerate(state.get_messages()):
     role = msg["role"]
     avatar = "🤖" if role == "assistant" else "🧑‍💻"
     with st.chat_message(role, avatar=avatar):
@@ -2816,7 +2816,7 @@ for msg_idx, msg in enumerate(st.session_state.messages):
                 st.rerun()
 
         # 渲染静态建议 (仅用于自动摘要)
-        is_last_message = msg_idx == len(st.session_state.messages) - 1
+        is_last_message = msg_idx == len(state.get_messages()) - 1
         if "suggestions" in msg and msg["suggestions"] and is_last_message and not st.session_state.suggestions_history:
             st.write("")
             for idx, q in enumerate(msg["suggestions"]):
@@ -2824,7 +2824,7 @@ for msg_idx, msg in enumerate(st.session_state.messages):
                     click_btn(q)
     
     # 在最后一条 assistant 消息之后显示动态追问推荐（在 chat_message 容器外）
-    is_last_message = msg_idx == len(st.session_state.messages) - 1
+    is_last_message = msg_idx == len(state.get_messages()) - 1
     if is_last_message and msg["role"] == "assistant" and active_kb_name and st.session_state.chat_engine:
         import hashlib
         msg_hash = hashlib.md5(msg['content'][:100].encode()).hexdigest()[:8]
@@ -2953,7 +2953,7 @@ if final_prompt:
         logger.log_user_question(final_prompt, kb_name=active_kb_name)
         
         st.session_state.messages.append({"role": "user", "content": final_prompt})
-        if active_kb_name: save_chat_history(active_kb_name, st.session_state.messages)
+        if active_kb_name: save_chat_history(active_kb_name, state.get_messages())
 
         with st.chat_message("user", avatar="🧑‍💻"): st.markdown(final_prompt)
         
@@ -3159,7 +3159,7 @@ if final_prompt:
                         terminal_logger.info("⚠️ 推荐问题生成失败")
                     
                     # 延迟保存：确认所有步骤（包括推荐问题）都成功后再保存
-                    if active_kb_name: save_chat_history(active_kb_name, st.session_state.messages)
+                    if active_kb_name: save_chat_history(active_kb_name, state.get_messages())
                     
                     # 释放内存
                     cleanup_memory()
