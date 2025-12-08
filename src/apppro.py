@@ -130,6 +130,13 @@ from src.ui.display_components import (
     get_relevance_label
 )
 
+# 引入 UI 模型选择器 (Stage 3.2.1)
+from src.ui.model_selectors import (
+    render_ollama_model_selector,
+    render_openai_model_selector,
+    render_hf_embedding_selector
+)
+
 # ⚠️ 关键修复：强制使用本地模型，避免 OpenAI 默认
 # 临时设置环境变量，让 LlamaIndex 使用本地模型
 os.environ['LLAMA_INDEX_EMBED_MODEL'] = 'local'
@@ -563,109 +570,25 @@ with st.sidebar:
             # 检测 Ollama 状态
             ollama_ok = check_ollama_status(llm_url)
             
-            col_status, col_refresh = st.columns([3, 1])
+            col_status, _ = st.columns([3, 1])
             with col_status:
                 if ollama_ok:
                     st.success("✅ Ollama 已连接")
                 else:
                     st.warning("⚠️ Ollama 未运行")
             
-            with col_refresh:
-                if st.button("🔄", key="refresh_ollama_models", help="刷新模型列表", use_container_width=True):
-                    if ollama_ok:
-                        try:
-                            from src.utils.model_manager import clean_proxy
-                            clean_proxy()
-                            client = ollama.Client(host=llm_url)
-                            models_resp = client.list()
-                            
-                            # 处理 ListResponse 对象
-                            models = []
-                            if hasattr(models_resp, 'models'):
-                                # 新版 ollama 返回 ListResponse 对象
-                                for m in models_resp.models:
-                                    if hasattr(m, 'model'):
-                                        models.append(m.model)
-                                    elif isinstance(m, str):
-                                        models.append(m)
-                            elif isinstance(models_resp, dict) and 'models' in models_resp:
-                                # 旧版返回字典
-                                for m in models_resp['models']:
-                                    if isinstance(m, dict):
-                                        models.append(m.get('name') or m.get('model', ''))
-                                    else:
-                                        models.append(str(m))
-                            
-                            st.session_state.ollama_models = [m for m in models if m]
-                            
-                            if st.session_state.ollama_models:
-                                st.toast(f"✅ 找到 {len(st.session_state.ollama_models)} 个模型")
-                            else:
-                                st.warning("未找到模型")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"获取失败: {e}")
-                            st.session_state.ollama_models = []
-                    else:
-                        st.warning("请先启动 Ollama")
-            
-            # 自动加载模型列表（首次）
-            if ollama_ok and ("ollama_models" not in st.session_state or not st.session_state.ollama_models):
-                try:
-                    from src.utils.model_manager import clean_proxy
-                    clean_proxy()
-                    client = ollama.Client(host=llm_url)
-                    models_resp = client.list()
-                    
-                    models = []
-                    if hasattr(models_resp, 'models'):
-                        for m in models_resp.models:
-                            if hasattr(m, 'model'):
-                                models.append(m.model)
-                            elif isinstance(m, str):
-                                models.append(m)
-                    elif isinstance(models_resp, dict) and 'models' in models_resp:
-                        for m in models_resp['models']:
-                            if isinstance(m, dict):
-                                models.append(m.get('name') or m.get('model', ''))
-                            else:
-                                models.append(str(m))
-                    
-                    st.session_state.ollama_models = [m for m in models if m]
-                except:
-                    st.session_state.ollama_models = []
-            
-            if not ollama_ok:
-                st.session_state.ollama_models = []
-            
-            # 模型选择/输入
+            # 模型选择/输入 - 使用新组件 (Stage 3.2.1)
             saved_model = defaults.get("llm_model_ollama", "qwen2.5:7b")
+            llm_model, save_as_default = render_ollama_model_selector(llm_url, saved_model, ollama_ok)
             
-            if st.session_state.ollama_models:
-                # 如果有模型列表，添加一个"手动输入"选项
-                options = st.session_state.ollama_models + ["✏️ 手动输入..."]
-                idx = st.session_state.ollama_models.index(saved_model) if saved_model in st.session_state.ollama_models else 0
-                col1, col2 = st.columns([4, 1])
-                with col1:
-                    selected = st.selectbox("选择/输入模型", options, index=idx, label_visibility="collapsed")
-                with col2:
-                    if st.button("⭐ 默认", key="set_default_llm", use_container_width=True):
-                        if selected == "✏️ 手动输入...":
-                            st.warning("请先输入模型名")
-                        else:
-                            config = load_config()
-                            config["llm_model_ollama"] = selected
-                            save_config(config)
-                            st.success(f"✅ 已设为默认: {selected}")
-                            time.sleep(1)
-                            st.rerun()
-                
-                if selected == "✏️ 手动输入...":
-                    llm_model = st.text_input("模型名", saved_model, label_visibility="collapsed", key="llm_manual_1")
-                else:
-                    llm_model = selected
-            else:
-                llm_model = st.text_input("输入模型名", saved_model, key="llm_direct_1")
+            # 处理"设为默认"按钮
+            if save_as_default:
+                config = load_config()
+                config["llm_model_ollama"] = llm_model
+                save_config(config)
+                st.success(f"✅ 已设为默认: {llm_model}")
+                time.sleep(1)
+                st.rerun()
             
             llm_key = ""
         else:
