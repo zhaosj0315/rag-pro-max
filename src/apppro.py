@@ -137,6 +137,9 @@ from src.ui.model_selectors import (
     render_hf_embedding_selector
 )
 
+# 引入 UI 高级配置 (Stage 3.2.3)
+from src.ui.advanced_config import render_advanced_features
+
 # ⚠️ 关键修复：强制使用本地模型，避免 OpenAI 默认
 # 临时设置环境变量，让 LlamaIndex 使用本地模型
 os.environ['LLAMA_INDEX_EMBED_MODEL'] = 'local'
@@ -734,53 +737,8 @@ print("SUCCESS")
             embed_url = st.text_input("URL", defaults.get("embed_url_ollama", "http://localhost:11434"))
             embed_key = ""
     
-    # P0改进3: 高级功能（默认折叠）
-    with st.expander("🎯 高级功能", expanded=False):
-        # P0改进2: 专业术语通俗化
-        st.markdown("**智能重排序 (Re-ranking)**")
-        enable_rerank = st.checkbox(
-            "开启智能重排序",
-            value=False,
-            key="enable_rerank",
-            help="💡 **通俗解释**：就像搜索引擎的第二次筛选，把最相关的结果排在前面\n\n"
-                 "🔧 **技术名称**：Re-ranking (Cross-Encoder)\n"
-                 "📈 **效果提升**：准确率 +10~20%\n"
-                 "⏱️ **速度影响**：查询延迟 +0.5~1秒"
-        )
-        
-        if enable_rerank:
-            st.caption("📊 **工作原理**：先检索10个候选 → 智能重排序 → 返回最相关的3个")
-            
-            rerank_model = st.selectbox(
-                "模型选择",
-                ["BAAI/bge-reranker-base（推荐）", "BAAI/bge-reranker-v2-m3（更强）"],
-                key="rerank_model_display",
-                help="首次使用会自动下载模型（约 1GB）"
-            )
-            
-            # 保存实际模型名
-            if "推荐" in rerank_model:
-                st.session_state.rerank_model = "BAAI/bge-reranker-base"
-            else:
-                st.session_state.rerank_model = "BAAI/bge-reranker-v2-m3"
-        
-        st.markdown("---")
-        
-        # P0改进2: BM25通俗化
-        st.markdown("**关键词增强 (BM25)**")
-        enable_bm25 = st.checkbox(
-            "开启关键词增强",
-            value=False,
-            key="enable_bm25",
-            help="💡 **通俗解释**：除了理解语义，还能精确匹配关键词（如版本号、代码、专有名词）\n\n"
-                 "🔧 **技术名称**：BM25 混合检索\n"
-                 "📈 **效果提升**：准确率再 +5~10%\n"
-                 "⏱️ **速度影响**：查询延迟 +0.2~0.5秒"
-        )
-        
-        if enable_bm25:
-            st.caption("📊 **工作原理**：语义检索 + 关键词匹配 → 智能融合 → 返回最佳结果")
-            st.caption("✨ **适用场景**：需要精确匹配版本号、代码片段、专有名词时")
+    # P0改进3: 高级功能（默认折叠）- 使用新组件 (Stage 3.2.3)
+    advanced_config = render_advanced_features()
     
     # P0改进3: 系统工具（默认折叠）
     with st.expander("🛠️ 系统工具", expanded=False):

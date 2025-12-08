@@ -17,6 +17,12 @@ from .model_selectors import (
     render_hf_embedding_selector
 )
 
+from .advanced_config import (
+    render_rerank_config,
+    render_bm25_config,
+    render_advanced_features
+)
+
 __all__ = [
     # Display components
     'render_message_stats',
@@ -27,5 +33,9 @@ __all__ = [
     # Model selectors
     'render_ollama_model_selector',
     'render_openai_model_selector',
-    'render_hf_embedding_selector'
+    'render_hf_embedding_selector',
+    # Advanced config
+    'render_rerank_config',
+    'render_bm25_config',
+    'render_advanced_features'
 ]
