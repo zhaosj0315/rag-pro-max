@@ -143,6 +143,9 @@ from src.ui.advanced_config import render_advanced_features
 # 引入 UI 配置表单 (Stage 3.2.2)
 from src.ui.config_forms import render_basic_config
 
+# 引入状态管理器 (Stage 3.3)
+from src.core.state_manager import state
+
 # ⚠️ 关键修复：强制使用本地模型，避免 OpenAI 默认
 # 临时设置环境变量，让 LlamaIndex 使用本地模型
 os.environ['LLAMA_INDEX_EMBED_MODEL'] = 'local'
