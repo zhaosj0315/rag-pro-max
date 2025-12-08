@@ -1,0 +1,13 @@
+streamlit
+requests
+ollama
+psutil
+jieba
+llama-index-core
+llama-index-llms-ollama
+llama-index-llms-openai
+llama-index-embeddings-huggingface
+llama-index-embeddings-ollama
+llama-index-embeddings-openai
+llama-index-retrievers-bm25
+pdfplumber

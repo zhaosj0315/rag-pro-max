@@ -1,0 +1,16 @@
+{
+    "target_path": "/Users/zhaosj/Documents/用所选项目新建的文件夹/temp_uploads/batch_1765167012",
+    "output_path": "/Users/zhaosj/Documents/用所选项目新建的文件夹/vector_db_storage",
+    "llm_type_index": 0,
+    "llm_url_ollama": "http://127.0.0.1:11434",
+    "llm_model_ollama": "gpt-oss:20b",
+    "llm_url_openai": "",
+    "llm_key": "",
+    "llm_model_openai": "",
+    "embed_provider_index": 0,
+    "embed_model_hf": "BAAI/bge-large-zh-v1.5",
+    "llm_type_idx": 0,
+    "embed_provider_idx": 0,
+    "embed_url_ollama": "",
+    "embed_model_ollama": ""
+}

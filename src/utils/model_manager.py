@@ -1,0 +1,227 @@
+"""
+模型管理模块 - 统一管理嵌入模型和 LLM 模型的加载
+"""
+import os
+from llama_index.core import Settings
+from llama_index.llms.ollama import Ollama
+from llama_index.llms.openai import OpenAI
+from llama_index.embeddings.ollama import OllamaEmbedding
+from llama_index.embeddings.openai import OpenAIEmbedding
+from ..custom_embeddings import create_custom_embedding
+from ..terminal_logger import terminal_logger
+from ..logger import logger
+
+
+def clean_proxy():
+    """清理代理设置，避免本地服务连接问题"""
+    for key in ['http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY']:
+        if key in os.environ:
+            del os.environ[key]
+
+
+def load_embedding_model(provider: str, model_name: str, api_key: str = "", api_url: str = ""):
+    """
+    加载嵌入模型
+    
+    Args:
+        provider: 供应商 (HuggingFace/OpenAI/Ollama)
+        model_name: 模型名称
+        api_key: API密钥（OpenAI需要）
+        api_url: API地址（OpenAI/Ollama需要）
+    
+    Returns:
+        嵌入模型实例，失败返回 None
+    """
+    try:
+        if provider.startswith("HuggingFace"):
+            # HuggingFace 本地模型
+            cache_dir = "./hf_cache"
+            local_paths = [
+                os.path.join(cache_dir, model_name.replace('/', '--')),
+                model_name,
+            ]
+            
+            local_model_path = None
+            for path in local_paths:
+                if os.path.exists(os.path.join(path, "config.json")):
+                    local_model_path = path
+                    break
+            
+            if not local_model_path:
+                local_model_path = model_name
+            
+            logger.log_model_loading("HuggingFace", model_name, "loading")
+            
+            # 检测GPU支持
+            device = "cpu"
+            try:
+                import torch
+                
+                # 清理环境变量
+                for key in ['PYTORCH_MPS_HIGH_WATERMARK_RATIO', 'PYTORCH_MPS_LOW_WATERMARK_RATIO']:
+                    if key in os.environ:
+                        del os.environ[key]
+                
+                if torch.backends.mps.is_available():
+                    device = "mps"
+                    try:
+                        torch.set_num_threads(10)
+                        torch.set_num_interop_threads(3)
+                    except:
+                        pass
+                    
+                    os.environ['OMP_NUM_THREADS'] = '10'
+                    os.environ['MKL_NUM_THREADS'] = '10'
+                    terminal_logger.success("🚀 Apple M4 Max GPU (MPS) + CPU 加速已启用")
+                    
+                elif torch.cuda.is_available():
+                    device = "cuda"
+                    try:
+                        torch.set_num_threads(10)
+                    except:
+                        pass
+                    torch.cuda.set_per_process_memory_fraction(0.9)
+                    terminal_logger.success("✅ CUDA GPU + 多核CPU 加速已启用 (限制90%)")
+                    
+                else:
+                    try:
+                        torch.set_num_threads(10)
+                    except:
+                        pass
+                    terminal_logger.warning("⚠️  未检测到GPU，使用 10核CPU 并行")
+                    
+            except Exception as e:
+                device = "cpu"
+                try:
+                    import torch
+                    torch.set_num_threads(12)
+                except:
+                    pass
+                terminal_logger.error(f"❌ GPU检测异常: {e}，使用 CPU")
+            
+            # 动态计算batch_size
+            import psutil
+            available_memory_gb = psutil.virtual_memory().available / (1024**3)
+            total_memory_gb = psutil.virtual_memory().total / (1024**3)
+            
+            if device == "mps":
+                usable_memory = available_memory_gb * 0.9
+                if usable_memory > 20:
+                    batch_size = 4096
+                elif usable_memory > 10:
+                    batch_size = 2048
+                elif usable_memory > 5:
+                    batch_size = 1024
+                else:
+                    batch_size = 512
+                terminal_logger.info(f"🔥 M4 Max GPU: batch_size={batch_size}, 可用内存={usable_memory:.1f}GB (目标 GPU <90%)")
+            elif device == "cuda":
+                batch_size = min(4096, max(1024, int(available_memory_gb * 50)))
+            else:
+                batch_size = 64
+            
+            terminal_logger.info(f"动态batch_size: {batch_size} (总内存: {total_memory_gb:.1f}GB, 可用: {available_memory_gb:.1f}GB)")
+            
+            import torch
+            torch.set_default_device(device)
+            
+            result = create_custom_embedding(
+                model_name=local_model_path,
+                cache_folder="./hf_cache",
+                batch_size=batch_size,
+                device=device
+            )
+            logger.log_model_loading("HuggingFace", model_name, "success")
+            return result
+            
+        elif provider.startswith("Ollama"):
+            clean_proxy()
+            logger.log_model_loading("Ollama", model_name, "success")
+            return OllamaEmbedding(model_name=model_name, base_url=api_url)
+            
+        elif provider.startswith("OpenAI"):
+            logger.log_model_loading("OpenAI", model_name, "success")
+            return OpenAIEmbedding(model=model_name, api_key=api_key, api_base=api_url)
+            
+    except Exception as e:
+        logger.log_model_loading(provider, model_name, "error", str(e)[:200])
+        terminal_logger.error(f"模型加载失败: {e}")
+        
+    return None
+
+
+def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: str = "", temperature: float = 0.7):
+    """
+    加载 LLM 模型
+    
+    Args:
+        provider: 供应商 (Ollama/OpenAI)
+        model_name: 模型名称
+        api_key: API密钥（OpenAI需要）
+        api_url: API地址
+        temperature: 温度参数
+    
+    Returns:
+        LLM 模型实例，失败返回 None
+    """
+    try:
+        if provider.startswith("Ollama"):
+            clean_proxy()
+            return Ollama(
+                model=model_name,
+                base_url=api_url,
+                request_timeout=360.0,
+                temperature=temperature
+            )
+            
+        elif provider.startswith("OpenAI"):
+            return OpenAI(
+                model=model_name,
+                api_key=api_key if api_key else "EMPTY",
+                api_base=api_url,
+                temperature=temperature,
+                request_timeout=120.0
+            )
+            
+    except Exception as e:
+        terminal_logger.error(f"LLM 加载失败: {e}")
+        
+    return None
+
+
+def set_global_embedding_model(provider: str, model_name: str, api_key: str = "", api_url: str = ""):
+    """
+    设置全局嵌入模型（Settings.embed_model）
+    
+    Returns:
+        bool: 是否设置成功
+    """
+    embed_model = load_embedding_model(provider, model_name, api_key, api_url)
+    if embed_model:
+        Settings.embed_model = embed_model
+        try:
+            dim = len(embed_model._get_text_embedding("test"))
+            terminal_logger.success(f"✅ 全局嵌入模型已设置: {model_name} ({dim}维)")
+        except:
+            terminal_logger.success(f"✅ 全局嵌入模型已设置: {model_name}")
+        return True
+    else:
+        terminal_logger.error(f"❌ 全局嵌入模型设置失败: {model_name}")
+        return False
+
+
+def set_global_llm_model(provider: str, model_name: str, api_key: str = "", api_url: str = "", temperature: float = 0.7):
+    """
+    设置全局 LLM 模型（Settings.llm）
+    
+    Returns:
+        bool: 是否设置成功
+    """
+    llm_model = load_llm_model(provider, model_name, api_key, api_url, temperature)
+    if llm_model:
+        Settings.llm = llm_model
+        terminal_logger.success(f"✅ 全局 LLM 已设置: {model_name}")
+        return True
+    else:
+        terminal_logger.error(f"❌ 全局 LLM 设置失败: {model_name}")
+        return False
