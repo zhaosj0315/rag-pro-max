@@ -123,6 +123,13 @@ from src.utils.model_utils import (
     get_model_dimension
 )
 
+# 引入 UI 展示组件 (Stage 3.1)
+from src.ui.display_components import (
+    render_message_stats,
+    render_source_references,
+    get_relevance_label
+)
+
 # ⚠️ 关键修复：强制使用本地模型，避免 OpenAI 默认
 # 临时设置环境变量，让 LlamaIndex 使用本地模型
 os.environ['LLAMA_INDEX_EMBED_MODEL'] = 'local'
@@ -377,15 +384,6 @@ for d in [HISTORY_DIR, UPLOAD_DIR]:
 
 defaults = load_config()
 
-def check_ollama_status(url):
-    try:
-        from utils.model_manager import clean_proxy
-        clean_proxy()
-        clean = url.replace("/api/chat", "").replace("/v1", "")
-        requests.get(clean, timeout=1.0)
-        return True
-    except: return False
-
 def fetch_remote_models(base_url, api_key):
     if not base_url: return None, "请填写 Base URL"
     clean_url = base_url.rstrip('/')
@@ -576,7 +574,7 @@ with st.sidebar:
                 if st.button("🔄", key="refresh_ollama_models", help="刷新模型列表", use_container_width=True):
                     if ollama_ok:
                         try:
-                            from utils.model_manager import clean_proxy
+                            from src.utils.model_manager import clean_proxy
                             clean_proxy()
                             client = ollama.Client(host=llm_url)
                             models_resp = client.list()
@@ -614,7 +612,7 @@ with st.sidebar:
             # 自动加载模型列表（首次）
             if ollama_ok and ("ollama_models" not in st.session_state or not st.session_state.ollama_models):
                 try:
-                    from utils.model_manager import clean_proxy
+                    from src.utils.model_manager import clean_proxy
                     clean_proxy()
                     client = ollama.Client(host=llm_url)
                     models_resp = client.list()
@@ -3081,41 +3079,13 @@ for msg_idx, msg in enumerate(st.session_state.messages):
     with st.chat_message(role, avatar=avatar):
         st.markdown(msg["content"])
         
-        # 显示统计信息（如果有）
+        # 显示统计信息（如果有）- 使用新组件 (Stage 3.1)
         if "stats" in msg and msg["stats"]:
-            s = msg["stats"]
-            # 优化统计显示 (P2 优化)
-            # 兼容旧版字段名
-            token_count = s.get('tokens', 0)
-            total_time = s.get('time', 0)
-            
-            # 1. 简单概览
-            stats_simple = f"⏱️ {total_time:.1f}秒 | 📝 约 {token_count} 字符"
-            st.caption(stats_simple)
-            
-            # 2. 详细信息 (折叠)
-            with st.expander("📊 详细统计", expanded=False):
-                tokens_per_sec = s.get('tokens_per_sec', 0)
-                st.caption(f"🚀 速度: {tokens_per_sec:.1f} tokens/s")
-                
-                prompt_tokens = s.get('prompt_tokens')
-                completion_tokens = s.get('completion_tokens')
-                if prompt_tokens:
-                    st.caption(f"📥 输入: {prompt_tokens} | 📤 输出: {completion_tokens}")
-                
-                cpu = s.get('cpu', 0)
-                mem = s.get('mem', 0)
-                gpu = s.get('gpu', 0)
-                st.caption(f"💻 资源: CPU {cpu:.1f}% | 内存 {mem:.1f}% | GPU {gpu:.1f}%")
+            render_message_stats(msg["stats"])
         
-        # 渲染引用源
+        # 渲染引用源 - 使用新组件 (Stage 3.1)
         if "sources" in msg:
-            with st.expander(f"📚 参考 {len(msg['sources'])} 个片段", expanded=False):
-                for src in msg["sources"]:
-                    score = src.get('score', 0)
-                    st.markdown(f"**{get_relevance_label(score)}** | 📄 `{src.get('file', '未知文件')}`")
-                    st.caption(f"> {src.get('text', '')}")
-                    st.divider()
+            render_source_references(msg["sources"], expanded=False)
         
         # 引用按钮 (P2 恢复功能)
         if role == "assistant":

@@ -20,11 +20,17 @@ def check_ollama_status(url):
         bool: 服务是否可用
     """
     try:
-        from utils.model_manager import clean_proxy
-        clean_proxy()
-        clean = url.replace("/api/chat", "").replace("/v1", "")
-        requests.get(clean, timeout=1.0)
-        return True
+        # 清理代理设置（如果可用）
+        try:
+            from utils.model_manager import clean_proxy
+            clean_proxy()
+        except:
+            pass
+        
+        clean = url.replace("/api/chat", "").replace("/v1", "").rstrip('/')
+        # 使用 Ollama 的健康检查端点
+        response = requests.get(f"{clean}/api/tags", timeout=2.0)
+        return response.status_code == 200
     except:
         return False
 

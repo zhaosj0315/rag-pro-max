@@ -337,41 +337,56 @@ open dist/RAG_Pro_Max.app
 
 ```
 .
-├── apppro.py                 # 主应用
-├── rag_engine.py             # RAG 核心引擎 ⭐
-├── system_monitor.py         # 系统监控工具
-├── file_processor.py         # 文档处理模块
-├── terminal_logger.py        # 终端日志模块
-├── logger.py                 # 日志系统
-├── kbllama                   # 命令行知识库工具
-├── utils/                    # 工具模块
-│   ├── memory.py             # 内存管理
-│   ├── model_manager.py      # 模型管理
-│   ├── document_processor.py # 文档处理
-│   ├── config_manager.py     # 配置管理
-│   ├── chat_manager.py       # 聊天历史管理
-│   ├── kb_manager.py         # 知识库管理
-│   ├── resource_monitor.py   # 资源监控 ⭐
-│   └── model_utils.py        # 模型工具 ⭐
+├── src/                      # 源代码目录
+│   ├── apppro.py             # 主应用
+│   ├── rag_engine.py         # RAG 核心引擎 ⭐
+│   ├── system_monitor.py     # 系统监控工具
+│   ├── file_processor.py     # 文档处理模块
+│   ├── terminal_logger.py    # 终端日志模块
+│   ├── logger.py             # 日志系统
+│   ├── metadata_manager.py   # 元数据管理
+│   ├── chat_utils_improved.py # 聊天工具
+│   ├── custom_embeddings.py  # 自定义嵌入
+│   └── utils/                # 工具模块
+│       ├── memory.py         # 内存管理
+│       ├── model_manager.py  # 模型管理
+│       ├── document_processor.py # 文档处理
+│       ├── config_manager.py # 配置管理
+│       ├── chat_manager.py   # 聊天历史管理
+│       ├── kb_manager.py     # 知识库管理
+│       ├── resource_monitor.py # 资源监控 ⭐
+│       ├── model_utils.py    # 模型工具 ⭐
+│       └── __init__.py       # 模块初始化
+├── tests/                    # 测试文件
+│   ├── factory_test.py       # 出厂测试
+│   ├── test_bm25.py          # BM25 测试
+│   ├── test_chat_engine.py   # 聊天引擎测试
+│   ├── test_rag_engine.py    # RAG 引擎测试
+│   ├── test_rerank.py        # 重排序测试
+│   └── test_utils_modules.py # 工具模块测试
+├── scripts/                  # 脚本文件
+│   ├── build_mac.sh          # macOS 打包脚本
+│   ├── docker-build.sh       # Docker 构建脚本
+│   ├── start.sh              # 启动脚本
+│   └── test.sh               # 测试脚本
 ├── config/                   # 配置文件（推荐）
 │   ├── app_config.json       # 应用配置
 │   ├── rag_config.json       # RAG 配置
 │   └── projects_config.json  # 项目配置
+├── kbllama                   # 命令行知识库工具
 ├── requirements.txt          # Python 依赖
-├── rag_config.json           # RAG 配置（根目录兼容）
-├── app_config.json           # 应用配置（根目录兼容）
-├── projects_config.json      # 项目配置（根目录兼容）
 ├── RAG_Pro_Max.spec          # PyInstaller 配置
-├── build_mac.sh              # macOS 打包脚本
-├── docker-build.sh           # Docker 构建脚本
 ├── Dockerfile                # Docker 镜像配置
 ├── docker-compose.yml        # Docker 编排配置
-├── vector_db_storage/        # 向量数据库存储
-├── chat_histories/           # 对话历史
-├── temp_uploads/             # 临时上传文件
-├── hf_cache/                 # HuggingFace 模型缓存
-├── app_logs/                 # 应用日志
-└── dist/                     # 打包输出
+├── README.md                 # 项目文档
+├── LICENSE                   # 许可证
+├── .gitignore                # Git 忽略文件
+├── vector_db_storage/        # 向量数据库存储（运行时生成）
+├── chat_histories/           # 对话历史（运行时生成）
+├── temp_uploads/             # 临时上传文件（运行时生成）
+├── hf_cache/                 # HuggingFace 模型缓存（运行时生成）
+├── app_logs/                 # 应用日志（运行时生成）
+└── dist/                     # 打包输出（构建时生成）
     └── RAG_Pro_Max.app       # macOS 应用
 ```
 
