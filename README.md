@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.1.5-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Docker-lightgrey.svg)
@@ -36,6 +36,7 @@
 
 ### 核心功能
 - 📄 **多格式支持**：PDF、TXT、DOCX、MD、XLSX、PPTX、CSV、HTML、JSON、ZIP
+- 🔍 **OCR识别**：扫描版PDF自动OCR，14核并行处理，无页数限制
 - 🔍 **语义检索**：基于向量数据库的智能检索
 - 🎯 **智能重排序 (Re-ranking)**：Cross-Encoder 二次排序，准确率提升 10-20%
 - 🔍 **关键词增强 (BM25)**：关键词 + 语义双重检索，准确率再提升 5-10%
@@ -610,6 +611,14 @@ A: 使用命令 `sudo python3 system_monitor.py`。Streamlit 内置监控只能�
 ---
 
 ## 📄 更新日志
+
+### v1.2.0 (2025-12-08)
+- 🔧 Stage 3 UI组件重构完成（-299行，-8.6%）
+- 📦 提取6个UI模块（display_components, model_selectors, config_forms, advanced_config）
+- 🏗️ 新增状态管理系统（state_manager.py, 138行）
+- ⚡ 修复OCR多进程调度问题（CPU 100%满载）
+- 🚀 移除OCR页数限制（50页→无限制）
+- ✅ 新增UI组件单元测试
 
 ### v1.1.5 (2025-12-08)
 - 🔧 Stage 2 重构完成

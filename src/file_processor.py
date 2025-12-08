@@ -64,6 +64,17 @@ import os
 # 支持的文件格式
 SUPPORTED_FORMATS = {'.pdf', '.txt', '.docx', '.md', '.xlsx', '.xls', '.csv', '.json'}
 
+# OCR多进程函数（必须在模块级别）
+def _ocr_page(args):
+    """OCR单页处理（用于多进程）"""
+    import pytesseract
+    idx, img = args
+    try:
+        text = pytesseract.image_to_string(img, lang='chi_sim+eng')
+        return idx, text.strip() if text else ""
+    except:
+        return idx, ""
+
 # 将文件加载函数移到模块级别（用于多进程）
 def _load_single_file(file_info):
     """单个文件加载函数（优化：直接读取文件内容，避免 SimpleDirectoryReader 开销）"""
@@ -154,26 +165,16 @@ def _load_single_file(file_info):
                     import multiprocessing as mp
                     from concurrent.futures import ProcessPoolExecutor
                     
-                    # 限制最多处理50页（多进程可以处理更多）
-                    max_pages = 50
-                    print(f"   🔍 检测到扫描版PDF，启动多进程OCR识别（最多{max_pages}页）...")
+                    # 不限制页数，处理所有页面（多进程并行）
+                    print(f"   🔍 检测到扫描版PDF，启动多进程OCR识别...")
                     
-                    images = convert_from_path(fp, first_page=1, last_page=max_pages, dpi=200)
+                    images = convert_from_path(fp, dpi=200)
                     print(f"   📄 共 {len(images)} 页，使用 {mp.cpu_count()} 进程并行OCR...")
-                    
-                    # 多进程OCR函数
-                    def ocr_page(args):
-                        idx, img = args
-                        try:
-                            text = pytesseract.image_to_string(img, lang='chi_sim+eng')
-                            return idx, text.strip() if text else ""
-                        except:
-                            return idx, ""
                     
                     # 并行处理
                     all_text = [""] * len(images)
                     with ProcessPoolExecutor(max_workers=mp.cpu_count()) as executor:
-                        results = executor.map(ocr_page, enumerate(images, 1))
+                        results = executor.map(_ocr_page, enumerate(images, 1))
                         for idx, text in results:
                             if text:
                                 all_text[idx-1] = f"--- 第{idx}页 ---\n{text}"
