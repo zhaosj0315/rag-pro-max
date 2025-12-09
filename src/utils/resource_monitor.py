@@ -6,12 +6,12 @@
 import psutil
 
 
-def check_resource_usage(threshold=80.0):
+def check_resource_usage(threshold=90.0):
     """
     检查系统资源使用率
     
     Args:
-        threshold: 资源使用阈值，默认80%
+        threshold: 资源使用阈值，默认90%
         
     Returns:
         tuple: (cpu%, mem%, gpu%, should_throttle)
@@ -81,7 +81,7 @@ def get_system_stats():
     return stats
 
 
-def should_throttle(cpu, mem, gpu, threshold=80.0):
+def should_throttle(cpu, mem, gpu, threshold=90.0):
     """
     判断是否需要限流
     
@@ -89,7 +89,7 @@ def should_throttle(cpu, mem, gpu, threshold=80.0):
         cpu: CPU 使用率
         mem: 内存使用率
         gpu: GPU 使用率
-        threshold: 阈值
+        threshold: 阈值，默认90%
         
     Returns:
         bool: 是否需要限流

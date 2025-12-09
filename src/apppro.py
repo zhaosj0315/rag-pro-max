@@ -48,7 +48,7 @@ import re
 import json
 import zipfile
 from datetime import datetime
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import multiprocessing as mp
 
 # 引入 LlamaIndex 核心
@@ -146,6 +146,9 @@ from src.ui.config_forms import render_basic_config
 # 引入状态管理器 (Stage 3.3)
 from src.core.state_manager import state
 
+# 引入文档处理器 (Stage 4.1)
+from src.processors import UploadHandler, IndexBuilder
+
 # ⚠️ 关键修复：强制使用本地模型，避免 OpenAI 默认
 # 临时设置环境变量，让 LlamaIndex 使用本地模型
 os.environ['LLAMA_INDEX_EMBED_MODEL'] = 'local'
@@ -159,32 +162,18 @@ def get_llm(provider, model, key, url, temp):
     """兼容旧代码的包装函数"""
     return load_llm_model(provider, model, key, url, temp)
 
-def _process_node_worker(args):
-    """多进程处理单个节点"""
-    node_data, kb_name = args
-    try:
-        metadata = node_data.get('metadata', {})
-        file_name = metadata.get('file_name', 'Unknown')
-        score = node_data.get('score', 0.0)
-        text = node_data.get('text', '')
-        
-        return {
-            "file": file_name, 
-            "score": score, 
-            "text": text[:150].replace("\n", " ") + "..."
-        }
-    except:
-        return None
-
 # 引入文件处理模块
 from src.file_processor import scan_directory_safe
 
-# 多进程函数：元数据提取（移到模块级别）
-def _extract_metadata_task(task):
-    """单个文件的元数据提取任务（多进程安全）"""
-    fp, fname, doc_ids, text_sample, persist_dir = task
-    temp_mgr = MetadataManager(persist_dir)
-    return fname, temp_mgr.add_file_metadata(fp, doc_ids, text_sample)
+# 引入并行执行模块
+from src.utils.parallel_executor import ParallelExecutor
+from src.utils.parallel_tasks import process_node_worker, extract_metadata_task
+
+# 引入聊天模块 (Stage 7)
+from src.chat import ChatEngine, SuggestionManager
+
+# 引入配置模块 (Stage 8)
+from src.config import ConfigLoader, ConfigValidator
 
 # 多进程函数：文档分块解析（移到模块级别）
 def _parse_single_doc(doc_text):
@@ -398,125 +387,8 @@ UPLOAD_DIR = "temp_uploads" # 临时上传目录
 for d in [HISTORY_DIR, UPLOAD_DIR]:
     if not os.path.exists(d): os.makedirs(d)
 
-defaults = load_config()
-
-def fetch_remote_models(base_url, api_key):
-    if not base_url: return None, "请填写 Base URL"
-    clean_url = base_url.rstrip('/')
-    endpoints = [f"{clean_url}/models", f"{clean_url}/v1/models"]
-    headers = {"Authorization": f"Bearer {api_key}" if api_key else "Bearer EMPTY"}
-    for url in endpoints:
-        try:
-            resp = requests.get(url, headers=headers, timeout=5)
-            if resp.status_code == 200:
-                data = resp.json()
-                if "data" in data and isinstance(data['data'], list):
-                    return [item['id'] for item in data['data']], None
-        except Exception as e: 
-            return None, f"连接失败或API错误: {e}"
-    return None, "未找到模型列表或路径错误"
-
-# --- 3. 核心初始化 (带缓存) ---
-def check_hf_model_exists(model_name):
-    """检查 HuggingFace 模型是否已下载到本地"""
-    cache_dir = "./hf_cache"
-    
-    # 方式1: 直接目录格式 (BAAI--bge-large-zh-v1.5)
-    model_dir1 = os.path.join(cache_dir, model_name.replace('/', '--'))
-    if os.path.exists(os.path.join(model_dir1, "config.json")):
-        return True
-    
-    # 方式2: HF Hub 缓存格式 (models--BAAI--bge-small-zh-v1.5)
-    model_dir2 = os.path.join(cache_dir, f"models--{model_name.replace('/', '--')}")
-    if os.path.exists(model_dir2):
-        return True
-    
-    return False
-
-def get_kb_embedding_dim(db_path):
-    """检测知识库的向量维度（带缓存）"""
-    # 1. 尝试从缓存获取
-    if 'kb_dimensions' not in st.session_state:
-        st.session_state.kb_dimensions = {}
-    
-    # 使用文件修改时间作为缓存键的一部分，确保知识库更新后缓存失效
-    kb_cache_key = f"{os.path.basename(db_path)}_dim"
-    try:
-        kb_info_file = os.path.join(db_path, ".kb_info.json")
-        if os.path.exists(kb_info_file):
-            mtime = os.path.getmtime(kb_info_file)
-            kb_cache_key = f"{os.path.basename(db_path)}_dim_{mtime}"
-            
-            # 清理旧缓存
-            keys_to_remove = [k for k in st.session_state.kb_dimensions if k.startswith(f"{os.path.basename(db_path)}_dim") and k != kb_cache_key]
-            for k in keys_to_remove:
-                del st.session_state.kb_dimensions[k]
-    except:
-        pass
-
-    if kb_cache_key in st.session_state.kb_dimensions:
-        return st.session_state.kb_dimensions[kb_cache_key]
-
-    print(f"🔍 开始检测维度: {db_path}")
-    
-    try:
-        # 方法0: 先检查保存的 KB 信息
-        import json
-        kb_info_file = os.path.join(db_path, ".kb_info.json")
-        if os.path.exists(kb_info_file):
-            try:
-                with open(kb_info_file, 'r') as f:
-                    kb_info = json.load(f)
-                    if 'embedding_dim' in kb_info:
-                        dim = kb_info['embedding_dim']
-                        model = kb_info.get('embedding_model', 'unknown')
-                        print(f"✅ 从 KB 信息读取维度: {dim}D (模型: {model})")
-                        st.session_state.kb_dimensions[kb_cache_key] = dim
-                        return dim
-            except Exception as e:
-                print(f"⚠️ 读取 KB 信息失败: {e}")
-        
-        # 方法1: 直接从 ChromaDB 读取维度
-        import chromadb
-        try:
-            client = chromadb.PersistentClient(path=db_path)
-            collections = client.list_collections()
-            print(f"📦 找到 {len(collections)} 个集合")
-            
-            if collections:
-                col = client.get_collection(collections[0].name)
-                data = col.get(limit=1, include=['embeddings'])
-                if data['embeddings'] and len(data['embeddings']) > 0:
-                    dim = len(data['embeddings'][0])
-                    print(f"✅ ChromaDB 检测到维度: {dim}D")
-                    st.session_state.kb_dimensions[kb_cache_key] = dim
-                    return dim
-        except Exception as e:
-            print(f"⚠️ ChromaDB 检测失败: {e}")
-        
-        # 方法2: 检查 vector_store.json
-        vector_store_path = os.path.join(db_path, "vector_store.json")
-        if os.path.exists(vector_store_path):
-            print(f"📄 检查 vector_store.json...")
-            with open(vector_store_path, 'r') as f:
-                data = json.load(f)
-                if 'embedding_dict' in data and data['embedding_dict']:
-                    first_embedding = next(iter(data['embedding_dict'].values()))
-                    if isinstance(first_embedding, list):
-                        dim = len(first_embedding)
-                        print(f"✅ JSON 检测到维度: {dim}D")
-                        st.session_state.kb_dimensions[kb_cache_key] = dim
-                        return dim
-        else:
-            print(f"❌ vector_store.json 不存在")
-        
-    except Exception as e:
-        print(f"❌ 维度检测异常: {e}")
-    
-    print(f"❌ 无法检测维度")
-    return None
-
-
+# 使用新的配置加载器 (Stage 8)
+defaults = ConfigLoader.load()
 
 def generate_doc_summary(doc_text, filename):
     """
@@ -546,17 +418,8 @@ with st.sidebar:
     st.markdown("### ⚡ 快速开始")
     
     if st.button("⚡ 一键配置（推荐新手）", type="primary", use_container_width=True, help="自动配置默认设置，1分钟开始使用"):
-        # 自动配置 Ollama
-        config = load_config()
-        config["llm_provider"] = "Ollama"
-        config["llm_url_ollama"] = "http://localhost:11434"
-        config["llm_model_ollama"] = "qwen2.5:7b"
-        
-        # 自动配置嵌入模型
-        config["embed_provider_idx"] = 0  # HuggingFace
-        config["embed_model_hf"] = "BAAI/bge-small-zh-v1.5"
-        
-        save_config(config)
+        # 使用新的配置加载器快速配置 (Stage 8)
+        ConfigLoader.quick_setup()
         st.success("✅ 已使用默认配置！\n\n💡 下一步：创建知识库 → 上传文档 → 开始对话")
         time.sleep(2)
         st.rerun()
@@ -763,7 +626,7 @@ with st.sidebar:
             label_visibility="collapsed"
         )
         
-        # 处理上传
+        # 处理上传 (Stage 4.1 - 使用 UploadHandler)
         if uploaded_files:
             if 'last_uploaded_names' not in st.session_state:
                 st.session_state.last_uploaded_names = []
@@ -772,102 +635,36 @@ with st.sidebar:
             
             # 只在文件列表变化时处理
             if set(current_names) != set(st.session_state.last_uploaded_names):
-                batch_dir = os.path.join(UPLOAD_DIR, f"batch_{int(time.time())}")
-                os.makedirs(batch_dir, exist_ok=True)
-                
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 
-                # 文件验证配置
-                MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
-                ALLOWED_EXTENSIONS = {'.pdf', '.txt', '.docx', '.md', '.xlsx', '.csv', '.pptx', '.html', '.json', '.zip'}
-                
-                success_count = 0
-                skipped_count = 0
-                skip_reasons = []
+                # 使用 UploadHandler 处理上传
+                handler = UploadHandler(UPLOAD_DIR, logger)
                 
                 for idx, f in enumerate(uploaded_files):
-                    try:
-                        status_text.text(f"验证中: {f.name} ({idx+1}/{len(uploaded_files)})")
-                        
-                        # 1. 检查文件大小
-                        if f.size > MAX_FILE_SIZE:
-                            skipped_count += 1
-                            skip_reasons.append(f"{f.name}: 超过100MB")
-                            continue
-                            
-                        # 2. 检查扩展名
-                        ext = os.path.splitext(f.name)[1].lower()
-                        if ext not in ALLOWED_EXTENSIONS:
-                            skipped_count += 1
-                            skip_reasons.append(f"{f.name}: 类型不支持 ({ext})")
-                            continue
-                            
-                        p = os.path.join(batch_dir, f.name)
-                        
-                        with open(p, "wb") as w: 
-                            w.write(f.getbuffer())
-                        
-                        # 处理 ZIP (带安全检查)
-                        if f.name.endswith('.zip'):
-                            try:
-                                with zipfile.ZipFile(p, 'r') as z: 
-                                    # 2.1 ZIP炸弹检查
-                                    total_size = sum(info.file_size for info in z.infolist())
-                                    if total_size > 500 * 1024 * 1024: # 解压后超过500MB
-                                        skipped_count += 1
-                                        skip_reasons.append(f"{f.name}: ZIP解压后过大(>500MB)")
-                                        os.remove(p)
-                                        continue
-                                    
-                                    # 2.2 路径遍历检查
-                                    is_safe = True
-                                    for info in z.infolist():
-                                        if info.filename.startswith('/') or '..' in info.filename:
-                                            is_safe = False
-                                            break
-                                    
-                                    if not is_safe:
-                                        skipped_count += 1
-                                        skip_reasons.append(f"{f.name}: ZIP包含非法路径")
-                                        os.remove(p)
-                                        continue
-                                        
-                                    z.extractall(batch_dir)
-                                os.remove(p)
-                            except Exception as e:
-                                skipped_count += 1
-                                skip_reasons.append(f"{f.name}: ZIP解压失败 {str(e)}")
-                                if os.path.exists(p): os.remove(p)
-                                continue
-                        
-                        logger.log_file_upload(f.name, "success")
-                        success_count += 1
-                        
-                        progress_bar.progress((idx + 1) / len(uploaded_files))
-                    except Exception as e:
-                        logger.log_file_upload(f.name, "error", str(e))
-                        skipped_count += 1
-                        skip_reasons.append(f"{f.name}: 系统错误")
+                    status_text.text(f"验证中: {f.name} ({idx+1}/{len(uploaded_files)})")
+                    progress_bar.progress((idx + 1) / len(uploaded_files))
+                
+                result = handler.process_uploads(uploaded_files)
                 
                 progress_bar.empty()
                 status_text.empty()
                 
                 st.session_state.last_uploaded_names = current_names
-                st.session_state.uploaded_path = os.path.abspath(batch_dir)
+                st.session_state.uploaded_path = os.path.abspath(result.batch_dir)
                 
                 # 显示上传结果
-                if success_count > 0:
-                    st.success(f"✅ 成功上传 {success_count} 个文件")
+                if result.success_count > 0:
+                    st.success(f"✅ 成功上传 {result.success_count} 个文件")
                 
-                if skipped_count > 0:
-                    st.warning(f"⚠️ 跳过 {skipped_count} 个文件")
+                if result.skipped_count > 0:
+                    st.warning(f"⚠️ 跳过 {result.skipped_count} 个文件")
                     with st.expander("查看跳过详情", expanded=False):
-                        for reason in skip_reasons:
+                        for reason in result.skip_reasons:
                             st.text(f"• {reason}")
                 
                 time.sleep(1)
-                if success_count > 0:
+                if result.success_count > 0:
                     st.rerun()
 
 
@@ -877,22 +674,8 @@ with st.sidebar:
         auto_name = ""
         if target_path:
             if os.path.exists(target_path):
-                # 统计文件信息
-                all_files = [f for r,d,fs in os.walk(target_path) for f in fs if not f.startswith('.')]
-                cnt = len(all_files)
-                
-                # 统计文件类型
-                file_types = {}
-                total_size = 0
-                for root, dirs, files in os.walk(target_path):
-                    for f in files:
-                        if not f.startswith('.'):
-                            ext = os.path.splitext(f)[1].upper() or 'OTHER'
-                            file_types[ext] = file_types.get(ext, 0) + 1
-                            try:
-                                total_size += os.path.getsize(os.path.join(root, f))
-                            except:
-                                pass
+                # 使用 UploadHandler 统计文件信息 (Stage 4.1)
+                cnt, file_types, total_size = UploadHandler.get_folder_stats(target_path)
                 
                 # 美化显示
                 size_mb = total_size / (1024 * 1024)
@@ -937,6 +720,16 @@ with st.sidebar:
         with st.expander("🔧 高级选项", expanded=False):
             force_reindex = st.checkbox("🔄 强制重建索引", False, help="删除现有索引，重新构建（用于修复损坏的索引）")
             st.caption("⚠️ 强制重建会删除现有的向量索引和文档片段，重新解析所有文档")
+            
+            st.write("")
+            st.markdown("**⚡ 性能选项**")
+            extract_metadata = st.checkbox(
+                "提取元数据（关键词、分类等）", 
+                value=False,
+                help="开启后提取文件分类、关键词等信息，但会降低 30% 处理速度"
+            )
+            if extract_metadata:
+                st.caption("📊 完整模式：提取元数据，可查看分类和关键词")
         
         st.write("")
         
@@ -1071,595 +864,101 @@ with st.sidebar:
 # ==========================================
 
 def process_knowledge_base_logic():
-    persist_dir = os.path.join(output_base, final_kb_name) 
-    index = None
-    docs = []
-    file_infos = []
+    """处理知识库逻辑 (Stage 4.2 - 使用 IndexBuilder)"""
+    persist_dir = os.path.join(output_base, final_kb_name)
     start_time = time.time()
 
-    # ⚠️ 关键修复：在处理开始时就设置嵌入模型
+    # 设置嵌入模型
     terminal_logger.info(f"🔧 设置嵌入模型: {embed_model} (provider: {embed_provider})")
     embed = get_embed(embed_provider, embed_model, embed_key, embed_url)
-    if embed:
-        Settings.embed_model = embed
-        try:
-            actual_dim = len(embed._get_text_embedding("test"))
-            terminal_logger.success(f"✅ 嵌入模型已设置: {embed_model} ({actual_dim}维)")
-        except:
-            terminal_logger.success(f"✅ 嵌入模型已设置: {embed_model}")
-    else:
+    if not embed:
         terminal_logger.error(f"❌ 嵌入模型加载失败: {embed_model}")
         raise ValueError(f"无法加载嵌入模型: {embed_model}")
+    
+    Settings.embed_model = embed
+    try:
+        actual_dim = len(embed._get_text_embedding("test"))
+        terminal_logger.success(f"✅ 嵌入模型已设置: {embed_model} ({actual_dim}维)")
+    except:
+        terminal_logger.success(f"✅ 嵌入模型已设置: {embed_model}")
 
     logger.log_kb_start(kb_name=final_kb_name)
     
+    # UI 状态容器
     status_container = st.status(f"🚀 处理知识库: {final_kb_name}", expanded=True)
     prog_bar = status_container.progress(0)
     status_container.write(f"⏱️ 开始时间: {datetime.now().strftime('%H:%M:%S')}")
-
-    # 步骤 1: 检查现有索引
-    terminal_logger.separator(f"知识库处理: {final_kb_name}")
-    terminal_logger.info(f"📂 [步骤 1/6] 检查现有索引...")
-    if not force_reindex and os.path.exists(persist_dir) and action_mode != "NEW":
-        try:
-            logger.log_kb_load_index(final_kb_name)
-            status_container.write("📂 [步骤1/6] 检查现有索引...")
-            
-            # 设置 embedding 模型确保兼容性
-            terminal_logger.info(f"🔧 创建知识库使用模型: {embed_model} (provider: {embed_provider})")
-            embed = get_embed(embed_provider, embed_model, embed_key, embed_url)
-            if embed:
-                Settings.embed_model = embed
-                actual_dim = len(embed._get_text_embedding("test"))
-                terminal_logger.info(f"✅ 模型维度: {actual_dim}")
-            else:
-                terminal_logger.error("❌ 嵌入模型加载失败！")
-            
-            storage_context = StorageContext.from_defaults(persist_dir=persist_dir)
-            index = load_index_from_storage(storage_context)
-            status_container.write("✅ 现有索引加载成功，将追加新文档")
-            terminal_logger.success("✅ [步骤 1/6] 现有索引加载成功，将追加新文档")
-            prog_bar.progress(10)
-        except Exception as e:
-            error_msg = str(e)
-            # 检查是否是维度不匹配错误
-            if "shapes" in error_msg and "not aligned" in error_msg:
-                status_container.write(f"⚠️  向量维度不匹配，清理旧索引")
-                terminal_logger.warning(f"⚠️  [步骤 1/6] 向量维度不匹配，转为新建模式")
-            else:
-                status_container.write(f"⚠️  索引损坏，转为新建模式")
-                terminal_logger.warning(f"⚠️  [步骤 1/6] 索引损坏，转为新建模式")
-            shutil.rmtree(persist_dir, ignore_errors=True)
-            index = None
-
-    current_target_path = st.session_state.get('uploaded_path') or st.session_state.path_input
     
+    # 回调函数：更新 UI
+    def status_callback(msg_type, *args):
+        if msg_type == "step":
+            step_num, step_desc = args
+            status_container.write(f"📂 [步骤{step_num}/6] {step_desc}")
+            terminal_logger.info(f"📂 [步骤 {step_num}/6] {step_desc}")
+            prog_bar.progress(step_num * 15)
+        elif msg_type == "info":
+            info_msg = args[0]
+            status_container.write(f"   {info_msg}")
+            terminal_logger.info(f"   {info_msg}")
+        elif msg_type == "warning":
+            warn_msg = args[0]
+            status_container.write(f"   ⚠️  {warn_msg}")
+            terminal_logger.warning(f"   ⚠️  {warn_msg}")
+    
+    # 获取源路径
+    current_target_path = st.session_state.get('uploaded_path') or st.session_state.path_input
     if not current_target_path or not os.path.exists(current_target_path):
         status_container.update(label="❌ 路径无效", state="error")
         terminal_logger.error(f"❌ 路径无效: {current_target_path}")
         raise ValueError(f"路径无效: {current_target_path}")
-
-    # 步骤 2: 扫描文件
-    terminal_logger.info(f"📁 [步骤 2/6] 扫描文件夹: {os.path.basename(current_target_path)}")
-    logger.log_kb_scan_path(current_target_path, kb_name=final_kb_name)
-    status_container.write(f"📁 [步骤2/6] 扫描文件夹: {os.path.basename(current_target_path)}")
     
-    # 先快速统计文件数量
-    all_files = []
-    for root, _, filenames in os.walk(current_target_path):
-        for f in filenames:
-            if not f.startswith('.'):
-                all_files.append(os.path.join(root, f))
+    # 使用 IndexBuilder 构建索引
+    builder = IndexBuilder(
+        kb_name=final_kb_name,
+        persist_dir=persist_dir,
+        embed_model=embed,
+        embed_model_name=embed_model,
+        extract_metadata=extract_metadata,  # 传递性能选项
+        logger=logger,
+        terminal_logger=terminal_logger
+    )
     
-    total_files = len(all_files)
-    status_container.write(f"   📊 发现 {total_files} 个文件")
-    terminal_logger.success(f"✅ [步骤 2/6] 扫描完成: 发现 {total_files} 个文件")
-    prog_bar.progress(20)
+    result = builder.build(
+        source_path=current_target_path,
+        force_reindex=force_reindex,
+        action_mode=action_mode,
+        status_callback=status_callback
+    )
     
-    # 步骤 3: 读取文档
-    terminal_logger.info(f"📖 [步骤 3/6] 读取文档内容 (共 {total_files} 个文件)")
-    status_container.write(f"📖 [步骤3/6] 读取文档内容 (共 {total_files} 个文件)")
-    if total_files > 10:
-        status_container.write(f"   🚀 250 线程并行读取 | 批量 5 个文件 | 目标 < 80% 资源")
-        terminal_logger.info(f"   🚀 启用 250 线程并行读取")
+    if not result.success:
+        status_container.update(label=f"❌ 处理失败: {result.error}", state="error")
+        terminal_logger.error(f"❌ 处理失败: {result.error}")
+        raise ValueError(result.error)
     
-    # 创建一个占位符用于实时更新
-    progress_placeholder = status_container.empty()
+    # 保存索引
+    if result.index:
+        result.index.storage_context.persist(persist_dir=persist_dir)
+        terminal_logger.success(f"💾 索引已保存到: {persist_dir}")
     
-    docs, process_result = scan_directory_safe(current_target_path)
-    summary = process_result.get_summary()
-    
-    if summary['success'] == 0:
-        status_container.update(label="❌ 没有可处理的文件", state="error")
-        raise ValueError(f"没有成功读取的文件。{process_result.get_report()}")
-    
-    # 计算总数和成功率
-    total_files = summary['success'] + summary['failed'] + summary['skipped']
-    success_rate = (summary['success'] / total_files * 100) if total_files > 0 else 0
-    
-    status_container.write(f"✅ 读取完成: {summary['success']}/{total_files} 个文件 ({success_rate:.1f}%)，{summary['total_docs']} 个文档片段")
-    terminal_logger.success(f"✅ [步骤 3/6] 读取完成: {summary['success']}/{total_files} 个文件，{summary['total_docs']} 个文档片段")
-    if summary['failed'] > 0:
-        status_container.write(f"   ⚠️  失败: {summary['failed']} 个文件 ({summary['failed']/total_files*100:.1f}%)")
-        terminal_logger.warning(f"   ⚠️  失败: {summary['failed']} 个文件")
-    if summary['skipped'] > 0:
-        status_container.write(f"   ⏭️  跳过: {summary['skipped']} 个文件 ({summary['skipped']/total_files*100:.1f}%)")
-        terminal_logger.info(f"   ⏭️  跳过: {summary['skipped']} 个文件")
-    prog_bar.progress(40)
-    
-    # 步骤 4: 构建文件清单
-    terminal_logger.info(f"📋 [步骤 4/6] 构建文件清单...")
-    status_container.write(f"📋 [步骤4/6] 构建文件清单...")
-    
-    # 初始化元数据管理器
-    metadata_mgr = MetadataManager(persist_dir)
-    
-    temp_file_map = {}
-    for root, _, filenames in os.walk(current_target_path):
-        for f in filenames:
-            if not f.startswith('.'):
-                fp = os.path.join(root, f)
-                info = get_file_info(fp, metadata_mgr); info['doc_ids'] = []
-                temp_file_map[f] = info
-    
-    file_count = len(temp_file_map)
-    logger.log_kb_read_success(len(docs), file_count=file_count, kb_name=final_kb_name)
-    status_container.write(f"✅ 清单完成: {file_count} 个文件已登记")
-    terminal_logger.success(f"✅ [步骤 4/6] 清单完成: {file_count} 个文件已登记")
-    logger.log_kb_manifest(file_count, kb_name=final_kb_name)
-    prog_bar.progress(50)
-    
-    # 步骤 5: 解析文档片段（快速模式 + 后台摘要 + 元数据提取）
-    terminal_logger.info(f"🔍 [步骤 5/6] 解析文档片段 (共 {len(docs)} 个)")
-    terminal_logger.info(f"   📋 任务: 映射文档ID → 文件清单 + 元数据提取")
-    status_container.write(f"🔍 [步骤5/6] 解析文档片段 (共 {len(docs)} 个)")
-    
-    step5_start = time.time()
-    # 快速映射文档ID + 提取元数据
-    file_text_samples = {}  # 收集每个文件的文本样本
-    for d in docs:
-        fname = d.metadata.get('file_name')
-        if fname and fname in temp_file_map:
-            temp_file_map[fname]['doc_ids'].append(d.doc_id)
-            # 收集文本样本用于元数据提取
-            if fname not in file_text_samples and d.text.strip():
-                file_text_samples[fname] = d.text[:1000]  # 前1000字用于分析
-    
-    # 批量处理元数据（多进程加速）
-    status_container.write(f"   🔖 提取元数据: 哈希/关键词/分类... ({len(file_text_samples)} 个文件)")
-    terminal_logger.info(f"   🔖 提取元数据: {len(file_text_samples)} 个文件")
-    
-    if len(file_text_samples) > 100:
-        # 大量文件，使用多进程
-        import multiprocessing as mp
-        
-        # 准备任务列表
-        tasks = []
-        for fname, text_sample in file_text_samples.items():
-            if fname in temp_file_map:
-                fp = os.path.join(current_target_path, fname)
-                if os.path.exists(fp):
-                    doc_ids = temp_file_map[fname]['doc_ids']
-                    tasks.append((fp, fname, doc_ids, text_sample, persist_dir))
-        
-        # 多进程处理
-        num_workers = min(mp.cpu_count(), 12)  # 最多12进程
-        status_container.write(f"   ⚡ 使用 {num_workers} 进程并行提取...")
-        terminal_logger.info(f"   ⚡ 使用 {num_workers} 进程并行提取元数据")
-        
-        with mp.Pool(processes=num_workers) as pool:
-            results = pool.map(_extract_metadata_task, tasks, chunksize=50)
-        
-        # 更新结果
-        metadata_count = 0
-        for fname, meta in results:
-            if fname in temp_file_map:
-                temp_file_map[fname].update({
-                    'file_hash': meta.get('file_hash', ''),
-                    'keywords': meta.get('keywords', []),
-                    'language': meta.get('language', 'unknown'),
-                    'category': meta.get('category', '其他文档')
-                })
-                metadata_count += 1
-        
-        terminal_logger.success(f"   ✅ 元数据提取完成: {metadata_count} 个文件")
-    else:
-        # 少量文件，单线程处理
-        terminal_logger.info(f"   📝 单线程处理 {len(file_text_samples)} 个文件")
-        metadata_count = 0
-        for fname, text_sample in file_text_samples.items():
-            if fname in temp_file_map:
-                fp = os.path.join(current_target_path, fname)
-                if os.path.exists(fp):
-                    doc_ids = temp_file_map[fname]['doc_ids']
-                    meta = metadata_mgr.add_file_metadata(fp, doc_ids, text_sample)
-                    temp_file_map[fname].update({
-                        'file_hash': meta.get('file_hash', ''),
-                        'keywords': meta.get('keywords', []),
-                        'language': meta.get('language', 'unknown'),
-                        'category': meta.get('category', '其他文档')
-                    })
-                    metadata_count += 1
-    
-    if metadata_count > 0:
-        status_container.write(f"   ✅ 元数据提取完成: {metadata_count} 个文件")
-        terminal_logger.success(f"   ✅ 元数据提取完成: {metadata_count} 个文件")
-    
-    # 收集需要生成摘要的文档
-    summary_tasks = []
-    for d in docs:
-        fname = d.metadata.get('file_name')
-        if fname and fname in temp_file_map and d.text.strip() and not temp_file_map[fname].get('summary'):
-            summary_tasks.append((fname, d.text[:2000]))  # 只保存前2000字
-    
-    if summary_tasks:
-        status_container.write(f"   💡 摘要生成已加入后台队列 ({len(summary_tasks)} 个文件)")
-        status_container.write(f"   ⚡ 知识库将立即完成，摘要在后台生成")
-        
-        # 保存摘要任务到文件，供后台处理
-        summary_queue_file = os.path.join(persist_dir, "summary_queue.json")
-        os.makedirs(persist_dir, exist_ok=True)
-        
-        # 清理文本中的特殊字符
-        def clean_text(text):
-            try:
-                # 移除代理对字符（surrogate pairs）
-                return text.encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')
-            except:
-                return ""
-        
-        cleaned_tasks = [(fname, clean_text(text)) for fname, text in summary_tasks]
-        
-        with open(summary_queue_file, 'w', encoding='utf-8', errors='ignore') as f:
-            json.dump({
-                'tasks': cleaned_tasks,
-                'total': len(cleaned_tasks),
-                'completed': 0
-            }, f, ensure_ascii=False)
-    
-    file_infos = list(temp_file_map.values())
-    valid_docs = [d for d in docs if d.text and d.text.strip()]
-    status_container.write(f"✅ 解析完成: {len(valid_docs)} 个有效片段")
-    prog_bar.progress(70)
-    
-    logger.log_kb_parse_complete(valid_count=len(valid_docs), kb_name=final_kb_name)
-    
-    if not valid_docs:
-        status_container.update(label="❌ 文档内容为空", state="error")
-        raise ValueError("路径下文档内容为空")
-    
-    if not valid_docs:
-        status_container.update(label="❌ 文档内容为空", state="error")
-        raise ValueError("路径下文档内容为空")
-
-    # 步骤 6: 向量化和索引构建
-    terminal_logger.info(f"⚡️ [步骤 6/6] 向量化和索引构建...")
-    if index and action_mode == "APPEND":
-        logger.log_kb_mode("append", kb_name=final_kb_name)
-        terminal_logger.info(f"➕ [步骤 6/6] 追加模式: 插入新文档到现有索引")
-        status_container.write(f"➕ [步骤6/6] 追加模式: 插入新文档到现有索引")
-        for i, d in enumerate(valid_docs):
-            index.insert(d)
-            if (i + 1) % 10 == 0:
-                prog_bar.progress(70 + int((i + 1) / len(valid_docs) * 20))
-    else:
-        logger.log_kb_mode("new", kb_name=final_kb_name)
-        step6_start = time.time()
-        terminal_logger.info(f"⚡️ [步骤 6/6] 新建模式: 构建向量索引")
-        terminal_logger.info(f"   📋 任务清单:")
-        terminal_logger.info(f"      1️⃣  文档分块 ({len(valid_docs)} 个文档)")
-        terminal_logger.info(f"      2️⃣  向量化 (GPU加速)")
-        terminal_logger.info(f"      3️⃣  构建索引")
-        status_container.write(f"⚡️ [步骤6/6] 新建模式: 构建向量索引")
-        status_container.write(f"   🚀 多核加速启动中...")
-        if os.path.exists(persist_dir): shutil.rmtree(persist_dir, ignore_errors=True)
-        parser = SentenceSplitter(chunk_size=512, chunk_overlap=50)
-        
-        # 多线程并行处理（针对 M4 Max 优化：10性能核+4效率核）
-        status_container.write(f"   🔥 多线程并行已启用 (共 {len(valid_docs)} 个文档)")
-        terminal_logger.processing(f"🚀 [6.1] 多线程并行处理 {len(valid_docs)} 个文档...")
-        
-        # 动态计算线程数 - 根据CPU核心数和当前负载
-        import psutil
-        cpu_count = psutil.cpu_count(logical=True)
-        current_cpu = psutil.cpu_percent(interval=0.5)
-        current_mem = psutil.virtual_memory().percent
-        
-        # 目标：保持总资源使用在80%以内
-        target_usage = 80.0
-        available_cpu = max(10, target_usage - current_cpu)  # 至少保留10%
-        available_mem = max(10, target_usage - current_mem)
-        
-        # 根据可用资源动态调整线程数
-        if available_cpu > 30 and available_mem > 50:
-            # 资源充足，激进使用
-            num_workers = min(cpu_count * 6, 80)  # 最多80个线程
-        elif available_cpu > 20 and available_mem > 30:
-            # 资源适中
-            num_workers = min(cpu_count * 4, 60)
-        elif available_cpu > 10 and available_mem > 20:
-            # 资源紧张
-            num_workers = min(cpu_count * 2, 40)
-        else:
-            # 资源非常紧张
-            num_workers = max(cpu_count, 20)
-        
-        status_container.write(f"   💻 {num_workers} 个线程运行中 (动态调整: CPU可用{available_cpu:.0f}%, 内存可用{available_mem:.0f}%)...")
-        terminal_logger.info(f"   💻 启用 {num_workers} 个并行线程（动态调整，目标资源<80%）")
-        terminal_logger.info(f"   📊 当前状态: CPU {current_cpu:.1f}%, 内存 {current_mem:.1f}%")
-        
-        terminal_logger.cpu_multicore_start(num_workers)
-        parse_start = time.time()
-        
-        # 提取文档文本
-        doc_texts = [doc.text for doc in valid_docs]
-        
-        status_container.write(f"   📦 正在分块处理...")
-        
-        # 创建实时进度占位符
-        chunk_progress = status_container.empty()
-        
-        all_chunks = []
-        processed_count = 0
-        
-        # 批量处理：小批次高并发
-        docs_per_batch = max(10, len(doc_texts) // (num_workers * 8))  # 每批10-30个
-        batches = [doc_texts[i:i + docs_per_batch] for i in range(0, len(doc_texts), docs_per_batch)]
-        
-        chunk_progress.write(f"      📦 分成 {len(batches)} 批，每批约 {docs_per_batch} 个文档")
-        terminal_logger.info(f"   📦 分成 {len(batches)} 批处理")
-        
-        with ThreadPoolExecutor(max_workers=num_workers) as executor:
-            futures = [executor.submit(_parse_batch_docs, batch) for batch in batches]
-            for i, future in enumerate(as_completed(futures)):
-                try:
-                    chunks = future.result()
-                    all_chunks.extend(chunks)
-                    processed_count += len(batches[i])
-                    
-                    # 计算预计完成时间
-                    elapsed = time.time() - parse_start
-                    if processed_count > 0:
-                        avg_time_per_doc = elapsed / processed_count
-                        remaining_docs = len(doc_texts) - processed_count
-                        eta_seconds = avg_time_per_doc * remaining_docs
-                        eta_str = f"{int(eta_seconds)}s" if eta_seconds < 60 else f"{int(eta_seconds/60)}m{int(eta_seconds%60)}s"
-                    else:
-                        eta_str = "计算中..."
-                    
-                    # 实时更新进度
-                    percent = int((processed_count / len(doc_texts)) * 100)
-                    chunk_progress.write(f"      ⚡ 已处理: {processed_count}/{len(doc_texts)} ({percent}%) | 已生成 {len(all_chunks)} 个节点 | 预计剩余: {eta_str}")
-                    
-                    prog_bar.progress(70 + int((processed_count / len(doc_texts)) * 10))
-                    
-                    if i % 5 == 0:
-                        terminal_logger.cpu_multicore_status(processed_count, len(doc_texts))
-                        terminal_logger.info(f"   ⏱️  预计剩余: {eta_str}")
-                        
-                        # 检查资源使用，超过90%则暂停
-                        cpu, mem, gpu, should_throttle = check_resource_usage()
-                        if should_throttle:
-                            import time as time_module
-                            terminal_logger.warning(f"⚠️  资源使用过高 (CPU: {cpu:.1f}%, 内存: {mem:.1f}%, GPU: {gpu:.1f}%)，暂停1秒...")
-                            time_module.sleep(1)
-                            
-                except Exception as e:
-                    terminal_logger.error(f"批次解析失败: {e}")
-        
-        parse_elapsed = time.time() - parse_start
-        terminal_logger.cpu_multicore_end(len(doc_texts), parse_elapsed)
-        
-        # 转换为 TextNode 对象
-        from llama_index.core.schema import TextNode
-        nodes = [TextNode(text=chunk['text']) for chunk in all_chunks]
-        
-        # 释放内存
-        del all_chunks
-        del doc_texts
-        cleanup_memory()
-        status_container.write(f"   🧹 内存清理完成")
-        
-        chunk_progress.empty()  # 清除进度占位符
-        status_container.write(f"   ✅ 分块完成: {len(nodes)} 个节点 (耗时 {parse_elapsed:.1f}s)")
-        prog_bar.progress(80)
-        
-        # GPU 向量化（最大化 GPU 利用率，不超过 90%）
-        status_container.write(f"   🎮 GPU 向量化处理中...")
-        status_container.write(f"      正在将 {len(nodes)} 个节点转换为向量...")
-        terminal_logger.processing(f"🚀 [6.2] GPU 批量构建索引 (目标 GPU 利用率 <90%)...")
-        terminal_logger.info(f"   📋 当前任务: 向量化 {len(nodes)} 个节点")
-        vector_start = time.time()
-        
-        # 动态批次大小：优化GPU利用率（更小的batch，更频繁的GPU调用）
-        import psutil
-        total_mem_gb = psutil.virtual_memory().total / (1024**3)
-        available_mem_gb = psutil.virtual_memory().available / (1024**3)
-        
-        # 优化策略：较小的batch_size，让GPU持续工作
-        if len(nodes) > 500000:  # 超大规模
-            batch_size = 50000   # 5万（原20万）
-        elif len(nodes) > 200000:  # 大规模
-            batch_size = 30000   # 3万（原15万）
-        elif len(nodes) > 100000:  # 中大规模
-            batch_size = 20000   # 2万（原10万）
-        elif len(nodes) > 50000:  # 中等规模
-            batch_size = 15000   # 1.5万（原8万）
-        else:  # 小规模
-            batch_size = 10000   # 1万（原5万）
-        
-        # 内存保护：如果可用内存不足，降低 batch_size
-        if available_mem_gb < 3:
-            batch_size = min(batch_size, 5000)
-        elif available_mem_gb < 8:
-            batch_size = min(batch_size, 10000)
-        
-        # 确保至少分 5 批（让GPU持续工作）
-        if len(nodes) > batch_size and total_batches < 5:
-            batch_size = len(nodes) // 5
-            
-        total_batches = (len(nodes) + batch_size - 1) // batch_size
-        
-        status_container.write(f"      📦 分 {total_batches} 批处理，每批 {batch_size} 个节点")
-        terminal_logger.info(f"   📦 分 {total_batches} 批处理 (batch_size={batch_size})")
-        terminal_logger.info(f"   🎯 目标: 最大化 GPU 利用率 (<90%)")
-        vector_progress = status_container.empty()
-        
-        # 创建索引（第一批）
-        first_batch = nodes[:batch_size]
-        
-        # 估算总时间（基于经验值：约 0.01-0.02s/节点）
-        estimated_total_time = len(nodes) * 0.015
-        eta_str = f"{int(estimated_total_time)}s" if estimated_total_time < 60 else f"{int(estimated_total_time/60)}m{int(estimated_total_time%60)}s"
-        
-        vector_progress.write(f"      ⚡ 处理第 1/{total_batches} 批 ({len(first_batch)} 个节点) | 预计总耗时: {eta_str}")
-        terminal_logger.info(f"   ⚡ 处理第 1/{total_batches} 批 | 预计总耗时: {eta_str}")
-        index = VectorStoreIndex(first_batch, show_progress=False)
-        
-        # 追加剩余批次（动态调整 batch_size）
-        current_batch_size = batch_size
-        for i in range(1, total_batches):
-            # 计算预计完成时间
-            elapsed = time.time() - vector_start
-            avg_time_per_batch = elapsed / i
-            remaining_batches = total_batches - i
-            eta_seconds = avg_time_per_batch * remaining_batches
-            eta_str = f"{int(eta_seconds)}s" if eta_seconds < 60 else f"{int(eta_seconds/60)}m{int(eta_seconds%60)}s"
-            
-            # 检查资源使用
-            import psutil
-            import time as time_module
-            mem_percent = psutil.virtual_memory().percent
-            cpu_percent = psutil.cpu_percent(interval=0.1)
-            
-            # 检查 GPU
-            gpu_percent = 0.0
-            try:
-                import torch
-                if torch.backends.mps.is_available():
-                    gpu_percent = min(90.0, mem_percent * 0.8)
-                elif torch.cuda.is_available():
-                    gpu_mem = torch.cuda.memory_allocated() / torch.cuda.get_device_properties(0).total_memory * 100
-                    gpu_percent = gpu_mem
-            except:
-                pass
-            
-            # 动态调整策略：GPU 利用率低且内存充足，尝试增大 batch
-            if i > 2 and gpu_percent < 60 and mem_percent < 70:
-                # GPU 利用率低，可以增大 batch_size
-                if i % 3 == 0:  # 每 3 批检查一次
-                    old_batch = current_batch_size
-                    current_batch_size = min(int(current_batch_size * 2), 300000)  # 翻倍，最大 30万
-                    if current_batch_size != old_batch:
-                        terminal_logger.info(f"   📈 动态调整: batch_size {old_batch} → {current_batch_size} (GPU 利用率低)")
-            
-            if mem_percent > 90 or cpu_percent > 90 or gpu_percent > 90:
-                vector_progress.write(f"      ⏸️  资源使用过高 (CPU: {cpu_percent:.1f}%, 内存: {mem_percent:.1f}%, GPU: {gpu_percent:.1f}%)，等待...")
-                terminal_logger.warning(f"   ⚠️  资源超过90%阈值，暂停2秒...")
-                time_module.sleep(2)
-            
-            start_idx = i * batch_size
-            end_idx = min((i + 1) * batch_size, len(nodes))
-            batch = nodes[start_idx:end_idx]
-            
-            percent = int((i / total_batches) * 100)
-            vector_progress.write(f"      ⚡ 处理第 {i+1}/{total_batches} 批 ({percent}%) | {len(batch)} 个节点 | CPU: {cpu_percent:.1f}% | 内存: {mem_percent:.1f}% | GPU: {gpu_percent:.1f}% | 预计剩余: {eta_str}")
-            
-            if i % 5 == 0:
-                terminal_logger.info(f"   📊 进度: {i+1}/{total_batches} ({percent}%) | 预计剩余: {eta_str}")
-            
-            # 批量插入（使用 insert_nodes 而不是逐个 insert）
-            index.insert_nodes(batch)
-        
-        vector_elapsed = time.time() - vector_start
-        vector_progress.empty()
-        status_container.write(f"   ✅ 向量化完成: {len(nodes)} 个节点 → 向量数据库 (耗时 {vector_elapsed:.1f}s)")
-        terminal_logger.success(f"✅ [6.2] 向量化完成: 耗时 {vector_elapsed:.1f}s")
-        terminal_logger.success(f"✅ 索引构建完成")
-    
-    prog_bar.progress(90)
-    
-    # 持久化存储
-    terminal_logger.info(f"💾 持久化存储: {final_kb_name}")
-    logger.log_kb_persist("persisting", kb_name=final_kb_name)
-    status_container.write(f"💾 保存到磁盘...")
-    status_container.write(f"   路径: {persist_dir}")
-    if not os.path.exists(output_base): os.makedirs(output_base)
-    index.storage_context.persist(persist_dir=persist_dir)
-    update_manifest(persist_dir, file_infos, is_append=(action_mode == "APPEND"), embed_model=embed_model)
-    logger.log_kb_persist("success", kb_name=final_kb_name)
-    status_container.write(f"   ✅ 保存成功")
-    terminal_logger.success(f"✅ 存储完成 [知识库: {final_kb_name}]")
-
+    # 更新进度
     prog_bar.progress(100)
-    elapsed = time.time() - start_time
     
-    # 显示完成摘要
-    terminal_logger.separator(f"处理完成")
-    terminal_logger.success(f"✅ 知识库处理完成: {final_kb_name}")
+    # 计算耗时
+    duration = time.time() - start_time
+    terminal_logger.separator("处理完成")
+    terminal_logger.success(f"✅ 知识库 '{final_kb_name}' 处理完成")
+    terminal_logger.info(f"📊 统计: {result.file_count} 个文件, {result.doc_count} 个文档片段")
+    terminal_logger.info(f"⏱️  耗时: {duration:.1f} 秒")
     
-    # 计算详细统计
-    end_time_obj = datetime.now()
-    start_time_obj = datetime.fromtimestamp(start_time)
-    docs_per_sec = len(valid_docs) / elapsed if elapsed > 0 else 0
+    logger.log_kb_complete(
+        kb_name=final_kb_name,
+        doc_count=result.doc_count
+    )
     
-    terminal_logger.data_summary("处理统计", {
-        "知识库": final_kb_name,
-        "文件数": file_count,
-        "文档片段": len(valid_docs),
-        "向量节点": len(nodes) if 'nodes' in locals() else 'N/A',
-        "模式": "追加" if action_mode == "APPEND" else "新建"
-    })
-    terminal_logger.data_summary("时间统计", {
-        "开始时间": start_time_obj.strftime('%H:%M:%S'),
-        "结束时间": end_time_obj.strftime('%H:%M:%S'),
-        "总耗时": f"{elapsed:.2f}s ({elapsed/60:.1f}分钟)",
-        "处理速度": f"{docs_per_sec:.1f} 文档/秒"
-    })
-    # 计算结束时间和各阶段耗时
-    end_time = datetime.now()
-    start_time_obj = datetime.fromtimestamp(start_time)
-    
-    # 计算平均速度
-    docs_per_sec = len(valid_docs) / elapsed if elapsed > 0 else 0
-    nodes_per_sec = len(nodes) / elapsed if elapsed > 0 and 'nodes' in locals() else 0
-    
-    status_container.write(f"")
-    status_container.write(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    status_container.write(f"✅ 处理完成!")
-    status_container.write(f"")
-    status_container.write(f"📊 统计信息:")
-    status_container.write(f"   📁 文件数: {file_count}")
-    status_container.write(f"   📄 文档片段: {len(valid_docs)}")
-    status_container.write(f"   🔢 向量节点: {len(nodes) if 'nodes' in locals() else 'N/A'}")
-    if 'summary' in locals() and summary.get('failed', 0) > 0:
-        status_container.write(f"   ⚠️  失败: {summary['failed']} 个文件")
-    if 'summary' in locals() and summary.get('skipped', 0) > 0:
-        status_container.write(f"   ⏭️  跳过: {summary['skipped']} 个文件")
-    status_container.write(f"")
-    status_container.write(f"⏱️  时间统计:")
-    status_container.write(f"   🕐 开始时间: {start_time_obj.strftime('%H:%M:%S')}")
-    status_container.write(f"   🕐 结束时间: {end_time.strftime('%H:%M:%S')}")
-    status_container.write(f"   ⏱️  总耗时: {elapsed/60:.1f} 分钟 ({elapsed:.0f}秒)")
-    status_container.write(f"   ⚡ 处理速度: {docs_per_sec:.1f} 文档/秒")
-    if 'parse_start' in locals() and 'vector_start' in locals():
-        parse_time = vector_start - parse_start if 'vector_start' in locals() else 0
-        vector_time = locals().get('vector_elapsed', 0)
-        status_container.write(f"")
-        status_container.write(f"📈 阶段耗时:")
-        status_container.write(f"   📦 文档分块: {parse_time:.1f}秒")
-        status_container.write(f"   🎮 GPU向量化: {vector_time:.1f}秒")
-    status_container.write(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    
-    logger.log_kb_complete(kb_name=final_kb_name, doc_count=len(valid_docs))
     status_container.update(label=f"✅ 知识库 '{final_kb_name}' 处理完成", state="complete", expanded=False)
     
-    # 显示详细处理报告
-    with st.expander("📊 文件处理详情", expanded=False):
-        st.markdown(process_result.get_report())
-    
     time.sleep(0.5)
-    return len(valid_docs)
+    return result.doc_count
 
 # ==========================================
 # 6. 聊天界面 & 无限追问功能
@@ -1676,6 +975,7 @@ if "suggestions_history" not in st.session_state: st.session_state.suggestions_h
 if "is_processing" not in st.session_state: st.session_state.is_processing = False 
 if "quote_content" not in st.session_state: st.session_state.quote_content = None # 引用内容初始化
 if "first_time_guide_shown" not in st.session_state: st.session_state.first_time_guide_shown = False
+if "question_queue" not in st.session_state: st.session_state.question_queue = []  # 问题队列
 
 # 首次使用引导
 if not st.session_state.first_time_guide_shown and len(existing_kbs) == 0:
@@ -1704,9 +1004,47 @@ if not st.session_state.first_time_guide_shown and len(existing_kbs) == 0:
         st.rerun()
 
 def click_btn(q):
-    st.session_state.prompt_trigger = q
-    st.session_state.suggestions_history = []
+    """点击追问按钮，将问题加入队列（去重）"""
+    if st.session_state.chat_engine:
+        # 检查队列中是否已存在相同问题
+        if q not in st.session_state.question_queue:
+            st.session_state.question_queue.append(q)
+        else:
+            st.toast("⚠️ 该问题已在队列中")
     st.rerun()
+
+# ==========================================
+# Stage 7+8: 新的聊天引擎和配置管理
+# ==========================================
+# 新模块已创建并测试通过:
+# - src/chat/chat_engine.py: ChatEngine 类
+# - src/chat/suggestion_manager.py: SuggestionManager 类
+# - src/config/config_loader.py: ConfigLoader 类
+# - src/config/config_validator.py: ConfigValidator 类
+#
+# 使用示例 (未来可替换现有逻辑):
+# 
+# # 使用 ChatEngine 处理问题
+# chat_engine = ChatEngine(st.session_state.chat_engine, active_kb_name)
+# for result in chat_engine.process_question(question, llm_model, quoted_text):
+#     if result['type'] == 'token':
+#         # 流式输出
+#         pass
+#     elif result['type'] == 'complete':
+#         # 完成处理
+#         full_text = result['content']
+#         sources = result['sources']
+#         stats = result['stats']
+#
+# # 使用 SuggestionManager 生成追问
+# suggestions = SuggestionManager.generate_initial_suggestions(
+#     context_text=full_text,
+#     messages=st.session_state.messages,
+#     question_queue=st.session_state.question_queue,
+#     query_engine=st.session_state.chat_engine
+# )
+# SuggestionManager.add_suggestions(suggestions)
+# ==========================================
 
 # 计算当前的 KB ID (根据侧边栏选择)
 active_kb_name = current_kb_name if not is_create_mode else None
@@ -1933,9 +1271,16 @@ if active_kb_name and st.session_state.chat_engine is None:
             else:
                 with st.spinner(f"📚 正在挂载知识库: {active_kb_name}..."):
                     try:
-                        # 读取知识库实际使用的模型（而不是侧边栏选择）
-                        kb_manifest = load_manifest(db_path)
-                        kb_embed_model = kb_manifest.get('embed_model', 'BAAI/bge-large-zh-v1.5')
+                        # 读取知识库信息（优先使用 .kb_info.json）
+                        kb_info_file = os.path.join(db_path, ".kb_info.json")
+                        if os.path.exists(kb_info_file):
+                            with open(kb_info_file, 'r') as f:
+                                kb_info = json.load(f)
+                                kb_embed_model = kb_info.get('embedding_model', 'BAAI/bge-large-zh-v1.5')
+                        else:
+                            # 兼容旧版本，使用 manifest
+                            kb_manifest = load_manifest(db_path)
+                            kb_embed_model = kb_manifest.get('embed_model', 'BAAI/bge-large-zh-v1.5')
                         
                         terminal_logger.info(f"📊 知识库模型: {kb_embed_model}")
                         terminal_logger.info(f"📊 Embed Provider: {embed_provider}")
@@ -2060,7 +1405,17 @@ if active_kb_name:
     manifest = load_manifest(db_path)
     file_cnt = len(manifest.get('files', []))
     last_upd = manifest.get('last_updated', 'N/A')[:10]
-    kb_model = manifest.get('embed_model', 'Unknown')
+    # 读取知识库模型信息（优先使用 .kb_info.json）
+    kb_info_file = os.path.join(db_path, ".kb_info.json")
+    if os.path.exists(kb_info_file):
+        try:
+            with open(kb_info_file, 'r') as f:
+                kb_info = json.load(f)
+                kb_model = kb_info.get('embedding_model', 'Unknown')
+        except:
+            kb_model = manifest.get('embed_model', 'Unknown')
+    else:
+        kb_model = manifest.get('embed_model', 'Unknown')
     
     # 计算统计信息
     total_sz = 0
@@ -2389,6 +1744,7 @@ if active_kb_name:
                         st.success(f"✅ 已生成 {success_count}/{selected_count} 个摘要")
                         st.session_state.selected_for_summary = set()
                         time.sleep(1)
+                        st.rerun()  # 立即刷新页面显示摘要
                 
                 if st.button("📥 导出清单", use_container_width=True):
                     export_data = f"知识库: {active_kb_name}\n文件数: {file_cnt}\n片段数: {total_chunks}\n\n文件列表:\n"
@@ -2515,13 +1871,21 @@ if active_kb_name:
                 current_page_files = [f['name'] for f in filtered_files[start_idx:end_idx] if not f.get('summary') and f.get('doc_ids')]
                 if current_page_files:
                     all_selected = all(fname in st.session_state.selected_for_summary for fname in current_page_files)
-                    select_all = cols[0].checkbox("全选", value=all_selected, key=f"select_all_page_{st.session_state.file_page}", label_visibility="collapsed")
                     
-                    # 根据全选框状态更新选中列表
-                    if select_all:
-                        st.session_state.selected_for_summary.update(current_page_files)
-                    else:
-                        st.session_state.selected_for_summary.difference_update(current_page_files)
+                    # 使用默认参数捕获当前值
+                    def toggle_select_all(files=current_page_files):
+                        if st.session_state.get(f"select_all_page_{st.session_state.file_page}"):
+                            st.session_state.selected_for_summary.update(files)
+                        else:
+                            st.session_state.selected_for_summary.difference_update(files)
+                    
+                    select_all = cols[0].checkbox(
+                        "全选", 
+                        value=all_selected, 
+                        key=f"select_all_page_{st.session_state.file_page}", 
+                        label_visibility="collapsed",
+                        on_change=toggle_select_all
+                    )
                 else:
                     cols[0].markdown("**✨**")
                 
@@ -2843,6 +2207,8 @@ for msg_idx, msg in enumerate(state.get_messages()):
                 with st.spinner("⏳ 正在生成新问题..."):
                     all_history_questions = [m['content'] for m in st.session_state.messages if m['role'] == 'user']
                     all_history_questions.extend(st.session_state.suggestions_history)
+                    # 排除队列中的问题
+                    all_history_questions.extend(st.session_state.question_queue)
                     
                     new_sugs = generate_follow_up_questions(
                         context_text=msg['content'], 
@@ -2874,63 +2240,93 @@ if st.session_state.get("quote_content"):
 
 # 处理输入
 user_input = st.chat_input("输入问题...")
-final_prompt = st.session_state.prompt_trigger if st.session_state.prompt_trigger else user_input
-if st.session_state.prompt_trigger: st.session_state.prompt_trigger = None
 
-# 显示队列状态
-if st.session_state.get('is_processing'):
-    st.info("⏳ 正在处理上一个问题，新问题已排队...")
-
-if final_prompt:
+# 如果有新输入，加入队列
+if user_input:
     if not st.session_state.chat_engine:
         st.error("请先点击左侧【🚀 执行处理】启动系统")
     else:
-        st.session_state.suggestions_history = []
+        st.session_state.question_queue.append(user_input)
+
+# 处理 prompt_trigger（追问按钮）
+if st.session_state.prompt_trigger:
+    if st.session_state.chat_engine:
+        st.session_state.question_queue.append(st.session_state.prompt_trigger)
+    st.session_state.prompt_trigger = None
+
+# 显示队列状态
+queue_len = len(st.session_state.question_queue)
+if st.session_state.get('is_processing'):
+    if queue_len > 0:
+        # 显示队列中的问题
+        with st.expander(f"⏳ 正在处理问题，队列中还有 {queue_len} 个问题等待...", expanded=False):
+            for i, q in enumerate(st.session_state.question_queue, 1):
+                # 截断过长的问题
+                display_q = q[:50] + "..." if len(q) > 50 else q
+                st.caption(f"{i}. {display_q}")
+    else:
+        st.info("⏳ 正在处理问题...")
+elif queue_len > 0:
+    # 显示待处理的问题列表
+    with st.expander(f"📝 队列中有 {queue_len} 个问题待处理", expanded=True):
+        for i, q in enumerate(st.session_state.question_queue, 1):
+            display_q = q[:50] + "..." if len(q) > 50 else q
+            st.caption(f"{i}. {display_q}")
+
+# 从队列中取出问题处理
+if not st.session_state.is_processing and st.session_state.question_queue:
+    final_prompt = st.session_state.question_queue.pop(0)
+    
+    if st.session_state.chat_engine:
+        # 不清空 suggestions_history，保留追问按钮
         st.session_state.is_processing = True  # 标记正在处理
         
         # 强制检测知识库维度并切换模型（静默处理，不显示加载）
+        # 优化：只在首次或切换知识库时检测，避免每次问答都重复
         db_path = os.path.join(output_base, active_kb_name)
-        kb_dim = get_kb_embedding_dim(db_path)
         
-        # 为历史知识库自动保存信息
-        auto_save_kb_info(db_path, embed_model)
-        
-        # 维度映射
-        model_map = {
-            512: "BAAI/bge-small-zh-v1.5",
-            768: "BAAI/bge-base-zh-v1.5",
-            1024: "BAAI/bge-m3"
-        }
-        
-        # 如果检测到维度，强制切换
-        if kb_dim and kb_dim in model_map:
-            required_model = model_map[kb_dim]
-            if embed_model != required_model:
-                print(f"🔄 强制切换模型: {embed_model} → {required_model} (维度: {kb_dim}D)")
-                embed_model = required_model
-                embed = get_embed(embed_provider, embed_model, embed_key, embed_url)
-                if embed:
-                    Settings.embed_model = embed
-                    print(f"✅ 模型已切换")
-        else:
-            # 维度检测失败时，降级到最小模型（512维）
-            print(f"⚠️ 维度检测失败，降级到最小模型")
-            fallback_model = "BAAI/bge-small-zh-v1.5"
-            if embed_model != fallback_model:
-                print(f"🔄 降级切换: {embed_model} → {fallback_model}")
-                embed_model = fallback_model
-                embed = get_embed(embed_provider, embed_model, embed_key, embed_url)
-                if embed:
-                    Settings.embed_model = embed
-                    print(f"✅ 已降级到最小模型")
+        # 检查是否需要重新检测（知识库切换或首次）
+        last_checked_kb = st.session_state.get('_last_checked_kb')
+        if last_checked_kb != active_kb_name:
+            kb_dim = get_kb_embedding_dim(db_path)
+            
+            # 为历史知识库自动保存信息
+            auto_save_kb_info(db_path, embed_model)
+            
+            # 维度映射
+            model_map = {
+                512: "BAAI/bge-small-zh-v1.5",
+                768: "BAAI/bge-base-zh-v1.5",
+                1024: "BAAI/bge-m3"
+            }
+            
+            # 如果检测到维度，强制切换
+            if kb_dim and kb_dim in model_map:
+                required_model = model_map[kb_dim]
+                if embed_model != required_model:
+                    print(f"🔄 强制切换模型: {embed_model} → {required_model} (维度: {kb_dim}D)")
+                    embed_model = required_model
+                    embed = get_embed(embed_provider, embed_model, embed_key, embed_url)
+                    if embed:
+                        Settings.embed_model = embed
+                        print(f"✅ 模型已切换")
+            else:
+                # 维度检测失败时，降级到最小模型（512维）
+                print(f"⚠️ 维度检测失败，降级到最小模型")
+                fallback_model = "BAAI/bge-small-zh-v1.5"
+                if embed_model != fallback_model:
+                    print(f"🔄 降级切换: {embed_model} → {fallback_model}")
+                    embed_model = fallback_model
+                    embed = get_embed(embed_provider, embed_model, embed_key, embed_url)
+                    if embed:
+                        Settings.embed_model = embed
+                        print(f"✅ 已降级到最小模型")
+            
+            # 标记已检测
+            st.session_state._last_checked_kb = active_kb_name
         
         terminal_logger.separator("知识库查询")
         terminal_logger.start_operation("查询", f"知识库: {active_kb_name}")
-        
-        # 显示系统资源利用
-        import psutil
-        mem_percent = psutil.virtual_memory().percent
-        terminal_logger.info(f"系统内存使用: {mem_percent:.1f}%")
         
         # 处理引用内容
         if st.session_state.get("quote_content"):
@@ -2963,10 +2359,6 @@ if final_prompt:
                 try:
                     # 开始计时
                     start_time = time.time()
-                    
-                    # 资源监控
-                    cpu_start, mem_start, gpu_start, _ = check_resource_usage(threshold=80.0)
-                    terminal_logger.info(f"🔋 资源状态: CPU {cpu_start:.1f}% | 内存 {mem_start:.1f}% | GPU {gpu_start:.1f}%")
                     
                     # 显示启用的检索增强功能
                     enhancements = []
@@ -3003,14 +2395,7 @@ if final_prompt:
                         for token in response.response_gen:
                             full_text += token
                             msg_placeholder.markdown(full_text + "▌")
-                            
-                            # 每50个token检查资源
                             token_count += 1
-                            if token_count % 50 == 0:
-                                cpu_now, mem_now, gpu_now, should_throttle = check_resource_usage(threshold=80.0)
-                                if should_throttle:
-                                    terminal_logger.info(f"⚠️ 资源限流: CPU {cpu_now:.1f}% | 内存 {mem_now:.1f}% | GPU {gpu_now:.1f}%")
-                                    time.sleep(0.05)  # 轻微延迟
                         
                         msg_placeholder.markdown(full_text)
                     
@@ -3072,18 +2457,15 @@ if final_prompt:
                                 'text': text
                             })
                         
-                        # 智能多进程处理 (优化版 - 专家建议 P2)
-                        if len(node_data) > 10:
-                            max_workers = max(2, min(os.cpu_count() - 1, len(node_data) // 2))
-                            with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                                srcs = [s for s in executor.map(_process_node_worker, 
-                                       [(d, active_kb_name) for d in node_data]) if s]
-                            terminal_logger.info(f"⚡ 多进程处理: {len(srcs)} 个节点 | 使用 {max_workers} 进程")
+                        # 使用并行执行器处理节点（自动判断串行/并行）
+                        executor = ParallelExecutor()
+                        tasks = [(d, active_kb_name) for d in node_data]
+                        srcs = [s for s in executor.execute(process_node_worker, tasks, threshold=10) if s]
+                        
+                        if len(node_data) >= 10:
+                            terminal_logger.info(f"⚡ 并行处理: {len(srcs)} 个节点")
                         else:
-                            # 少量节点直接串行处理，避免进程开销
-                            srcs = [_process_node_worker((d, active_kb_name)) for d in node_data]
-                            srcs = [s for s in srcs if s]
-                            terminal_logger.info(f"⚡ 串行处理: {len(srcs)} 个节点 (少量数据)")
+                            terminal_logger.info(f"⚡ 串行处理: {len(srcs)} 个节点")
                     
                     logger.log_answer_complete(
                         kb_name=active_kb_name, 
@@ -3095,10 +2477,6 @@ if final_prompt:
                     
                     # 计算总耗时
                     total_time = time.time() - start_time
-                    
-                    # 资源监控结束
-                    cpu_end, mem_end, gpu_end, _ = check_resource_usage(threshold=80.0)
-                    terminal_logger.info(f"✅ 资源峰值: CPU {max(cpu_start, cpu_end):.1f}% | 内存 {max(mem_start, mem_end):.1f}% | GPU {max(gpu_start, gpu_end):.1f}%")
                     terminal_logger.complete_operation(f"查询完成 (耗时 {total_time:.2f}s)")
                     
                     # 准备统计信息
@@ -3108,10 +2486,7 @@ if final_prompt:
                         "tokens": token_count,
                         "tokens_per_sec": tokens_per_sec,
                         "prompt_tokens": prompt_tokens,
-                        "completion_tokens": completion_tokens,
-                        "cpu": max(cpu_start, cpu_end),
-                        "mem": max(mem_start, mem_end),
-                        "gpu": max(gpu_start, gpu_end)
+                        "completion_tokens": completion_tokens
                     }
                     
                     st.session_state.messages.append({
@@ -3122,39 +2497,48 @@ if final_prompt:
                     })
                     # 历史记录保存已移动到流程末尾
                     
-                    # 在前端显示统计信息 (优化版 - 专家建议 P2)
-                    # 1. 简单概览
+                    # 在前端显示统计信息
                     stats_simple = f"⏱️ {total_time:.1f}秒 | 📝 约 {token_count} 字符"
                     st.caption(stats_simple)
                     
-                    # 2. 详细信息 (折叠)
+                    # 详细信息 (折叠)
                     with st.expander("📊 详细统计", expanded=False):
                         st.caption(f"🚀 速度: {tokens_per_sec:.1f} tokens/s")
                         if prompt_tokens:
                             st.caption(f"📥 输入: {prompt_tokens} | 📤 输出: {completion_tokens}")
-                        st.caption(f"💻 资源: CPU {max(cpu_start, cpu_end):.1f}% | 内存 {max(mem_start, mem_end):.1f}% | GPU {max(gpu_start, gpu_end):.1f}%")
                     
                     # 问答结束后，自动生成初始追问，并添加到 suggestions_history
                     # 使用 container 来显示加载状态，避免界面跳动
                     st.divider()
                     sug_container = st.empty()
                     sug_container.caption("✨ 正在生成推荐问题...")
+                    # 排除已有的问题（历史+队列+已生成的追问）
+                    existing_questions = [m['content'] for m in st.session_state.messages if m['role'] == 'user']
+                    existing_questions.extend(st.session_state.question_queue)
+                    existing_questions.extend(st.session_state.suggestions_history)  # 排除已生成的追问
+                    
                     initial_sugs = generate_follow_up_questions(
                         full_text, 
                         num_questions=3,
+                        existing_questions=existing_questions,
                         query_engine=st.session_state.chat_engine if st.session_state.get('chat_engine') else None
                     )
                     sug_container.empty()
                     
                     if initial_sugs:
-                        st.session_state.suggestions_history.extend(initial_sugs)
-                        terminal_logger.info(f"✨ 生成 {len(initial_sugs)} 个推荐问题")
-                        
-                        # 立即显示生成的推荐问题 (无需等待重绘)
-                        st.markdown("##### 🚀 追问推荐")
-                        for idx, q in enumerate(initial_sugs):
-                            if st.button(f"👉 {q}", key=f"temp_sug_{int(time.time())}_{idx}", use_container_width=True):
-                                click_btn(q)
+                        # 去重：只添加不在 suggestions_history 中的问题
+                        new_sugs = [q for q in initial_sugs if q not in st.session_state.suggestions_history]
+                        if new_sugs:
+                            st.session_state.suggestions_history.extend(new_sugs)
+                            terminal_logger.info(f"✨ 生成 {len(new_sugs)} 个新推荐问题")
+                            
+                            # 立即显示新生成的推荐问题
+                            st.markdown("##### 🚀 追问推荐")
+                            for idx, q in enumerate(new_sugs):
+                                if st.button(f"👉 {q}", key=f"temp_sug_{int(time.time())}_{idx}", use_container_width=True):
+                                    click_btn(q)
+                        else:
+                            terminal_logger.info("⚠️ 生成的问题已存在，跳过")
                     else:
                         terminal_logger.info("⚠️ 推荐问题生成失败")
                     
@@ -3167,9 +2551,10 @@ if final_prompt:
                     
                     st.session_state.is_processing = False  # 处理完成
                     
-                    # 检查是否有新问题排队
-                    if st.session_state.prompt_trigger:
-                        st.rerun()  # 只在有新问题时才重新运行
+                    # 检查队列中是否还有问题
+                    if st.session_state.question_queue:
+                        terminal_logger.info(f"📝 队列中还有 {len(st.session_state.question_queue)} 个问题，继续处理...")
+                        st.rerun()  # 处理下一个问题
                 except Exception as e: 
                     print(f"❌ 查询出错: {e}\n")
                     st.error(f"出错: {e}")
