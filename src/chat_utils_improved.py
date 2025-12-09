@@ -11,8 +11,10 @@ import json
 import shutil
 import threading
 import time
+import re
 from datetime import datetime
 from pathlib import Path
+from collections import Counter
 from llama_index.core import Settings
 import re
 
@@ -207,6 +209,27 @@ def extract_sources_safe(response, min_score=0.3, logger=None):
     return sources
 
 
+def _extract_keywords(text, max_keywords=5):
+    """提取文本关键词"""
+    try:
+        import jieba
+        # 使用 jieba 分词
+        words = jieba.lcut(text)
+    except:
+        # 降级：简单分词
+        text = re.sub(r'[^\w\s]', ' ', text)
+        words = text.split()
+    
+    # 过滤停用词和短词
+    stop_words = {'的', '了', '是', '在', '有', '和', '与', '或', '等', '及', '以', '为', '这', '那', '我', '你', '他', '她', '它', '们', '个', '中', '也', '都', '就', '而', '要', '会', '可以', '能', '说', '对', '但', '不', '没有'}
+    keywords = [w for w in words if len(w) > 1 and w not in stop_words]
+    
+    # 统计词频
+    word_freq = Counter(keywords)
+    # 返回高频词
+    return [word for word, _ in word_freq.most_common(max_keywords)]
+
+
 def generate_follow_up_questions_safe(context_text, num_questions=3, existing_questions=None, timeout=10, logger=None, query_engine=None):
     """
     安全的追问生成（带降级策略）
@@ -248,10 +271,32 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
             # 排除已问过的问题
             existing_str = "\n".join(existing_questions) if existing_questions else ""
             
+            # 🆕 尝试从知识库获取相关主题
+            kb_topics = ""
+            if query_engine:
+                try:
+                    # 提取关键词查询知识库
+                    keywords = _extract_keywords(short_context)
+                    if keywords:
+                        kb_query = " ".join(keywords[:3])  # 使用前3个关键词
+                        kb_response = query_engine.query(kb_query)
+                        if kb_response and hasattr(kb_response, 'source_nodes'):
+                            # 获取相关文档的标题或摘要
+                            topics = []
+                            for node in kb_response.source_nodes[:2]:  # 只取前2个
+                                if hasattr(node, 'metadata') and 'file_name' in node.metadata:
+                                    topics.append(node.metadata['file_name'])
+                            if topics:
+                                kb_topics = f"\n知识库相关主题：{', '.join(topics)}"
+                except:
+                    pass  # 静默失败，不影响主流程
+            
             prompt = (
                 f"基于以下回答，提出 {num_questions * 2} 个简短的追问问题。\n"
                 f"要求：\n1. 只需要问题，不要序号\n2. 简短（15字以内）\n3. 有启发性\n"
-                f"{'避免：' + existing_str if existing_str else ''}\n\n"
+                f"4. 结合知识库内容，提出用户可能感兴趣的相关问题\n"
+                f"{'避免：' + existing_str if existing_str else ''}\n"
+                f"{kb_topics}\n\n"
                 f"内容：\n{short_context}"
             )
             
