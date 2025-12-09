@@ -20,6 +20,9 @@ from src.file_processor import scan_directory_safe
 from src.utils.document_processor import get_file_info
 from src.utils.parallel_executor import ParallelExecutor
 from src.utils.parallel_tasks import extract_metadata_task
+from src.utils.concurrency_manager import ConcurrencyManager
+from src.utils.vectorization_wrapper import VectorizationWrapper
+from src.utils.dynamic_batch import DynamicBatchOptimizer
 
 
 @dataclass
@@ -47,6 +50,11 @@ class IndexBuilder:
         self.extract_metadata = extract_metadata  # 是否提取元数据
         self.logger = logger
         self.metadata_mgr = MetadataManager(persist_dir)
+        
+        # 初始化并发优化组件
+        self.concurrency_mgr = ConcurrencyManager()
+        self.batch_optimizer = DynamicBatchOptimizer()
+        self.vectorization_wrapper = None  # 延迟初始化
     
     def build(self, source_path: str, force_reindex: bool = False, 
               action_mode: str = "NEW", status_callback=None) -> BuildResult:
@@ -307,12 +315,29 @@ class IndexBuilder:
         else:
             # 新建模式
             if callback:
-                callback("info", "新建模式: 构建向量索引")
+                callback("info", "新建模式: 构建向量索引（异步优化）")
             
             if os.path.exists(self.persist_dir):
                 shutil.rmtree(self.persist_dir, ignore_errors=True)
             
-            index = VectorStoreIndex.from_documents(valid_docs, show_progress=True)
+            # 使用优化的向量化包装器
+            try:
+                if not self.vectorization_wrapper:
+                    self.vectorization_wrapper = VectorizationWrapper(
+                        embed_model=self.embed_model,
+                        batch_optimizer=self.batch_optimizer
+                    )
+                
+                # 动态批量优化向量化
+                index = self.vectorization_wrapper.vectorize_documents(valid_docs, show_progress=True)
+                if self.logger:
+                    self.logger.info("✅ 优化向量化完成")
+            except Exception as e:
+                # 降级到同步模式
+                if self.logger:
+                    self.logger.warning(f"优化向量化失败，降级到标准模式: {e}")
+                index = VectorStoreIndex.from_documents(valid_docs, show_progress=True)
+            
             index.storage_context.persist(persist_dir=self.persist_dir)
             
             # 保存知识库信息

@@ -97,6 +97,13 @@ from src.config import ConfigLoader, ManifestManager
 # 引入聊天管理
 from src.chat import HistoryManager, SuggestionManager
 
+# 引入资源保护
+from src.utils.adaptive_throttling import get_resource_guard
+import psutil as psutil_main
+
+# 初始化资源保护
+resource_guard = get_resource_guard()
+
 # 引入知识库管理
 from src.kb import KBManager
 kb_manager = KBManager()
@@ -950,6 +957,17 @@ def process_knowledge_base_logic():
     global logger
     persist_dir = os.path.join(output_base, final_kb_name)
     start_time = time.time()
+    
+    # 资源保护检查
+    cpu = psutil_main.cpu_percent(interval=0.1)
+    mem = psutil_main.virtual_memory().percent
+    result = resource_guard.check_resources(cpu, mem, 0)
+    throttle_info = result.get('throttle', {})
+    if throttle_info.get('action') == 'reject':
+        st.warning(f"⚠️ 系统资源紧张，请稍后再试")
+        logger.warning(f"资源不足，暂停处理: CPU={cpu}%, MEM={mem}%")
+        time.sleep(2)
+        return
 
     # 设置嵌入模型
     logger.info(f"🔧 设置嵌入模型: {embed_model} (provider: {embed_provider})")
@@ -1036,6 +1054,10 @@ def process_knowledge_base_logic():
     }", stage="知识库处理")
     
     status_container.update(label=f"✅ 知识库 '{final_kb_name}' 处理完成", state="complete", expanded=False)
+    
+    # 资源清理
+    resource_guard.throttler.cleanup_memory()
+    logger.info("🧹 资源已清理")
     
     time.sleep(0.5)
     return result.doc_count

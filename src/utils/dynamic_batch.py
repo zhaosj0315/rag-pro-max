@@ -27,10 +27,21 @@ class DynamicBatchOptimizer:
     def get_available_memory(self) -> float:
         """获取可用内存（GB）"""
         if self.device == 'cuda':
-            return torch.cuda.get_device_properties(0).total_memory / (1024**3)
+            # CUDA设备，检查GPU显存
+            try:
+                import torch
+                gpu_mem = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                gpu_free = (torch.cuda.get_device_properties(0).total_memory - 
+                           torch.cuda.memory_allocated(0)) / (1024**3)
+                return min(gpu_free, gpu_mem * 0.8)  # 最多使用80%
+            except:
+                return psutil.virtual_memory().available / (1024**3)
         elif self.device == 'mps':
-            # M4 Max 有专用的统一内存
-            return psutil.virtual_memory().available / (1024**3)
+            # M4 Max 有专用的统一内存，但需要保守估计
+            total_mem = psutil.virtual_memory().total / (1024**3)
+            available_mem = psutil.virtual_memory().available / (1024**3)
+            # MPS使用统一内存，预留更多给系统
+            return min(available_mem, total_mem * 0.6)
         else:
             return psutil.virtual_memory().available / (1024**3)
     

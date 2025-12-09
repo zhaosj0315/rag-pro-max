@@ -156,3 +156,9 @@ DEV_RULES.md
 demo.mp4
 
 # ⬆️ 新增临时文件添加到此处 ⬆️
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

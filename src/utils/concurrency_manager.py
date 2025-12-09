@@ -21,6 +21,7 @@ class ConcurrencyManager:
             'total_time': 0,
             'throughput': 0
         }
+        self._is_shutdown = False
     
     def process_documents_optimized(self, documents: List[Any],
                                     parse_func: Callable,
@@ -40,18 +41,24 @@ class ConcurrencyManager:
         Returns:
             处理统计信息
         """
+        if self._is_shutdown:
+            raise RuntimeError("ConcurrencyManager已关闭")
+        
         start_time = time.time()
         doc_count = len(documents)
         
         # 获取最优配置
         config = self.batch_optimizer.get_optimal_config(doc_count)
         
-        if use_pipeline and doc_count > 10:
-            # 使用异步管道
-            stats = run_async_pipeline(documents, parse_func, embed_func, store_func)
-        else:
-            # 使用智能调度器
-            stats = self._process_with_scheduler(documents, parse_func, embed_func, store_func)
+        try:
+            if use_pipeline and doc_count > 10:
+                # 使用异步管道
+                stats = run_async_pipeline(documents, parse_func, embed_func, store_func)
+            else:
+                # 使用智能调度器
+                stats = self._process_with_scheduler(documents, parse_func, embed_func, store_func)
+        except Exception as e:
+            raise RuntimeError(f"文档处理失败: {e}")
         
         total_time = time.time() - start_time
         
@@ -88,8 +95,21 @@ class ConcurrencyManager:
         return self.batch_optimizer.calculate_batch_size(doc_count)
     
     def shutdown(self):
-        """关闭管理器"""
-        self.scheduler.shutdown()
+        """关闭管理器，释放资源"""
+        if not self._is_shutdown:
+            self.scheduler.shutdown()
+            self._is_shutdown = True
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.shutdown()
+    
+    def __del__(self):
+        """析构时自动清理"""
+        if not self._is_shutdown:
+            self.shutdown()
 
 
 # 全局实例
@@ -99,6 +119,14 @@ _manager = None
 def get_concurrency_manager(embedding_dim: int = 1024) -> ConcurrencyManager:
     """获取全局并发管理器"""
     global _manager
-    if _manager is None:
+    if _manager is None or _manager._is_shutdown:
         _manager = ConcurrencyManager(embedding_dim=embedding_dim)
     return _manager
+
+
+def cleanup_concurrency_manager():
+    """清理全局管理器"""
+    global _manager
+    if _manager is not None:
+        _manager.shutdown()
+        _manager = None
