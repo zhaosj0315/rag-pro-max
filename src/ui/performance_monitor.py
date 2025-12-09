@@ -21,7 +21,23 @@ class PerformanceMonitor:
             # 获取性能指标
             metrics = self.logger.get_metrics()
             
-            if not metrics or metrics.get('total_operations', 0) == 0:
+            if not metrics:
+                st.info("💡 暂无性能数据，开始对话后将显示统计信息")
+                return
+            
+            # 汇总所有操作的指标
+            all_times = []
+            total_operations = 0
+            for op_name, op_metrics in metrics.items():
+                if isinstance(op_metrics, dict) and 'count' in op_metrics:
+                    total_operations += op_metrics['count']
+                    # 重建时间列表
+                    avg = op_metrics['avg']
+                    count = op_metrics['count']
+                    for _ in range(count):
+                        all_times.append(avg)
+            
+            if not all_times:
                 st.info("💡 暂无性能数据，开始对话后将显示统计信息")
                 return
             
@@ -30,15 +46,15 @@ class PerformanceMonitor:
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                avg_time = metrics.get('avg_duration', 0)
+                avg_time = sum(all_times) / len(all_times)
                 st.metric("平均耗时", f"{avg_time:.2f}s")
             
             with col2:
-                min_time = metrics.get('min_duration', 0)
+                min_time = min(all_times)
                 st.metric("最快", f"{min_time:.2f}s")
             
             with col3:
-                max_time = metrics.get('max_duration', 0)
+                max_time = max(all_times)
                 st.metric("最慢", f"{max_time:.2f}s")
             
             # 查询统计
@@ -46,11 +62,10 @@ class PerformanceMonitor:
             col1, col2 = st.columns(2)
             
             with col1:
-                total_queries = metrics.get('total_operations', 0)
-                st.metric("总查询数", total_queries)
+                st.metric("总查询数", total_operations)
             
             with col2:
-                total_time = metrics.get('total_duration', 0)
+                total_time = sum(all_times)
                 st.metric("总耗时", f"{total_time:.1f}s")
             
             # 最近查询

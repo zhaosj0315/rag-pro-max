@@ -172,6 +172,12 @@ class LogManager:
         if name in self.timers:
             elapsed = time.time() - self.timers[name]
             del self.timers[name]
+            
+            # 记录性能指标
+            if name not in self.metrics:
+                self.metrics[name] = []
+            self.metrics[name].append(elapsed)
+            
             return elapsed
         return 0.0
     
