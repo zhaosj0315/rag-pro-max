@@ -857,6 +857,7 @@ with st.sidebar:
 
 def process_knowledge_base_logic():
     """处理知识库逻辑 (Stage 4.2 - 使用 IndexBuilder)"""
+    global logger
     persist_dir = os.path.join(output_base, final_kb_name)
     start_time = time.time()
 
@@ -911,8 +912,7 @@ def process_knowledge_base_logic():
         embed_model=embed,
         embed_model_name=embed_model,
         extract_metadata=extract_metadata,  # 传递性能选项
-        logger=logger,
-        terminal_logger=terminal_logger
+        logger=logger
     )
     
     result = builder.build(
@@ -1387,7 +1387,8 @@ if btn_start:
                 if os.path.exists(hist_path): os.remove(hist_path)
             
             time.sleep(1); st.rerun()
-        except Exception as e: st.error(f"执行失败: {e}")
+        except Exception as e:
+            st.error(f"执行失败: {e}")
 
 # --- 主视图渲染 ---
 if active_kb_name:

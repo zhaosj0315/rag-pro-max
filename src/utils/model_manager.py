@@ -8,8 +8,8 @@ from llama_index.llms.openai import OpenAI
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.embeddings.openai import OpenAIEmbedding
 from ..custom_embeddings import create_custom_embedding
-from ..terminal_logger import terminal_logger
-from ..logger import logger
+from src.logging import LogManager
+logger = LogManager()
 
 
 def clean_proxy():
@@ -50,7 +50,7 @@ def load_embedding_model(provider: str, model_name: str, api_key: str = "", api_
             if not local_model_path:
                 local_model_path = model_name
             
-            logger.log_model_loading("HuggingFace", model_name, "loading")
+            logger.info("📥 正在加载模型...")
             
             # 检测GPU支持
             device = "cpu"
@@ -72,7 +72,7 @@ def load_embedding_model(provider: str, model_name: str, api_key: str = "", api_
                     
                     os.environ['OMP_NUM_THREADS'] = '10'
                     os.environ['MKL_NUM_THREADS'] = '10'
-                    terminal_logger.success("🚀 Apple M4 Max GPU (MPS) + CPU 加速已启用")
+                    logger.success("🚀 Apple M4 Max GPU (MPS) + CPU 加速已启用")
                     
                 elif torch.cuda.is_available():
                     device = "cuda"
@@ -81,14 +81,14 @@ def load_embedding_model(provider: str, model_name: str, api_key: str = "", api_
                     except:
                         pass
                     torch.cuda.set_per_process_memory_fraction(0.9)
-                    terminal_logger.success("✅ CUDA GPU + 多核CPU 加速已启用 (限制90%)")
+                    logger.success("✅ CUDA GPU + 多核CPU 加速已启用 (限制90%)")
                     
                 else:
                     try:
                         torch.set_num_threads(10)
                     except:
                         pass
-                    terminal_logger.warning("⚠️  未检测到GPU，使用 10核CPU 并行")
+                    logger.warning("⚠️  未检测到GPU，使用 10核CPU 并行")
                     
             except Exception as e:
                 device = "cpu"
@@ -97,7 +97,7 @@ def load_embedding_model(provider: str, model_name: str, api_key: str = "", api_
                     torch.set_num_threads(12)
                 except:
                     pass
-                terminal_logger.error(f"❌ GPU检测异常: {e}，使用 CPU")
+                logger.error(f"❌ GPU检测异常: {e}，使用 CPU")
             
             # 动态计算batch_size
             import psutil
@@ -114,13 +114,13 @@ def load_embedding_model(provider: str, model_name: str, api_key: str = "", api_
                     batch_size = 1024
                 else:
                     batch_size = 512
-                terminal_logger.info(f"🔥 M4 Max GPU: batch_size={batch_size}, 可用内存={usable_memory:.1f}GB (目标 GPU <90%)")
+                logger.info(f"🔥 M4 Max GPU: batch_size={batch_size}, 可用内存={usable_memory:.1f}GB (目标 GPU <90%)")
             elif device == "cuda":
                 batch_size = min(4096, max(1024, int(available_memory_gb * 50)))
             else:
                 batch_size = 64
             
-            terminal_logger.info(f"动态batch_size: {batch_size} (总内存: {total_memory_gb:.1f}GB, 可用: {available_memory_gb:.1f}GB)")
+            logger.info(f"动态batch_size: {batch_size} (总内存: {total_memory_gb:.1f}GB, 可用: {available_memory_gb:.1f}GB)")
             
             import torch
             torch.set_default_device(device)
@@ -131,21 +131,20 @@ def load_embedding_model(provider: str, model_name: str, api_key: str = "", api_
                 batch_size=batch_size,
                 device=device
             )
-            logger.log_model_loading("HuggingFace", model_name, "success")
+            logger.success("✅ 模型加载成功")
             return result
             
         elif provider.startswith("Ollama"):
             clean_proxy()
-            logger.log_model_loading("Ollama", model_name, "success")
+            logger.success("✅ 模型加载成功")
             return OllamaEmbedding(model_name=model_name, base_url=api_url)
             
         elif provider.startswith("OpenAI"):
-            logger.log_model_loading("OpenAI", model_name, "success")
+            logger.success("✅ 模型加载成功")
             return OpenAIEmbedding(model=model_name, api_key=api_key, api_base=api_url)
             
     except Exception as e:
-        logger.log_model_loading(provider, model_name, "error", str(e)[:200])
-        terminal_logger.error(f"模型加载失败: {e}")
+        logger.error(f"❌ 模型加载失败: {str(e)[:200]}")
         
     return None
 
@@ -184,7 +183,7 @@ def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: s
             )
             
     except Exception as e:
-        terminal_logger.error(f"LLM 加载失败: {e}")
+        logger.error(f"LLM 加载失败: {e}")
         
     return None
 
@@ -201,12 +200,12 @@ def set_global_embedding_model(provider: str, model_name: str, api_key: str = ""
         Settings.embed_model = embed_model
         try:
             dim = len(embed_model._get_text_embedding("test"))
-            terminal_logger.success(f"✅ 全局嵌入模型已设置: {model_name} ({dim}维)")
+            logger.success(f"✅ 全局嵌入模型已设置: {model_name} ({dim}维)")
         except:
-            terminal_logger.success(f"✅ 全局嵌入模型已设置: {model_name}")
+            logger.success(f"✅ 全局嵌入模型已设置: {model_name}")
         return True
     else:
-        terminal_logger.error(f"❌ 全局嵌入模型设置失败: {model_name}")
+        logger.error(f"❌ 全局嵌入模型设置失败: {model_name}")
         return False
 
 
@@ -220,8 +219,8 @@ def set_global_llm_model(provider: str, model_name: str, api_key: str = "", api_
     llm_model = load_llm_model(provider, model_name, api_key, api_url, temperature)
     if llm_model:
         Settings.llm = llm_model
-        terminal_logger.success(f"✅ 全局 LLM 已设置: {model_name}")
+        logger.success(f"✅ 全局 LLM 已设置: {model_name}")
         return True
     else:
-        terminal_logger.error(f"❌ 全局 LLM 设置失败: {model_name}")
+        logger.error(f"❌ 全局 LLM 设置失败: {model_name}")
         return False

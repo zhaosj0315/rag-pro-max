@@ -39,14 +39,13 @@ class IndexBuilder:
     def __init__(self, kb_name: str, persist_dir: str, 
                  embed_model, embed_model_name: str = "Unknown",
                  extract_metadata: bool = True,
-                 logger=None, terminal_logger=None):
+                 logger=None):
         self.kb_name = kb_name
         self.persist_dir = persist_dir
         self.embed_model = embed_model
         self.embed_model_name = embed_model_name
         self.extract_metadata = extract_metadata  # 是否提取元数据
         self.logger = logger
-        self.terminal_logger = terminal_logger
         self.metadata_mgr = MetadataManager(persist_dir)
     
     def build(self, source_path: str, force_reindex: bool = False, 
@@ -278,8 +277,8 @@ class IndexBuilder:
                         'completed': 0
                     }, f, ensure_ascii=False)
             except Exception as e:
-                if self.terminal_logger:
-                    self.terminal_logger.warning(f"⚠️ 摘要队列写入失败: {e}")
+                if self.logger:
+                    self.logger.warning(f"⚠️ 摘要队列写入失败: {e}")
         
         # 启动后台线程
         thread = threading.Thread(target=write_queue_async, daemon=True)
@@ -354,11 +353,11 @@ class IndexBuilder:
             with open(kb_info_file, 'w') as f:
                 json.dump(kb_info, f, indent=2)
             
-            if self.terminal_logger:
-                self.terminal_logger.success(f"✅ 已保存知识库信息: {embed_model_name} ({embed_dim}D)")
+            if self.logger:
+                self.logger.success(f"✅ 已保存知识库信息: {embed_model_name} ({embed_dim}D)")
         except Exception as e:
-            if self.terminal_logger:
-                self.terminal_logger.warning(f"⚠️ 保存知识库信息失败: {e}")
+            if self.logger:
+                self.logger.warning(f"⚠️ 保存知识库信息失败: {e}")
 
 
     def _save_manifest(self, file_map):
@@ -373,11 +372,11 @@ class IndexBuilder:
                 self.embed_model_name
             )
             
-            if self.terminal_logger:
-                self.terminal_logger.success(f"✅ 已保存文件清单: {len(files_list)} 个文件")
+            if self.logger:
+                self.logger.success(f"✅ 已保存文件清单: {len(files_list)} 个文件")
         except Exception as e:
-            if self.terminal_logger:
-                self.terminal_logger.warning(f"⚠️ 保存文件清单失败: {e}")
+            if self.logger:
+                self.logger.warning(f"⚠️ 保存文件清单失败: {e}")
 
 
 # 多进程辅助函数
