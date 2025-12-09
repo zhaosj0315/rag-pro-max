@@ -8,6 +8,10 @@ from typing import Optional, Dict, Any, List
 from contextlib import contextmanager
 
 
+# 全局单例
+_global_logger_instance = None
+
+
 class LogManager:
     """统一日志管理器 - 替代 terminal_logger"""
     
@@ -18,7 +22,19 @@ class LogManager:
     ERROR = 'ERROR'
     SUCCESS = 'SUCCESS'
     
+    def __new__(cls, *args, **kwargs):
+        """单例模式"""
+        global _global_logger_instance
+        if _global_logger_instance is None:
+            _global_logger_instance = super().__new__(cls)
+        return _global_logger_instance
+    
     def __init__(self, log_dir: str = "app_logs", enable_terminal: bool = True):
+        # 避免重复初始化
+        if hasattr(self, '_initialized'):
+            return
+        self._initialized = True
+        
         self.log_dir = log_dir
         self.enable_terminal = enable_terminal
         self.timers = {}
