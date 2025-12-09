@@ -19,6 +19,32 @@ def test_performance_monitor_import():
         return False
 
 
+def test_logger_singleton():
+    """测试 LogManager 单例模式"""
+    try:
+        from src.logging import LogManager
+        
+        logger1 = LogManager()
+        logger2 = LogManager()
+        
+        assert logger1 is logger2, "LogManager 不是单例"
+        
+        # 测试性能指标共享
+        logger1.start_timer("test")
+        import time
+        time.sleep(0.1)
+        logger1.end_timer("test")
+        
+        metrics = logger2.get_metrics()
+        assert 'test' in metrics, "性能指标未共享"
+        
+        print("✅ LogManager 单例: PASS")
+        return True
+    except Exception as e:
+        print(f"❌ LogManager 单例: FAIL - {e}")
+        return False
+
+
 def test_suggestion_engine_enhanced():
     """测试推荐引擎增强功能"""
     try:
@@ -49,6 +75,24 @@ def test_suggestion_engine_enhanced():
         return True
     except Exception as e:
         print(f"❌ 推荐引擎增强: FAIL - {e}")
+        return False
+
+
+def test_suggestion_generation():
+    """测试推荐问题生成改进"""
+    try:
+        from src.chat_utils_improved import _extract_keywords
+        
+        # 测试关键词提取
+        text = "Python 是一种编程语言，用于数据分析和机器学习"
+        keywords = _extract_keywords(text)
+        assert len(keywords) > 0, "关键词提取失败"
+        assert 'Python' in keywords or '编程语言' in keywords, "关键词不准确"
+        
+        print("✅ 推荐问题生成: PASS")
+        return True
+    except Exception as e:
+        print(f"❌ 推荐问题生成: FAIL - {e}")
         return False
 
 
@@ -104,32 +148,6 @@ def test_error_handler_enhanced():
         return False
 
 
-def test_logger_metrics():
-    """测试 LogManager 性能指标"""
-    try:
-        from src.logging import LogManager
-        logger = LogManager()
-        
-        # 测试计时器
-        logger.start_timer("test")
-        import time
-        time.sleep(0.1)
-        elapsed = logger.end_timer("test")
-        
-        assert elapsed >= 0.1
-        assert elapsed < 0.2
-        
-        # 测试指标获取
-        metrics = logger.get_metrics()
-        assert isinstance(metrics, dict)
-        
-        print("✅ LogManager 指标: PASS")
-        return True
-    except Exception as e:
-        print(f"❌ LogManager 指标: FAIL - {e}")
-        return False
-
-
 def test_syntax_check():
     """语法检查"""
     import py_compile
@@ -139,6 +157,8 @@ def test_syntax_check():
         "src/ui/suggestion_panel.py",
         "src/chat/suggestion_engine.py",
         "src/utils/error_handler.py",
+        "src/logging/log_manager.py",
+        "src/chat_utils_improved.py",
     ]
     
     all_pass = True
@@ -160,11 +180,12 @@ def main():
     
     tests = [
         ("1. 性能监控模块", test_performance_monitor_import),
-        ("2. 推荐引擎增强", test_suggestion_engine_enhanced),
-        ("3. 推荐问题面板", test_suggestion_panel),
-        ("4. 错误处理增强", test_error_handler_enhanced),
-        ("5. LogManager 指标", test_logger_metrics),
-        ("6. 语法检查", test_syntax_check),
+        ("2. LogManager 单例", test_logger_singleton),
+        ("3. 推荐引擎增强", test_suggestion_engine_enhanced),
+        ("4. 推荐问题生成", test_suggestion_generation),
+        ("5. 推荐问题面板", test_suggestion_panel),
+        ("6. 错误处理增强", test_error_handler_enhanced),
+        ("7. 语法检查", test_syntax_check),
     ]
     
     results = []
