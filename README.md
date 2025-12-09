@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.5.1-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Docker-lightgrey.svg)
@@ -631,6 +631,20 @@ A: 使用命令 `sudo python3 system_monitor.py`。Streamlit 内置监控只能�
 ---
 
 ## 📄 更新日志
+
+### v1.5.1 (2025-12-09)
+- ✨ **性能监控面板** - 实时查看查询性能和统计信息
+- ✨ **推荐问题优化** - 自定义推荐和历史管理
+- ✨ **错误恢复机制** - 自动重试和友好提示
+- 📦 新增 3 个模块（+500 行代码）
+- 🧪 测试：6/6 可行性测试通过，58/63 出厂测试通过
+
+### v1.5.0 (2025-12-09)
+- 🚀 **查询缓存系统** - 提升重复查询速度 80%+
+- 📦 新增 3 个独立模块（query_cache, suggestion_engine, error_handler）
+- ✨ **扩展 LogManager** - 新增 10+ 个日志方法
+- 🐛 修复 terminal_logger 引用问题
+- 🧪 测试：6/6 可行性测试通过，58/63 出厂测试通过
 
 ### v1.4.4 (2025-12-09)
 - 🐛 **修复追问推荐按钮导致回答消失的 bug**
