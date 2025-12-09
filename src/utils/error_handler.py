@@ -1,0 +1,82 @@
+"""统一错误处理模块"""
+
+import streamlit as st
+from typing import Optional, Callable, Any, Tuple
+from functools import wraps
+
+
+class ErrorHandler:
+    """错误处理器"""
+    
+    @staticmethod
+    def handle_error(error: Exception, context: str = "") -> str:
+        """处理错误并返回友好消息"""
+        error_type = type(error).__name__
+        error_msg = str(error)
+        
+        # 常见错误的友好提示
+        friendly_messages = {
+            "FileNotFoundError": "文件未找到，请检查文件路径是否正确",
+            "PermissionError": "权限不足，请检查文件访问权限",
+            "ValueError": "数据格式错误，请检查输入内容",
+            "KeyError": "配置项缺失，请检查配置文件",
+            "ConnectionError": "网络连接失败，请检查网络设置",
+            "TimeoutError": "操作超时，请稍后重试",
+            "MemoryError": "内存不足，请关闭其他程序或减少数据量",
+        }
+        
+        friendly_msg = friendly_messages.get(error_type, "发生未知错误")
+        
+        if context:
+            return f"❌ {context}: {friendly_msg}\n\n详细信息: {error_msg}"
+        else:
+            return f"❌ {friendly_msg}\n\n详细信息: {error_msg}"
+    
+    @staticmethod
+    def show_error(error: Exception, context: str = ""):
+        """在 Streamlit 中显示错误"""
+        msg = ErrorHandler.handle_error(error, context)
+        st.error(msg)
+    
+    @staticmethod
+    def with_recovery(error: Exception, context: str = "") -> str:
+        """提供恢复建议"""
+        error_type = type(error).__name__
+        
+        recovery_tips = {
+            "FileNotFoundError": "💡 建议: 检查文件是否存在，或重新上传文件",
+            "PermissionError": "💡 建议: 使用管理员权限运行，或修改文件权限",
+            "ValueError": "💡 建议: 检查输入格式，确保数据类型正确",
+            "KeyError": "💡 建议: 检查配置文件是否完整，或重置配置",
+            "ConnectionError": "💡 建议: 检查网络连接，或更换 API 地址",
+            "TimeoutError": "💡 建议: 增加超时时间，或减少数据量",
+            "MemoryError": "💡 建议: 关闭其他程序，或分批处理数据",
+        }
+        
+        tip = recovery_tips.get(error_type, "💡 建议: 查看日志获取更多信息，或联系技术支持")
+        
+        msg = ErrorHandler.handle_error(error, context)
+        return f"{msg}\n\n{tip}"
+    
+    @staticmethod
+    def safe_execute(func: Callable, *args, **kwargs) -> Tuple[bool, Any]:
+        """安全执行函数"""
+        try:
+            result = func(*args, **kwargs)
+            return True, result
+        except Exception as e:
+            return False, e
+
+
+def handle_errors(context: str = ""):
+    """错误处理装饰器"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                ErrorHandler.show_error(e, context)
+                return None
+        return wrapper
+    return decorator

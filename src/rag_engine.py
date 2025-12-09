@@ -26,8 +26,7 @@ class RAGEngine:
         persist_dir: str,
         embed_model,
         llm_model,
-        logger=None,
-        terminal_logger=None
+        logger=None
     ):
         """
         初始化 RAG 引擎
@@ -38,14 +37,12 @@ class RAGEngine:
             embed_model: 嵌入模型
             llm_model: LLM 模型
             logger: 日志记录器
-            terminal_logger: 终端日志记录器
         """
         self.kb_name = kb_name
         self.persist_dir = persist_dir
         self.embed_model = embed_model
         self.llm_model = llm_model
         self.logger = logger
-        self.terminal_logger = terminal_logger
         self.index = None
         
         # 设置全局模型
@@ -65,24 +62,24 @@ class RAGEngine:
             return False
         
         try:
-            if self.terminal_logger:
-                self.terminal_logger.info(f"📂 加载现有索引: {self.kb_name}")
+            if self.logger:
+                self.logger.info(f"📂 加载现有索引: {self.kb_name}")
             
             storage_context = StorageContext.from_defaults(persist_dir=self.persist_dir)
             self.index = load_index_from_storage(storage_context)
             
-            if self.terminal_logger:
-                self.terminal_logger.success("✅ 索引加载成功")
+            if self.logger:
+                self.logger.success("✅ 索引加载成功")
             
             return True
             
         except Exception as e:
             error_msg = str(e)
-            if self.terminal_logger:
+            if self.logger:
                 if "shapes" in error_msg and "not aligned" in error_msg:
-                    self.terminal_logger.warning("⚠️  向量维度不匹配，需要重建索引")
+                    self.logger.warning("⚠️  向量维度不匹配，需要重建索引")
                 else:
-                    self.terminal_logger.warning(f"⚠️  索引加载失败: {error_msg}")
+                    self.logger.warning(f"⚠️  索引加载失败: {error_msg}")
             
             # 清理损坏的索引
             shutil.rmtree(self.persist_dir, ignore_errors=True)
@@ -108,22 +105,22 @@ class RAGEngine:
         Returns:
             VectorStoreIndex: 创建的索引
         """
-        if self.terminal_logger:
-            self.terminal_logger.info(f"🔨 创建向量索引: {len(documents)} 个文档")
+        if self.logger:
+            self.logger.info(f"🔨 创建向量索引: {len(documents)} 个文档")
         
         start_time = time.time()
         
         # 创建索引
         if self.index:
             # 追加到现有索引
-            if self.terminal_logger:
-                self.terminal_logger.info("📝 追加文档到现有索引")
+            if self.logger:
+                self.logger.info("📝 追加文档到现有索引")
             for doc in documents:
                 self.index.insert(doc)
         else:
             # 创建新索引
-            if self.terminal_logger:
-                self.terminal_logger.info("🆕 创建新索引")
+            if self.logger:
+                self.logger.info("🆕 创建新索引")
             self.index = VectorStoreIndex.from_documents(
                 documents,
                 show_progress=show_progress
@@ -133,8 +130,8 @@ class RAGEngine:
         self.index.storage_context.persist(persist_dir=self.persist_dir)
         
         elapsed = time.time() - start_time
-        if self.terminal_logger:
-            self.terminal_logger.success(f"✅ 索引创建完成 (耗时 {elapsed:.1f}s)")
+        if self.logger:
+            self.logger.success(f"✅ 索引创建完成 (耗时 {elapsed:.1f}s)")
         
         return self.index
     
@@ -225,8 +222,8 @@ class RAGEngine:
         if not self.index:
             raise ValueError("索引未加载，请先创建或加载索引")
         
-        if self.terminal_logger:
-            self.terminal_logger.info(f"🔍 查询: {question[:50]}...")
+        if self.logger:
+            self.logger.info(f"🔍 查询: {question[:50]}...")
         
         query_engine = self.get_query_engine(
             similarity_top_k=top_k,
@@ -237,8 +234,8 @@ class RAGEngine:
         response = query_engine.query(question)
         elapsed = time.time() - start_time
         
-        if self.terminal_logger:
-            self.terminal_logger.success(f"✅ 查询完成 (耗时 {elapsed:.1f}s)")
+        if self.logger:
+            self.logger.success(f"✅ 查询完成 (耗时 {elapsed:.1f}s)")
         
         return response
     
@@ -276,8 +273,8 @@ class RAGEngine:
         """删除知识库"""
         if os.path.exists(self.persist_dir):
             shutil.rmtree(self.persist_dir)
-            if self.terminal_logger:
-                self.terminal_logger.success(f"✅ 知识库已删除: {self.kb_name}")
+            if self.logger:
+                self.logger.success(f"✅ 知识库已删除: {self.kb_name}")
         
         self.index = None
     

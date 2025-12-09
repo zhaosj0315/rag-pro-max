@@ -11,23 +11,25 @@ def cleanup_memory():
         import torch
         # 延迟导入，避免 pickle 错误
         try:
-            from terminal_logger import terminal_logger
+            from src.logging import LogManager
+            logger = LogManager()
         except:
-            terminal_logger = None
+            logger = None
         
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-            if terminal_logger:
-                terminal_logger.info("🧹 已清理 CUDA 显存缓存")
+            if logger:
+                logger.info("🧹 已清理 CUDA 显存缓存")
         elif torch.backends.mps.is_available():
             torch.mps.empty_cache()
-            if terminal_logger:
-                terminal_logger.info("🧹 已清理 MPS 显存缓存")
+            if logger:
+                logger.info("🧹 已清理 MPS 显存缓存")
     except Exception as e:
         try:
-            from terminal_logger import terminal_logger
-            if terminal_logger:
-                terminal_logger.warning(f"显存清理失败: {e}")
+            from src.logging import LogManager
+            logger = LogManager()
+            if logger:
+                logger.warning(f"显存清理失败: {e}")
         except:
             pass
 

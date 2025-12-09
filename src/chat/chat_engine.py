@@ -8,8 +8,8 @@ import re
 from typing import Dict, List, Optional, Any
 import streamlit as st
 
-from src.logger import logger
-from src.terminal_logger import terminal_logger
+from src.logging import LogManager
+logger = LogManager()
 from src.utils.parallel_executor import ParallelExecutor
 from src.utils.parallel_tasks import process_node_worker
 
@@ -52,11 +52,11 @@ class ChatEngine:
             if len(quoted_text) > 2000:
                 quoted_text = quoted_text[:2000] + "...(已截断)"
             final_prompt = f"基于以下引用内容：\n> {quoted_text}\n\n我的问题是：{question}"
-            terminal_logger.info("📌 已应用引用内容")
+            logger.info("📌 已应用引用内容")
         
         # 记录日志
-        terminal_logger.separator("知识库查询")
-        terminal_logger.start_operation("查询", f"知识库: {self.kb_name}")
+        logger.separator("知识库查询")
+        logger.start_operation("查询", f"知识库: {self.kb_name}")
         logger.log_user_question(final_prompt, kb_name=self.kb_name)
         
         # 开始计时
@@ -71,18 +71,18 @@ class ChatEngine:
         
         if enhancements:
             enhancement_str = " + ".join(enhancements)
-            terminal_logger.info(f"🎯 检索增强: {enhancement_str}")
+            logger.info(f"🎯 检索增强: {enhancement_str}")
             logger.log("查询对话", "检索增强", f"启用功能: {enhancement_str}")
         
         # 检索和生成
-        with terminal_logger.timer("检索相关文档"):
+        with logger.timer("检索相关文档"):
             logger.log_retrieval_start(kb_name=self.kb_name)
             
             retrieval_start = time.time()
             response = self.query_engine.stream_chat(final_prompt)
             retrieval_time = time.time() - retrieval_start
             
-            terminal_logger.info(f"🔍 检索耗时: {retrieval_time:.2f}s (GPU加速)")
+            logger.info(f"🔍 检索耗时: {retrieval_time:.2f}s (GPU加速)")
             
             # 流式输出
             full_text = ""
@@ -115,7 +115,7 @@ class ChatEngine:
         sources = []
         if response.source_nodes:
             logger.log_retrieval_result(len(response.source_nodes), kb_name=self.kb_name)
-            terminal_logger.data_summary("检索结果", {
+            logger.data_summary("检索结果", {
                 "查询": final_prompt[:50] + "..." if len(final_prompt) > 50 else final_prompt,
                 "相关文档": len(response.source_nodes),
                 "知识库": self.kb_name
@@ -148,9 +148,9 @@ class ChatEngine:
             sources = [s for s in self.executor.execute(process_node_worker, tasks, threshold=10) if s]
             
             if len(node_data) >= 10:
-                terminal_logger.info(f"⚡ 并行处理: {len(sources)} 个节点")
+                logger.info(f"⚡ 并行处理: {len(sources)} 个节点")
             else:
-                terminal_logger.info(f"⚡ 串行处理: {len(sources)} 个节点")
+                logger.info(f"⚡ 串行处理: {len(sources)} 个节点")
         
         # 记录完成日志
         logger.log_answer_complete(
@@ -163,7 +163,7 @@ class ChatEngine:
         
         # 计算总耗时
         total_time = time.time() - start_time
-        terminal_logger.complete_operation(f"查询完成 (耗时 {total_time:.2f}s)")
+        logger.complete_operation(f"查询完成 (耗时 {total_time:.2f}s)")
         
         # 准备统计信息
         tokens_per_sec = token_count / total_time if total_time > 0 else 0
