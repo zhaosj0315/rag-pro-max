@@ -101,6 +101,10 @@ from src.chat import HistoryManager, SuggestionManager
 from src.kb import KBManager
 kb_manager = KBManager()
 
+# 性能监控 (v1.5.1)
+from src.ui.performance_monitor import get_monitor
+perf_monitor = get_monitor()
+
 # 引入 RAG 引擎
 from src.rag_engine import RAGEngine
 
@@ -435,6 +439,9 @@ with st.sidebar:
     
     # P0改进3: 高级功能（默认折叠）- 使用新组件 (Stage 3.2.3)
     advanced_config = render_advanced_features()
+    
+    # v1.5.1: 性能监控面板
+    perf_monitor.render_panel()
     
     # P0改进3: 系统工具（默认折叠）
     with st.expander("🛠️ 系统工具", expanded=False):

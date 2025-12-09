@@ -1,0 +1,92 @@
+"""
+性能监控面板
+v1.5.1 新增功能
+"""
+
+import streamlit as st
+import time
+from typing import Dict, Any, Optional
+from src.logging import LogManager
+
+
+class PerformanceMonitor:
+    """性能监控器"""
+    
+    def __init__(self):
+        self.logger = LogManager()
+        
+    def render_panel(self):
+        """渲染性能监控面板"""
+        with st.expander("📊 性能监控", expanded=False):
+            # 获取性能指标
+            metrics = self.logger.get_metrics()
+            
+            if not metrics or metrics.get('total_operations', 0) == 0:
+                st.info("💡 暂无性能数据，开始对话后将显示统计信息")
+                return
+            
+            # 查询性能
+            st.markdown("**🔍 查询性能**")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                avg_time = metrics.get('avg_duration', 0)
+                st.metric("平均耗时", f"{avg_time:.2f}s")
+            
+            with col2:
+                min_time = metrics.get('min_duration', 0)
+                st.metric("最快", f"{min_time:.2f}s")
+            
+            with col3:
+                max_time = metrics.get('max_duration', 0)
+                st.metric("最慢", f"{max_time:.2f}s")
+            
+            # 查询统计
+            st.markdown("**📈 查询统计**")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                total_queries = metrics.get('total_operations', 0)
+                st.metric("总查询数", total_queries)
+            
+            with col2:
+                total_time = metrics.get('total_duration', 0)
+                st.metric("总耗时", f"{total_time:.1f}s")
+            
+            # 最近查询
+            if 'last_query_stats' in st.session_state:
+                st.markdown("**⏱️ 最近查询**")
+                stats = st.session_state.last_query_stats
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    query_time = stats.get('time', 0)
+                    st.caption(f"耗时: {query_time:.2f}s")
+                
+                with col2:
+                    doc_count = stats.get('doc_count', 0)
+                    st.caption(f"检索文档: {doc_count} 个")
+            
+            # 操作按钮
+            st.markdown("---")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("🔄 刷新", use_container_width=True, key="perf_refresh"):
+                    st.rerun()
+            
+            with col2:
+                if st.button("🗑️ 清空", use_container_width=True, key="perf_clear"):
+                    self.logger.metrics.clear()
+                    if 'last_query_stats' in st.session_state:
+                        del st.session_state.last_query_stats
+                    st.success("✅ 已清空")
+                    time.sleep(0.5)
+                    st.rerun()
+
+
+def get_monitor() -> PerformanceMonitor:
+    """获取全局性能监控器"""
+    if 'performance_monitor' not in st.session_state:
+        st.session_state.performance_monitor = PerformanceMonitor()
+    return st.session_state.performance_monitor
