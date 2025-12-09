@@ -281,7 +281,16 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
                     if keywords:
                         kb_query = " ".join(keywords[:3])  # 使用前3个关键词
                         print(f"[DEBUG] 查询知识库: {kb_query}")  # 调试
-                        kb_response = query_engine.query(kb_query)
+                        
+                        # 修复：使用正确的查询方法
+                        if hasattr(query_engine, 'query'):
+                            kb_response = query_engine.query(kb_query)
+                        elif hasattr(query_engine, 'chat'):
+                            kb_response = query_engine.chat(kb_query)
+                        else:
+                            print(f"[DEBUG] query_engine 类型: {type(query_engine)}")
+                            kb_response = None
+                        
                         if kb_response and hasattr(kb_response, 'source_nodes'):
                             # 获取相关文档的标题或摘要
                             topics = []
@@ -313,30 +322,15 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
             
             questions = [re.sub(r'^[\d\.\-\s]+', '', q).strip() for q in text.split('\n') if q.strip()]
             
-            # 验证问题是否能在知识库中找到内容
-            if query_engine and questions:
-                valid_questions = []
-                for q in questions[:num_questions * 2]:  # 多生成一些备选
-                    try:
-                        # 快速检索验证
-                        retriever = query_engine.retriever
-                        nodes = retriever.retrieve(q)
-                        # 检查是否有高相关度的结果
-                        if nodes and len(nodes) > 0 and nodes[0].score > 0.3:
-                            valid_questions.append(q)
-                            if len(valid_questions) >= num_questions:
-                                break
-                    except:
-                        continue
-                
-                if valid_questions:
-                    result["questions"] = valid_questions[:num_questions]
-                else:
-                    result["questions"] = fallback
-            elif not questions:
-                result["questions"] = fallback
-            else:
+            print(f"[DEBUG] 解析出 {len(questions)} 个问题")  # 调试
+            
+            # 直接返回生成的问题，不再验证（验证逻辑有问题）
+            if questions:
                 result["questions"] = questions[:num_questions]
+                print(f"[DEBUG] 返回问题: {result['questions']}")  # 调试
+            else:
+                result["questions"] = fallback
+                print(f"[DEBUG] 使用 fallback")  # 调试
                 
         except Exception as e:
             if logger:
