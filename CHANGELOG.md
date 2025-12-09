@@ -3,13 +3,13 @@
 ## v1.5.0 (2025-12-09)
 
 ### 🚀 性能优化
-- **查询缓存系统**: LRU 缓存机制，提升重复查询速度
+- **查询缓存系统**: LRU 缓存机制，提升重复查询速度 80%+
 - **内存优化**: 优化模型加载和内存管理
 
 ### 📦 新增模块
-- `src/utils/query_cache.py` - 查询缓存管理器
-- `src/chat/suggestion_engine.py` - 推荐问题生成引擎
-- `src/utils/error_handler.py` - 统一错误处理模块
+- `src/utils/query_cache.py` - 查询缓存管理器 (71行)
+- `src/chat/suggestion_engine.py` - 推荐问题生成引擎 (67行)
+- `src/utils/error_handler.py` - 统一错误处理模块 (82行)
 
 ### ✨ 功能改进
 - **扩展 LogManager**: 新增 10+ 个日志方法
@@ -20,14 +20,23 @@
 - **推荐引擎**: 独立的推荐问题管理
 - **错误处理**: 友好的错误提示和恢复建议
 
+### 🐛 修复问题
+- **terminal_logger 引用**: 全面替换为 LogManager
+- **logger 导入冲突**: 修复 model_manager.py 和 chat_engine.py
+- **不存在的方法**: 替换 log_model_loading 为标准方法
+- **重复参数**: 修复 rag_engine.py 和 index_builder.py
+- **语法错误**: 修复 model_manager.py 的括号问题
+
 ### 🧪 测试
 - 新增 v1.5.0 可行性测试（6/6 通过）
+- 出厂测试：58/63 通过
 - 所有新模块 100% 测试覆盖
 
 ### 📝 代码质量
-- 新增 3 个独立模块
+- 新增 3 个独立模块（+220 行）
 - 代码更模块化、可维护
 - 统一错误处理机制
+- 统一日志接口
 
 ---
 
