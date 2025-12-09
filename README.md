@@ -70,16 +70,230 @@
 - 4GB+ 内存
 - 10GB+ 磁盘空间（包含模型缓存）
 
-### 安装依赖
+### 平台支持
+
+- ✅ macOS (M1/M2/M3/M4, Intel)
+- ✅ Linux (Ubuntu, CentOS, Debian)
+- ✅ Windows (10/11)
+- ✅ Docker (跨平台)
+
+---
+
+## 📦 安装部署
+
+### macOS / Linux
+
+#### 方式 1: 自动部署（推荐）
 
 ```bash
 # 克隆项目
-git clone https://github.com/yourusername/rag-pro-max.git
+git clone https://github.com/zhaosj0315/rag-pro-max.git
 cd rag-pro-max
 
-# 安装依赖
+# Linux 自动部署
+chmod +x scripts/deploy_linux.sh
+./scripts/deploy_linux.sh
+
+# macOS 直接安装
 pip install -r requirements.txt
 ```
+
+#### 方式 2: 手动安装
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/zhaosj0315/rag-pro-max.git
+cd rag-pro-max
+
+# 2. 创建虚拟环境（可选）
+python3 -m venv venv
+source venv/bin/activate  # macOS/Linux
+
+# 3. 安装依赖
+pip install -r requirements.txt
+
+# 4. 创建必要目录
+mkdir -p vector_db_storage chat_histories temp_uploads hf_cache app_logs suggestion_history
+```
+
+#### 启动应用
+
+```bash
+# 推荐方式（自动测试）
+./start.sh
+
+# 直接启动
+streamlit run src/apppro.py
+```
+
+---
+
+### Windows
+
+#### 方式 1: 自动部署（推荐）
+
+1. 下载项目：
+   ```cmd
+   git clone https://github.com/zhaosj0315/rag-pro-max.git
+   cd rag-pro-max
+   ```
+
+2. 双击运行 `scripts\deploy_windows.bat`
+
+3. 按提示完成部署
+
+#### 方式 2: 手动安装
+
+```cmd
+# 1. 克隆项目
+git clone https://github.com/zhaosj0315/rag-pro-max.git
+cd rag-pro-max
+
+# 2. 创建虚拟环境（可选）
+python -m venv venv
+venv\Scripts\activate
+
+# 3. 安装依赖
+pip install -r requirements.txt
+
+# 4. 创建必要目录
+mkdir vector_db_storage chat_histories temp_uploads hf_cache app_logs suggestion_history
+```
+
+#### 启动应用
+
+```cmd
+# 方式 1: 双击运行
+start_windows.bat
+
+# 方式 2: 命令行
+streamlit run src/apppro.py
+```
+
+#### 创建桌面快捷方式
+
+1. 右键 `start_windows.bat`
+2. 发送到 → 桌面快捷方式
+3. 双击快捷方式启动
+
+---
+
+### Docker 部署（跨平台）
+
+#### 快速开始
+
+```bash
+# 1. 构建镜像
+./scripts/docker-build.sh
+
+# 2. 启动服务
+docker-compose up -d
+
+# 3. 访问应用
+# 浏览器打开：http://localhost:8501
+```
+
+#### Docker 管理
+
+```bash
+# 查看日志
+docker logs -f rag-pro-max
+
+# 停止服务
+docker-compose down
+
+# 重启服务
+docker-compose restart
+
+# 进入容器
+docker exec -it rag-pro-max bash
+```
+
+---
+
+## 🔧 部署验证
+
+### 验证清单
+
+运行以下命令验证部署：
+
+```bash
+# 1. 检查 Python 版本
+python --version  # 应该 >= 3.8
+
+# 2. 检查依赖
+pip list | grep streamlit
+
+# 3. 运行测试
+python tests/factory_test.py
+
+# 4. 测试启动
+streamlit run src/apppro.py --server.headless=true
+```
+
+### 常见问题
+
+#### Linux 特定问题
+
+**问题**: `ModuleNotFoundError: No module named 'tkinter'`
+
+**解决**:
+```bash
+# Ubuntu/Debian
+sudo apt-get install python3-tk
+
+# CentOS/RHEL
+sudo yum install python3-tkinter
+```
+
+**问题**: 权限不足
+
+**解决**:
+```bash
+chmod +x start.sh scripts/*.sh
+```
+
+#### Windows 特定问题
+
+**问题**: `'python' 不是内部或外部命令`
+
+**解决**:
+1. 重新安装 Python
+2. 勾选 "Add Python to PATH"
+3. 重启命令提示符
+
+**问题**: 端口被占用
+
+**解决**:
+```cmd
+# 查看占用端口的进程
+netstat -ano | findstr :8501
+
+# 使用其他端口
+streamlit run src/apppro.py --server.port 8502
+```
+
+---
+
+## 🌐 访问应用
+
+应用启动后会自动打开浏览器，或手动访问：
+
+- **本地**: http://localhost:8501
+- **局域网**: http://YOUR_IP:8501
+
+### 局域网访问配置
+
+编辑 `.streamlit/config.toml`（如不存在则创建）：
+
+```toml
+[server]
+headless = true
+address = "0.0.0.0"
+port = 8501
+```
+
+---
 
 ### 本地运行
 
