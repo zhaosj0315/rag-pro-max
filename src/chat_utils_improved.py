@@ -277,8 +277,10 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
                 try:
                     # 提取关键词查询知识库
                     keywords = _extract_keywords(short_context)
+                    print(f"[DEBUG] 提取关键词: {keywords[:3]}")  # 调试
                     if keywords:
                         kb_query = " ".join(keywords[:3])  # 使用前3个关键词
+                        print(f"[DEBUG] 查询知识库: {kb_query}")  # 调试
                         kb_response = query_engine.query(kb_query)
                         if kb_response and hasattr(kb_response, 'source_nodes'):
                             # 获取相关文档的标题或摘要
@@ -288,7 +290,9 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
                                     topics.append(node.metadata['file_name'])
                             if topics:
                                 kb_topics = f"\n知识库相关主题：{', '.join(topics)}"
-                except:
+                                print(f"[DEBUG] 知识库主题: {topics}")  # 调试
+                except Exception as e:
+                    print(f"[DEBUG] 知识库查询失败: {e}")  # 调试
                     pass  # 静默失败，不影响主流程
             
             prompt = (
@@ -300,10 +304,14 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
                 f"内容：\n{short_context}"
             )
             
+            print(f"[DEBUG] 是否有知识库主题: {bool(kb_topics)}")  # 调试
+            
             resp = Settings.llm.complete(prompt)
             text = resp.text.strip()
             
-            questions = [re.sub(r'^[\\d\\.\\-\\s]+', '', q).strip() for q in text.split('\n') if q.strip()]
+            print(f"[DEBUG] LLM 生成的问题: {text[:100]}...")  # 调试
+            
+            questions = [re.sub(r'^[\d\.\-\s]+', '', q).strip() for q in text.split('\n') if q.strip()]
             
             # 验证问题是否能在知识库中找到内容
             if query_engine and questions:
