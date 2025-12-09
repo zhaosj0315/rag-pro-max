@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.5.1-blue.svg)
+![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Docker-lightgrey.svg)
@@ -832,6 +832,16 @@ A: 使用命令 `sudo python3 system_monitor.py`。Streamlit 内置监控只能�
 ---
 
 ## 📄 更新日志
+
+### v1.6.0 (2025-12-09) - 最终版
+- ✨ **查询改写 (Query Rewriting)** - 自动优化用户查询，提升检索准确率 5-10%
+- ✨ **文档预览 (Document Preview)** - 上传前/后预览文档，带翻页功能（每页10个）
+- ✨ **智能命名 (Smart Naming)** - 自动生成有意义的知识库名称
+- 🔧 **队列处理优化** - 自动处理队列中的问题，避免中断
+- 🔧 **知识库切换保护** - 处理问题时禁止切换，避免对话中断
+- 📦 新增 3 个模块（query_rewriter, document_viewer, document_preview）
+- 🧪 测试：2/2 单元测试通过
+- 📚 完整功能文档（docs/V1.6_FEATURES.md）
 
 ### v1.5.1 (2025-12-09)
 - ✨ **性能监控面板** - 实时查看查询性能和统计信息

@@ -105,6 +105,13 @@ kb_manager = KBManager()
 from src.ui.performance_monitor import get_monitor
 perf_monitor = get_monitor()
 
+# 查询改写 (v1.6)
+from src.query.query_rewriter import QueryRewriter
+
+# 文档预览 (v1.6)
+from src.kb.document_viewer import DocumentViewer
+from src.ui.document_preview import show_upload_preview, show_kb_documents
+
 # 引入 RAG 引擎
 from src.rag_engine import RAGEngine
 
@@ -625,6 +632,44 @@ with st.sidebar:
             label_visibility="collapsed"
         )
         
+        # 文档预览 (v1.6) - 带翻页
+        if uploaded_files:
+            with st.expander(f"📄 已选择 {len(uploaded_files)} 个文件 - 点击预览", expanded=False):
+                # 翻页设置
+                page_size = 10
+                total_pages = (len(uploaded_files) - 1) // page_size + 1
+                
+                if 'preview_page' not in st.session_state:
+                    st.session_state.preview_page = 0
+                
+                # 翻页控制
+                col1, col2, col3 = st.columns([1, 2, 1])
+                if col1.button("⬅️ 上一页", disabled=st.session_state.preview_page == 0):
+                    st.session_state.preview_page -= 1
+                    st.rerun()
+                col2.write(f"第 {st.session_state.preview_page + 1}/{total_pages} 页")
+                if col3.button("下一页 ➡️", disabled=st.session_state.preview_page >= total_pages - 1):
+                    st.session_state.preview_page += 1
+                    st.rerun()
+                
+                st.divider()
+                
+                # 显示当前页的文件
+                start_idx = st.session_state.preview_page * page_size
+                end_idx = min(start_idx + page_size, len(uploaded_files))
+                
+                for uploaded_file in uploaded_files[start_idx:end_idx]:
+                    col1, col2, col3 = st.columns([4, 1, 1])
+                    col1.write(f"📎 {uploaded_file.name}")
+                    col2.write(f"{uploaded_file.size / 1024:.1f} KB")
+                    if col3.button("👁️", key=f"preview_{uploaded_file.name}_{uploaded_file.size}", help="预览"):
+                        st.session_state['preview_file'] = uploaded_file
+                
+                # 显示预览对话框
+                if 'preview_file' in st.session_state and st.session_state.preview_file:
+                    show_upload_preview(st.session_state.preview_file)
+                    st.session_state.preview_file = None
+        
         # 处理上传 (Stage 4.1 - 使用 UploadHandler)
         if uploaded_files:
             if 'last_uploaded_names' not in st.session_state:
@@ -698,6 +743,35 @@ with st.sidebar:
                     st.caption(type_text)
                 
                 auto_name = folder_name
+                
+                # 智能生成知识库名称
+                if cnt > 0:
+                    # 分析文件类型，生成有意义的名称
+                    main_types = sorted(file_types.items(), key=lambda x: x[1], reverse=True)
+                    if main_types:
+                        main_ext = main_types[0][0].replace('.', '').upper()
+                        
+                        # 根据文件类型生成建议名称
+                        if cnt == 1:
+                            # 单文件：用文件名
+                            files = [f for f in os.listdir(target_path) if not f.startswith('.')]
+                            if files:
+                                auto_name = os.path.splitext(files[0])[0]
+                        elif main_ext in ['PDF', 'DOCX', 'DOC']:
+                            auto_name = "文档集合"
+                        elif main_ext in ['MD', 'TXT']:
+                            auto_name = "笔记集合"
+                        elif main_ext in ['PY', 'JS', 'JAVA']:
+                            auto_name = "代码库"
+                        elif main_ext in ['XLSX', 'CSV']:
+                            auto_name = "数据集"
+                        else:
+                            auto_name = f"{main_ext}文件集"
+                        
+                        # 添加日期后缀避免重名
+                        from datetime import datetime
+                        date_suffix = datetime.now().strftime("%Y%m%d")
+                        auto_name = f"{auto_name}_{date_suffix}"
             else:
                 st.error("❌ 路径不存在，请检查路径是否正确")
 
@@ -705,13 +779,22 @@ with st.sidebar:
         st.write("")
         if is_create_mode:
             st.markdown("**知识库名称**")
+            
+            # 显示智能建议
+            if auto_name:
+                st.caption(f"💡 建议名称：{auto_name}")
+            
             final_kb_name = st.text_input(
                 "知识库名称", 
-                value=sanitize_filename(auto_name), 
-                placeholder="例如: Project_Alpha, 技术文档库",
+                value=sanitize_filename(auto_name) if auto_name else "", 
+                placeholder="留空自动生成，或输入自定义名称",
                 label_visibility="collapsed",
-                help="建议使用英文、数字、下划线，避免特殊字符"
+                help="留空将自动生成有意义的名称"
             )
+            
+            # 如果用户没输入，使用自动生成的名称
+            if not final_kb_name and auto_name:
+                final_kb_name = sanitize_filename(auto_name)
         else:
             final_kb_name = current_kb_name
 
@@ -1048,11 +1131,17 @@ active_kb_name = current_kb_name if not is_create_mode else None
 
 # 自动加载逻辑
 if active_kb_name and active_kb_name != st.session_state.current_kb_id:
-    st.session_state.current_kb_id = active_kb_name
-    st.session_state.chat_engine = None
-    with st.spinner("📜 正在加载对话历史..."):
-        st.session_state.messages = HistoryManager.load(active_kb_name)
-    st.session_state.suggestions_history = []
+    # 只在没有正在处理的问题时才切换
+    if not st.session_state.get('is_processing', False):
+        st.session_state.current_kb_id = active_kb_name
+        st.session_state.chat_engine = None
+        with st.spinner("📜 正在加载对话历史..."):
+            st.session_state.messages = HistoryManager.load(active_kb_name)
+        st.session_state.suggestions_history = []
+    else:
+        st.warning("⚠️ 正在处理问题，请等待完成后再切换知识库")
+        # 恢复之前的选择
+        st.session_state.current_nav = f"📂 {st.session_state.current_kb_id}"
 
 if active_kb_name and st.session_state.chat_engine is None:
     db_path = os.path.join(output_base, active_kb_name)
@@ -1473,69 +1562,73 @@ if active_kb_name:
         if not manifest['files']: 
             st.info("暂无文件")
         else:
-            # 计算存储大小
-            import os
-            db_size = 0
-            if os.path.exists(db_path):
-                for root, dirs, files in os.walk(db_path):
-                    db_size += sum(os.path.getsize(os.path.join(root, f)) for f in files)
-            db_size_mb = db_size / (1024 * 1024)
+            # 文档列表查看 (v1.6)
+            tab1, tab2 = st.tabs(["📊 统计信息", "📄 文档列表"])
             
-            # 计算成功率
-            files_with_chunks = len([f for f in manifest['files'] if len(f.get('doc_ids', [])) > 0])
-            success_rate = (files_with_chunks / file_cnt * 100) if file_cnt > 0 else 0
-            
-            # 计算压缩比和存储效率（统一为字节）
-            total_sz_bytes = total_sz * 1024  # total_sz 是 KB，转换为字节
-            compression_ratio = (total_sz_bytes / db_size) if db_size > 0 else 0
-            storage_efficiency = f"{compression_ratio:.1f}x" if compression_ratio > 1 else "1.0x" if compression_ratio > 0 else "N/A"
-            
-            # 单行统计摘要
-            time_range = f"{oldest_date[:10]} ~ {newest_date[:10]}" if oldest_date and newest_date else last_upd
-            st.markdown(f"**📊 统计** · {file_cnt} 文件 · {total_chunks} 片段 · 📁 原始 {f'{total_sz/1024:.1f}MB' if total_sz > 1024 else f'{int(total_sz)}KB'} · 💾 向量库 {db_size_mb:.1f}MB ({storage_efficiency}) · 📅 {time_range}")
-            
-            # 核心指标 + 质量分析（6列）
-            metric_col1, metric_col2, metric_col3, metric_col4, metric_col5, metric_col6 = st.columns(6)
-            avg_chunks = total_chunks / file_cnt if file_cnt > 0 else 0
-            avg_size = (total_sz / file_cnt) if file_cnt > 0 else 0
-            
-            metric_col1.metric("📈 平均片段", f"{avg_chunks:.1f}")
-            metric_col2.metric("📊 平均大小", f"{avg_size/1024:.1f}KB" if avg_size > 1024 else f"{int(avg_size)}KB")
-            
-            # 健康度
-            health_icon = "🟢" if success_rate >= 90 else "🟡" if success_rate >= 70 else "🔴"
-            metric_col3.metric("💚 健康度", f"{health_icon} {success_rate:.0f}%")
-            
-            # 质量分析
-            low_quality = len([f for f in manifest['files'] if len(f.get('doc_ids', [])) < 2])
-            large_files = len([f for f in manifest['files'] if 'MB' in f['size']])
-            empty_docs = len([f for f in manifest['files'] if len(f.get('doc_ids', [])) == 0])
-            
-            quality_status = "✅ 优秀" if low_quality == 0 and large_files == 0 and empty_docs == 0 else f"⚠️ {empty_docs}空 {low_quality}低质"
-            metric_col4.metric("🔍 质量", quality_status)
-            
-            # 文件类型数量
-            type_count = len(file_types)
-            metric_col5.metric("📂 类型", f"{type_count} 种")
-            
-            metric_col6.metric("🔤 模型", kb_model.split('/')[-1][:12] if '/' in kb_model else kb_model[:12])
-            
-            st.divider()
-            
-            # 四列布局：类型分布 + 大小分布 + 片段分布 + 数据洞察
-            type_col, size_col, chunk_col, insight_col = st.columns([2, 2, 2, 2])
-            
-            with type_col:
-                st.markdown("**📂 类型分布**")
-                sorted_types = sorted(file_types.items(), key=lambda x: x[1], reverse=True)
-                for i, (ftype, count) in enumerate(sorted_types[:5]):  # 显示前5种
-                    pct = (count / file_cnt * 100) if file_cnt > 0 else 0
-                    bar = "█" * int(pct / 5) + "░" * (20 - int(pct / 5))
-                    st.caption(f"{ftype}: {count} ({pct:.0f}%) {bar[:10]}")
-                if len(sorted_types) > 5:
-                    other_count = sum(c for _, c in sorted_types[5:])
-                    other_pct = (other_count / file_cnt * 100) if file_cnt > 0 else 0
-                    st.caption(f"其他: {other_count} ({other_pct:.0f}%)")
+            with tab1:
+                # 计算存储大小
+                import os
+                db_size = 0
+                if os.path.exists(db_path):
+                    for root, dirs, files in os.walk(db_path):
+                        db_size += sum(os.path.getsize(os.path.join(root, f)) for f in files)
+                db_size_mb = db_size / (1024 * 1024)
+                
+                # 计算成功率
+                files_with_chunks = len([f for f in manifest['files'] if len(f.get('doc_ids', [])) > 0])
+                success_rate = (files_with_chunks / file_cnt * 100) if file_cnt > 0 else 0
+                
+                # 计算压缩比和存储效率（统一为字节）
+                total_sz_bytes = total_sz * 1024  # total_sz 是 KB，转换为字节
+                compression_ratio = (total_sz_bytes / db_size) if db_size > 0 else 0
+                storage_efficiency = f"{compression_ratio:.1f}x" if compression_ratio > 1 else "1.0x" if compression_ratio > 0 else "N/A"
+                
+                # 单行统计摘要
+                time_range = f"{oldest_date[:10]} ~ {newest_date[:10]}" if oldest_date and newest_date else last_upd
+                st.markdown(f"**📊 统计** · {file_cnt} 文件 · {total_chunks} 片段 · 📁 原始 {f'{total_sz/1024:.1f}MB' if total_sz > 1024 else f'{int(total_sz)}KB'} · 💾 向量库 {db_size_mb:.1f}MB ({storage_efficiency}) · 📅 {time_range}")
+                
+                # 核心指标 + 质量分析（6列）
+                metric_col1, metric_col2, metric_col3, metric_col4, metric_col5, metric_col6 = st.columns(6)
+                avg_chunks = total_chunks / file_cnt if file_cnt > 0 else 0
+                avg_size = (total_sz / file_cnt) if file_cnt > 0 else 0
+                
+                metric_col1.metric("📈 平均片段", f"{avg_chunks:.1f}")
+                metric_col2.metric("📊 平均大小", f"{avg_size/1024:.1f}KB" if avg_size > 1024 else f"{int(avg_size)}KB")
+                
+                # 健康度
+                health_icon = "🟢" if success_rate >= 90 else "🟡" if success_rate >= 70 else "🔴"
+                metric_col3.metric("💚 健康度", f"{health_icon} {success_rate:.0f}%")
+                
+                # 质量分析
+                low_quality = len([f for f in manifest['files'] if len(f.get('doc_ids', [])) < 2])
+                large_files = len([f for f in manifest['files'] if 'MB' in f['size']])
+                empty_docs = len([f for f in manifest['files'] if len(f.get('doc_ids', [])) == 0])
+                
+                quality_status = "✅ 优秀" if low_quality == 0 and large_files == 0 and empty_docs == 0 else f"⚠️ {empty_docs}空 {low_quality}低质"
+                metric_col4.metric("🔍 质量", quality_status)
+                
+                # 文件类型数量
+                type_count = len(file_types)
+                metric_col5.metric("📂 类型", f"{type_count} 种")
+                
+                metric_col6.metric("🔤 模型", kb_model.split('/')[-1][:12] if '/' in kb_model else kb_model[:12])
+                
+                st.divider()
+                
+                # 四列布局：类型分布 + 大小分布 + 片段分布 + 数据洞察
+                type_col, size_col, chunk_col, insight_col = st.columns([2, 2, 2, 2])
+                
+                with type_col:
+                    st.markdown("**📂 类型分布**")
+                    sorted_types = sorted(file_types.items(), key=lambda x: x[1], reverse=True)
+                    for i, (ftype, count) in enumerate(sorted_types[:5]):  # 显示前5种
+                        pct = (count / file_cnt * 100) if file_cnt > 0 else 0
+                        bar = "█" * int(pct / 5) + "░" * (20 - int(pct / 5))
+                        st.caption(f"{ftype}: {count} ({pct:.0f}%) {bar[:10]}")
+                    if len(sorted_types) > 5:
+                        other_count = sum(c for _, c in sorted_types[5:])
+                        other_pct = (other_count / file_cnt * 100) if file_cnt > 0 else 0
+                        st.caption(f"其他: {other_count} ({other_pct:.0f}%)")
             
             with size_col:
                 st.markdown("**📊 大小分布**")
@@ -1753,6 +1846,10 @@ if active_kb_name:
                     for f in manifest['files']:
                         export_data += f"- {f['name']} ({f['type']}, {len(f.get('doc_ids', []))} 片段)\n"
                     st.download_button("下载", export_data, f"{active_kb_name}_清单.txt", use_container_width=True)
+            
+            # 文档列表标签页 (v1.6)
+            with tab2:
+                show_kb_documents(active_kb_name)
             
             st.divider()
             
@@ -2331,6 +2428,31 @@ if not st.session_state.is_processing and st.session_state.question_queue:
         logger.separator("知识库查询")
         logger.start_operation("查询", f"知识库: {active_kb_name}")
         
+        # 查询改写 (v1.6) - 在处理引用内容之前
+        query_rewriter = QueryRewriter(Settings.llm)
+        should_rewrite, reason = query_rewriter.should_rewrite(final_prompt)
+        
+        if should_rewrite:
+            logger.info(f"💡 检测到需要改写查询: {reason}")
+            rewritten_query = query_rewriter.suggest_rewrite(final_prompt)
+            
+            if rewritten_query and rewritten_query != final_prompt:
+                # 显示改写建议
+                with st.chat_message("assistant", avatar="🤖"):
+                    st.info(f"💡 **查询优化建议**\n\n原问题：{final_prompt}\n\n优化后：{rewritten_query}")
+                    col1, col2 = st.columns(2)
+                    if col1.button("✅ 使用优化后的问题", key="use_rewritten"):
+                        final_prompt = rewritten_query
+                        logger.info(f"✅ 用户选择使用优化后的查询")
+                        st.rerun()
+                    if col2.button("❌ 使用原问题", key="use_original"):
+                        logger.info(f"❌ 用户选择使用原查询")
+                        st.rerun()
+                # 暂停处理，等待用户选择
+                st.session_state.is_processing = False
+                st.session_state.question_queue.insert(0, final_prompt)  # 放回队列
+                st.stop()
+        
         # 处理引用内容
         if st.session_state.get("quote_content"):
             quoted_text = st.session_state.quote_content
@@ -2546,10 +2668,10 @@ if not st.session_state.is_processing and st.session_state.question_queue:
                     
                     st.session_state.is_processing = False  # 处理完成
                     
-                    # 不自动处理队列，避免 rerun 导致回答消失
-                    # 用户可以看到当前回答，然后手动触发下一个问题
+                    # 自动处理队列中的下一个问题
                     if st.session_state.question_queue:
-                        logger.info(f"📝 队列中还有 {len(st.session_state.question_queue)} 个问题待处理")
+                        logger.info(f"📝 队列中还有 {len(st.session_state.question_queue)} 个问题，自动处理下一个")
+                        st.rerun()  # 触发重新运行，处理下一个问题
                         # 显示提示，让用户知道还有问题在队列中
                         st.info(f"✅ 回答完成！队列中还有 {len(st.session_state.question_queue)} 个问题，点击下方按钮继续处理。")
                         if st.button("▶️ 处理下一个问题", key="process_next", type="primary"):
