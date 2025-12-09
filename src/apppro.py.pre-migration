@@ -66,8 +66,7 @@ from llama_index.core.schema import Document
 from src.custom_embeddings import create_custom_embedding
 
 # 引入日志模块
-from src.logging import LogManager
-logger = LogManager()
+from src.logger import logger
 from src.terminal_logger import terminal_logger
 from src.chat_utils_improved import generate_follow_up_questions_safe as generate_follow_up_questions
 
@@ -90,16 +89,25 @@ from src.utils.document_processor import (
     get_relevance_label,
     load_pptx_file
 )
-
-# 引入配置管理
-from src.config import ConfigLoader, ManifestManager
-
-# 引入聊天管理
-from src.chat import HistoryManager, SuggestionManager
-
-# 引入知识库管理
-from src.kb import KBManager
-kb_manager = KBManager()
+from src.utils.config_manager import (
+    load_config,
+    save_config,
+    load_manifest,
+    update_manifest,
+    get_manifest_path
+)
+from src.utils.chat_manager import (
+    load_chat_history,
+    save_chat_history,
+    clear_chat_history
+)
+from src.utils.kb_manager import (
+    rename_kb,
+    get_existing_kbs,
+    delete_kb,
+    auto_save_kb_info,
+    get_kb_info
+)
 
 # 引入 RAG 引擎
 from src.rag_engine import RAGEngine
@@ -507,7 +515,7 @@ with st.sidebar:
     # 使用当前工作目录下的 vector_db_storage
     default_output_path = os.path.join(os.getcwd(), "vector_db_storage")
     output_base = st.text_input("存储根目录", value=default_output_path)
-    existing_kbs = (setattr(kb_manager, "base_path", output_base), kb_manager.list_all())[1]
+    existing_kbs = get_existing_kbs(output_base)
 
     # --- 核心导航 ---
     st.markdown("#### 📚 知识库管理")
@@ -745,7 +753,7 @@ with st.sidebar:
                 st.session_state.messages.pop()
                 # 保存更新后的历史
                 if current_kb_name:
-                    HistoryManager.save(current_kb_name, state.get_messages())
+                    save_chat_history(current_kb_name, state.get_messages())
                 st.toast("✅ 已撤销上一条消息")
                 time.sleep(0.5)
                 st.rerun()
@@ -755,7 +763,7 @@ with st.sidebar:
             st.session_state.messages = []
             st.session_state.suggestions_history = []
             if current_kb_name:
-                HistoryManager.save(current_kb_name, [])
+                save_chat_history(current_kb_name, [])
             st.toast("✅ 对话已清空")
             time.sleep(0.5)
             st.rerun()
@@ -874,7 +882,7 @@ def process_knowledge_base_logic():
     except:
         terminal_logger.success(f"✅ 嵌入模型已设置: {embed_model}")
 
-    logger.log("INFO", f"开始处理知识库: {final_kb_name}", stage="知识库处理")
+    logger.log_kb_start(kb_name=final_kb_name)
     
     # UI 状态容器
     status_container = st.status(f"🚀 处理知识库: {final_kb_name}", expanded=True)
@@ -942,8 +950,10 @@ def process_knowledge_base_logic():
     terminal_logger.info(f"📊 统计: {result.file_count} 个文件, {result.doc_count} 个文档片段")
     terminal_logger.info(f"⏱️  耗时: {duration:.1f} 秒")
     
-    logger.log("SUCCESS", f"知识库处理完成: {final_kb_name}, 文档数: {result.doc_count
-    }", stage="知识库处理")
+    logger.log_kb_complete(
+        kb_name=final_kb_name,
+        doc_count=result.doc_count
+    )
     
     status_container.update(label=f"✅ 知识库 '{final_kb_name}' 处理完成", state="complete", expanded=False)
     
@@ -1044,14 +1054,14 @@ if active_kb_name and active_kb_name != st.session_state.current_kb_id:
     st.session_state.current_kb_id = active_kb_name
     st.session_state.chat_engine = None
     with st.spinner("📜 正在加载对话历史..."):
-        st.session_state.messages = HistoryManager.load(active_kb_name)
+        st.session_state.messages = load_chat_history(active_kb_name)
     st.session_state.suggestions_history = []
 
 if active_kb_name and st.session_state.chat_engine is None:
     db_path = os.path.join(output_base, active_kb_name)
     if os.path.exists(db_path):
         try:
-            logger.log("INFO", f"开始加载知识库: {active_kb_name}", stage="知识库加载")
+            logger.log_kb_mount_start(active_kb_name)
             
             # 检测知识库的向量维度
             kb_dim = get_kb_embedding_dim(db_path)
@@ -1269,7 +1279,7 @@ if active_kb_name and st.session_state.chat_engine is None:
                                 kb_embed_model = kb_info.get('embedding_model', 'BAAI/bge-large-zh-v1.5')
                         else:
                             # 兼容旧版本，使用 manifest
-                            kb_manifest = ManifestManager.load(db_path)
+                            kb_manifest = load_manifest(db_path)
                             kb_embed_model = kb_manifest.get('embed_model', 'BAAI/bge-large-zh-v1.5')
                         
                         terminal_logger.info(f"📊 知识库模型: {kb_embed_model}")
@@ -1337,13 +1347,13 @@ if active_kb_name and st.session_state.chat_engine is None:
                     )
             
             terminal_logger.success("问答引擎已启用GPU加速")
-            logger.log("SUCCESS", f"知识库加载成功: {active_kb_name}", stage="知识库加载")
+            logger.log_kb_mount_success(active_kb_name)
             st.toast(f"✅ 知识库 '{active_kb_name}' 挂载成功！")
             
             # 释放内存
             cleanup_memory()
         except Exception as e: 
-            logger.log("ERROR", f"知识库加载失败: {active_kb_name} - {str(e)}", stage="知识库加载")
+            logger.log_kb_mount_error(active_kb_name, e)
             st.error(f"知识库挂载失败，请尝试【强制重建】：{e}")
             st.session_state.chat_engine = None 
 
@@ -1363,7 +1373,7 @@ if btn_start:
         "embed_url_ollama": embed_url if embed_provider.startswith("Ollama") else "",
         "embed_model_ollama": embed_model if embed_provider.startswith("Ollama") else ""
     }
-    ConfigLoader.save(config_to_save)
+    save_config(config_to_save)
 
     if not final_kb_name:
         st.error("请输入知识库名称")
@@ -1392,7 +1402,7 @@ if btn_start:
 # --- 主视图渲染 ---
 if active_kb_name:
     db_path = os.path.join(output_base, active_kb_name)
-    manifest = ManifestManager.load(db_path)
+    manifest = load_manifest(db_path)
     file_cnt = len(manifest.get('files', []))
     last_upd = manifest.get('last_updated', 'N/A')[:10]
     # 读取知识库模型信息（优先使用 .kb_info.json）
@@ -1437,13 +1447,9 @@ if active_kb_name:
             n = sanitize_filename(st.session_state.new_name_input)
             if n and n != active_kb_name:
                 try:
-                    kb_manager.base_path = output_base
-                    success, msg = kb_manager.rename(active_kb_name, n)
-                    if success:
-                        st.session_state.current_nav = f"📂 {n}"
-                        st.toast("✅ 重命名成功")
-                    else:
-                        st.error(f"重命名失败: {msg}")
+                    rename_kb(active_kb_name, n, output_base)
+                    st.session_state.current_nav = f"📂 {n}"
+                    st.toast("✅ 重命名成功")
                 except FileExistsError as e:
                     st.error(f"重命名失败: {e}")
             st.session_state.renaming = False
@@ -1730,7 +1736,7 @@ if active_kb_name:
                             progress_bar.progress((i + 1) / selected_count)
                         
                         # 保存 manifest
-                        with open(ManifestManager.get_path(db_path), 'w', encoding='utf-8') as f:
+                        with open(get_manifest_path(db_path), 'w', encoding='utf-8') as f:
                             json.dump(manifest, f, indent=4, ensure_ascii=False)
                         
                         status_text.empty()
@@ -2076,14 +2082,14 @@ if active_kb_name:
                                             summary = generate_doc_summary(doc_text, f['name'])
                                             
                                             # 更新 manifest
-                                            manifest = ManifestManager.load(db_path)
+                                            manifest = load_manifest(db_path)
                                             for file in manifest['files']:
                                                 if file['name'] == f['name']:
                                                     file['summary'] = summary
                                                     break
                                             
                                             # 保存 manifest
-                                            with open(ManifestManager.get_path(db_path), 'w', encoding='utf-8') as mf:
+                                            with open(get_manifest_path(db_path), 'w', encoding='utf-8') as mf:
                                                 json.dump(manifest, mf, indent=4, ensure_ascii=False)
                                             
                                             st.success("✅ 摘要已生成")
@@ -2140,7 +2146,7 @@ if active_kb_name and st.session_state.chat_engine and not st.session_state.mess
                 sug = [re.sub(r'^\d+\.\s*', '', q.strip()) for q in summary_lines[1:] if q.strip()][:3]
 
                 st.session_state.messages.append({"role": "assistant", "content": summary, "suggestions": sug})
-                HistoryManager.save(active_kb_name, state.get_messages())
+                save_chat_history(active_kb_name, state.get_messages())
                 st.rerun()
             except Exception as e:
                 error_msg = str(e)
@@ -2285,8 +2291,7 @@ if not st.session_state.is_processing and st.session_state.question_queue:
             kb_dim = get_kb_embedding_dim(db_path)
             
             # 为历史知识库自动保存信息
-            kb_name = os.path.basename(db_path)
-            kb_manager.save_info(kb_name, embed_model, 0)
+            auto_save_kb_info(db_path, embed_model)
             
             # 维度映射
             model_map = {
@@ -2341,10 +2346,10 @@ if not st.session_state.is_processing and st.session_state.question_queue:
             st.session_state.quote_content = None
             terminal_logger.info("📌 已应用引用内容")
         
-        logger.log("INFO", f"用户提问: {final_prompt}", stage="查询对话", details={"kb_name": active_kb_name})
+        logger.log_user_question(final_prompt, kb_name=active_kb_name)
         
         st.session_state.messages.append({"role": "user", "content": final_prompt})
-        if active_kb_name: HistoryManager.save(active_kb_name, state.get_messages())
+        if active_kb_name: save_chat_history(active_kb_name, state.get_messages())
 
         with st.chat_message("user", avatar="🧑‍💻"): st.markdown(final_prompt)
         
@@ -2365,10 +2370,10 @@ if not st.session_state.is_processing and st.session_state.question_queue:
                     if enhancements:
                         enhancement_str = " + ".join(enhancements)
                         terminal_logger.info(f"🎯 检索增强: {enhancement_str}")
-                        logger.log("INFO", f"检索增强: {enhancement_str}", stage="查询对话")
+                        logger.log("查询对话", "检索增强", f"启用功能: {enhancement_str}")
                     
                     with terminal_logger.timer("检索相关文档"):
-                        logger.log("INFO", "开始检索相关文档", stage="查询对话", details={"kb_name": active_kb_name})
+                        logger.log_retrieval_start(kb_name=active_kb_name)
                         
                         # 确保 embedding 模型已设置
                         embed = get_embed(embed_provider, embed_model, embed_key, embed_url)
@@ -2393,9 +2398,6 @@ if not st.session_state.is_processing and st.session_state.question_queue:
                             token_count += 1
                         
                         msg_placeholder.markdown(full_text)
-                    
-                    # status 块结束，确保回答仍然显示
-                    msg_placeholder.markdown(full_text)
                     
                     # 提取 token 统计 (优先使用真实数据)
                     prompt_tokens = 0
@@ -2422,7 +2424,7 @@ if not st.session_state.is_processing and st.session_state.question_queue:
                     # 多核并行处理节点
                     srcs = []
                     if response.source_nodes:
-                        logger.log("INFO", f"检索完成，找到 {len(response.source_nodes)} 个相关文档", stage="查询对话", details={"kb_name": active_kb_name})
+                        logger.log_retrieval_result(len(response.source_nodes), kb_name=active_kb_name)
                         terminal_logger.data_summary("检索结果", {
                             "查询": final_prompt[:50] + "..." if len(final_prompt) > 50 else final_prompt,
                             "相关文档": len(response.source_nodes),
@@ -2465,8 +2467,13 @@ if not st.session_state.is_processing and st.session_state.question_queue:
                         else:
                             terminal_logger.info(f"⚡ 串行处理: {len(srcs)} 个节点")
                     
-                    logger.log("SUCCESS", "回答生成完成", stage="查询对话", details={"kb_name": active_kb_name, "model": llm_model, "tokens": token_count, "prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens
-                    })
+                    logger.log_answer_complete(
+                        kb_name=active_kb_name, 
+                        model=llm_model, 
+                        tokens=token_count,
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens
+                    )
                     
                     # 计算总耗时
                     total_time = time.time() - start_time
@@ -2524,13 +2531,19 @@ if not st.session_state.is_processing and st.session_state.question_queue:
                         if new_sugs:
                             st.session_state.suggestions_history.extend(new_sugs)
                             terminal_logger.info(f"✨ 生成 {len(new_sugs)} 个新推荐问题")
+                            
+                            # 立即显示新生成的推荐问题
+                            st.markdown("##### 🚀 追问推荐")
+                            for idx, q in enumerate(new_sugs):
+                                if st.button(f"👉 {q}", key=f"temp_sug_{int(time.time())}_{idx}", use_container_width=True):
+                                    click_btn(q)
                         else:
                             terminal_logger.info("⚠️ 生成的问题已存在，跳过")
                     else:
                         terminal_logger.info("⚠️ 推荐问题生成失败")
                     
                     # 延迟保存：确认所有步骤（包括推荐问题）都成功后再保存
-                    if active_kb_name: HistoryManager.save(active_kb_name, state.get_messages())
+                    if active_kb_name: save_chat_history(active_kb_name, state.get_messages())
                     
                     # 释放内存
                     cleanup_memory()
@@ -2538,14 +2551,10 @@ if not st.session_state.is_processing and st.session_state.question_queue:
                     
                     st.session_state.is_processing = False  # 处理完成
                     
-                    # 不自动处理队列，避免 rerun 导致回答消失
-                    # 用户可以看到当前回答，然后手动触发下一个问题
+                    # 检查队列中是否还有问题
                     if st.session_state.question_queue:
-                        terminal_logger.info(f"📝 队列中还有 {len(st.session_state.question_queue)} 个问题待处理")
-                        # 显示提示，让用户知道还有问题在队列中
-                        st.info(f"✅ 回答完成！队列中还有 {len(st.session_state.question_queue)} 个问题，点击下方按钮继续处理。")
-                        if st.button("▶️ 处理下一个问题", key="process_next", type="primary"):
-                            st.rerun()
+                        terminal_logger.info(f"📝 队列中还有 {len(st.session_state.question_queue)} 个问题，继续处理...")
+                        st.rerun()  # 处理下一个问题
                 except Exception as e: 
                     print(f"❌ 查询出错: {e}\n")
                     st.error(f"出错: {e}")
@@ -2559,37 +2568,3 @@ if not st.session_state.is_processing and st.session_state.question_queue:
                     cleanup_memory()
                     terminal_logger.info("🧹 错误处理完成，内存已清理")
                     st.session_state.is_processing = False
-            
-            # 在 chat_message 块外显示推荐问题按钮
-            if st.session_state.suggestions_history:
-                st.divider()
-                st.markdown("##### 🚀 追问推荐")
-                for idx, q in enumerate(st.session_state.suggestions_history):
-                    if st.button(f"👉 {q}", key=f"sug_btn_{int(time.time())}_{idx}", use_container_width=True):
-                        click_btn(q)
-                
-                if st.button("✨ 继续推荐 3 个追问", key=f"gen_more_{int(time.time())}", type="secondary", use_container_width=True):
-                    with st.spinner("⏳ 正在生成新问题..."):
-                        all_history_questions = [m['content'] for m in st.session_state.messages if m['role'] == 'user']
-                        all_history_questions.extend(st.session_state.suggestions_history)
-                        all_history_questions.extend(st.session_state.question_queue)
-                        
-                        # 获取最后一条回答作为上下文
-                        last_answer = ""
-                        for msg in reversed(st.session_state.messages):
-                            if msg['role'] == 'assistant':
-                                last_answer = msg['content']
-                                break
-                        
-                        new_sugs = generate_follow_up_questions(
-                            context_text=last_answer, 
-                            num_questions=3,
-                            existing_questions=all_history_questions,
-                            query_engine=st.session_state.chat_engine if st.session_state.get('chat_engine') else None
-                        )
-                        
-                        if new_sugs:
-                            st.session_state.suggestions_history.extend(new_sugs)
-                            st.rerun()
-                        else:
-                            st.warning("未能生成更多追问，请尝试输入新问题。")

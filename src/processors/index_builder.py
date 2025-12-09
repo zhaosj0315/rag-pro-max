@@ -364,10 +364,10 @@ class IndexBuilder:
     def _save_manifest(self, file_map):
         """保存 manifest.json"""
         try:
-            from src.utils.config_manager import update_manifest
+            from src.config import ManifestManager
             
             files_list = list(file_map.values())
-            update_manifest(
+            ManifestManager.save(
                 self.persist_dir,
                 files_list,
                 self.embed_model_name

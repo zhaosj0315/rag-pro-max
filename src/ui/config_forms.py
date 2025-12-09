@@ -54,11 +54,11 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str]:
         
         # 处理"设为默认"
         if save_as_default:
-            from src.utils.config_manager import load_config, save_config
+            from src.config import ConfigLoader
             import time
-            config = load_config()
+            config = ConfigLoader.load()
             config["llm_model_ollama"] = llm_model
-            save_config(config)
+            ConfigLoader.save(config)
             st.success(f"✅ 已设为默认: {llm_model}")
             time.sleep(1)
             st.rerun()
@@ -118,11 +118,11 @@ def render_embedding_config(defaults: dict) -> Tuple[str, str, str, str]:
         
         # 处理"设为默认"信号
         if st.session_state.get('save_embed_model'):
-            from src.utils.config_manager import load_config, save_config
+            from src.config import ConfigLoader
             import time
-            config = load_config()
+            config = ConfigLoader.load()
             config["embed_model_hf"] = st.session_state.save_embed_model
-            save_config(config)
+            ConfigLoader.save(config)
             st.success(f"✅ 已设为默认")
             time.sleep(1)
             del st.session_state.save_embed_model

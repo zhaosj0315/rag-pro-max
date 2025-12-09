@@ -59,12 +59,12 @@ class UploadHandler:
                         continue
                 
                 if self.logger:
-                    self.logger.log_file_upload(f.name, "success")
+                    self.logger.log('INFO', f"文件上传成功: {f.name}", stage="文件上传")
                 success_count += 1
                 
             except Exception as e:
                 if self.logger:
-                    self.logger.log_file_upload(f.name, "error", str(e))
+                    self.logger.log('ERROR', f"文件上传失败: {f.name} - {str(e)}", stage="文件上传")
                 skipped_count += 1
                 skip_reasons.append(f"{f.name}: 系统错误")
         

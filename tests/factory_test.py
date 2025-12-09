@@ -131,14 +131,11 @@ def test_core_imports():
         ("src.utils.document_processor", "sanitize_filename"),
         ("src.utils.document_processor", "get_file_type"),
         ("src.utils.document_processor", "get_file_info"),
-        ("src.utils.config_manager", "load_config"),
-        ("src.utils.config_manager", "save_config"),
-        ("src.utils.config_manager", "load_manifest"),
-        ("src.utils.chat_manager", "load_chat_history"),
-        ("src.utils.chat_manager", "save_chat_history"),
-        ("src.utils.kb_manager", "rename_kb"),
-        ("src.utils.kb_manager", "get_existing_kbs"),
-        ("src.utils.kb_manager", "auto_save_kb_info"),
+        ("src.config", "ConfigLoader"),
+        ("src.config", "ManifestManager"),
+        ("src.chat", "HistoryManager"),
+        ("src.chat", "SuggestionManager"),
+        ("src.kb", "KBManager"),
     ]
     
     for module_name, attr_name in modules:
