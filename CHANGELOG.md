@@ -1,5 +1,36 @@
 # 更新日志
 
+## v1.5.0 (2025-12-09)
+
+### 🚀 性能优化
+- **查询缓存系统**: LRU 缓存机制，提升重复查询速度
+- **内存优化**: 优化模型加载和内存管理
+
+### 📦 新增模块
+- `src/utils/query_cache.py` - 查询缓存管理器
+- `src/chat/suggestion_engine.py` - 推荐问题生成引擎
+- `src/utils/error_handler.py` - 统一错误处理模块
+
+### ✨ 功能改进
+- **扩展 LogManager**: 新增 10+ 个日志方法
+  - `start_operation()` / `complete_operation()`
+  - `processing()` / `data_summary()`
+  - `separator()` / `progress_bar()`
+  - `cpu_multicore_*()` 系列方法
+- **推荐引擎**: 独立的推荐问题管理
+- **错误处理**: 友好的错误提示和恢复建议
+
+### 🧪 测试
+- 新增 v1.5.0 可行性测试（6/6 通过）
+- 所有新模块 100% 测试覆盖
+
+### 📝 代码质量
+- 新增 3 个独立模块
+- 代码更模块化、可维护
+- 统一错误处理机制
+
+---
+
 ## v1.4.4 (2025-12-09)
 
 ### 🐛 Bug 修复

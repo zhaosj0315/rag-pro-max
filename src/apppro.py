@@ -68,7 +68,7 @@ from src.custom_embeddings import create_custom_embedding
 # 引入日志模块
 from src.logging import LogManager
 logger = LogManager()
-from src.terminal_logger import terminal_logger
+# terminal_logger 已被 logger 替代
 from src.chat_utils_improved import generate_follow_up_questions_safe as generate_follow_up_questions
 
 # 引入元数据管理
@@ -363,10 +363,10 @@ st.markdown("""
 
 # 应用启动日志
 if 'app_initialized' not in st.session_state:
-    terminal_logger.separator("RAG Pro Max 启动")
-    terminal_logger.info("应用初始化中...")
+    logger.separator("RAG Pro Max 启动")
+    logger.info("应用初始化中...")
     st.session_state.app_initialized = True
-    terminal_logger.success("应用初始化完成")
+    logger.success("应用初始化完成")
 
 # ==========================================
 # 2. 本地持久化与工具函数
@@ -843,7 +843,7 @@ with st.sidebar:
             json.dump(defaults, f, indent=4, ensure_ascii=False)
         
         st.success("✅ 已使用默认配置！\n\n📝 LLM: Ollama (qwen2.5:7b)\n📝 嵌入: BAAI/bge-small-zh-v1.5\n\n现在可以直接创建知识库了！")
-        terminal_logger.success("快速开始模式：已配置默认值")
+        logger.success("快速开始模式：已配置默认值")
         time.sleep(1.5)
         st.rerun()
     
@@ -861,18 +861,18 @@ def process_knowledge_base_logic():
     start_time = time.time()
 
     # 设置嵌入模型
-    terminal_logger.info(f"🔧 设置嵌入模型: {embed_model} (provider: {embed_provider})")
+    logger.info(f"🔧 设置嵌入模型: {embed_model} (provider: {embed_provider})")
     embed = get_embed(embed_provider, embed_model, embed_key, embed_url)
     if not embed:
-        terminal_logger.error(f"❌ 嵌入模型加载失败: {embed_model}")
+        logger.error(f"❌ 嵌入模型加载失败: {embed_model}")
         raise ValueError(f"无法加载嵌入模型: {embed_model}")
     
     Settings.embed_model = embed
     try:
         actual_dim = len(embed._get_text_embedding("test"))
-        terminal_logger.success(f"✅ 嵌入模型已设置: {embed_model} ({actual_dim}维)")
+        logger.success(f"✅ 嵌入模型已设置: {embed_model} ({actual_dim}维)")
     except:
-        terminal_logger.success(f"✅ 嵌入模型已设置: {embed_model}")
+        logger.success(f"✅ 嵌入模型已设置: {embed_model}")
 
     logger.log("INFO", f"开始处理知识库: {final_kb_name}", stage="知识库处理")
     
@@ -886,22 +886,22 @@ def process_knowledge_base_logic():
         if msg_type == "step":
             step_num, step_desc = args
             status_container.write(f"📂 [步骤{step_num}/6] {step_desc}")
-            terminal_logger.info(f"📂 [步骤 {step_num}/6] {step_desc}")
+            logger.info(f"📂 [步骤 {step_num}/6] {step_desc}")
             prog_bar.progress(step_num * 15)
         elif msg_type == "info":
             info_msg = args[0]
             status_container.write(f"   {info_msg}")
-            terminal_logger.info(f"   {info_msg}")
+            logger.info(f"   {info_msg}")
         elif msg_type == "warning":
             warn_msg = args[0]
             status_container.write(f"   ⚠️  {warn_msg}")
-            terminal_logger.warning(f"   ⚠️  {warn_msg}")
+            logger.warning(f"   ⚠️  {warn_msg}")
     
     # 获取源路径
     current_target_path = st.session_state.get('uploaded_path') or st.session_state.path_input
     if not current_target_path or not os.path.exists(current_target_path):
         status_container.update(label="❌ 路径无效", state="error")
-        terminal_logger.error(f"❌ 路径无效: {current_target_path}")
+        logger.error(f"❌ 路径无效: {current_target_path}")
         raise ValueError(f"路径无效: {current_target_path}")
     
     # 使用 IndexBuilder 构建索引
@@ -924,23 +924,23 @@ def process_knowledge_base_logic():
     
     if not result.success:
         status_container.update(label=f"❌ 处理失败: {result.error}", state="error")
-        terminal_logger.error(f"❌ 处理失败: {result.error}")
+        logger.error(f"❌ 处理失败: {result.error}")
         raise ValueError(result.error)
     
     # 保存索引
     if result.index:
         result.index.storage_context.persist(persist_dir=persist_dir)
-        terminal_logger.success(f"💾 索引已保存到: {persist_dir}")
+        logger.success(f"💾 索引已保存到: {persist_dir}")
     
     # 更新进度
     prog_bar.progress(100)
     
     # 计算耗时
     duration = time.time() - start_time
-    terminal_logger.separator("处理完成")
-    terminal_logger.success(f"✅ 知识库 '{final_kb_name}' 处理完成")
-    terminal_logger.info(f"📊 统计: {result.file_count} 个文件, {result.doc_count} 个文档片段")
-    terminal_logger.info(f"⏱️  耗时: {duration:.1f} 秒")
+    logger.separator("处理完成")
+    logger.success(f"✅ 知识库 '{final_kb_name}' 处理完成")
+    logger.info(f"📊 统计: {result.file_count} 个文件, {result.doc_count} 个文档片段")
+    logger.info(f"⏱️  耗时: {duration:.1f} 秒")
     
     logger.log("SUCCESS", f"知识库处理完成: {final_kb_name}, 文档数: {result.doc_count
     }", stage="知识库处理")
@@ -1066,7 +1066,7 @@ if active_kb_name and st.session_state.chat_engine is None:
                 if kb_dim in model_map:
                     required_model = model_map[kb_dim]
                     if embed_model != required_model:
-                        terminal_logger.warning(f"⚠️ 知识库维度: {kb_dim}D，自动切换模型: {required_model}")
+                        logger.warning(f"⚠️ 知识库维度: {kb_dim}D，自动切换模型: {required_model}")
                         embed_model = required_model
                         # 重新加载 embedding 模型
                         embed = get_embed(embed_provider, embed_model, embed_key, embed_url)
@@ -1081,7 +1081,7 @@ if active_kb_name and st.session_state.chat_engine is None:
             
             if is_large_kb:
                 load_start = time.time()
-                terminal_logger.info(f"📊 知识库统计: {len(vector_files)} 个文件, {total_size:.1f}MB")
+                logger.info(f"📊 知识库统计: {len(vector_files)} 个文件, {total_size:.1f}MB")
                 
                 # 进度条放在外面
                 progress_placeholder = st.empty()
@@ -1090,8 +1090,8 @@ if active_kb_name and st.session_state.chat_engine is None:
                 with st.status(f"📚 正在挂载大型知识库: {active_kb_name}（{len(vector_files)} 个文件, {total_size:.1f}MB）", expanded=True) as status:
                     # 阶段1: 加载向量数据 (0-40%)
                     status.write("⏳ [1/3] 正在加载向量数据...")
-                    terminal_logger.processing("[1/3] 开始加载向量数据...")
-                    terminal_logger.info(f"📂 加载 docstore.json ({total_size:.1f}MB)...")
+                    logger.processing("[1/3] 开始加载向量数据...")
+                    logger.info(f"📂 加载 docstore.json ({total_size:.1f}MB)...")
                     
                     # 实时进度显示
                     stage1_start = time.time()
@@ -1117,13 +1117,13 @@ if active_kb_name and st.session_state.chat_engine is None:
                     
                     progress_bar.progress(40, text=f"✅ [1/3] 向量数据加载完成 ({stage1_time:.1f}s) - 40%")
                     status.write(f"✅ [1/3] 向量数据加载完成 (耗时 {stage1_time:.1f}s)")
-                    terminal_logger.success(f"[1/3] 向量数据加载完成 ({stage1_time:.1f}s)")
+                    logger.success(f"[1/3] 向量数据加载完成 ({stage1_time:.1f}s)")
                     
                     # 阶段2: 构建索引 (40-80%)
                     status.write("⏳ [2/3] 正在构建索引...")
-                    terminal_logger.processing("[2/3] 开始构建索引...")
-                    terminal_logger.info(f"📊 加载 index_store.json...")
-                    terminal_logger.info(f"🔗 构建向量索引 (959K 节点)...")
+                    logger.processing("[2/3] 开始构建索引...")
+                    logger.info(f"📊 加载 index_store.json...")
+                    logger.info(f"🔗 构建向量索引 (959K 节点)...")
                     
                     stage2_start = time.time()
                     result2 = [None]
@@ -1147,12 +1147,12 @@ if active_kb_name and st.session_state.chat_engine is None:
                     
                     progress_bar.progress(80, text=f"✅ [2/3] 索引构建完成 ({stage2_time:.1f}s) - 80%")
                     status.write(f"✅ [2/3] 索引构建完成 (耗时 {stage2_time:.1f}s)")
-                    terminal_logger.success(f"[2/3] 索引构建完成 ({stage2_time:.1f}s)")
+                    logger.success(f"[2/3] 索引构建完成 ({stage2_time:.1f}s)")
                     
                     # 阶段3: 初始化问答引擎 (80-100%)
                     status.write("⏳ [3/3] 正在初始化问答引擎...")
-                    terminal_logger.processing("[3/3] 初始化问答引擎...")
-                    terminal_logger.info(f"🤖 配置 chat_engine...")
+                    logger.processing("[3/3] 初始化问答引擎...")
+                    logger.info(f"🤖 配置 chat_engine...")
                     
                     stage3_start = time.time()
                     for i in range(85, 100, 3):
@@ -1171,7 +1171,7 @@ if active_kb_name and st.session_state.chat_engine is None:
                             from llama_index.core.retrievers import QueryFusionRetriever
                             
                             status.write(f"   🔍 构建 BM25 混合检索...")
-                            terminal_logger.info(f"🔍 BM25 混合检索启用")
+                            logger.info(f"🔍 BM25 混合检索启用")
                             
                             # 获取所有节点
                             nodes = index.docstore.docs.values()
@@ -1195,13 +1195,13 @@ if active_kb_name and st.session_state.chat_engine is None:
                             )
                             
                             status.write(f"   ✅ BM25 混合检索构建成功")
-                            terminal_logger.success(f"✅ BM25 混合检索构建成功")
+                            logger.success(f"✅ BM25 混合检索构建成功")
                         except ImportError:
                             status.write(f"   ⚠️ BM25 需要安装: pip install llama-index-retrievers-bm25")
-                            terminal_logger.warning("BM25 依赖缺失")
+                            logger.warning("BM25 依赖缺失")
                         except Exception as e:
                             status.write(f"   ⚠️ BM25 构建失败: {e}")
-                            terminal_logger.error(f"BM25 构建失败: {e}")
+                            logger.error(f"BM25 构建失败: {e}")
                     
                     if st.session_state.get('enable_rerank', False):
                         try:
@@ -1209,7 +1209,7 @@ if active_kb_name and st.session_state.chat_engine is None:
                             
                             rerank_model = st.session_state.get('rerank_model', 'BAAI/bge-reranker-base')
                             status.write(f"   🎯 加载 Re-ranking 模型: {rerank_model}...")
-                            terminal_logger.info(f"🎯 Re-ranking 启用: {rerank_model}")
+                            logger.info(f"🎯 Re-ranking 启用: {rerank_model}")
                             
                             reranker = SentenceTransformerRerank(
                                 top_n=3,
@@ -1220,13 +1220,13 @@ if active_kb_name and st.session_state.chat_engine is None:
                             similarity_top_k = 10  # Re-ranking 时先检索更多
                             
                             status.write(f"   ✅ Re-ranking 模型加载成功")
-                            terminal_logger.success(f"✅ Re-ranking 模型加载成功")
+                            logger.success(f"✅ Re-ranking 模型加载成功")
                         except ImportError:
                             status.write(f"   ⚠️ Re-ranking 需要安装: pip install sentence-transformers")
-                            terminal_logger.warning("Re-ranking 依赖缺失")
+                            logger.warning("Re-ranking 依赖缺失")
                         except Exception as e:
                             status.write(f"   ⚠️ Re-ranking 加载失败: {e}")
-                            terminal_logger.error(f"Re-ranking 加载失败: {e}")
+                            logger.error(f"Re-ranking 加载失败: {e}")
                     
                     # 创建查询引擎
                     if retriever:
@@ -1250,10 +1250,10 @@ if active_kb_name and st.session_state.chat_engine is None:
                     
                     progress_bar.progress(100, text=f"✅ 全部完成！总耗时: {load_time:.1f}s - 100%")
                     status.write(f"✅ [3/3] 问答引擎初始化完成 (耗时 {stage3_time:.1f}s)")
-                    terminal_logger.success(f"[3/3] 问答引擎初始化完成 ({stage3_time:.1f}s)")
+                    logger.success(f"[3/3] 问答引擎初始化完成 ({stage3_time:.1f}s)")
                     
                     status.update(label=f"✅ 知识库 '{active_kb_name}' 挂载成功！总耗时: {load_time:.1f}s", state="complete")
-                    terminal_logger.info(f"📊 总耗时: {load_time:.1f}s")
+                    logger.info(f"📊 总耗时: {load_time:.1f}s")
                 
                 # 清理进度条
                 time.sleep(1.5)
@@ -1272,18 +1272,18 @@ if active_kb_name and st.session_state.chat_engine is None:
                             kb_manifest = ManifestManager.load(db_path)
                             kb_embed_model = kb_manifest.get('embed_model', 'BAAI/bge-large-zh-v1.5')
                         
-                        terminal_logger.info(f"📊 知识库模型: {kb_embed_model}")
-                        terminal_logger.info(f"📊 Embed Provider: {embed_provider}")
+                        logger.info(f"📊 知识库模型: {kb_embed_model}")
+                        logger.info(f"📊 Embed Provider: {embed_provider}")
                         
                         # 使用知识库的模型加载
                         embed = get_embed(embed_provider, kb_embed_model, embed_key, embed_url)
                         if embed:
                             Settings.embed_model = embed
-                            terminal_logger.success(f"✅ 嵌入模型已设置: {kb_embed_model}")
+                            logger.success(f"✅ 嵌入模型已设置: {kb_embed_model}")
                         else:
                             raise ValueError(f"无法加载嵌入模型: {kb_embed_model}")
                     except Exception as e:
-                        terminal_logger.error(f"❌ 模型加载失败: {e}")
+                        logger.error(f"❌ 模型加载失败: {e}")
                         st.error(f"知识库挂载失败: {e}")
                         raise
                     
@@ -1293,9 +1293,9 @@ if active_kb_name and st.session_state.chat_engine is None:
                     except Exception as e:
                         # 检查是否是维度不匹配错误
                         if "shapes" in str(e) and "not aligned" in str(e):
-                            terminal_logger.warning(f"⚠️ 向量维度不匹配")
-                            terminal_logger.info(f"当前模型: {embed_model}")
-                            terminal_logger.info(f"错误信息: {str(e)}")
+                            logger.warning(f"⚠️ 向量维度不匹配")
+                            logger.info(f"当前模型: {embed_model}")
+                            logger.info(f"错误信息: {str(e)}")
                             
                             st.error(f"❌ 向量维度不匹配")
                             st.warning(f"""
@@ -1315,7 +1315,7 @@ if active_kb_name and st.session_state.chat_engine is None:
                                     with st.spinner("正在清理旧索引..."):
                                         import shutil
                                         shutil.rmtree(db_path, ignore_errors=True)
-                                        terminal_logger.success(f"✅ 旧索引已清理，请重新上传文档")
+                                        logger.success(f"✅ 旧索引已清理，请重新上传文档")
                                         st.success("✅ 索引已清理，请重新上传文档")
                                         time.sleep(2)
                                         st.rerun()
@@ -1328,7 +1328,7 @@ if active_kb_name and st.session_state.chat_engine is None:
                         else:
                             raise
                     
-                    terminal_logger.processing("初始化问答引擎...")
+                    logger.processing("初始化问答引擎...")
                     st.session_state.chat_engine = index.as_chat_engine(
                         chat_mode="context", 
                         memory=ChatMemoryBuffer.from_defaults(token_limit=4000),
@@ -1336,7 +1336,7 @@ if active_kb_name and st.session_state.chat_engine is None:
                         similarity_top_k=3,  # 减少检索数量
                     )
             
-            terminal_logger.success("问答引擎已启用GPU加速")
+            logger.success("问答引擎已启用GPU加速")
             logger.log("SUCCESS", f"知识库加载成功: {active_kb_name}", stage="知识库加载")
             st.toast(f"✅ 知识库 '{active_kb_name}' 挂载成功！")
             
@@ -2124,7 +2124,7 @@ if active_kb_name and st.session_state.chat_engine and not st.session_state.mess
             try:
                 # 使用知识库的模型（已在挂载时设置，无需重复设置）
                 current_model = getattr(Settings.embed_model, '_model_name', 'Unknown')
-                terminal_logger.info(f"💬 摘要生成使用模型: {current_model}")
+                logger.info(f"💬 摘要生成使用模型: {current_model}")
                 
                 prompt = "请用一段话简要总结此知识库的核心内容。然后，提出3个用户可能最关心的问题，每行一个，不要序号。"
                 full = ""
@@ -2146,10 +2146,10 @@ if active_kb_name and st.session_state.chat_engine and not st.session_state.mess
                 error_msg = str(e)
                 if "timed out" in error_msg.lower() or "timeout" in error_msg.lower():
                     summary_placeholder.info("⏱️ LLM 响应超时，已跳过自动摘要。您可以直接开始提问。")
-                    terminal_logger.warning(f"⏱️ 摘要生成超时: {e}")
+                    logger.warning(f"⏱️ 摘要生成超时: {e}")
                 else:
                     summary_placeholder.warning(f"摘要生成受阻: {e}")
-                    terminal_logger.error(f"❌ 摘要生成失败: {e}")
+                    logger.error(f"❌ 摘要生成失败: {e}")
                 st.session_state.messages.append({"role": "assistant", "content": "👋 知识库已就绪。"})
 
 # 渲染消息
@@ -2320,8 +2320,8 @@ if not st.session_state.is_processing and st.session_state.question_queue:
             # 标记已检测
             st.session_state._last_checked_kb = active_kb_name
         
-        terminal_logger.separator("知识库查询")
-        terminal_logger.start_operation("查询", f"知识库: {active_kb_name}")
+        logger.separator("知识库查询")
+        logger.start_operation("查询", f"知识库: {active_kb_name}")
         
         # 处理引用内容
         if st.session_state.get("quote_content"):
@@ -2339,7 +2339,7 @@ if not st.session_state.is_processing and st.session_state.question_queue:
             
             # 清除引用状态
             st.session_state.quote_content = None
-            terminal_logger.info("📌 已应用引用内容")
+            logger.info("📌 已应用引用内容")
         
         logger.log("INFO", f"用户提问: {final_prompt}", stage="查询对话", details={"kb_name": active_kb_name})
         
@@ -2364,10 +2364,10 @@ if not st.session_state.is_processing and st.session_state.question_queue:
                     
                     if enhancements:
                         enhancement_str = " + ".join(enhancements)
-                        terminal_logger.info(f"🎯 检索增强: {enhancement_str}")
+                        logger.info(f"🎯 检索增强: {enhancement_str}")
                         logger.log("INFO", f"检索增强: {enhancement_str}", stage="查询对话")
                     
-                    with terminal_logger.timer("检索相关文档"):
+                    with logger.timer("检索相关文档"):
                         logger.log("INFO", "开始检索相关文档", stage="查询对话", details={"kb_name": active_kb_name})
                         
                         # 确保 embedding 模型已设置
@@ -2380,7 +2380,7 @@ if not st.session_state.is_processing and st.session_state.question_queue:
                         response = st.session_state.chat_engine.stream_chat(final_prompt)
                         retrieval_time = time.time() - retrieval_start
                         
-                        terminal_logger.info(f"🔍 检索耗时: {retrieval_time:.2f}s (GPU加速)")
+                        logger.info(f"🔍 检索耗时: {retrieval_time:.2f}s (GPU加速)")
                         
                         full_text = ""
                         # 流式输出 + 资源控制
@@ -2423,7 +2423,7 @@ if not st.session_state.is_processing and st.session_state.question_queue:
                     srcs = []
                     if response.source_nodes:
                         logger.log("INFO", f"检索完成，找到 {len(response.source_nodes)} 个相关文档", stage="查询对话", details={"kb_name": active_kb_name})
-                        terminal_logger.data_summary("检索结果", {
+                        logger.data_summary("检索结果", {
                             "查询": final_prompt[:50] + "..." if len(final_prompt) > 50 else final_prompt,
                             "相关文档": len(response.source_nodes),
                             "知识库": active_kb_name
@@ -2461,16 +2461,16 @@ if not st.session_state.is_processing and st.session_state.question_queue:
                         srcs = [s for s in executor.execute(process_node_worker, tasks, threshold=10) if s]
                         
                         if len(node_data) >= 10:
-                            terminal_logger.info(f"⚡ 并行处理: {len(srcs)} 个节点")
+                            logger.info(f"⚡ 并行处理: {len(srcs)} 个节点")
                         else:
-                            terminal_logger.info(f"⚡ 串行处理: {len(srcs)} 个节点")
+                            logger.info(f"⚡ 串行处理: {len(srcs)} 个节点")
                     
                     logger.log("SUCCESS", "回答生成完成", stage="查询对话", details={"kb_name": active_kb_name, "model": llm_model, "tokens": token_count, "prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens
                     })
                     
                     # 计算总耗时
                     total_time = time.time() - start_time
-                    terminal_logger.complete_operation(f"查询完成 (耗时 {total_time:.2f}s)")
+                    logger.complete_operation(f"查询完成 (耗时 {total_time:.2f}s)")
                     
                     # 准备统计信息
                     tokens_per_sec = token_count / total_time if total_time > 0 else 0
@@ -2523,25 +2523,25 @@ if not st.session_state.is_processing and st.session_state.question_queue:
                         new_sugs = [q for q in initial_sugs if q not in st.session_state.suggestions_history]
                         if new_sugs:
                             st.session_state.suggestions_history.extend(new_sugs)
-                            terminal_logger.info(f"✨ 生成 {len(new_sugs)} 个新推荐问题")
+                            logger.info(f"✨ 生成 {len(new_sugs)} 个新推荐问题")
                         else:
-                            terminal_logger.info("⚠️ 生成的问题已存在，跳过")
+                            logger.info("⚠️ 生成的问题已存在，跳过")
                     else:
-                        terminal_logger.info("⚠️ 推荐问题生成失败")
+                        logger.info("⚠️ 推荐问题生成失败")
                     
                     # 延迟保存：确认所有步骤（包括推荐问题）都成功后再保存
                     if active_kb_name: HistoryManager.save(active_kb_name, state.get_messages())
                     
                     # 释放内存
                     cleanup_memory()
-                    terminal_logger.info("🧹 对话完成，内存已清理")
+                    logger.info("🧹 对话完成，内存已清理")
                     
                     st.session_state.is_processing = False  # 处理完成
                     
                     # 不自动处理队列，避免 rerun 导致回答消失
                     # 用户可以看到当前回答，然后手动触发下一个问题
                     if st.session_state.question_queue:
-                        terminal_logger.info(f"📝 队列中还有 {len(st.session_state.question_queue)} 个问题待处理")
+                        logger.info(f"📝 队列中还有 {len(st.session_state.question_queue)} 个问题待处理")
                         # 显示提示，让用户知道还有问题在队列中
                         st.info(f"✅ 回答完成！队列中还有 {len(st.session_state.question_queue)} 个问题，点击下方按钮继续处理。")
                         if st.button("▶️ 处理下一个问题", key="process_next", type="primary"):
@@ -2557,7 +2557,7 @@ if not st.session_state.is_processing and st.session_state.question_queue:
                     
                     # 释放内存
                     cleanup_memory()
-                    terminal_logger.info("🧹 错误处理完成，内存已清理")
+                    logger.info("🧹 错误处理完成，内存已清理")
                     st.session_state.is_processing = False
             
             # 在 chat_message 块外显示推荐问题按钮
