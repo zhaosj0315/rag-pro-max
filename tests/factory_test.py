@@ -474,6 +474,144 @@ def test_gpu_optimization():
         print_test("GPU 优化", "FAIL", str(e))
 
 # ============================================================
+# v2.0 功能测试
+# ============================================================
+def test_v2_features():
+    """测试v2.0新功能"""
+    print_header("v2.0 功能测试")
+    
+    # 测试增量更新模块
+    try:
+        from src.kb.incremental_updater import IncrementalUpdater
+        print_test("增量更新模块", "PASS", "导入成功")
+        
+        # 测试基本功能
+        temp_dir = tempfile.mkdtemp()
+        updater = IncrementalUpdater(temp_dir)
+        
+        # 测试文件哈希计算
+        test_file = os.path.join(temp_dir, "test.txt")
+        with open(test_file, 'w') as f:
+            f.write("test content")
+        
+        hash_value = updater._calculate_file_hash(test_file)
+        if hash_value and len(hash_value) == 32:
+            print_test("文件哈希计算", "PASS", f"MD5: {hash_value[:8]}...")
+        else:
+            print_test("文件哈希计算", "FAIL", "哈希值无效")
+        
+        # 测试变化检测
+        changes = updater.get_changed_files([test_file])
+        if test_file in changes['new']:
+            print_test("文件变化检测", "PASS", "检测到新文件")
+        else:
+            print_test("文件变化检测", "FAIL", "未检测到新文件")
+        
+        # 清理
+        shutil.rmtree(temp_dir)
+        
+    except ImportError:
+        print_test("增量更新模块", "SKIP", "模块不存在（v1.8版本）")
+    except Exception as e:
+        print_test("增量更新模块", "FAIL", str(e))
+    
+    # 测试多模态处理模块
+    try:
+        from src.processors.multimodal_processor import MultimodalProcessor
+        print_test("多模态处理模块", "PASS", "导入成功")
+        
+        processor = MultimodalProcessor()
+        
+        # 测试文件类型检测
+        test_cases = [
+            ('test.jpg', 'image'),
+            ('test.pdf', 'pdf_multimodal'),
+            ('test.xlsx', 'table'),
+            ('test.txt', 'text')
+        ]
+        
+        detection_passed = True
+        for filename, expected_type in test_cases:
+            with tempfile.NamedTemporaryFile(suffix=os.path.splitext(filename)[1], delete=False) as f:
+                detected_type = processor.detect_file_type(f.name)
+                if detected_type != expected_type:
+                    detection_passed = False
+                    break
+                os.unlink(f.name)
+        
+        if detection_passed:
+            print_test("文件类型检测", "PASS", "所有类型检测正确")
+        else:
+            print_test("文件类型检测", "FAIL", "类型检测错误")
+        
+        # 测试支持格式查询
+        formats = processor.get_supported_formats()
+        if 'images' in formats and 'tables' in formats:
+            print_test("支持格式查询", "PASS", f"图片: {len(formats['images'])}种, 表格: {len(formats['tables'])}种")
+        else:
+            print_test("支持格式查询", "FAIL", "格式信息不完整")
+        
+    except ImportError:
+        print_test("多模态处理模块", "SKIP", "模块不存在（v1.8版本）")
+    except Exception as e:
+        print_test("多模态处理模块", "FAIL", str(e))
+    
+    # 测试v2.0集成模块
+    try:
+        from src.core.v2_integration import V2Integration
+        print_test("v2.0集成模块", "PASS", "导入成功")
+        
+        integration = V2Integration()
+        if hasattr(integration, 'kb_manager') and hasattr(integration, 'multimodal_processor'):
+            print_test("集成模块初始化", "PASS", "管理器初始化成功")
+        else:
+            print_test("集成模块初始化", "FAIL", "管理器初始化失败")
+        
+    except ImportError:
+        print_test("v2.0集成模块", "SKIP", "模块不存在（v1.8版本）")
+    except Exception as e:
+        print_test("v2.0集成模块", "FAIL", str(e))
+    
+    # 测试API扩展
+    try:
+        from src.api.fastapi_server import app
+        
+        # 检查API版本
+        if hasattr(app, 'version') and app.version == "2.0.0":
+            print_test("API版本", "PASS", "v2.0.0")
+        else:
+            print_test("API版本", "SKIP", f"版本: {getattr(app, 'version', 'unknown')}")
+        
+        # 检查v2.0路由（通过检查路由路径）
+        routes = [route.path for route in app.routes if hasattr(route, 'path')]
+        v2_routes = ['/incremental-update', '/upload-multimodal', '/query-multimodal']
+        
+        v2_routes_found = sum(1 for route in v2_routes if route in routes)
+        if v2_routes_found == len(v2_routes):
+            print_test("v2.0 API路由", "PASS", f"发现 {v2_routes_found}/{len(v2_routes)} 个新路由")
+        else:
+            print_test("v2.0 API路由", "SKIP", f"发现 {v2_routes_found}/{len(v2_routes)} 个新路由")
+        
+    except Exception as e:
+        print_test("API扩展", "FAIL", str(e))
+    
+    # 测试智能启动脚本
+    try:
+        start_script = "scripts/start.sh"
+        if os.path.exists(start_script):
+            with open(start_script, 'r') as f:
+                content = f.read()
+            
+            if 'V2_AVAILABLE' in content and 'v2.0' in content.lower():
+                print_test("智能启动脚本", "PASS", "包含v2.0检测逻辑")
+            else:
+                print_test("智能启动脚本", "SKIP", "未包含v2.0检测逻辑")
+        else:
+            print_test("智能启动脚本", "FAIL", "启动脚本不存在")
+    except Exception as e:
+        print_test("智能启动脚本", "FAIL", str(e))
+
+# ============================================================
 # 主测试流程
 # ============================================================
 def main():
@@ -495,6 +633,7 @@ def main():
     test_performance_config()
     test_memory_management()
     test_gpu_optimization()
+    test_v2_features()  # 新增v2.0功能测试
     
     # 输出测试结果
     print_header("测试结果汇总")

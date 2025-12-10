@@ -5,6 +5,7 @@ import json
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 from .kb_operations import KBOperations
+from .incremental_updater import IncrementalUpdater
 
 
 class KBManager:
@@ -84,6 +85,31 @@ class KBManager:
         
         kb_path = os.path.join(self.base_path, kb_name)
         return self.ops.save_kb_info(kb_path, embed_model, embed_dim)
+    
+    def get_incremental_updater(self, kb_name: str) -> Optional[IncrementalUpdater]:
+        """获取增量更新器"""
+        if not self.exists(kb_name):
+            return None
+        
+        kb_path = os.path.join(self.base_path, kb_name)
+        return IncrementalUpdater(kb_path)
+    
+    def check_incremental_changes(self, kb_name: str, file_paths: List[str]) -> Optional[Dict[str, List[str]]]:
+        """检查增量变化"""
+        updater = self.get_incremental_updater(kb_name)
+        if not updater:
+            return None
+        
+        return updater.get_changed_files(file_paths)
+    
+    def mark_files_processed(self, kb_name: str, file_paths: List[str]) -> bool:
+        """标记文件已处理"""
+        updater = self.get_incremental_updater(kb_name)
+        if not updater:
+            return False
+        
+        updater.mark_files_processed(file_paths)
+        return True
     
     def get_stats(self, kb_name: str) -> Optional[Dict]:
         """获取知识库统计信息"""

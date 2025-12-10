@@ -1,220 +1,221 @@
-"""
-多模态文档处理器
-支持图片、表格理解
-"""
+"""多模态处理器 - 支持图片、表格等多模态内容处理"""
 
 import os
+import json
 import base64
-from typing import Dict, List, Any, Optional
-from PIL import Image
-import pandas as pd
-from src.logging import LogManager
+from typing import List, Dict, Any, Optional, Tuple
+from pathlib import Path
+import tempfile
+
+try:
+    from PIL import Image
+    import pytesseract
+    HAS_OCR = True
+except ImportError:
+    HAS_OCR = False
+
+try:
+    import pandas as pd
+    import tabula
+    HAS_TABLE_EXTRACTION = True
+except ImportError:
+    HAS_TABLE_EXTRACTION = False
+
+from ..logging import LogManager
 
 logger = LogManager()
 
+
 class MultimodalProcessor:
-    """多模态文档处理器"""
+    """多模态处理器"""
     
     def __init__(self):
-        self.supported_image_formats = ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff']
-        self.supported_table_formats = ['.xlsx', '.xls', '.csv']
+        self.supported_image_formats = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif'}
+        self.supported_table_formats = {'.pdf', '.xlsx', '.xls', '.csv'}
+        self.ocr_languages = 'chi_sim+eng'  # 中文简体 + 英文
     
-    def process_document(self, file_path: str) -> Dict[str, Any]:
-        """处理多模态文档"""
-        file_ext = os.path.splitext(file_path)[1].lower()
+    def detect_file_type(self, file_path: str) -> str:
+        """检测文件类型"""
+        ext = Path(file_path).suffix.lower()
         
+        if ext == '.pdf':
+            return 'pdf_multimodal'  # PDF可能包含图片和表格，优先处理
+        elif ext in self.supported_image_formats:
+            return 'image'
+        elif ext in self.supported_table_formats:
+            return 'table'
+        else:
+            return 'text'
+    
+    def extract_text_from_image(self, image_path: str) -> Dict[str, Any]:
+        """从图片中提取文字"""
+        if not HAS_OCR:
+            logger.log_warning("OCR功能不可用", "请安装 pillow 和 pytesseract")
+            return {'text': '', 'confidence': 0, 'error': 'OCR不可用'}
+        
+        try:
+            # 打开图片
+            image = Image.open(image_path)
+            
+            # OCR识别
+            text = pytesseract.image_to_string(image, lang=self.ocr_languages)
+            
+            # 获取置信度信息
+            data = pytesseract.image_to_data(image, lang=self.ocr_languages, output_type=pytesseract.Output.DICT)
+            confidences = [int(conf) for conf in data['conf'] if int(conf) > 0]
+            avg_confidence = sum(confidences) / len(confidences) if confidences else 0
+            
+            return {
+                'text': text.strip(),
+                'confidence': avg_confidence,
+                'word_count': len(text.split()),
+                'image_size': image.size,
+                'format': image.format
+            }
+            
+        except Exception as e:
+            logger.log_error(f"图片OCR失败: {image_path}", str(e))
+            return {'text': '', 'confidence': 0, 'error': str(e)}
+    
+    def extract_tables_from_pdf(self, pdf_path: str) -> List[Dict[str, Any]]:
+        """从PDF中提取表格"""
+        if not HAS_TABLE_EXTRACTION:
+            logger.log_warning("表格提取功能不可用", "请安装 pandas 和 tabula-py")
+            return []
+        
+        try:
+            # 使用tabula提取表格
+            tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True)
+            
+            extracted_tables = []
+            for i, table in enumerate(tables):
+                if not table.empty:
+                    table_info = {
+                        'table_id': f"table_{i+1}",
+                        'shape': table.shape,
+                        'columns': table.columns.tolist(),
+                        'data': table.to_dict('records'),
+                        'csv_string': table.to_csv(index=False),
+                        'html_string': table.to_html(index=False)
+                    }
+                    extracted_tables.append(table_info)
+            
+            return extracted_tables
+            
+        except Exception as e:
+            logger.log_error(f"PDF表格提取失败: {pdf_path}", str(e))
+            return []
+    
+    def extract_tables_from_excel(self, excel_path: str) -> List[Dict[str, Any]]:
+        """从Excel中提取表格"""
+        if not HAS_TABLE_EXTRACTION:
+            return []
+        
+        try:
+            # 读取所有工作表
+            excel_file = pd.ExcelFile(excel_path)
+            extracted_tables = []
+            
+            for sheet_name in excel_file.sheet_names:
+                df = pd.read_excel(excel_path, sheet_name=sheet_name)
+                if not df.empty:
+                    table_info = {
+                        'table_id': f"sheet_{sheet_name}",
+                        'sheet_name': sheet_name,
+                        'shape': df.shape,
+                        'columns': df.columns.tolist(),
+                        'data': df.to_dict('records'),
+                        'csv_string': df.to_csv(index=False),
+                        'html_string': df.to_html(index=False)
+                    }
+                    extracted_tables.append(table_info)
+            
+            return extracted_tables
+            
+        except Exception as e:
+            logger.log_error(f"Excel表格提取失败: {excel_path}", str(e))
+            return []
+    
+    def process_multimodal_file(self, file_path: str) -> Dict[str, Any]:
+        """处理多模态文件"""
+        file_type = self.detect_file_type(file_path)
         result = {
-            "text_content": "",
-            "images": [],
-            "tables": [],
-            "metadata": {}
+            'file_path': file_path,
+            'file_type': file_type,
+            'text_content': '',
+            'images': [],
+            'tables': [],
+            'metadata': {}
         }
         
         try:
-            if file_ext in self.supported_image_formats:
-                result.update(self._process_image(file_path))
-            elif file_ext in self.supported_table_formats:
-                result.update(self._process_table(file_path))
-            elif file_ext == '.pdf':
-                result.update(self._process_pdf_multimodal(file_path))
-            else:
-                # 标准文本处理
-                result["text_content"] = self._extract_text(file_path)
-            
-            logger.info(f"📄 多模态处理完成: {os.path.basename(file_path)}")
-            return result
-            
-        except Exception as e:
-            logger.error(f"多模态处理失败: {e}")
-            return result
-    
-    def _process_image(self, image_path: str) -> Dict[str, Any]:
-        """处理图片文件"""
-        try:
-            with Image.open(image_path) as img:
-                # 图片基本信息
-                image_info = {
-                    "format": img.format,
-                    "size": img.size,
-                    "mode": img.mode
-                }
+            if file_type == 'image':
+                # 处理图片
+                ocr_result = self.extract_text_from_image(file_path)
+                result['text_content'] = ocr_result.get('text', '')
+                result['images'] = [{
+                    'source': file_path,
+                    'ocr_result': ocr_result
+                }]
                 
-                # 转换为base64用于存储
-                img_base64 = self._image_to_base64(image_path)
+            elif file_type == 'table' or file_type == 'pdf_multimodal':
+                # 处理表格
+                if file_path.endswith('.pdf'):
+                    tables = self.extract_tables_from_pdf(file_path)
+                elif file_path.endswith(('.xlsx', '.xls')):
+                    tables = self.extract_tables_from_excel(file_path)
+                else:
+                    tables = []
                 
-                # OCR文字识别（简化版）
-                ocr_text = self._extract_text_from_image(img)
+                result['tables'] = tables
                 
-                return {
-                    "text_content": ocr_text,
-                    "images": [{
-                        "path": image_path,
-                        "info": image_info,
-                        "base64": img_base64,
-                        "ocr_text": ocr_text
-                    }],
-                    "metadata": {"type": "image", "info": image_info}
-                }
-        except Exception as e:
-            logger.error(f"图片处理失败: {e}")
-            return {"text_content": "", "images": [], "tables": []}
-    
-    def _process_table(self, table_path: str) -> Dict[str, Any]:
-        """处理表格文件"""
-        try:
-            file_ext = os.path.splitext(table_path)[1].lower()
+                # 将表格内容转换为文本
+                table_texts = []
+                for table in tables:
+                    table_texts.append(f"表格 {table['table_id']}:\n{table['csv_string']}")
+                result['text_content'] = '\n\n'.join(table_texts)
             
-            if file_ext == '.csv':
-                df = pd.read_csv(table_path, encoding='utf-8')
-            else:
-                df = pd.read_excel(table_path)
-            
-            # 表格转文本
-            table_text = self._table_to_text(df)
-            
-            # 表格统计信息
-            table_info = {
-                "rows": len(df),
-                "columns": len(df.columns),
-                "column_names": df.columns.tolist()
-            }
-            
-            return {
-                "text_content": table_text,
-                "tables": [{
-                    "data": df.to_dict('records'),
-                    "info": table_info,
-                    "text_representation": table_text
-                }],
-                "metadata": {"type": "table", "info": table_info}
+            # 添加元数据
+            result['metadata'] = {
+                'file_size': os.path.getsize(file_path),
+                'processed_at': pd.Timestamp.now().isoformat() if HAS_TABLE_EXTRACTION else '',
+                'has_ocr': HAS_OCR,
+                'has_table_extraction': HAS_TABLE_EXTRACTION
             }
             
         except Exception as e:
-            logger.error(f"表格处理失败: {e}")
-            return {"text_content": "", "images": [], "tables": []}
+            logger.log_error(f"多模态文件处理失败: {file_path}", str(e))
+            result['error'] = str(e)
+        
+        return result
     
-    def _process_pdf_multimodal(self, pdf_path: str) -> Dict[str, Any]:
-        """处理PDF中的多模态内容"""
-        try:
-            # 这里可以集成更高级的PDF处理库
-            # 如 pymupdf, pdfplumber 等来提取图片和表格
-            
-            result = {
-                "text_content": "",
-                "images": [],
-                "tables": []
+    async def query(self, kb_name: str, query: str, include_images: bool = True, 
+                   include_tables: bool = True, top_k: int = 5) -> Dict[str, Any]:
+        """多模态查询"""
+        # TODO: 实现多模态查询逻辑
+        # 这里需要集成向量检索，支持文本、图片、表格的混合检索
+        
+        result = {
+            'answer': f'多模态查询结果: {query}',
+            'text_sources': [],
+            'image_sources': [],
+            'table_sources': [],
+            'metadata': {
+                'kb_name': kb_name,
+                'query': query,
+                'include_images': include_images,
+                'include_tables': include_tables,
+                'top_k': top_k
             }
-            
-            # 简化实现：提取文本
-            result["text_content"] = self._extract_text(pdf_path)
-            
-            # TODO: 实现PDF图片和表格提取
-            # result["images"] = self._extract_pdf_images(pdf_path)
-            # result["tables"] = self._extract_pdf_tables(pdf_path)
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"PDF多模态处理失败: {e}")
-            return {"text_content": "", "images": [], "tables": []}
-    
-    def _extract_text_from_image(self, img: Image.Image) -> str:
-        """从图片中提取文字（OCR）"""
-        try:
-            # 简化版OCR实现
-            # 实际应用中可以集成 pytesseract 或其他OCR库
-            
-            # 检查图片是否包含文字（基于图片特征）
-            if self._has_text_content(img):
-                return f"[图片包含文字内容，尺寸: {img.size}]"
-            else:
-                return f"[图片内容，尺寸: {img.size}]"
-                
-        except Exception as e:
-            logger.error(f"OCR处理失败: {e}")
-            return "[图片内容]"
-    
-    def _has_text_content(self, img: Image.Image) -> bool:
-        """检测图片是否包含文字"""
-        # 简化的文字检测逻辑
-        # 实际可以使用更复杂的算法
-        width, height = img.size
-        return width > 100 and height > 50  # 基本尺寸判断
-    
-    def _table_to_text(self, df: pd.DataFrame) -> str:
-        """表格转换为文本"""
-        try:
-            # 生成表格的文本描述
-            text_parts = []
-            
-            # 表格基本信息
-            text_parts.append(f"表格包含 {len(df)} 行 {len(df.columns)} 列")
-            text_parts.append(f"列名: {', '.join(df.columns.tolist())}")
-            
-            # 前几行数据
-            if len(df) > 0:
-                text_parts.append("\n表格内容:")
-                for i, row in df.head(5).iterrows():
-                    row_text = " | ".join([f"{col}: {val}" for col, val in row.items()])
-                    text_parts.append(f"第{i+1}行: {row_text}")
-                
-                if len(df) > 5:
-                    text_parts.append(f"... 还有 {len(df)-5} 行数据")
-            
-            return "\n".join(text_parts)
-            
-        except Exception as e:
-            logger.error(f"表格转文本失败: {e}")
-            return "表格内容"
-    
-    def _image_to_base64(self, image_path: str) -> str:
-        """图片转base64"""
-        try:
-            with open(image_path, "rb") as img_file:
-                return base64.b64encode(img_file.read()).decode('utf-8')
-        except Exception as e:
-            logger.error(f"图片base64转换失败: {e}")
-            return ""
-    
-    def _extract_text(self, file_path: str) -> str:
-        """提取文本内容（回退方法）"""
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return f.read()
-        except:
-            try:
-                with open(file_path, 'r', encoding='gbk') as f:
-                    return f.read()
-            except:
-                return "[无法读取文件内容]"
+        }
+        
+        return result
     
     def get_supported_formats(self) -> Dict[str, List[str]]:
         """获取支持的格式"""
         return {
-            "images": self.supported_image_formats,
-            "tables": self.supported_table_formats,
-            "multimodal": ['.pdf']
+            'images': list(self.supported_image_formats),
+            'tables': list(self.supported_table_formats),
+            'ocr_available': HAS_OCR,
+            'table_extraction_available': HAS_TABLE_EXTRACTION
         }
-
-# 全局多模态处理器
-multimodal_processor = MultimodalProcessor()

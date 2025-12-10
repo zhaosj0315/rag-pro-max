@@ -1695,7 +1695,12 @@ if active_kb_name:
                     
                     # 文件摘要展开
                     if f.get('summary'):
-                        with st.expander(f"📖 {f['summary'][:50]}...", expanded=False):
+                        # 获取摘要的第一行作为标题，如果太长则截取
+                        summary_lines = f['summary'].split('\n')
+                        first_line = summary_lines[0] if summary_lines else f['summary']
+                        title = first_line if len(first_line) <= 80 else first_line[:80] + "..."
+                        
+                        with st.expander(f"📖 {title}", expanded=False):
                             st.markdown(f.get('summary'))
                     
                     # 文件统计信息
@@ -2022,22 +2027,42 @@ if st.session_state.get('is_processing'):
                 # 截断过长的问题
                 display_q = q[:50] + "..." if len(q) > 50 else q
                 st.caption(f"{i}. {display_q}")
+            
+            # 添加队列重置按钮
+            if st.button("🔄 重置队列（如果卡住）", key="reset_queue"):
+                st.session_state.is_processing = False
+                st.session_state.question_queue = []
+                st.success("✅ 队列已重置")
+                st.rerun()
     else:
         st.info("⏳ 正在处理问题...")
+        # 添加重置按钮（防止卡住）
+        if st.button("🔄 重置状态", key="reset_processing"):
+            st.session_state.is_processing = False
+            st.success("✅ 处理状态已重置")
+            st.rerun()
 elif queue_len > 0:
     # 显示待处理的问题列表
     with st.expander(f"📝 队列中有 {queue_len} 个问题待处理", expanded=True):
         for i, q in enumerate(st.session_state.question_queue, 1):
             display_q = q[:50] + "..." if len(q) > 50 else q
             st.caption(f"{i}. {display_q}")
+        
+        # 添加清空队列按钮
+        if st.button("🗑️ 清空队列", key="clear_queue"):
+            st.session_state.question_queue = []
+            st.success("✅ 队列已清空")
+            st.rerun()
 
 # 从队列中取出问题处理
-if not st.session_state.is_processing and st.session_state.question_queue:
+if not st.session_state.get('is_processing', False) and st.session_state.question_queue:
     final_prompt = st.session_state.question_queue.pop(0)
+    logger.info(f"🚀 开始处理队列问题: {final_prompt[:50]}...")
     
     if st.session_state.chat_engine:
         # 不清空 suggestions_history，保留追问按钮
         st.session_state.is_processing = True  # 标记正在处理
+        logger.info("✅ 设置处理状态为 True")
         
         # 强制检测知识库维度并切换模型（静默处理，不显示加载）
         # 优化：只在首次或切换知识库时检测，避免每次问答都重复
