@@ -230,112 +230,228 @@ def _extract_keywords(text, max_keywords=5):
     return [word for word, _ in word_freq.most_common(max_keywords)]
 
 
-def generate_follow_up_questions_safe(context_text, num_questions=3, existing_questions=None, timeout=10, logger=None, query_engine=None):
+def _is_similar_question(q1, q2, threshold=0.7):
+    """检测两个问题是否相似"""
+    if not q1 or not q2:
+        return False
+    
+    # 简单的相似性检测
+    q1_clean = re.sub(r'[^\w]', '', q1.lower())
+    q2_clean = re.sub(r'[^\w]', '', q2.lower())
+    
+    # 完全相同
+    if q1_clean == q2_clean:
+        return True
+    
+    # 包含关系
+    if len(q1_clean) > 5 and len(q2_clean) > 5:
+        if q1_clean in q2_clean or q2_clean in q1_clean:
+            return True
+    
+    # 关键词重叠度
+    words1 = set(_extract_keywords(q1, max_keywords=5))
+    words2 = set(_extract_keywords(q2, max_keywords=5))
+    
+    if words1 and words2:
+        overlap = len(words1 & words2) / len(words1 | words2)
+        return overlap > threshold
+    
+    return False
+
+
+def generate_follow_up_questions_safe(context_text, num_questions=3, existing_questions=None, timeout=10, logger=None, query_engine=None, llm_model=None):
     """
-    安全的追问生成（带降级策略）
-    - 包含降级逻辑
-    - 超时控制
-    - 线程隔离
-    - 知识库内容验证（新增）
+    安全的追问生成（带降级策略）- 优化版
+    - 智能降级问题
+    - 基于内容类型的问题模板
+    - 知识库相关性增强
     """
     result = {"questions": []}
     
-    # 降级问题库
-    fallback_questions = [
-        "能否详细解释一下这个概念？",
-        "这个方案有什么优缺点？",
-        "有没有相关的实际案例？",
-        "这与常见做法有什么区别？",
-        "如何处理其中可能出现的错误？"
-    ]
-    
-    # 根据上下文调整降级问题
-    if "如何" in context_text or "怎么" in context_text:
-        fallback_questions.insert(0, "具体的操作步骤是什么？")
-    if "原因" in context_text or "为什么" in context_text:
-        fallback_questions.insert(0, "还有其他可能的原因吗？")
-    if "代码" in context_text or "Python" in context_text:
-        fallback_questions.insert(0, "能否提供更详细的代码示例？")
+    # 分析内容类型，生成针对性降级问题
+    def get_smart_fallback(text):
+        fallback = []
         
-    fallback = fallback_questions[:num_questions]
+        # 基于内容特征生成问题
+        if any(word in text for word in ["读书", "阅读", "书籍", "作者"]):
+            fallback.extend([
+                "这本书的核心观点是什么？",
+                "作者的写作背景如何？", 
+                "有哪些实用的阅读技巧？"
+            ])
+        elif any(word in text for word in ["培养", "思维", "创新", "能力"]):
+            fallback.extend([
+                "如何在日常生活中应用这些方法？",
+                "有什么具体的训练方式？",
+                "这种能力对个人发展有何帮助？"
+            ])
+        elif any(word in text for word in ["组织", "管理", "团队", "领导"]):
+            fallback.extend([
+                "在实际工作中如何实施？",
+                "可能遇到哪些挑战？",
+                "成功案例有哪些特点？"
+            ])
+        elif any(word in text for word in ["技术", "方法", "工具", "系统"]):
+            fallback.extend([
+                "这个方法的适用场景是什么？",
+                "与其他方案相比有何优势？",
+                "实施过程中需要注意什么？"
+            ])
+        else:
+            # 通用但更有针对性的问题
+            fallback.extend([
+                "这个观点的依据是什么？",
+                "在实践中效果如何？",
+                "还有哪些相关的要点？"
+            ])
+        
+        # 添加基于关键词的问题
+        keywords = _extract_keywords(text, max_keywords=3)
+        if keywords:
+            fallback.append(f"关于{keywords[0]}还有什么需要了解的？")
+        
+        return fallback[:num_questions]
 
     def _generate():
-        if not hasattr(Settings, 'llm') or not Settings.llm: 
-            result["questions"] = fallback
+        nonlocal result
+        print(f"🔍 _generate开始，result初始状态: {result}")
+        
+        if result is None:
+            result = {"questions": []}
+            print(f"🔍 result为None，重新初始化: {result}")
+        
+        # 尝试从多个来源获取LLM
+        llm = None
+        
+        # 1. 优先使用传入的LLM
+        if llm_model:
+            llm = llm_model
+            print(f"🔍 使用传入的LLM: {type(llm_model)}")
+        
+        # 2. 从Settings获取
+        elif hasattr(Settings, 'llm') and Settings.llm:
+            llm = Settings.llm
+            print(f"🔍 使用Settings.llm: {type(Settings.llm)}")
+        
+        # 3. 从query_engine获取
+        elif query_engine and hasattr(query_engine, '_llm'):
+            llm = query_engine._llm
+            print(f"🔍 使用query_engine._llm: {type(query_engine._llm)}")
+        
+        if not llm:
+            print("⚠️ LLM未设置，使用降级策略")
+            result["questions"] = get_smart_fallback(context_text)
             return
+        
+        print(f"🔍 LLM获取成功，开始生成推荐问题...")
 
         try:
-            # 减少上下文长度，提高速度
-            short_context = context_text[-2000:] 
+            # 优化上下文处理
+            short_context = context_text[-1500:] if len(context_text) > 1500 else context_text
             
             # 排除已问过的问题
-            existing_str = "\n".join(existing_questions) if existing_questions else ""
+            existing_str = "\n".join(existing_questions[-10:]) if existing_questions else ""  # 只看最近10个
             
-            # 🆕 尝试从知识库获取相关主题
-            kb_topics = ""
+            # 🆕 增强知识库相关性
+            kb_context = ""
+            relevant_topics = []
+            
             if query_engine:
                 try:
-                    # 提取关键词查询知识库
-                    keywords = _extract_keywords(short_context)
-                    print(f"[DEBUG] 提取关键词: {keywords[:3]}")  # 调试
+                    # 更精准的关键词提取
+                    keywords = _extract_keywords(short_context, max_keywords=5)
                     if keywords:
-                        kb_query = " ".join(keywords[:3])  # 使用前3个关键词
-                        print(f"[DEBUG] 查询知识库: {kb_query}")  # 调试
-                        
-                        # 修复：使用正确的查询方法
-                        if hasattr(query_engine, 'query'):
-                            kb_response = query_engine.query(kb_query)
-                        elif hasattr(query_engine, 'chat'):
-                            kb_response = query_engine.chat(kb_query)
-                        else:
-                            print(f"[DEBUG] query_engine 类型: {type(query_engine)}")
-                            kb_response = None
-                        
-                        if kb_response and hasattr(kb_response, 'source_nodes'):
-                            # 获取相关文档的标题或摘要
-                            topics = []
-                            for node in kb_response.source_nodes[:2]:  # 只取前2个
-                                if hasattr(node, 'metadata') and 'file_name' in node.metadata:
-                                    topics.append(node.metadata['file_name'])
-                            if topics:
-                                kb_topics = f"\n知识库相关主题：{', '.join(topics)}"
-                                print(f"[DEBUG] 知识库主题: {topics}")  # 调试
+                        # 尝试多个查询策略
+                        for i in range(min(2, len(keywords))):
+                            try:
+                                kb_query = " ".join(keywords[i:i+2])  # 2个关键词组合
+                                
+                                if hasattr(query_engine, 'query'):
+                                    kb_response = query_engine.query(kb_query)
+                                elif hasattr(query_engine, 'chat'):
+                                    kb_response = query_engine.chat(kb_query)
+                                else:
+                                    continue
+                                
+                                if kb_response and hasattr(kb_response, 'source_nodes'):
+                                    for node in kb_response.source_nodes[:3]:
+                                        if hasattr(node, 'metadata'):
+                                            if 'file_name' in node.metadata:
+                                                topic = node.metadata['file_name'].replace('.pdf', '').replace('.txt', '')
+                                                if topic not in relevant_topics:
+                                                    relevant_topics.append(topic)
+                                            # 获取部分内容作为上下文
+                                            if hasattr(node, 'text') and len(node.text) > 50:
+                                                kb_context += node.text[:200] + "...\n"
+                                
+                                if len(relevant_topics) >= 2:  # 找到足够的相关主题就停止
+                                    break
+                            except:
+                                continue
+                                
                 except Exception as e:
-                    print(f"[DEBUG] 知识库查询失败: {e}")  # 调试
-                    pass  # 静默失败，不影响主流程
+                    pass  # 静默失败
+            
+            # 构建更智能的提示词，强调基于知识库内容
+            topic_hint = f"\n相关文档：{', '.join(relevant_topics[:3])}" if relevant_topics else ""
+            kb_hint = f"\n知识库内容参考：\n{kb_context[:300]}" if kb_context else ""
             
             prompt = (
-                f"基于以下回答，提出 {num_questions * 2} 个简短的追问问题。\n"
-                f"要求：\n1. 只需要问题，不要序号\n2. 简短（15字以内）\n3. 有启发性\n"
-                f"4. 结合知识库内容，提出用户可能感兴趣的相关问题\n"
-                f"{'避免：' + existing_str if existing_str else ''}\n"
-                f"{kb_topics}\n\n"
-                f"内容：\n{short_context}"
+                f"基于以下回答内容和知识库信息，生成 {num_questions * 2} 个高质量的追问问题。\n\n"
+                f"重要要求：\n"
+                f"1. 问题必须基于知识库实际内容，确保知识库能够回答\n"
+                f"2. 问题简洁（10-15字）\n"
+                f"3. 具有启发性和实用性\n"
+                f"4. 避免重复已有问题\n"
+                f"5. 每行一个问题，不要编号\n"
+                f"6. 优先生成知识库有明确答案的问题\n\n"
+                f"回答内容：{short_context}\n"
+                f"{topic_hint}"
+                f"{kb_hint}\n"
+                f"{'已问过的问题（避免重复）：\n' + existing_str if existing_str else ''}"
             )
             
-            print(f"[DEBUG] 是否有知识库主题: {bool(kb_topics)}")  # 调试
+            print(f"🔍 开始调用LLM生成推荐问题...")
+            print(f"🔍 提示词长度: {len(prompt)} 字符")
             
-            resp = Settings.llm.complete(prompt)
-            text = resp.text.strip()
+            try:
+                resp = llm.complete(prompt)
+                text = resp.text.strip()
+                print(f"🔍 LLM响应: {text[:100]}...")
+            except Exception as e:
+                print(f"❌ LLM调用失败: {e}")
+                result["questions"] = get_smart_fallback(context_text)
+                return
             
-            print(f"[DEBUG] LLM 生成的问题: {text[:100]}...")  # 调试
+            # 解析生成的问题
+            questions = []
+            for line in text.split('\n'):
+                line = line.strip()
+                if line:
+                    # 清理问题格式
+                    question = re.sub(r'^[\d\.\-\s\*\•]+', '', line).strip()
+                    if question and len(question) > 5:  # 过滤太短的问题
+                        questions.append(question)
             
-            questions = [re.sub(r'^[\d\.\-\s]+', '', q).strip() for q in text.split('\n') if q.strip()]
+            print(f"🔍 解析出 {len(questions)} 个问题: {questions[:3]}")
             
-            print(f"[DEBUG] 解析出 {len(questions)} 个问题")  # 调试
-            
-            # 直接返回生成的问题，不再验证（验证逻辑有问题）
+            # 直接设置result，跳过复杂的验证逻辑
             if questions:
                 result["questions"] = questions[:num_questions]
-                print(f"[DEBUG] 返回问题: {result['questions']}")  # 调试
-            else:
-                result["questions"] = fallback
-                print(f"[DEBUG] 使用 fallback")  # 调试
+                print(f"🔍 强制设置result: {result}")
+                return
+            
+            # 如果没有问题，使用fallback
+            result["questions"] = get_smart_fallback(context_text)
+            print(f"🔍 使用fallback: {result}")
+            return
                 
         except Exception as e:
+            print(f"❌ 推荐问题生成异常: {e}")
             if logger:
                 logger.log_error("追问生成", str(e))
-            result["questions"] = fallback
+            if result is not None:
+                result["questions"] = get_smart_fallback(context_text)
     
     # 使用线程执行并设置超时
     thread = threading.Thread(target=_generate, daemon=True)
@@ -343,10 +459,18 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
     thread.join(timeout=timeout)
     
     if thread.is_alive():
+        print(f"⏰ 推荐问题生成超时 ({timeout}秒)")
         if logger:
             logger.log_error("追问生成", "超时")
-        return fallback
+        return get_smart_fallback(context_text)
     
+    print(f"🔍 线程执行完成，result: {result}")
+    
+    if result is None or "questions" not in result:
+        print(f"🔍 result为空或无questions，返回fallback")
+        return get_smart_fallback(context_text)
+    
+    print(f"🔍 函数最终返回: {result['questions']}")
     return result["questions"]
 
 

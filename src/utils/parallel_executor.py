@@ -1,3 +1,4 @@
+from .safe_parallel_tasks import safe_process_node_worker, safe_extract_metadata_task
 """
 并行执行管理器
 Stage 6 - 统一的多进程/多线程执行接口
@@ -7,7 +8,7 @@ Stage 6.1 - 自动并行装饰器
 import os
 import psutil
 import functools
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, List, Any, Optional
 
 
@@ -23,7 +24,7 @@ class ParallelExecutor:
         """
         self.max_workers = max_workers or max(2, os.cpu_count() - 1)
     
-    def should_parallelize(self, task_count: int, threshold: int = 10) -> bool:
+    def should_parallelize(self, task_count: int, threshold: int = 2) -> bool:
         """
         智能判断是否需要并行执行
         
@@ -35,7 +36,7 @@ class ParallelExecutor:
             bool: 是否应该并行执行
         """
         # 任务数太少，串行更快（避免进程创建开销）
-        if task_count < threshold:
+        if task_count < 2:
             return False
         
         # CPU核心数太少，并行无意义
@@ -45,7 +46,7 @@ class ParallelExecutor:
         # 资源占用过高，避免并行加重负担
         try:
             cpu_percent = psutil.cpu_percent(interval=0.1)
-            if cpu_percent > 85:
+            if cpu_percent > 95:
                 return False
         except:
             pass  # 如果获取失败，继续并行
@@ -54,7 +55,7 @@ class ParallelExecutor:
     
     def execute(self, func: Callable, tasks: List[Any], 
                 chunksize: Optional[int] = None,
-                threshold: int = 10) -> List[Any]:
+                threshold: int = 2) -> List[Any]:
         """
         执行并行任务（自动判断串行/并行）
         
@@ -74,14 +75,14 @@ class ParallelExecutor:
         # 并行执行
         workers = min(self.max_workers, len(tasks) // 2)
         chunk = chunksize or max(1, len(tasks) // (workers * 4))
-        with ProcessPoolExecutor(max_workers=workers) as executor:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
             results = list(executor.map(func, tasks, chunksize=chunk))
         
         return results
     
     def execute_with_progress(self, func: Callable, tasks: List[Any],
                               callback: Optional[Callable] = None,
-                              threshold: int = 10) -> List[Any]:
+                              threshold: int = 2) -> List[Any]:
         """
         带进度回调的并行执行
         
@@ -107,7 +108,7 @@ class ParallelExecutor:
         
         # 并行执行
         workers = min(self.max_workers, total // 2)
-        with ProcessPoolExecutor(max_workers=workers) as executor:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
             futures = {executor.submit(func, task): i for i, task in enumerate(tasks)}
             results = [None] * total
             completed = 0
@@ -137,7 +138,7 @@ def get_global_executor(max_workers: Optional[int] = None) -> ParallelExecutor:
 # 自动并行装饰器
 # ============================================================================
 
-def auto_parallel(threshold: int = 10, chunksize: Optional[int] = None):
+def auto_parallel(threshold: int = 2, chunksize: Optional[int] = None):
     """
     自动并行装饰器
     
@@ -198,7 +199,7 @@ def auto_parallel(threshold: int = 10, chunksize: Optional[int] = None):
 
 
 def parallelize_list(func: Callable, items: List[Any], 
-                     threshold: int = 10, 
+                     threshold: int = 2, 
                      chunksize: Optional[int] = None) -> List[Any]:
     """
     便捷函数：对列表中的每个元素应用函数（自动并行）

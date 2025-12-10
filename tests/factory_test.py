@@ -79,7 +79,7 @@ def test_environment():
     
     # 必需的文件
     required_files = [
-        "src/apppro.py", "src/logger.py", "src/terminal_logger.py",
+        "src/apppro.py", "src/logger.py",
         "src/custom_embeddings.py", "src/metadata_manager.py",
         "src/chat_utils_improved.py", "requirements.txt"
     ]
@@ -119,7 +119,6 @@ def test_core_imports():
     
     modules = [
         ("src.logger", "logger"),
-        ("src.terminal_logger", "terminal_logger"),
         ("src.custom_embeddings", "create_custom_embedding"),
         ("src.metadata_manager", "MetadataManager"),
         ("src.chat_utils_improved", "generate_follow_up_questions_safe"),
@@ -160,7 +159,7 @@ def test_logging_system():
     try:
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
         from src.logger import logger
-        from src.terminal_logger import terminal_logger
+        from src.logging import LogManager
         
         # 测试日志目录
         log_dir = "app_logs"
@@ -170,11 +169,14 @@ def test_logging_system():
             os.makedirs(log_dir)
             print_test("日志目录", "PASS", f"{log_dir} 已创建")
         
-        # 测试日志写入（使用正确的方法）
+        # 测试日志写入（使用统一的LogManager）
         test_msg = f"Factory test at {datetime.now()}"
         logger.log("测试", "成功", test_msg)
-        terminal_logger.info(test_msg)
-        print_test("日志写入", "PASS", "logger.log + terminal_logger")
+        
+        # 测试LogManager
+        log_manager = LogManager()
+        log_manager.info(test_msg)
+        print_test("日志写入", "PASS", "logger.log + LogManager")
         
     except Exception as e:
         print_test("日志系统", "FAIL", str(e))

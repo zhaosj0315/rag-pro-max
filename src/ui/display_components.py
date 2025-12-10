@@ -131,9 +131,21 @@ def render_source_references(sources: List[Dict[str, Any]], expanded: bool = Fal
     
     with st.expander(f"📚 参考 {len(sources)} 个片段", expanded=expanded):
         for idx, src in enumerate(sources):
-            score = src.get('score', 0)
-            file_name = src.get('file', '未知文件')
-            text = src.get('text', '')
+            # 安全处理不同类型的src
+            if isinstance(src, dict):
+                score = src.get('score', 0)
+                file_name = src.get('file', '未知文件')
+                text = src.get('text', '')
+            elif isinstance(src, str):
+                # 如果src是字符串，直接显示
+                score = 0
+                file_name = '未知文件'
+                text = src
+            else:
+                # 其他类型，转换为字符串
+                score = 0
+                file_name = '未知文件'
+                text = str(src)
             
             # 相关性标签 + 文件名
             st.markdown(f"**{get_relevance_label(score)}** | 📄 `{file_name}`")

@@ -41,6 +41,10 @@ class LogManager:
         self.perf_stack = []
         self.metrics = {}
         
+        # 日志去重功能
+        self._recent_logs = []
+        self._max_recent = 5
+        
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
         
@@ -66,8 +70,26 @@ class LogManager:
         except Exception:
             pass
     
+    def _is_duplicate(self, message: str, stage: str) -> bool:
+        """检查是否为重复日志"""
+        log_key = f"{stage}:{message}"
+        
+        if log_key in self._recent_logs:
+            return True
+            
+        # 添加到最近日志列表
+        self._recent_logs.append(log_key)
+        if len(self._recent_logs) > self._max_recent:
+            self._recent_logs.pop(0)
+            
+        return False
+    
     def log(self, level: str, message: str, stage: str = "", details: Optional[Dict] = None):
         """记录日志"""
+        # 检查重复日志（模型加载等重复信息）
+        if stage in ["模型加载", "GPU状态"] and self._is_duplicate(message, stage):
+            return
+            
         entry = {
             "timestamp": datetime.now().isoformat(),
             "level": level,

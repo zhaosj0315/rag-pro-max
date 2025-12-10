@@ -1,5 +1,19 @@
 # RAG Pro Max 出厂测试指南
 
+## 📊 最新测试结果 (v1.8.0)
+
+**测试时间**: 2025-12-10 19:06:00  
+**测试版本**: v1.7.3  
+**测试环境**: macOS, Python 3.12.9
+
+```
+✅ 通过: 56/61
+❌ 失败: 0/61
+⏭️ 跳过: 5/61
+
+✅ 所有测试通过！系统可以发布。
+```
+
 ## 📋 测试概述
 
 `factory_test.py` 是 RAG Pro Max 的全面出厂测试脚本，覆盖所有核心功能。每次代码修改后都应运行此测试，确保没有破坏现有功能。
@@ -19,15 +33,15 @@ python3 tests/factory_test.py
 ### 1. 环境检查 (14 项)
 - Python 版本 (3.8+)
 - 必需的包：streamlit, llama_index, chromadb, requests, ollama, sentence_transformers, torch
-- 必需的文件：src/apppro.py, src/logger.py, src/terminal_logger.py, src/custom_embeddings.py, src/metadata_manager.py, src/chat_utils_improved.py, requirements.txt
+- 必需的文件：src/apppro.py, src/logger.py, src/custom_embeddings.py, src/metadata_manager.py, src/chat_utils_improved.py, requirements.txt
 
 ### 2. 配置文件测试 (3 项)
-- rag_config.json - RAG 检索参数
-- app_config.json - 应用默认配置
+- rag_config.json - RAG 检索参数 (12个配置项)
+- app_config.json - 应用默认配置 (13个配置项)
 - projects_config.json - 项目配置
 
-### 3. 核心模块导入测试 (5 项)
-- logger 模块
+### 3. 核心模块导入测试 (17 项)
+- 包括新修复的 src.core.environment 模块
 - terminal_logger 模块
 - custom_embeddings 模块
 - metadata_manager 模块

@@ -1,0 +1,23 @@
+streamlit
+requests
+ollama
+psutil
+jieba
+llama-index-core
+llama-index-llms-ollama
+llama-index-llms-openai
+llama-index-embeddings-huggingface
+llama-index-embeddings-ollama
+llama-index-embeddings-openai
+llama-index-retrievers-bm25
+pdfplumber
+
+# 核心优化依赖（无数据库）
+fastapi>=0.104.0
+uvicorn>=0.24.0
+pydantic>=2.0.0
+
+# 多模态支持
+pandas>=2.0.0
+Pillow>=10.0.0
+openpyxl>=3.1.0
