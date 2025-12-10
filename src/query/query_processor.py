@@ -159,14 +159,16 @@ class QueryProcessor:
                         'text': text
                     })
                 
-                # 并行处理节点
+                # 并行处理节点（优化阈值）
                 tasks = [(d, active_kb_name) for d in node_data]
-                srcs = [s for s in self.executor.execute(process_node_worker, tasks, threshold=10) if s]
+                # 降低并行阈值：2个节点就并行，充分利用多核
+                parallel_threshold = 2
+                srcs = [s for s in self.executor.execute(process_node_worker, tasks, threshold=parallel_threshold) if s]
                 
-                if len(node_data) >= 10:
-                    logger.info(f"⚡ 并行处理: {len(srcs)} 个节点")
+                if len(node_data) >= parallel_threshold:
+                    logger.info(f"⚡ 并行处理: {len(srcs)} 个节点 (阈值: {parallel_threshold})")
                 else:
-                    logger.info(f"⚡ 串行处理: {len(srcs)} 个节点")
+                    logger.info(f"⚡ 单节点处理: {len(srcs)} 个节点")
             
             # 计算统计信息
             total_time = time.time() - start_time

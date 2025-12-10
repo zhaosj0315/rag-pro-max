@@ -2270,16 +2270,17 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                                 'text': text
                             })
                         
-                        # 使用并行执行器处理节点（自动判断串行/并行）
+                        # 使用并行执行器处理节点（优化并行阈值）
                         executor = ParallelExecutor()
                         tasks = [(d, active_kb_name) for d in node_data]
-                        # 使用串行处理避免多进程问题
-                        srcs = [process_node_worker(task) for task in tasks]
+                        # 启用真正的并行处理，降低阈值到2个节点
+                        parallel_threshold = 2
+                        srcs = [s for s in executor.execute(process_node_worker, tasks, threshold=parallel_threshold) if s]
                         
-                        if len(node_data) >= 10:
-                            logger.info(f"⚡ 并行处理: {len(srcs)} 个节点")
+                        if len(node_data) >= parallel_threshold:
+                            logger.info(f"⚡ 并行处理: {len(srcs)} 个节点 (阈值: {parallel_threshold})")
                         else:
-                            logger.info(f"⚡ 串行处理: {len(srcs)} 个节点")
+                            logger.info(f"⚡ 单节点处理: {len(srcs)} 个节点")
                     
                     logger.log("SUCCESS", "回答生成完成", stage="查询对话", details={"kb_name": active_kb_name, "model": llm_model, "tokens": token_count, "prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens
                     })

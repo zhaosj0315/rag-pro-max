@@ -1,0 +1,28 @@
+# RAG Pro Max v2.1 新增依赖
+
+# 实时文件监控
+watchdog>=3.0.0
+
+# 批量OCR优化
+opencv-python>=4.8.0
+pytesseract>=0.3.10
+Pillow>=10.0.0
+
+# 表格智能解析
+camelot-py[cv]>=0.10.1
+tabula-py>=2.8.0
+openpyxl>=3.1.0
+
+# 多模态向量化
+transformers>=4.35.0
+torch>=2.0.0
+sentence-transformers>=2.2.0
+clip-by-openai>=1.0
+
+# GPU加速（可选）
+# paddlepaddle-gpu>=2.5.0  # 如需PaddleOCR GPU版本
+# paddleocr>=2.7.0
+
+# 图像处理增强
+scikit-image>=0.21.0
+matplotlib>=3.7.0
