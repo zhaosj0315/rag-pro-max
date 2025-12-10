@@ -1,12 +1,13 @@
 # 部署指南
 
-**版本**: v1.8.0  
+**版本**: v2.0.0  
 **更新日期**: 2025-12-10
 
-本文档介绍 RAG Pro Max 的各种部署方式。
+本文档介绍 RAG Pro Max v2.0 的各种部署方式，包括新增的增量更新和多模态功能。
 
 ## 📋 目录
 
+- [v2.0 新功能部署](#v20-新功能部署)
 - [本地部署](#本地部署)
 - [Docker 部署](#docker-部署)
 - [macOS 应用](#macos-应用)
@@ -14,6 +15,64 @@
 - [生产环境](#生产环境)
 
 ---
+
+## v2.0 新功能部署
+
+### 快速升级到v2.0
+```bash
+# 1. 拉取最新代码
+git pull origin main
+
+# 2. 自动部署v2.0功能
+./scripts/deploy_v2.sh
+
+# 3. 智能启动（自动检测v2.0功能）
+./start.sh
+```
+
+### v2.0 系统依赖
+
+#### OCR功能 (图片文字识别)
+```bash
+# macOS
+brew install tesseract tesseract-lang
+
+# Ubuntu/Debian
+sudo apt-get install tesseract-ocr tesseract-ocr-chi-sim tesseract-ocr-eng
+
+# CentOS/RHEL
+sudo yum install tesseract tesseract-langpack-chi_sim tesseract-langpack-eng
+```
+
+#### 表格提取功能 (需要Java)
+```bash
+# macOS
+brew install openjdk
+
+# Ubuntu/Debian
+sudo apt-get install openjdk-8-jdk
+
+# CentOS/RHEL
+sudo yum install java-1.8.0-openjdk
+```
+
+#### Python依赖
+```bash
+pip install -r requirements_v2.txt
+```
+
+### v2.0 服务启动
+```bash
+# 方式1: 智能启动（推荐）
+./start.sh  # 自动检测v2.0功能
+
+# 方式2: 完整v2.0服务
+./start_v2.sh  # 启动Streamlit + API服务
+
+# 访问地址
+# 主应用: http://localhost:8501
+# API文档: http://localhost:8000/docs
+```
 
 ## 本地部署
 

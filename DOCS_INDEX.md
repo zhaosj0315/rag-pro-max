@@ -3,14 +3,15 @@
 ## 🎯 核心文档
 
 ### 📖 项目概览
-- [📄 README.md](README.md) - 项目主文档
+- [📄 README.md](README.md) - 项目主文档 (v2.0.0)
 - [📝 CHANGELOG.md](CHANGELOG.md) - 版本更新日志
-- [🔧 RELEASE_v1.7.3.md](RELEASE_v1.7.3.md) - v1.7.3 发布说明 ⭐
+- [🚀 v2.0功能文档](docs/V2.0_FEATURES.md) - v2.0 完整功能说明 ⭐
 - [📜 LICENSE](LICENSE) - 开源许可证
 
 ### 🚀 快速开始
-- [🚀 部署指南](DEPLOYMENT.md) - 详细部署说明
+- [🚀 部署指南](DEPLOYMENT.md) - 详细部署说明 (v2.0)
 - [👋 首次使用指南](FIRST_TIME_GUIDE.md) - 新手入门
+- [📖 用户手册](USER_MANUAL.md) - 完整操作指南 (v2.0)
 - [🔄 自动测试](AUTO_TEST.md) - 自动化测试配置
 - [🚀 安全启动](START.md) - 启动前测试
 
