@@ -1,10 +1,11 @@
 # 常见问题 (FAQ)
 
-**版本**: v1.8.0  
+**版本**: v2.0.0  
 **更新日期**: 2025-12-10
 
 ## 📋 目录
 
+- [v2.0 新功能](#v20-新功能)
 - [安装和配置](#安装和配置)
 - [使用问题](#使用问题)
 - [性能优化](#性能优化)
@@ -12,6 +13,48 @@
 - [高级功能](#高级功能)
 
 ---
+
+## v2.0 新功能
+
+### Q: 如何使用增量更新功能？
+
+**A**: 
+1. 确保安装了v2.0依赖: `./scripts/deploy_v2.sh`
+2. 在Web界面的侧边栏找到"📈 增量更新"部分
+3. 上传文件后点击"🔍 检查文件变化"
+4. 系统会显示新增、修改、未变化的文件
+5. 点击"🚀 执行增量更新"只处理变化的文件
+
+### Q: 多模态功能支持哪些格式？
+
+**A**: 
+- **图片**: JPG, JPEG, PNG, BMP, TIFF, GIF (需要Tesseract OCR)
+- **表格**: PDF表格, Excel (.xlsx/.xls), CSV (需要Java环境)
+- **文档**: 所有原有格式 + 图片和表格内容提取
+
+### Q: 如何安装OCR和表格提取依赖？
+
+**A**:
+```bash
+# macOS
+brew install tesseract tesseract-lang
+brew install openjdk
+
+# Ubuntu/Debian  
+sudo apt-get install tesseract-ocr tesseract-ocr-chi-sim tesseract-ocr-eng
+sudo apt-get install openjdk-8-jdk
+
+# 然后安装Python依赖
+pip install -r requirements_v2.txt
+```
+
+### Q: v2.0和v1.8有什么区别？
+
+**A**: v2.0完全向后兼容v1.8，新增功能：
+- ✅ 增量更新 - 只处理变化文件，效率提升70-90%
+- ✅ 多模态支持 - 图片OCR + 表格提取
+- ✅ API扩展 - 新增4个RESTful接口
+- ✅ 智能启动 - 自动检测功能可用性
 
 ## 安装和配置
 

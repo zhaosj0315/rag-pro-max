@@ -1,13 +1,105 @@
-# RAG Pro Max API 文档
+# RAG Pro Max API 文档 v2.0
 
 ## 🚀 快速开始
 
 ### 启动API服务器
 ```bash
-python start_api.py
+# v2.0完整服务
+./start_v2.sh
+
+# 或单独启动API
+python3 src/api/fastapi_server.py
 ```
 
 ### 访问地址
+- **API服务**: http://localhost:8000
+- **交互式文档**: http://localhost:8000/docs
+- **OpenAPI规范**: http://localhost:8000/openapi.json
+
+## 📋 v2.0 新增接口
+
+### 增量更新
+```http
+POST /incremental-update
+Content-Type: application/json
+
+{
+  "kb_name": "my_knowledge_base",
+  "file_paths": ["/path/to/doc1.pdf", "/path/to/doc2.docx"],
+  "force_update": false
+}
+```
+
+### 多模态文件上传
+```http
+POST /upload-multimodal
+Content-Type: multipart/form-data
+
+kb_name: my_knowledge_base
+file: [binary file data]
+```
+
+### 多模态查询
+```http
+POST /query-multimodal
+Content-Type: application/json
+
+{
+  "query": "图片中显示了什么？",
+  "kb_name": "my_knowledge_base", 
+  "include_images": true,
+  "include_tables": true,
+  "top_k": 5
+}
+```
+
+### 增量统计
+```http
+GET /kb/{kb_name}/incremental-stats
+```
+
+### 支持格式查询
+```http
+GET /multimodal/formats
+```
+
+## 📋 v1.8 基础接口
+
+### 智能问答
+```http
+POST /query
+Content-Type: application/json
+
+{
+  "query": "你的问题",
+  "kb_name": "knowledge_base_name",
+  "top_k": 5,
+  "use_cache": true
+}
+```
+
+### 知识库列表
+```http
+GET /knowledge-bases
+```
+
+### 缓存管理
+```http
+GET /cache/stats
+DELETE /cache
+```
+
+## 🔧 错误处理
+
+所有接口返回标准HTTP状态码：
+- `200` - 成功
+- `400` - 请求参数错误
+- `404` - 资源不存在
+- `500` - 服务器内部错误
+
+## 📚 完整文档
+
+访问 http://localhost:8000/docs 查看完整的交互式API文档。
 - **API服务**: http://localhost:8000
 - **交互式文档**: http://localhost:8000/docs
 - **ReDoc文档**: http://localhost:8000/redoc
