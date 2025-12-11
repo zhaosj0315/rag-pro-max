@@ -40,9 +40,10 @@ class LLMManager:
     
     def _create_ollama_llm(self, model: str, url: str, temp: float):
         """创建Ollama LLM"""
+        # LlamaIndex的Ollama类期望base_url不包含/api后缀
         base_url = url.rstrip('/')
-        if not base_url.endswith('/api'):
-            base_url += '/api'
+        if base_url.endswith('/api'):
+            base_url = base_url[:-4]
         
         return Ollama(
             model=model,

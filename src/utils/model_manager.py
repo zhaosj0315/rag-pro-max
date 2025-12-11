@@ -166,9 +166,14 @@ def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: s
     try:
         if provider.startswith("Ollama"):
             clean_proxy()
+            # 修复Ollama URL格式 - LlamaIndex期望不包含/api后缀
+            base_url = api_url.rstrip('/')
+            if base_url.endswith('/api'):
+                base_url = base_url[:-4]
+            
             return Ollama(
                 model=model_name,
-                base_url=api_url,
+                base_url=base_url,
                 request_timeout=360.0,
                 temperature=temperature
             )

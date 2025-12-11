@@ -513,6 +513,30 @@ st.markdown("""
 if 'app_initialized' not in st.session_state:
     logger.separator("RAG Pro Max 启动")
     logger.info("应用初始化中...")
+    
+    # 立即设置全局LLM（确保摘要生成等功能可用）
+    try:
+        # 读取配置文件获取LLM设置
+        config_file = "app_config.json"
+        if os.path.exists(config_file):
+            with open(config_file, 'r') as f:
+                config = json.load(f)
+            
+            llm_provider = config.get('llm_provider', 'Ollama')
+            if config.get('llm_type_idx', 0) == 0:  # Ollama
+                llm_model = config.get('llm_model_ollama', 'gpt-oss:20b')
+                llm_url = config.get('llm_url_ollama', 'http://localhost:11434')
+                llm_key = ""
+            else:  # OpenAI
+                llm_model = config.get('llm_model_openai', 'gpt-3.5-turbo')
+                llm_url = config.get('llm_url_openai', 'https://api.openai.com/v1')
+                llm_key = config.get('llm_key', '')
+            
+            # 设置全局LLM
+            set_global_llm_model(llm_provider, llm_model, llm_key, llm_url)
+    except Exception as e:
+        logger.warning(f"全局LLM初始化失败: {e}")
+    
     st.session_state.app_initialized = True
     logger.success("应用初始化完成")
 
@@ -1010,6 +1034,10 @@ with st.sidebar:
         embed_model = config_values.get('embed_model', 'BAAI/bge-small-zh-v1.5')
         embed_url = config_values.get('embed_url', '')
         embed_key = config_values.get('embed_key', '')
+
+        # 设置全局LLM（确保查询改写等功能可以使用）
+        if not hasattr(Settings, 'llm') or Settings.llm is None:
+            set_global_llm_model(llm_provider, llm_model, llm_key, llm_url)
 
         # P0改进3: 高级功能（默认展开）- 使用新组件 (Stage 3.2.3)
         from src.ui.sidebar_config import SidebarConfig
@@ -2008,7 +2036,7 @@ elif is_create_mode:
 if active_kb_name and st.session_state.chat_engine and not st.session_state.messages:
     with st.chat_message("assistant", avatar="🤖"):
         summary_placeholder = st.empty()
-        with st.status("✨ 正在分析文档生成摘要...", expanded=True):
+        with st.status("✨ 正在分析文档生成摘要...", expanded=True) as status:
             try:
                 # 使用知识库的模型（已在挂载时设置，无需重复设置）
                 current_model = getattr(Settings.embed_model, '_model_name', 'Unknown')
@@ -2021,6 +2049,8 @@ if active_kb_name and st.session_state.chat_engine and not st.session_state.mess
                 for t in resp.response_gen:
                     full += t
                     summary_placeholder.markdown(full + "▌")
+                
+                status.update(label="✅ 摘要生成完成", state="complete")
                 summary_placeholder.markdown(full)
                 
                 summary_lines = full.split('\n')
@@ -2033,9 +2063,11 @@ if active_kb_name and st.session_state.chat_engine and not st.session_state.mess
             except Exception as e:
                 error_msg = str(e)
                 if "timed out" in error_msg.lower() or "timeout" in error_msg.lower():
+                    status.update(label="⏱️ 摘要生成超时", state="error")
                     summary_placeholder.info("⏱️ LLM 响应超时，已跳过自动摘要。您可以直接开始提问。")
                     logger.warning(f"⏱️ 摘要生成超时: {e}")
                 else:
+                    status.update(label="❌ 摘要生成失败", state="error")
                     summary_placeholder.warning(f"摘要生成受阻: {e}")
                     logger.error(f"❌ 摘要生成失败: {e}")
                 st.session_state.messages.append({"role": "assistant", "content": "👋 知识库已就绪。"})
@@ -2226,7 +2258,7 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             # 维度映射
             model_map = {
                 512: "BAAI/bge-small-zh-v1.5",
-                768: "BAAI/bge-base-zh-v1.5",
+                768: "BAAI/bge-large-zh-v1.5",
                 1024: "BAAI/bge-m3"
             }
             
