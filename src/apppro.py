@@ -1468,7 +1468,7 @@ if active_kb_name:
             st.session_state.renaming = True
     
     # 文件管理
-    with st.expander("📊 知识库详情与管理", expanded=True):
+    with st.expander("📊 知识库详情与管理", expanded=False):
         if not doc_manager.manifest['files']: 
             st.info("暂无文件")
         else:
