@@ -259,7 +259,7 @@ def _is_similar_question(q1, q2, threshold=0.7):
     return False
 
 
-def generate_follow_up_questions_safe(context_text, num_questions=3, existing_questions=None, timeout=10, logger=None, query_engine=None, llm_model=None):
+def generate_follow_up_questions_safe(context_text, num_questions=3, existing_questions=None, timeout=15, logger=None, query_engine=None, llm_model=None):
     """
     安全的追问生成（带降级策略）- 优化版
     - 智能降级问题
@@ -459,10 +459,17 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
     thread.join(timeout=timeout)
     
     if thread.is_alive():
-        print(f"⏰ 推荐问题生成超时 ({timeout}秒)")
-        if logger:
-            logger.log_error("追问生成", "超时")
-        return get_smart_fallback(context_text)
+        print(f"⏰ 推荐问题生成超时 ({timeout}秒)，等待后台完成...")
+        # 给更多时间让LLM完成
+        thread.join(timeout=5)  # 再等5秒
+        
+        if thread.is_alive():
+            print(f"⏰ 最终超时，使用fallback")
+            if logger:
+                logger.log_error("追问生成", "最终超时")
+            return get_smart_fallback(context_text)
+        else:
+            print(f"✅ 后台生成完成")
     
     print(f"🔍 线程执行完成，result: {result}")
     
