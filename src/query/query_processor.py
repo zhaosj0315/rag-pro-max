@@ -9,7 +9,7 @@ import time
 import streamlit as st
 from llama_index.core import Settings
 
-from src.logging import LogManager
+from src.app_logging import LogManager
 from src.chat import HistoryManager
 from src.chat_utils_improved import generate_follow_up_questions_safe as generate_follow_up_questions
 from src.utils.memory import cleanup_memory

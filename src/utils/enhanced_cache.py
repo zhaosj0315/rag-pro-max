@@ -9,7 +9,7 @@ import time
 import threading
 from typing import Dict, Any, Optional, List
 from collections import OrderedDict
-from src.logging import LogManager
+from src.app_logging import LogManager
 
 logger = LogManager()
 

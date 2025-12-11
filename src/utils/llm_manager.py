@@ -5,7 +5,7 @@ LLM管理器
 
 from llama_index.llms.openai import OpenAI
 from llama_index.llms.ollama import Ollama
-from src.logging import LogManager
+from src.app_logging import LogManager
 
 
 class LLMManager:

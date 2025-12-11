@@ -7,7 +7,7 @@ import torch
 import time
 import threading
 from typing import Optional, Dict, Any
-from src.logging import LogManager
+from src.app_logging import LogManager
 
 logger = LogManager()
 

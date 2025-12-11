@@ -5,7 +5,7 @@
 
 import re
 from llama_index.core import Settings
-from src.logging import LogManager
+from src.app_logging import LogManager
 
 
 class SummaryGenerator:

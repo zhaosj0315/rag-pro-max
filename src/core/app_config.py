@@ -5,7 +5,7 @@
 
 import json
 import os
-from src.logging import LogManager
+from src.app_logging import LogManager
 
 logger = LogManager()
 

@@ -6,7 +6,7 @@
 import os
 import json
 import streamlit as st
-from src.logging import LogManager
+from src.app_logging import LogManager
 
 logger = LogManager()
 

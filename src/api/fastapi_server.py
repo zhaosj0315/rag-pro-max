@@ -13,7 +13,7 @@ import os
 import tempfile
 from datetime import datetime
 
-from src.logging import LogManager
+from src.app_logging import LogManager
 from src.utils.enhanced_cache import smart_cache_manager
 from src.kb.kb_manager import KBManager
 from src.processors.multimodal_processor import MultimodalProcessor

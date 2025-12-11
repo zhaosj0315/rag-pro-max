@@ -8,7 +8,7 @@ import time
 import streamlit as st
 from llama_index.core import Settings, load_index_from_storage, StorageContext
 
-from src.logging import LogManager
+from src.app_logging import LogManager
 from src.utils.memory import cleanup_memory
 from src.utils.model_manager import load_embedding_model, load_llm_model
 from src.chat import HistoryManager

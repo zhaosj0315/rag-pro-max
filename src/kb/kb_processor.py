@@ -9,7 +9,7 @@ import psutil
 from datetime import datetime
 from llama_index.core import Settings
 
-from src.logging import LogManager
+from src.app_logging import LogManager
 from src.utils.model_manager import load_embedding_model
 from src.utils.adaptive_throttling import get_resource_guard
 from src.processors.index_builder import IndexBuilder

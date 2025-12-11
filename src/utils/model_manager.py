@@ -8,7 +8,7 @@ from llama_index.llms.openai import OpenAI
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.embeddings.openai import OpenAIEmbedding
 from ..custom_embeddings import create_custom_embedding
-from src.logging import LogManager
+from src.app_logging import LogManager
 logger = LogManager()
 
 

@@ -7,7 +7,7 @@ import streamlit as st
 import time
 from typing import Optional
 
-from src.logging import LogManager
+from src.app_logging import LogManager
 from src.query.query_handler import QueryHandler
 from src.chat import HistoryManager, SuggestionManager
 from src.chat_utils_improved import generate_follow_up_questions_safe as generate_follow_up_questions

@@ -6,7 +6,7 @@
 import os
 import time
 import streamlit as st
-from src.logging import LogManager
+from src.app_logging import LogManager
 from src.config import ConfigLoader
 from src.utils.document_processor import sanitize_filename
 from src.chat import HistoryManager

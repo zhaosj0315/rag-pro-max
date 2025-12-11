@@ -9,7 +9,7 @@ from typing import Dict, Any
 from src.utils.gpu_optimizer import gpu_optimizer
 from src.utils.enhanced_cache import enhanced_cache
 from src.processors.multimodal_processor import multimodal_processor
-from src.logging import LogManager
+from src.app_logging import LogManager
 
 logger = LogManager()
 

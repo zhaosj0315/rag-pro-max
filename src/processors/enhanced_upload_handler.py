@@ -8,7 +8,7 @@ import shutil
 from typing import List, Dict, Any
 from src.processors.multimodal_processor import multimodal_processor
 from src.processors.upload_handler import UploadHandler
-from src.logging import LogManager
+from src.app_logging import LogManager
 
 logger = LogManager()
 

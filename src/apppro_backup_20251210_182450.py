@@ -33,7 +33,7 @@ from llama_index.core.schema import Document
 from src.custom_embeddings import create_custom_embedding
 
 # 引入日志模块
-from src.logging import LogManager
+from src.app_logging import LogManager
 logger = LogManager()
 # terminal_logger 已被 logger 替代
 from src.chat_utils_improved import generate_follow_up_questions_safe as generate_follow_up_questions

@@ -8,7 +8,7 @@ import re
 from typing import Dict, List, Optional, Any
 import streamlit as st
 
-from src.logging import LogManager
+from src.app_logging import LogManager
 logger = LogManager()
 from src.utils.parallel_executor import ParallelExecutor
 from src.utils.parallel_tasks import process_node_worker

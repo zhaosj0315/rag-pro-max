@@ -23,7 +23,7 @@ import streamlit as st
 from datetime import datetime
 
 # 业务模块导入
-from src.logging import LogManager
+from src.app_logging import LogManager
 from src.utils.memory import cleanup_memory
 from src.kb.kb_manager import KBManager
 from src.chat.chat_engine import ChatEngine

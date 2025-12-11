@@ -12,7 +12,7 @@ import streamlit as st
 from llama_index.core import StorageContext, load_index_from_storage
 from llama_index.core.memory import ChatMemoryBuffer
 
-from src.logging import LogManager
+from src.app_logging import LogManager
 from src.config import ManifestManager
 from src.utils.model_manager import load_embedding_model
 

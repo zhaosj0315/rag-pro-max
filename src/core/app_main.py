@@ -13,7 +13,7 @@ from src.utils.app_utils import initialize_session_state, show_first_time_guide,
 from src.ui.message_renderer import MessageRenderer
 from src.summary.auto_summary import AutoSummaryGenerator
 from src.queue.queue_manager import QueueManager
-from src.logging import LogManager
+from src.app_logging import LogManager
 
 logger = LogManager()
 

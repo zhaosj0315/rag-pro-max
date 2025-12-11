@@ -11,7 +11,7 @@ def cleanup_memory():
         import torch
         # 延迟导入，避免 pickle 错误
         try:
-            from src.logging import LogManager
+            from src.app_logging import LogManager
             logger = LogManager()
         except:
             logger = None
@@ -26,7 +26,7 @@ def cleanup_memory():
                 logger.info("🧹 已清理 MPS 显存缓存")
     except Exception as e:
         try:
-            from src.logging import LogManager
+            from src.app_logging import LogManager
             logger = LogManager()
             if logger:
                 logger.warning(f"显存清理失败: {e}")
