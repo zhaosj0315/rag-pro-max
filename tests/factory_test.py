@@ -634,10 +634,10 @@ def main():
     test_memory_management()
     test_gpu_optimization()
     test_v2_features()  # 新增v2.0功能测试
-    test_v22_tab_migration()  # v2.2.0标签页迁移测试
-    test_v22_component_separation()  # v2.2.0组件分离测试
-    test_v22_auto_switch()  # v2.2.0自动跳转测试
-    test_v22_ui_optimization()  # v2.2.0界面优化测试
+    test_v22_tab_migration()  # v2.2.1标签页迁移测试
+    test_v22_component_separation()  # v2.2.1组件分离测试
+    test_v22_auto_switch()  # v2.2.1自动跳转测试
+    test_v22_ui_optimization()  # v2.2.1界面优化测试
     
     # 输出测试结果
     print_header("测试结果汇总")
@@ -659,8 +659,8 @@ def main():
 
 
 def test_v22_tab_migration():
-    """测试v2.2.0标签页迁移功能"""
-    print("\n🧪 测试 v2.2.0 标签页迁移功能...")
+    """测试v2.2.1标签页迁移功能"""
+    print("\n🧪 测试 v2.2.1 标签页迁移功能...")
     
     try:
         # 测试配置组件导入
@@ -691,12 +691,12 @@ def test_v22_tab_migration():
         return True
         
     except Exception as e:
-        print(f"  ❌ v2.2.0标签页迁移测试失败: {e}")
+        print(f"  ❌ v2.2.1标签页迁移测试失败: {e}")
         return False
 
 def test_v22_component_separation():
-    """测试v2.2.0组件分离"""
-    print("\n🧪 测试 v2.2.0 组件分离...")
+    """测试v2.2.1组件分离"""
+    print("\n🧪 测试 v2.2.1 组件分离...")
     
     try:
         # 检查主文件中是否移除了配置组件冲突
@@ -719,12 +719,12 @@ def test_v22_component_separation():
         return True
         
     except Exception as e:
-        print(f"  ❌ v2.2.0组件分离测试失败: {e}")
+        print(f"  ❌ v2.2.1组件分离测试失败: {e}")
         return False
 
 def test_v22_auto_switch():
-    """测试v2.2.0自动跳转功能"""
-    print("\n🧪 测试 v2.2.0 自动跳转功能...")
+    """测试v2.2.1自动跳转功能"""
+    print("\n🧪 测试 v2.2.1 自动跳转功能...")
     
     try:
         # 检查自动跳转逻辑
@@ -747,12 +747,12 @@ def test_v22_auto_switch():
         return True
         
     except Exception as e:
-        print(f"  ❌ v2.2.0自动跳转测试失败: {e}")
+        print(f"  ❌ v2.2.1自动跳转测试失败: {e}")
         return False
 
 def test_v22_ui_optimization():
-    """测试v2.2.0界面优化"""
-    print("\n🧪 测试 v2.2.0 界面优化...")
+    """测试v2.2.1界面优化"""
+    print("\n🧪 测试 v2.2.1 界面优化...")
     
     try:
         # 检查界面优化设置
@@ -774,7 +774,7 @@ def test_v22_ui_optimization():
         return True
         
     except Exception as e:
-        print(f"  ❌ v2.2.0界面优化测试失败: {e}")
+        print(f"  ❌ v2.2.1界面优化测试失败: {e}")
         return False
 
 if __name__ == "__main__":

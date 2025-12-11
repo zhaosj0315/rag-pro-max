@@ -36,14 +36,17 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str]:
     
     if llm_provider_choice.startswith("Ollama"):
         llm_provider = "Ollama"
-        llm_url = st.text_input("Ollama URL", defaults.get("llm_url_ollama", "http://localhost:11434"), key="config_ollama_url")
+        # Ollama URL 和状态同行显示
+        col_url, col_status = st.columns([3, 1])
+        with col_url:
+            llm_url = st.text_input("Ollama URL", defaults.get("llm_url_ollama", "http://localhost:11434"), key="config_ollama_url")
         
         # 检测 Ollama 状态
         from src.utils.model_utils import check_ollama_status
         ollama_ok = check_ollama_status(llm_url)
         
-        col_status, _ = st.columns([3, 1])
         with col_status:
+            st.write("")  # 占位，对齐输入框
             if ollama_ok:
                 st.success("✅ Ollama 已连接")
             else:

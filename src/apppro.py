@@ -290,138 +290,167 @@ PageStyle.setup_page()
 # 注入 CSS
 st.markdown("""
 <style>
-    /* 禁用 spinner 遮罩层 */
-    .stSpinner > div {
-        border: none !important;
-        background-color: transparent !important;
-    }
-    div[data-testid="stStatusWidget"] {
-        background-color: transparent !important;
-    }
-    
-    /* 侧边栏顶部完全无空白 - 激进版本 */
-    section[data-testid="stSidebar"] {
-        padding-top: 0rem !important;
-    }
-    section[data-testid="stSidebar"] > div {
-        padding-top: 0rem !important;
-        margin-top: 0rem !important;
-    }
-    section[data-testid="stSidebar"] .block-container {
-        padding-top: 0rem !important;
-        margin-top: 0rem !important;
-    }
-    section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
-        padding-top: 0rem !important;
-        margin-top: 0rem !important;
-        gap: 0.5rem !important;
-    }
-    section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div:first-child {
-        padding-top: 0rem !important;
-        margin-top: 0rem !important;
-    }
-    
-    /* 最小化顶部空白 */
-    .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 0.5rem !important;
-    }
-    
-    /* 紧凑标题 */
-    h3, h4 {
-        margin-top: 0 !important;
-        margin-bottom: 0.5rem !important;
-        padding-top: 0 !important;
-        line-height: 1.2 !important;
-    }
-    
-    /* 超紧凑指标卡片 */
-    [data-testid="stMetricValue"] {
-        font-size: 1.1rem !important;
-    }
-    [data-testid="stMetricLabel"] {
-        font-size: 0.75rem !important;
-        margin-bottom: 0 !important;
-    }
-    [data-testid="metric-container"] {
-        padding: 0.3rem 0 !important;
-    }
-    
-    /* 按钮样式优化 */
-    div.stButton > button {
-        background-color: transparent !important;
-        border: 1px solid rgba(128, 128, 128, 0.5) !important;
-        color: inherit !important;
-        border-radius: 6px !important;
-        padding: 0.3rem 0.6rem !important;
-        transition: all 0.3s ease;
-        line-height: 1.2;
-        text-align: center;
+    /* 标签页显示优化 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2px !important;
+        padding: 2px !important;
+        overflow-x: auto !important;
         white-space: nowrap !important;
     }
+    
+    .stTabs [data-baseweb="tab"] {
+        padding: 6px 8px !important;
+        font-size: 0.8rem !important;
+        min-width: auto !important;
+        flex-shrink: 0 !important;
+    }
+    
+    /* 侧边栏宽度优化 */
+    .css-1d391kg {
+        min-width: 280px !important;
+        max-width: 320px !important;
+    }
+    
+
+    /* 全局布局优化 */
+    .main .block-container {
+        padding: 0.5rem 1rem !important;
+        max-width: 1400px !important;
+    }
+    
+    /* 侧边栏优化 */
+    .css-1d391kg {
+        padding-top: 1rem !important;
+    }
+    
+    /* 标签页样式 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 4px !important;
+        background: rgba(0,0,0,0.02) !important;
+        border-radius: 8px !important;
+        padding: 2px !important;
+        margin-bottom: 1rem !important;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        padding: 8px 16px !important;
+        border-radius: 6px !important;
+        font-weight: 500 !important;
+        font-size: 0.9rem !important;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: #FF4B4B !important;
+        color: white !important;
+    }
+    
+    /* 按钮优化 */
+    div.stButton > button {
+        border-radius: 6px !important;
+        padding: 0.4rem 0.8rem !important;
+        font-size: 0.85rem !important;
+        font-weight: 500 !important;
+        border: 1px solid rgba(0,0,0,0.1) !important;
+        transition: all 0.2s !important;
+    }
+    
     div.stButton > button:hover {
         border-color: #FF4B4B !important;
         color: #FF4B4B !important;
-        background-color: rgba(255, 75, 75, 0.05) !important;
+        background: rgba(255,75,75,0.05) !important;
     }
     
-    /* 输入框和下拉框 - 确保文字完整显示 */
+    /* 输入框优化 */
     .stTextInput > div > div > input,
-    .stSelectbox > div > div > div {
-        border-radius: 6px;
-        padding: 0.4rem 0.8rem !important;
+    .stTextArea > div > div > textarea {
+        border-radius: 6px !important;
         font-size: 0.9rem !important;
-        white-space: nowrap !important;
-        overflow: visible !important;
+        padding: 0.5rem !important;
     }
     
-    /* 下拉框选项完整显示 */
-    .stSelectbox label {
+    /* 选择框优化 */
+    .stSelectbox > div > div {
+        border-radius: 6px !important;
         font-size: 0.9rem !important;
-        font-weight: 500 !important;
     }
     
-    /* 减少列间距但保持可读性 */
-    [data-testid="column"] {
-        padding: 0 0.4rem !important;
+    /* 文件上传区域 */
+    .stFileUploader > div {
+        border-radius: 8px !important;
+        padding: 1rem !important;
+        border: 2px dashed rgba(0,0,0,0.1) !important;
     }
     
-    /* 侧边栏文件列表 */
-    .file-item {
-        font-size: 12px; 
-        padding: 5px 8px; 
-        background: rgba(128,128,128,0.1); 
-        border-radius: 6px; 
-        margin-bottom: 3px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .file-name { font-weight: 500; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .file-meta { font-size: 10px; opacity: 0.7; }
-    
-    /* 欢迎页卡片 */
-    .welcome-box {
-        padding: 20px;
-        border-radius: 10px;
-        background-color: rgba(128, 128, 128, 0.05);
-        border: 1px solid rgba(128, 128, 128, 0.2);
-        margin-bottom: 15px;
-        text-align: center;
-    }
-    
-    /* 减少expander间距 */
+    /* 展开器优化 */
     .streamlit-expanderHeader {
-        padding: 0.4rem 0.8rem !important;
+        background: rgba(0,0,0,0.02) !important;
+        border-radius: 6px !important;
+        padding: 0.5rem 0.8rem !important;
+        margin-bottom: 0.5rem !important;
     }
     
-    /* 减少caption间距 */
-    .stCaption {
-        margin-top: 0.2rem !important;
-        margin-bottom: 0.2rem !important;
+    /* 消息容器 */
+    .stChatMessage {
+        border-radius: 8px !important;
+        padding: 0.8rem !important;
+        margin-bottom: 0.8rem !important;
+        border: 1px solid rgba(0,0,0,0.05) !important;
     }
-</style>
-""", unsafe_allow_html=True)
+    
+    /* 指标卡片 */
+    [data-testid="metric-container"] {
+        background: rgba(0,0,0,0.02) !important;
+        border: 1px solid rgba(0,0,0,0.05) !important;
+        border-radius: 8px !important;
+        padding: 0.8rem !important;
+    }
+    
+    /* 减少间距 */
+    .element-container {
+        margin-bottom: 0.5rem !important;
+    }
+    
+    h1, h2, h3 {
+        margin: 0.5rem 0 !important;
+    }
+    
+    [data-testid="column"] {
+        padding: 0 0.3rem !important;
+    }
+    
+    /* 文件列表 */
+    .file-item {
+        font-size: 0.8rem !important;
+        padding: 0.5rem !important;
+        background: rgba(0,0,0,0.02) !important;
+        border-radius: 6px !important;
+        margin-bottom: 0.3rem !important;
+        border: 1px solid rgba(0,0,0,0.05) !important;
+    }
+    
+    /* 欢迎页面 */
+    .welcome-box {
+        padding: 1.5rem !important;
+        border-radius: 10px !important;
+        background: rgba(255,75,75,0.02) !important;
+        border: 1px solid rgba(255,75,75,0.1) !important;
+        text-align: center !important;
+        margin: 1rem 0 !important;
+    }
+    
+    /* 进度条 */
+    .stProgress > div > div {
+        border-radius: 4px !important;
+        height: 6px !important;
+    }
+    
+    /* 响应式 */
+    @media (max-width: 768px) {
+        .main .block-container {
+            padding: 0.5rem !important;
+        }
+    }
+</style>""", unsafe_allow_html=True)
 
 # 应用启动日志
 if 'app_initialized' not in st.session_state:
@@ -469,7 +498,7 @@ def generate_doc_summary(doc_text, filename):
 
 with st.sidebar:
     # 横向标签页布局
-    tab_main, tab_config, tab_monitor, tab_tools, tab_help = st.tabs(["🏠 主页", "⚙️ 配置", "📊 监控", "🔧 工具", "ℹ️ 帮助"])
+    tab_main, tab_config, tab_monitor, tab_tools, tab_help = st.tabs(["🏠 主页", "⚙️ 配置", "📊 监控", "🔧 工具", "❓ 帮助"])
     
     with tab_main:
         # P0改进1: 快速开始模式
@@ -483,75 +512,6 @@ with st.sidebar:
             st.rerun()
 
         st.caption("💡 或手动配置（高级用户）")
-
-        st.markdown("---")
-
-# v1.5.1: 性能监控面板
-        perf_monitor.render_panel()
-
-        # P0改进3: 系统工具（默认折叠）
-        with st.expander("🛠️ 系统工具", expanded=False):
-            # 系统监控
-            auto_refresh = st.checkbox("🔄 自动刷新 (2秒)", value=False, key="monitor_auto_refresh")
-
-            monitor_placeholder = st.empty()
-
-            import psutil
-            import subprocess
-            cpu_percent = psutil.cpu_percent(interval=0.1)
-            mem = psutil.virtual_memory()
-            disk = psutil.disk_usage('/System/Volumes/Data')
-
-            gpu_active = False
-            try:
-                result = subprocess.run(['ioreg', '-r', '-d', '1', '-w', '0', '-c', 'IOAccelerator'],
-                                      capture_output=True, text=True, timeout=1)
-                if 'PerformanceStatistics' in result.stdout:
-                    gpu_active = True
-            except:
-                pass
-
-            with monitor_placeholder.container():
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.metric("CPU 使用率", f"{cpu_percent:.1f}%")
-                with col2:
-                    st.caption(f"{psutil.cpu_count()} 核")
-                st.progress(cpu_percent / 100)
-
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.metric("GPU 状态", "活跃" if gpu_active else "空闲")
-                with col2:
-                    st.caption("32 核")
-                if gpu_active:
-                    st.progress(0.5)
-                else:
-                    st.progress(0.0)
-
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.metric("内存使用", f"{mem.percent:.1f}%")
-                with col2:
-                    st.caption(f"{mem.used/1024**3:.1f}GB")
-                st.progress(mem.percent / 100)
-
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.metric("磁盘使用", f"{disk.percent:.1f}%")
-                with col2:
-                    st.caption(f"{disk.used/1024**3:.0f}GB")
-                st.progress(disk.percent / 100)
-
-                current_proc = psutil.Process()
-                proc_mem = current_proc.memory_info().rss / 1024**3
-                st.caption(f"🔍 进程: {proc_mem:.1f}GB | {current_proc.num_threads()} 线程")
-                st.caption("💡 GPU 详细信息需要: `sudo python3 system_monitor.py`")
-
-            if auto_refresh:
-                import time
-                time.sleep(2)
-                st.rerun()
 
         st.markdown("---")
         st.markdown("### 💠 知识库控制台")
@@ -976,8 +936,6 @@ with st.sidebar:
 
         st.caption("💡 提示：快速开始会使用 Ollama 本地模型，需要先安装 Ollama")
 
-        # --- 模型配置区域 (折叠收纳) ---
-        st.write("")
     
     with tab_config:
         st.session_state.current_tab = "config"
@@ -1001,14 +959,86 @@ with st.sidebar:
         advanced_config = SidebarConfig._render_advanced_config()
 
     with tab_monitor:
-        st.info("所有监控功能在主页标签中")
+        # v1.5.1: 性能监控面板
+        perf_monitor.render_panel()
     
     with tab_tools:
-        st.info("所有工具功能在主页标签中")
+        st.markdown("### 🔧 工具箱")
+        
+        # P0改进3: 系统工具（默认展开）
+        with st.expander("🛠️ 系统工具", expanded=True):
+            # 系统监控
+            auto_refresh = st.checkbox("🔄 自动刷新 (2秒)", value=False, key="tools_auto_refresh")
+
+            monitor_placeholder = st.empty()
+
+            import psutil
+            import subprocess
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+            mem = psutil.virtual_memory()
+            disk = psutil.disk_usage('/System/Volumes/Data')
+
+            gpu_active = False
+            try:
+                result = subprocess.run(['ioreg', '-r', '-d', '1', '-w', '0', '-c', 'IOAccelerator'],
+                                      capture_output=True, text=True, timeout=1)
+                if 'PerformanceStatistics' in result.stdout:
+                    gpu_active = True
+            except:
+                pass
+
+            with monitor_placeholder.container():
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.metric("CPU 使用率", f"{cpu_percent:.1f}%")
+                with col2:
+                    st.caption(f"{psutil.cpu_count()} 核")
+                st.progress(cpu_percent / 100)
+
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.metric("GPU 状态", "活跃" if gpu_active else "空闲")
+                with col2:
+                    st.caption("32 核")
+                if gpu_active:
+                    st.progress(0.5)
+                else:
+                    st.progress(0.0)
+
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.metric("内存使用", f"{mem.percent:.1f}%")
+                with col2:
+                    st.caption(f"{mem.used/1024**3:.1f}GB")
+                st.progress(mem.percent / 100)
+
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.metric("磁盘使用", f"{disk.percent:.1f}%")
+                with col2:
+                    st.caption(f"{disk.used/1024**3:.0f}GB")
+                st.progress(disk.percent / 100)
+
+                current_proc = psutil.Process()
+                proc_mem = current_proc.memory_info().rss / 1024**3
+                st.caption(f"🔍 进程: {proc_mem:.1f}GB | {current_proc.num_threads()} 线程")
+                st.caption("💡 GPU 详细信息需要: `sudo python3 system_monitor.py`")
+
+            if auto_refresh:
+                import time
+                time.sleep(2)
+                st.rerun()
+        
+        st.markdown("---")
+        st.markdown("#### ⬆️ 快速上传")
+        uploaded_file = st.file_uploader("选择文件", type=['pdf', 'txt', 'docx', 'md'], key="tools_uploader")
+        if uploaded_file:
+            st.success(f"✅ 已选择: {uploaded_file.name}")
+            st.info("💡 请到主页完成处理")
     
     with tab_help:
         st.markdown("### 📖 帮助")
-        st.info("RAG Pro Max v2.1.0 - 横向标签页版本")
+        st.info("RAG Pro Max v2.2.1 - 横向标签页版本")
 
 # ==========================================
 # 5. 核心逻辑 (RAG & Indexing)
@@ -1158,9 +1188,22 @@ with st.sidebar:
 st.markdown("""
 <style>
 /* 侧边栏紧凑化 */
-.css-1d391kg {
+.css-1d391kg, [data-testid="stSidebar"] {
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
+}
+
+/* 确保侧边栏收起按钮可见和可用 */
+[data-testid="collapsedControl"] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* 侧边栏收起状态 */
+[data-testid="stSidebar"][aria-expanded="false"] {
+    width: 0 !important;
+    min-width: 0 !important;
 }
 
 /* 减少标题间距 */

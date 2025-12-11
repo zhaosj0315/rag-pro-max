@@ -1,21 +1,31 @@
-# RAG Pro Max
+# RAG Pro Max - 智能文档问答系统 | AI知识库 | 本地部署RAG应用
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.2.1-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Docker-lightgrey.svg)
+![Stars](https://img.shields.io/github/stars/zhaosj0315/rag-pro-max?style=social)
+![Forks](https://img.shields.io/github/forks/zhaosj0315/rag-pro-max?style=social)
 
-基于 Streamlit 的 RAG（检索增强生成）应用，支持文档上传、向量检索和智能问答。
+**🔥 开源免费的企业级RAG应用 | 支持本地部署 | 无需联网使用**
 
-**v2.0 新增**: 增量更新、多模态支持、扩展API接口，智能兼容启动
+基于 Streamlit + LlamaIndex 的智能文档问答系统，支持PDF/Word/Excel等多格式文档上传，提供语义检索和AI问答功能。适合企业知识库、学术研究、个人文档管理。
 
-📺 **[观看演示视频](./demo_compressed.mp4)** | [高清版本 (Release)](../../releases)
+**🎯 核心优势**: 本地部署 • 数据安全 • 多模态支持 • GPU加速 • 一键部署
 
-[快速开始](#快速开始) • [功能特性](#功能特性) • [部署方式](#docker-部署推荐) • [文档](#使用指南)
+📺 **[观看演示视频](./demo_compressed.mp4)** | 🚀 **[在线体验](https://demo.ragpromax.com)** | 📖 **[完整文档](https://docs.ragpromax.com)**
+
+[⚡ 快速开始](#快速开始) • [🎯 功能特性](#功能特性) • [🐳 Docker部署](#docker-部署推荐) • [📚 使用指南](#使用指南) • [🤝 贡献指南](#贡献指南)
 
 </div>
+
+---
+
+## 🏷️ 关键词标签
+
+`RAG` `检索增强生成` `AI问答` `知识库` `文档问答` `本地部署` `Streamlit` `LlamaIndex` `向量数据库` `语义检索` `OCR识别` `多模态AI` `企业级应用` `开源免费` `私有化部署` `ChatGPT替代` `本地LLM` `Ollama` `文档管理` `智能助手`
 
 ---
 
@@ -968,6 +978,14 @@ A: 使用命令 `sudo python3 system_monitor.py`。Streamlit 内置监控只能�
 ---
 
 ## 📄 更新日志
+
+### v2.2.1 (2025-12-11) - UI优化版
+- 🎨 **界面样式全面优化** - 现代化设计，提升用户体验
+- 📱 **标签页显示修复** - 解决标签页被挤压问题
+- 🔧 **重复功能清理** - 主页和配置页功能完全分离
+- 📏 **空白区域优化** - 紧凑布局，提升空间利用率
+- ✨ **交互效果增强** - 悬停动画，按钮反馈优化
+- 📐 **响应式设计** - 支持不同屏幕尺寸
 
 ### v2.2.0 (2025-12-11) - 标签页迁移版
 - 🎯 **配置标签页迁移完成** - 所有配置功能迁移到专门标签页

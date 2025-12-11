@@ -43,5 +43,14 @@
     "pages_processed": 6,
     "processing_time": 53.03233027458191,
     "success_rate": 1.0
+  },
+  {
+    "timestamp": 1765460782.53618,
+    "cpu_usage": 27.9,
+    "memory_usage": 50.5,
+    "workers": 1,
+    "pages_processed": 6,
+    "processing_time": 53.285603046417236,
+    "success_rate": 1.0
   }
 ]

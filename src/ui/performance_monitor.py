@@ -17,7 +17,7 @@ class PerformanceMonitor:
         
     def render_panel(self):
         """渲染性能监控面板"""
-        with st.expander("📊 性能监控", expanded=False):
+        with st.expander("📊 性能监控", expanded=True):
             # 获取性能指标
             metrics = self.logger.get_metrics()
             
@@ -87,11 +87,11 @@ class PerformanceMonitor:
             col1, col2 = st.columns(2)
             
             with col1:
-                if st.button("🔄 刷新", use_container_width=True, key="perf_refresh"):
+                if st.button("🔄 刷新", use_container_width=True, key="monitor_perf_refresh"):
                     st.rerun()
             
             with col2:
-                if st.button("🗑️ 清空", use_container_width=True, key="perf_clear"):
+                if st.button("🗑️ 清空", use_container_width=True, key="monitor_perf_clear"):
                     self.logger.metrics.clear()
                     if 'last_query_stats' in st.session_state:
                         del st.session_state.last_query_stats

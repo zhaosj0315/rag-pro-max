@@ -1,3 +1,13 @@
+def _process_single_image_global(args):
+    """处理单张图片 - 全局函数用于多进程"""
+    import pytesseract
+    image, page_num = args
+    try:
+        text = pytesseract.image_to_string(image, lang='chi_sim+eng')
+        return page_num, text.strip()
+    except Exception as e:
+        return page_num, f"OCR错误: {str(e)}"
+
 """
 增强OCR优化器
 集成自适应调度、GPU加速和实时进度监控
@@ -171,7 +181,7 @@ class EnhancedOCROptimizer:
         with ProcessPoolExecutor(max_workers=workers) as executor:
             # 提交任务
             future_to_page = {
-                executor.submit(process_single_image, (img, i)): i 
+                executor.submit(_process_single_image_global, (img, i)): i 
                 for i, img in enumerate(images)
             }
             
