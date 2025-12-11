@@ -115,15 +115,12 @@ def render_message_stats(stats: Dict[str, Any]) -> None:
             st.caption(f"💻 资源: CPU {cpu:.1f}% | 内存 {mem:.1f}% | GPU {gpu:.1f}%")
 
 
-def render_source_references(sources: List[Dict[str, Any]], expanded: bool = False) -> None:
+def render_source_references(sources: List[str], expanded: bool = False) -> None:
     """
-    渲染引用来源
+    渲染引用来源 - 修复版本
     
     Args:
-        sources: 来源列表，每个来源包含:
-            - score: 相似度分数
-            - file: 文件名
-            - text: 引用文本
+        sources: 来源文本列表（已格式化的文本）
         expanded: 是否默认展开
     """
     if not sources:
@@ -131,34 +128,13 @@ def render_source_references(sources: List[Dict[str, Any]], expanded: bool = Fal
     
     with st.expander(f"📚 参考 {len(sources)} 个片段", expanded=expanded):
         for idx, src in enumerate(sources):
-            # 安全处理不同类型的src
-            if isinstance(src, dict):
-                score = src.get('score', 0)
-                file_name = src.get('file', '未知文件')
-                text = src.get('text', '')
-            elif isinstance(src, str):
-                # 如果src是字符串，直接显示
-                score = 0
-                file_name = '未知文件'
-                text = src
-            else:
-                # 其他类型，转换为字符串
-                score = 0
-                file_name = '未知文件'
-                text = str(src)
-            
-            # 相关性标签 + 文件名
-            st.markdown(f"**{get_relevance_label(score)}** | 📄 `{file_name}`")
-            
-            # 引用文本
-            if text:
-                # 限制显示长度
-                display_text = text[:300] + "..." if len(text) > 300 else text
-                st.caption(f"> {display_text}")
-            
-            # 分隔线（最后一个不显示）
-            if idx < len(sources) - 1:
-                st.divider()
+            if src and isinstance(src, str):
+                # 直接显示格式化的文本，不使用HTML
+                st.markdown(src)
+                
+                # 分隔线（最后一个不显示）
+                if idx < len(sources) - 1:
+                    st.divider()
 
 
 def render_kb_info_card(kb_name: str, doc_count: int, total_chunks: int) -> None:

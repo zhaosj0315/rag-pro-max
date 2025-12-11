@@ -37,19 +37,16 @@ def safe_process_node_worker(task_data: Tuple[Dict[str, Any], str]) -> str:
         else:
             page_info = ""
         
-        # 生成HTML
-        html_content = f"""
-        <div style="border-left: 3px solid #1f77b4; padding-left: 10px; margin: 10px 0;">
-            <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">
-                📄 {file_name}{page_info} | 相关度: {score:.3f}
-            </div>
-            <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px;">
-                {text[:300]}{"..." if len(text) > 300 else ""}
-            </div>
-        </div>
-        """
+        # 生成简洁的文本格式（避免HTML截断）
+        content_preview = text[:200] + "..." if len(text) > 200 else text
         
-        return html_content.strip()
+        result_text = f"""📌 相关度: {score:.3f} | 📄 {file_name}{page_info}
+        
+{content_preview}
+
+---"""
+        
+        return result_text.strip()
         
     except Exception as e:
         # 返回错误信息而不是抛出异常
