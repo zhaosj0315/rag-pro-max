@@ -5,6 +5,13 @@
 
 echo "🚀 RAG Pro Max 启动中..."
 
+# 环境优化 - 减少启动警告
+export DISABLE_MODEL_SOURCE_CHECK=True
+export TOKENIZERS_PARALLELISM=false
+export PYTHONWARNINGS="ignore::UserWarning:jieba,ignore::UserWarning:pydantic"
+
+
+
 # 启动CPU保护
 echo "🛡️  启动CPU保护 (限制95%)..."
 python3 -c "

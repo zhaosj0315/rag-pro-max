@@ -1,4 +1,10 @@
 # 初始化环境配置
+# 环境变量设置 - 减少启动警告
+import os
+os.environ['DISABLE_MODEL_SOURCE_CHECK'] = 'True'
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
+
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -35,7 +41,7 @@ from llama_index.core.schema import Document
 from src.custom_embeddings import create_custom_embedding
 
 # 引入日志模块
-from src.logging import LogManager
+from src.app_logging import LogManager
 logger = LogManager()
 # terminal_logger 已被 logger 替代
 from src.chat_utils_improved import generate_follow_up_questions_safe as generate_follow_up_questions
@@ -290,35 +296,65 @@ PageStyle.setup_page()
 # 注入 CSS
 st.markdown("""
 <style>
-                    /* 紧凑统计卡片 */
+                        /* 修复统计卡片显示 */
     [data-testid="metric-container"] {
-        background: rgba(0,0,0,0.02) !important;
-        border: 1px solid rgba(0,0,0,0.05) !important;
-        border-radius: 6px !important;
-        padding: 0.5rem !important;
+        background: rgba(248, 249, 251, 0.8) !important;
+        border: 1px solid rgba(0, 0, 0, 0.08) !important;
+        border-radius: 8px !important;
+        padding: 0.75rem !important;
         margin: 0.25rem !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
         transition: all 0.2s ease !important;
+        min-height: 80px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
     }
     
     [data-testid="metric-container"]:hover {
-        transform: translateY(-1px) !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+        border-color: rgba(31, 119, 180, 0.3) !important;
     }
     
-    /* 统计数字样式 */
+    /* 统计数值样式 */
     [data-testid="metric-container"] [data-testid="metric-value"] {
-        font-size: 1.2rem !important;
-        font-weight: 600 !important;
+        font-size: 1.5rem !important;
+        font-weight: 700 !important;
         color: #1f77b4 !important;
+        line-height: 1.2 !important;
+        margin-bottom: 0.25rem !important;
     }
     
     /* 统计标签样式 */
     [data-testid="metric-container"] [data-testid="metric-label"] {
-        font-size: 0.8rem !important;
-        color: #666 !important;
-        margin-top: 0.25rem !important;
+        font-size: 0.85rem !important;
+        color: #6c757d !important;
+        font-weight: 500 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
     }
     
+    /* 确保统计区域布局正常 */
+    .stMetric {
+        background: transparent !important;
+    }
+    
+    /* 修复可能的布局问题 */
+    div[data-testid="column"] > div {
+        height: auto !important;
+    }
+    
+    /* 统计区域容器 */
+    .stats-container {
+        background: white !important;
+        border-radius: 10px !important;
+        padding: 1rem !important;
+        margin: 1rem 0 !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    }
+    
+
     /* 文档详情折叠优化 */
     .document-details {
         background: #f8f9fa !important;

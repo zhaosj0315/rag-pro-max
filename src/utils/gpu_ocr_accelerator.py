@@ -67,20 +67,31 @@ class GPUOCRAccelerator:
             print(f"   批量大小: {self.batch_size}")
             
             # 初始化PaddleOCR
-            use_gpu = self.device in ["cuda", "mps"]
+            # 设备检测已在初始化中处理
             
-            self.ocr_engine = PaddleOCR(
-                use_angle_cls=True,
-                lang='ch',
-                use_gpu=use_gpu,
-                # GPU优化参数
-                det_db_thresh=0.3,
-                det_db_box_thresh=0.6,
-                det_db_unclip_ratio=1.5,
-                # 批量处理优化
-                det_limit_side_len=960,
-                det_limit_type='max'
-            )
+            # 根据设备类型设置参数
+            if self.device == "cuda":
+                self.ocr_engine = PaddleOCR(
+                    use_angle_use_angle_cls=True,
+                    lang='ch',
+                    # GPU优化参数
+                    det_db_thresh=0.3,
+                    det_db_box_thresh=0.6,
+                    det_db_unclip_ratio=1.5,
+                    det_limit_side_len=960,
+                    det_limit_type='max'
+                )
+            else:
+                # CPU或MPS设备
+                self.ocr_engine = PaddleOCR(
+                    use_angle_use_angle_cls=True,
+                    lang='ch',
+                    det_db_thresh=0.3,
+                    det_db_box_thresh=0.6,
+                    det_db_unclip_ratio=1.5,
+                    det_limit_side_len=960,
+                    det_limit_type='max'
+                )
             
             # 预热模型
             self._warmup()
@@ -138,7 +149,11 @@ class GPUOCRAccelerator:
                 img_array = np.array(image)
                 
                 # OCR识别
-                result = self.ocr_engine.ocr(img_array, cls=True)
+                try:
+                    result = self.ocr_engine.ocr(img_array)
+                except Exception as ocr_error:
+                    print(f"❌ GPU OCR处理失败: {ocr_error}")
+                    result = None
                 
                 # 提取文本
                 text = self._extract_text_from_result(result)
