@@ -68,11 +68,26 @@ SUPPORTED_FORMATS = {'.pdf', '.txt', '.docx', '.md', '.xlsx', '.xls', '.csv', '.
 def _ocr_page(args):
     """OCR单页处理（用于多进程）"""
     import pytesseract
+    import os
+    
     idx, img = args
     try:
-        text = pytesseract.image_to_string(img, lang='chi_sim+eng')
-        return idx, text.strip() if text else ""
-    except:
+        # 设置OCR配置，提升识别速度和准确率
+        config = '--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz一二三四五六七八九十百千万亿零壹贰叁肆伍陆柒捌玖拾佰仟萬億'
+        
+        # 多语言识别
+        text = pytesseract.image_to_string(img, lang='chi_sim+eng', config=config)
+        
+        # 清理文本
+        if text:
+            text = text.strip()
+            # 移除过短的行（可能是噪声）
+            lines = [line.strip() for line in text.split('\n') if len(line.strip()) > 2]
+            text = '\n'.join(lines)
+        
+        return idx, text if text else ""
+    except Exception as e:
+        print(f"   ⚠️  第{idx}页OCR失败: {str(e)[:30]}")
         return idx, ""
 
 # 将文件加载函数移到模块级别（用于多进程）
@@ -159,39 +174,43 @@ def _load_single_file(file_info):
                     needs_ocr = True
             
             if needs_ocr:
+                # 快速模式：跳过扫描版PDF，避免OCR处理延迟
+                skip_ocr = os.environ.get('SKIP_OCR', 'false').lower() == 'true'
+                if skip_ocr:
+                    print(f"   ⚡ 快速模式：跳过扫描版PDF OCR处理")
+                    return "此PDF为扫描版，已跳过OCR处理以提升速度。如需OCR识别，请设置环境变量 SKIP_OCR=false"
+                
                 try:
                     from pdf2image import convert_from_path
-                    import pytesseract
-                    import multiprocessing as mp
-                    from concurrent.futures import ProcessPoolExecutor
+                    from src.utils.batch_ocr_processor import batch_ocr_processor
+                    from src.utils.force_batch_ocr_trigger import force_batch_ocr_trigger
+                    import uuid
                     
-                    # 不限制页数，处理所有页面（多进程并行）
-                    print(f"   🔍 检测到扫描版PDF，启动多进程OCR识别...")
+                    print(f"   🔍 检测到扫描版PDF，添加到批量OCR队列...")
                     
+                    # 转换PDF为图片
                     images = convert_from_path(fp, dpi=200)
-                    print(f"   📄 共 {len(images)} 页，使用 {mp.cpu_count()} 进程并行OCR...")
                     
-                    # 并行处理
-                    all_text = [""] * len(images)
-                    with ProcessPoolExecutor(max_workers=mp.cpu_count()) as executor:
-                        results = executor.map(_ocr_page, enumerate(images, 1))
-                        for idx, text in results:
-                            if text:
-                                all_text[idx-1] = f"--- 第{idx}页 ---\n{text}"
+                    # 生成任务ID
+                    task_id = str(uuid.uuid4())
                     
-                    # 过滤空页
-                    all_text = [t for t in all_text if t]
+                    # 添加到批量OCR队列（不立即处理）
+                    batch_ocr_processor.add_ocr_task(fp, images, task_id)
                     
-                    if all_text:
-                        full_text = "\n\n".join(all_text)
-                        docs = [Document(text=full_text, metadata={'file_name': fname, 'file_path': fp})]
-                        read_mode = 'ocr'
-                        print(f"   ✅ OCR完成: 识别了 {len(all_text)}/{len(images)} 页")
-                    else:
-                        return None, fname, 'failed', f"OCR未识别到文字（共{len(images)}页）", 'ocr'
+                    # 添加到强制触发器
+                    force_batch_ocr_trigger.add_ocr_file({
+                        'file_path': fp,
+                        'task_id': task_id,
+                        'pages': len(images)
+                    })
+                    
+                    print(f"   📄 已添加 {len(images)} 页到OCR队列，任务ID: {task_id[:8]}")
+                    
+                    # 返回特殊标记，表示需要批量处理
+                    return f"__BATCH_OCR__{task_id}", fname, 'pending_ocr', len(images), 'batch_ocr'
                 
                 except Exception as e:
-                    return None, fname, 'failed', f"OCR失败: {str(e)[:50]}", 'ocr'
+                    return None, fname, 'failed', f"OCR准备失败: {str(e)[:50]}", 'ocr'
         
         if docs:
             # 过滤掉空文档
@@ -424,6 +443,43 @@ def scan_directory_safe(input_dir: str) -> Tuple[List, 'FileProcessResult']:
             
             except Exception as e:
                 result.add_failed(fname, str(e)[:100])
+    
+    # 批量OCR处理（在所有文件扫描完成后统一处理）
+    from src.utils.batch_ocr_processor import batch_ocr_processor
+    
+    if batch_ocr_processor.ocr_tasks:
+        print(f"\n🚀 [第 4 步] 批量OCR处理开始...")
+        
+        # 统一处理所有OCR任务
+        ocr_results = batch_ocr_processor.process_all_ocr_tasks()
+        
+        # 处理OCR结果，将待处理的文档转换为真实文档
+        pending_docs = []
+        for doc in all_docs:
+            if hasattr(doc, 'text') and doc.text.startswith('__BATCH_OCR__'):
+                task_id = doc.text.replace('__BATCH_OCR__', '')
+                
+                # 获取OCR结果
+                ocr_texts = batch_ocr_processor.get_file_result(task_id)
+                
+                if ocr_texts:
+                    # 创建新的文档对象
+                    from llama_index.core import Document
+                    full_text = "\n\n".join(ocr_texts)
+                    new_doc = Document(text=full_text, metadata=doc.metadata)
+                    pending_docs.append(new_doc)
+                    print(f"   ✅ OCR完成: {doc.metadata.get('file_name', 'unknown')} ({len(ocr_texts)} 页)")
+                else:
+                    # OCR失败，记录到失败列表
+                    fname = doc.metadata.get('file_name', 'unknown')
+                    result.add_failed(fname, "OCR未识别到文字")
+                    print(f"   ❌ OCR失败: {fname}")
+        
+        # 替换待处理的文档
+        all_docs = [doc for doc in all_docs if not (hasattr(doc, 'text') and doc.text.startswith('__BATCH_OCR__'))]
+        all_docs.extend(pending_docs)
+        
+        print(f"✅ [第 4 步] 批量OCR处理完成")
     
     return all_docs, result
 

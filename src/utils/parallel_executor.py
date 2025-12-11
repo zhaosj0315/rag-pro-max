@@ -1,8 +1,10 @@
 from .safe_parallel_tasks import safe_process_node_worker, safe_extract_metadata_task
+from .cpu_throttle import CPUThrottle, SafeThreadPoolExecutor
 """
 并行执行管理器
 Stage 6 - 统一的多进程/多线程执行接口
 Stage 6.1 - 自动并行装饰器
+v2.1.1 - 添加CPU使用率限制，防止系统过载
 """
 
 import os
@@ -13,20 +15,28 @@ from typing import Callable, List, Any, Optional
 
 
 class ParallelExecutor:
-    """统一的并行执行管理器"""
+    """统一的并行执行管理器 - 带CPU使用率限制"""
     
-    def __init__(self, max_workers: Optional[int] = None):
+    def __init__(self, max_workers: Optional[int] = None, cpu_limit: float = 90.0):
         """
         初始化并行执行器
         
         Args:
             max_workers: 最大工作进程数，默认为 CPU核心数-1
+            cpu_limit: CPU使用率限制，默认90%
         """
-        self.max_workers = max_workers or max(2, os.cpu_count() - 1)
+        self.cpu_throttle = CPUThrottle(max_cpu_percent=cpu_limit)
+        
+        # 动态调整工作线程数
+        default_workers = max_workers or max(2, os.cpu_count() - 1)
+        self.max_workers = self.cpu_throttle.get_safe_worker_count(default_workers)
+        
+        # 启动CPU监控
+        self.cpu_throttle.start_monitoring()
     
     def should_parallelize(self, task_count: int, threshold: int = 2) -> bool:
         """
-        智能判断是否需要并行执行
+        智能判断是否需要并行执行 - 增强CPU检查
         
         Args:
             task_count: 任务数量
@@ -43,13 +53,19 @@ class ParallelExecutor:
         if os.cpu_count() <= 2:
             return False
         
-        # 资源占用过高，避免并行加重负担
+        # 检查CPU使用率，如果过高则禁用并行
         try:
             cpu_percent = psutil.cpu_percent(interval=0.1)
-            if cpu_percent > 95:
+            if cpu_percent > 85:  # 降低阈值，更保守
+                print(f"⚠️  CPU使用率过高 ({cpu_percent:.1f}%)，禁用并行处理")
                 return False
         except:
             pass  # 如果获取失败，继续并行
+        
+        # 检查是否正在限流
+        if self.cpu_throttle.is_throttling:
+            print("⚠️  CPU正在限流中，禁用并行处理")
+            return False
         
         return True
     
@@ -57,7 +73,7 @@ class ParallelExecutor:
                 chunksize: Optional[int] = None,
                 threshold: int = 2) -> List[Any]:
         """
-        执行并行任务（自动判断串行/并行）
+        执行并行任务（自动判断串行/并行）- 带CPU限制
         
         Args:
             func: 要执行的函数
@@ -72,10 +88,11 @@ class ParallelExecutor:
             # 串行执行
             return [func(task) for task in tasks]
         
-        # 并行执行
+        # 并行执行 - 使用安全的线程池
         workers = min(self.max_workers, len(tasks) // 2)
         chunk = chunksize or max(1, len(tasks) // (workers * 4))
-        with ThreadPoolExecutor(max_workers=workers) as executor:
+        
+        with SafeThreadPoolExecutor(max_workers=workers, cpu_throttle=self.cpu_throttle) as executor:
             results = list(executor.map(func, tasks, chunksize=chunk))
         
         return results

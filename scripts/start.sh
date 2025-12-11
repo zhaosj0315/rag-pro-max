@@ -1,8 +1,25 @@
 #!/bin/bash
 # RAG Pro Max 启动脚本 - v2.0 兼容版
 # 自动检测并启用v2.0功能，保持向后兼容
+# v2.1.1: 集成CPU保护功能
 
 echo "🚀 RAG Pro Max 启动中..."
+
+# 启动CPU保护
+echo "🛡️  启动CPU保护 (限制95%)..."
+python3 -c "
+import sys, os
+sys.path.insert(0, '.')
+try:
+    from src.utils.cpu_throttle import start_global_cpu_protection
+    start_global_cpu_protection()
+    print('✅ CPU保护已启动')
+except ImportError:
+    print('⚠️  CPU保护模块未找到，跳过')
+except Exception as e:
+    print(f'⚠️  CPU保护启动失败: {e}')
+" &
+
 echo ""
 
 # 检查是否有v2.0依赖
@@ -80,9 +97,9 @@ echo "🛑 停止服务: Ctrl+C"
 
 # 等待用户中断
 if [ "$V2_AVAILABLE" = true ]; then
-    trap "echo '🛑 正在停止服务...'; kill $STREAMLIT_PID $API_PID 2>/dev/null; exit 0" INT
+    trap "echo '🛑 正在停止服务...'; python3 -c 'from src.utils.cpu_throttle import stop_global_cpu_protection; stop_global_cpu_protection()' 2>/dev/null; kill $STREAMLIT_PID $API_PID 2>/dev/null; exit 0" INT
 else
-    trap "echo '🛑 正在停止服务...'; kill $STREAMLIT_PID 2>/dev/null; exit 0" INT
+    trap "echo '🛑 正在停止服务...'; python3 -c 'from src.utils.cpu_throttle import stop_global_cpu_protection; stop_global_cpu_protection()' 2>/dev/null; kill $STREAMLIT_PID 2>/dev/null; exit 0" INT
 fi
 
 wait

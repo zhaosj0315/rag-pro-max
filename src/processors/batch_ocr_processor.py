@@ -1,6 +1,7 @@
 """
 批量 OCR 优化处理器 - v2.1
 并行处理多个图片文件，GPU加速OCR识别
+v2.1.1: 添加CPU使用率限制，防止系统过载
 """
 
 import cv2
@@ -13,6 +14,12 @@ import torch
 import multiprocessing as mp
 from pathlib import Path
 import logging
+import sys
+import os
+
+# 添加项目根目录到路径
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.cpu_throttle import CPUThrottle, SafeThreadPoolExecutor
 
 class ImagePreprocessor:
     """智能图片预处理"""
@@ -63,19 +70,31 @@ class ImagePreprocessor:
         return binary
 
 class BatchOCRProcessor:
-    """批量OCR处理器"""
+    """批量OCR处理器 - 带CPU使用率限制"""
     
-    def __init__(self, max_workers: Optional[int] = None, use_gpu: bool = True):
-        self.max_workers = max_workers or min(mp.cpu_count(), 8)
+    def __init__(self, max_workers: Optional[int] = None, use_gpu: bool = True, cpu_limit: float = 90.0):
+        # CPU 限制器
+        self.cpu_throttle = CPUThrottle(max_cpu_percent=cpu_limit)
+        
+        # 动态调整工作线程数，避免CPU过载
+        default_workers = max_workers or min(mp.cpu_count(), 8)
+        self.max_workers = self.cpu_throttle.get_safe_worker_count(default_workers)
+        
         self.use_gpu = use_gpu and torch.cuda.is_available()
         self.preprocessor = ImagePreprocessor()
         
         # OCR配置
         self.ocr_config = '--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz中文'
+        
+        # 启动CPU监控
+        self.cpu_throttle.start_monitoring()
     
     def process_single_image(self, image_path: str) -> Dict:
-        """处理单个图片"""
+        """处理单个图片 - 带CPU限制检查"""
         try:
+            # 检查CPU使用率，如果过高则等待
+            self.cpu_throttle.wait_if_throttling(max_wait=2.0)
+            
             # 读取图片
             image = cv2.imread(image_path)
             if image is None:
@@ -102,11 +121,20 @@ class BatchOCRProcessor:
             return {'path': image_path, 'text': '', 'error': str(e)}
     
     def process_batch(self, image_paths: List[str], progress_callback=None) -> List[Dict]:
-        """批量处理图片"""
+        """批量处理图片 - 带CPU使用率限制"""
         results = []
         
-        # 使用线程池并行处理
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+        # 如果图片数量很少，直接串行处理
+        if len(image_paths) <= 2:
+            for i, path in enumerate(image_paths):
+                result = self.process_single_image(path)
+                results.append(result)
+                if progress_callback:
+                    progress_callback(i + 1, len(image_paths))
+            return results
+        
+        # 使用安全的线程池，带CPU限制
+        with SafeThreadPoolExecutor(max_workers=self.max_workers, cpu_throttle=self.cpu_throttle) as executor:
             # 提交所有任务
             futures = {
                 executor.submit(self.process_single_image, path): path 
