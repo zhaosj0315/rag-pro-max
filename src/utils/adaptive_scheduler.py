@@ -31,7 +31,7 @@ class AdaptiveScheduler:
         
         # 学习参数
         self.learning_rate = 0.1
-        self.min_samples = 5
+        self.min_samples = 20  # 提高阈值，让基础激进模式运行更久
         self.max_history = 100
         
     def load_history(self):
@@ -99,15 +99,20 @@ class AdaptiveScheduler:
         return best_strategy
     
     def _get_basic_strategy(self, cpu_usage: float, pages: int) -> Tuple[int, str, float]:
-        """基础策略（无历史数据时使用）"""
-        if cpu_usage > 85:
-            return 1, "基础保护模式", 0.5
-        elif cpu_usage > 70:
-            return 2, "基础保守模式", 0.6
-        elif cpu_usage > 50:
-            return 3, "基础平衡模式", 0.7
+        """基础策略（无历史数据时使用）- 更激进的资源利用"""
+        if cpu_usage > 90:
+            return 3, "基础保护模式", 0.6
+        elif cpu_usage > 80:
+            return 6, "基础保守模式", 0.7
+        elif cpu_usage > 60:
+            return 8, "基础平衡模式", 0.8
+        elif cpu_usage > 40:
+            return 10, "基础高效模式", 0.85
+        elif cpu_usage > 20:
+            return 12, "基础激进模式", 0.9
         else:
-            return min(4, max(1, pages // 5)), "基础高效模式", 0.8
+            # 极低CPU使用率时最激进，充分利用14核CPU
+            return min(14, max(8, pages // 2)), "基础极速模式", 0.95
     
     def _analyze_history(self, cpu: float, memory: float, pages: int) -> Tuple[int, str, float]:
         """分析历史数据获取最优策略"""
@@ -137,8 +142,8 @@ class AdaptiveScheduler:
                 score = (record.pages_processed / record.processing_time) * record.success_rate / (record.cpu_usage / 100)
                 worker_performance[workers].append(score)
         
-        # 选择平均性能最好的worker数
-        best_workers = 1
+        # 选择平均性能最好的worker数，但允许更激进的配置
+        best_workers = 2  # 提高默认值
         best_score = 0
         confidence = 0.5
         
@@ -149,6 +154,10 @@ class AdaptiveScheduler:
                     best_score = avg_score
                     best_workers = workers
                     confidence = min(0.9, 0.5 + len(scores) * 0.1)
+        
+        # 如果历史数据显示可以承受更多进程，适当增加
+        if confidence > 0.7 and best_workers < 8:
+            best_workers = min(best_workers + 2, 10)
         
         strategy_name = f"学习优化模式(样本:{len(similar_records)})"
         

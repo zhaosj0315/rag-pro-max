@@ -12,6 +12,12 @@ from src.core.environment import initialize_environment
 initialize_environment()
 
 import os
+# 在最开始设置环境变量，禁用PaddleOCR详细日志
+import os
+os.environ['GLOG_minloglevel'] = '2'
+os.environ['FLAGS_logtostderr'] = '0'
+os.environ['PADDLE_LOG_LEVEL'] = '40'  # ERROR级别
+
 import streamlit as st
 
 # 防止HTML内容被截断

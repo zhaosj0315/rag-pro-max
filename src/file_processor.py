@@ -362,9 +362,10 @@ def scan_directory_safe(input_dir: str) -> Tuple[List, 'FileProcessResult']:
         except RuntimeError:
              pass
         
-        # 限制进程数
-        actual_workers = min(max_workers, int(mp.cpu_count() * 1.2))
-        print(f"💻 [第 3 步] 使用 {actual_workers} 个进程（CPU: {mp.cpu_count()}核，目标<80%）")
+        # 允许更充分的资源利用（不超过95%）
+        cpu_limit = int(mp.cpu_count() * 0.9)  # 90%的CPU核心
+        actual_workers = min(max_workers, cpu_limit, 50)  # 最多50个进程防止过载
+        print(f"💻 [第 3 步] 使用 {actual_workers} 个进程（CPU: {mp.cpu_count()}核，目标<90%）")
         
         # 统计快速/慢速读取
         fast_count = 0
@@ -383,7 +384,17 @@ def scan_directory_safe(input_dir: str) -> Tuple[List, 'FileProcessResult']:
             for batch_results in pool.imap_unordered(_process_batch, batches, chunksize=1):
                 try:
                     for file_result in batch_results:
-                        docs, fname, status, info, read_mode = file_result if len(file_result) == 5 else (*file_result, 'unknown')
+                        # 更安全的解包处理
+                        if len(file_result) == 5:
+                            docs, fname, status, info, read_mode = file_result
+                        elif len(file_result) == 4:
+                            docs, fname, status, info = file_result
+                            read_mode = 'unknown'
+                        else:
+                            # 处理异常情况
+                            print(f"⚠️ 异常返回值: {file_result}")
+                            continue
+                            
                         completed += 1
                         
                         # 统计读取模式
