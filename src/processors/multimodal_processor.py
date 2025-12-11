@@ -21,7 +21,7 @@ try:
 except ImportError:
     HAS_TABLE_EXTRACTION = False
 
-from ..logging import LogManager
+from ..app_logging import LogManager
 
 logger = LogManager()
 

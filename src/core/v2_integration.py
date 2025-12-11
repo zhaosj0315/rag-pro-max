@@ -6,7 +6,7 @@ import os
 
 from ..kb.kb_manager import KBManager
 from ..processors.multimodal_processor import MultimodalProcessor
-from ..logging import LogManager
+from ..app_logging import LogManager
 
 logger = LogManager()
 
