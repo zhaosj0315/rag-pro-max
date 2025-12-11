@@ -182,20 +182,28 @@ def _load_single_file(file_info):
                 
                 try:
                     from pdf2image import convert_from_path
-                    from src.utils.batch_ocr_processor import batch_ocr_processor
-                    from src.utils.force_batch_ocr_trigger import force_batch_ocr_trigger
-                    import uuid
+                    from src.utils.enhanced_ocr_optimizer import enhanced_ocr_optimizer
                     
-                    print(f"   🔍 检测到扫描版PDF，添加到批量OCR队列...")
+                    print(f"   🔍 检测到扫描版PDF，启用增强OCR处理...")
                     
                     # 转换PDF为图片
                     images = convert_from_path(fp, dpi=200)
                     
-                    # 生成任务ID
-                    task_id = str(uuid.uuid4())
+                    # 使用增强OCR优化器处理
+                    ocr_results = enhanced_ocr_optimizer.process_pdf_pages(fp, images)
                     
-                    # 添加到批量OCR队列（不立即处理）
-                    batch_ocr_processor.add_ocr_task(fp, images, task_id)
+                    # 合并OCR结果
+                    full_text = '\n\n'.join([
+                        f"=== 第 {i+1} 页 ===\n{text}" 
+                        for i, text in enumerate(ocr_results) if text.strip()
+                    ])
+                    
+                    if full_text.strip():
+                        print(f"   ✅ OCR处理完成: {len(images)} 页，提取 {len(full_text)} 字符")
+                        return full_text
+                    else:
+                        print(f"   ⚠️  OCR未提取到文本内容")
+                        return "此PDF为扫描版，OCR处理未能提取到文本内容。"
                     
                     # 添加到强制触发器
                     force_batch_ocr_trigger.add_ocr_file({

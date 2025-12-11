@@ -30,12 +30,13 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str]:
         "供应商",
         ["Ollama (本地)", "OpenAI-Compatible (云端)"],
         horizontal=True,
-        label_visibility="collapsed"
+        label_visibility="collapsed",
+        key="config_llm_provider_radio"
     )
     
     if llm_provider_choice.startswith("Ollama"):
         llm_provider = "Ollama"
-        llm_url = st.text_input("Ollama URL", defaults.get("llm_url_ollama", "http://localhost:11434"))
+        llm_url = st.text_input("Ollama URL", defaults.get("llm_url_ollama", "http://localhost:11434"), key="config_ollama_url")
         
         # 检测 Ollama 状态
         from src.utils.model_utils import check_ollama_status
@@ -108,7 +109,7 @@ def render_embedding_config(defaults: dict) -> Tuple[str, str, str, str]:
         "供应商",
         ["HuggingFace (本地/极速)", "OpenAI-Compatible", "Ollama"],
         index=embed_idx,
-        key="embed_provider_1"
+        key="config_embed_provider"
     )
     
     if embed_provider.startswith("HuggingFace"):
@@ -161,7 +162,7 @@ def render_basic_config(defaults: dict) -> dict:
             'embed_key': str
         }
     """
-    with st.expander("⚙️ 基础配置", expanded=False):
+    with st.expander("⚙️ 基础配置", expanded=True):
         # LLM 配置
         llm_provider, llm_url, llm_model, llm_key = render_llm_config(defaults)
         

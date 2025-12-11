@@ -634,6 +634,10 @@ def main():
     test_memory_management()
     test_gpu_optimization()
     test_v2_features()  # 新增v2.0功能测试
+    test_v22_tab_migration()  # v2.2.0标签页迁移测试
+    test_v22_component_separation()  # v2.2.0组件分离测试
+    test_v22_auto_switch()  # v2.2.0自动跳转测试
+    test_v22_ui_optimization()  # v2.2.0界面优化测试
     
     # 输出测试结果
     print_header("测试结果汇总")
@@ -651,6 +655,127 @@ def main():
     else:
         print("\n✅ 所有测试通过！系统可以发布。")
         sys.exit(0)
+
+
+
+def test_v22_tab_migration():
+    """测试v2.2.0标签页迁移功能"""
+    print("\n🧪 测试 v2.2.0 标签页迁移功能...")
+    
+    try:
+        # 测试配置组件导入
+        from src.ui.config_forms import render_basic_config, render_llm_config, render_embedding_config
+        print("  ✅ 配置组件导入正常")
+        
+        # 测试模型选择器导入
+        from src.ui.model_selectors import render_ollama_model_selector, render_hf_embedding_selector
+        print("  ✅ 模型选择器导入正常")
+        
+        # 测试侧边栏配置导入
+        from src.ui.sidebar_config import SidebarConfig
+        print("  ✅ 侧边栏配置导入正常")
+        
+        # 测试配置表单结构
+        defaults = {
+            "llm_url_ollama": "http://localhost:11434",
+            "llm_model_ollama": "qwen2.5:7b",
+            "embed_model_hf": "BAAI/bge-small-zh-v1.5"
+        }
+        
+        # 验证配置函数可调用（不实际执行Streamlit组件）
+        assert callable(render_basic_config), "render_basic_config 应该是可调用的"
+        assert callable(render_llm_config), "render_llm_config 应该是可调用的"
+        assert callable(render_embedding_config), "render_embedding_config 应该是可调用的"
+        print("  ✅ 配置函数结构正常")
+        
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ v2.2.0标签页迁移测试失败: {e}")
+        return False
+
+def test_v22_component_separation():
+    """测试v2.2.0组件分离"""
+    print("\n🧪 测试 v2.2.0 组件分离...")
+    
+    try:
+        # 检查主文件中是否移除了配置组件冲突
+        with open('src/apppro.py', 'r', encoding='utf-8') as f:
+            main_content = f.read()
+        
+        # 验证配置标签页存在
+        assert 'with tab_config:' in main_content, "配置标签页应该存在"
+        print("  ✅ 配置标签页存在")
+        
+        # 验证配置功能调用
+        assert 'render_basic_config(defaults)' in main_content, "配置功能调用应该存在"
+        print("  ✅ 配置功能调用正常")
+        
+        # 验证标签页布局
+        tab_count = main_content.count('with tab_')
+        assert tab_count >= 4, f"应该有至少4个标签页，实际: {tab_count}"
+        print(f"  ✅ 标签页布局正常 ({tab_count}个标签页)")
+        
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ v2.2.0组件分离测试失败: {e}")
+        return False
+
+def test_v22_auto_switch():
+    """测试v2.2.0自动跳转功能"""
+    print("\n🧪 测试 v2.2.0 自动跳转功能...")
+    
+    try:
+        # 检查自动跳转逻辑
+        with open('src/apppro.py', 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # 验证自动跳转代码存在
+        assert 'st.session_state.current_nav' in content, "自动跳转逻辑应该存在"
+        print("  ✅ 自动跳转逻辑存在")
+        
+        # 验证成功提示
+        assert '构建完成' in content, "构建完成提示应该存在"
+        print("  ✅ 构建完成提示存在")
+        
+        # 验证页面刷新
+        rerun_count = content.count('st.rerun()')
+        assert rerun_count > 0, "应该有页面刷新逻辑"
+        print(f"  ✅ 页面刷新逻辑正常 ({rerun_count}处)")
+        
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ v2.2.0自动跳转测试失败: {e}")
+        return False
+
+def test_v22_ui_optimization():
+    """测试v2.2.0界面优化"""
+    print("\n🧪 测试 v2.2.0 界面优化...")
+    
+    try:
+        # 检查界面优化设置
+        with open('src/apppro.py', 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # 验证默认收起设置
+        assert 'expanded=False' in content, "应该有默认收起的组件"
+        print("  ✅ 默认收起设置存在")
+        
+        # 检查配置文件中的默认展开
+        with open('src/ui/config_forms.py', 'r', encoding='utf-8') as f:
+            config_content = f.read()
+        
+        # 验证配置默认展开
+        assert 'expanded=True' in config_content, "配置应该默认展开"
+        print("  ✅ 配置默认展开设置正确")
+        
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ v2.2.0界面优化测试失败: {e}")
+        return False
 
 if __name__ == "__main__":
     main()

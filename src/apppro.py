@@ -18,7 +18,9 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import multiprocessing as mp
 
-# 引入 LlamaIndex 核心
+# 引入新的优化组件
+from src.utils.enhanced_ocr_optimizer import enhanced_ocr_optimizer
+from src.ui.progress_monitor import progress_monitor
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings, StorageContext, load_index_from_storage
 from llama_index.core.memory import ChatMemoryBuffer
 from llama_index.core.node_parser import SentenceSplitter
@@ -232,7 +234,6 @@ from src.ui.model_selectors import (
 )
 
 # 引入 UI 高级配置 (Stage 3.2.3)
-from src.ui.advanced_config import render_advanced_features
 
 # 引入 UI 配置表单 (Stage 3.2.2)
 from src.ui.config_forms import render_basic_config
@@ -467,528 +468,548 @@ def generate_doc_summary(doc_text, filename):
         return f"总结失败: {str(e)}"
 
 with st.sidebar:
-    # P0改进1: 快速开始模式
-    st.markdown("### ⚡ 快速开始")
+    # 横向标签页布局
+    tab_main, tab_config, tab_monitor, tab_tools, tab_help = st.tabs(["🏠 主页", "⚙️ 配置", "📊 监控", "🔧 工具", "ℹ️ 帮助"])
     
-    if st.button("⚡ 一键配置（推荐新手）", type="primary", use_container_width=True, help="自动配置默认设置，1分钟开始使用"):
-        # 使用新的配置加载器快速配置 (Stage 8)
-        ConfigLoader.quick_setup()
-        st.success("✅ 已使用默认配置！\n\n💡 下一步：创建知识库 → 上传文档 → 开始对话")
-        time.sleep(2)
-        st.rerun()
-    
-    st.caption("💡 或手动配置（高级用户）")
-    
-    st.markdown("---")
-    
-    # P0改进3: 侧边栏分组 - 基础配置（默认折叠）- 使用新组件 (Stage 3.2.2)
-    config_values = render_basic_config(defaults)
-    
-    # 提取配置值
-    llm_provider = config_values['llm_provider']
-    llm_url = config_values['llm_url']
-    llm_model = config_values['llm_model']
-    llm_key = config_values['llm_key']
-    embed_provider = config_values['embed_provider']
-    embed_model = config_values['embed_model']
-    embed_url = config_values['embed_url']
-    embed_key = config_values['embed_key']
-    
-    # P0改进3: 高级功能（默认折叠）- 使用新组件 (Stage 3.2.3)
-    advanced_config = render_advanced_features()
-    
-    # v1.5.1: 性能监控面板
-    perf_monitor.render_panel()
-    
-    # P0改进3: 系统工具（默认折叠）
-    with st.expander("🛠️ 系统工具", expanded=False):
-        # 系统监控
-        auto_refresh = st.checkbox("🔄 自动刷新 (2秒)", value=False, key="monitor_auto_refresh")
-        
-        monitor_placeholder = st.empty()
-        
-        import psutil
-        import subprocess
-        cpu_percent = psutil.cpu_percent(interval=0.1)
-        mem = psutil.virtual_memory()
-        disk = psutil.disk_usage('/System/Volumes/Data')
-        
-        gpu_active = False
-        try:
-            result = subprocess.run(['ioreg', '-r', '-d', '1', '-w', '0', '-c', 'IOAccelerator'],
-                                  capture_output=True, text=True, timeout=1)
-            if 'PerformanceStatistics' in result.stdout:
-                gpu_active = True
-        except:
-            pass
-        
-        with monitor_placeholder.container():
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.metric("CPU 使用率", f"{cpu_percent:.1f}%")
-            with col2:
-                st.caption(f"{psutil.cpu_count()} 核")
-            st.progress(cpu_percent / 100)
-            
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.metric("GPU 状态", "活跃" if gpu_active else "空闲")
-            with col2:
-                st.caption("32 核")
-            if gpu_active:
-                st.progress(0.5)
-            else:
-                st.progress(0.0)
-            
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.metric("内存使用", f"{mem.percent:.1f}%")
-            with col2:
-                st.caption(f"{mem.used/1024**3:.1f}GB")
-            st.progress(mem.percent / 100)
-            
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.metric("磁盘使用", f"{disk.percent:.1f}%")
-            with col2:
-                st.caption(f"{disk.used/1024**3:.0f}GB")
-            st.progress(disk.percent / 100)
-            
-            current_proc = psutil.Process()
-            proc_mem = current_proc.memory_info().rss / 1024**3
-            st.caption(f"🔍 进程: {proc_mem:.1f}GB | {current_proc.num_threads()} 线程")
-            st.caption("💡 GPU 详细信息需要: `sudo python3 system_monitor.py`")
-        
-        if auto_refresh:
-            import time
+    with tab_main:
+        # P0改进1: 快速开始模式
+        st.markdown("### ⚡ 快速开始")
+
+        if st.button("⚡ 一键配置（推荐新手）", type="primary", use_container_width=True, help="自动配置默认设置，1分钟开始使用"):
+            # 使用新的配置加载器快速配置 (Stage 8)
+            ConfigLoader.quick_setup()
+            st.success("✅ 已使用默认配置！\n\n💡 下一步：创建知识库 → 上传文档 → 开始对话")
             time.sleep(2)
             st.rerun()
-    
-    st.markdown("---")
-    st.markdown("### 💠 知识库控制台")
-    if "model_list" not in st.session_state: st.session_state.model_list = []
 
-    # 使用当前工作目录下的 vector_db_storage
-    default_output_path = os.path.join(os.getcwd(), "vector_db_storage")
-    output_base = st.text_input("存储根目录", value=default_output_path)
-    existing_kbs = (setattr(kb_manager, "base_path", output_base), kb_manager.list_all())[1]
+        st.caption("💡 或手动配置（高级用户）")
 
-    # --- 核心导航 ---
-    st.markdown("#### 📚 知识库管理")
-    
-    # 知识库搜索/过滤
-    if len(existing_kbs) > 5:
-        search_kb = st.text_input(
-            "🔍 搜索知识库",
-            placeholder="输入关键词过滤...",
-            key="search_kb",
-            label_visibility="collapsed"
-        )
-        if search_kb:
-            filtered_kbs = [kb for kb in existing_kbs if search_kb.lower() in kb.lower()]
-            st.caption(f"找到 {len(filtered_kbs)} 个匹配的知识库")
-        else:
-            filtered_kbs = existing_kbs
-    else:
-        filtered_kbs = existing_kbs
-    
-    nav_options = ["➕ 新建知识库..."] + [f"📂 {kb}" for kb in filtered_kbs]
-    
-    # 默认选择"新建知识库"，避免自动加载大知识库
-    default_idx = 0
-    if "current_nav" in st.session_state and st.session_state.current_nav in nav_options:
-        default_idx = nav_options.index(st.session_state.current_nav)
-    # 注释掉自动选择第一个知识库的逻辑
-    # elif len(nav_options) > 1:
-    #     default_idx = 1 
-        
-    selected_nav = st.selectbox("选择当前知识库", nav_options, index=default_idx, label_visibility="collapsed")
-    
-    # 卸载知识库按钮（释放内存）
-    if not (selected_nav == "➕ 新建知识库...") and st.session_state.get('chat_engine') is not None:
-        if st.button("🔓 卸载知识库（释放内存）", use_container_width=True, help="释放当前知识库占用的内存资源"):
-            st.session_state.chat_engine = None
-            st.session_state.current_kb_id = None
-            cleanup_memory()
-            st.toast("✅ 知识库已卸载，内存已释放")
-            st.rerun()
-    
-    if selected_nav != st.session_state.get('current_nav'):
-        st.session_state.pop('suggestions_history', None) 
-        
-    st.session_state.current_nav = selected_nav
-    
-    is_create_mode = (selected_nav == "➕ 新建知识库...")
-    current_kb_name = selected_nav.replace("📂 ", "") if not is_create_mode else None
+        st.markdown("---")
 
-    # --- 数据源配置区 ---
-    if is_create_mode:
-        st.caption("🛠️ 创建新知识库")
-    else:
-        st.caption(f"🛠️ 管理: {current_kb_name}")
+# v1.5.1: 性能监控面板
+        perf_monitor.render_panel()
 
-    with st.container(border=True):
-        if is_create_mode:
-            action_mode = "NEW"
-        else:
-            action_mode = st.radio("操作模式", ["➕ 追加", "🔄 覆盖"], horizontal=True, label_visibility="collapsed")
-            action_mode = "APPEND" if "追加" in action_mode else "NEW"
+        # P0改进3: 系统工具（默认折叠）
+        with st.expander("🛠️ 系统工具", expanded=False):
+            # 系统监控
+            auto_refresh = st.checkbox("🔄 自动刷新 (2秒)", value=False, key="monitor_auto_refresh")
 
-        st.markdown("**数据源**")
-        
-        if "path_val" not in st.session_state: 
-            st.session_state.path_val = os.path.abspath(defaults.get("target_path", ""))
+            monitor_placeholder = st.empty()
 
-        if 'path_input' not in st.session_state:
-            st.session_state.path_input = ""
-        
-        # 如果有上传路径且输入框为空，自动填充
-        if st.session_state.get('uploaded_path') and not st.session_state.path_input:
-            st.session_state.path_input = st.session_state.uploaded_path
-        
-        # 优化路径显示
-        path_col1, path_col2 = st.columns([5, 1])
-        with path_col1:
-            target_path = st.text_input(
-                "文件/文件夹路径", 
-                value=st.session_state.path_input,
-                placeholder="📁 /Users/username/docs 或上传后自动生成",
-                key="path_input_display",
+            import psutil
+            import subprocess
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+            mem = psutil.virtual_memory()
+            disk = psutil.disk_usage('/System/Volumes/Data')
+
+            gpu_active = False
+            try:
+                result = subprocess.run(['ioreg', '-r', '-d', '1', '-w', '0', '-c', 'IOAccelerator'],
+                                      capture_output=True, text=True, timeout=1)
+                if 'PerformanceStatistics' in result.stdout:
+                    gpu_active = True
+            except:
+                pass
+
+            with monitor_placeholder.container():
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.metric("CPU 使用率", f"{cpu_percent:.1f}%")
+                with col2:
+                    st.caption(f"{psutil.cpu_count()} 核")
+                st.progress(cpu_percent / 100)
+
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.metric("GPU 状态", "活跃" if gpu_active else "空闲")
+                with col2:
+                    st.caption("32 核")
+                if gpu_active:
+                    st.progress(0.5)
+                else:
+                    st.progress(0.0)
+
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.metric("内存使用", f"{mem.percent:.1f}%")
+                with col2:
+                    st.caption(f"{mem.used/1024**3:.1f}GB")
+                st.progress(mem.percent / 100)
+
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.metric("磁盘使用", f"{disk.percent:.1f}%")
+                with col2:
+                    st.caption(f"{disk.used/1024**3:.0f}GB")
+                st.progress(disk.percent / 100)
+
+                current_proc = psutil.Process()
+                proc_mem = current_proc.memory_info().rss / 1024**3
+                st.caption(f"🔍 进程: {proc_mem:.1f}GB | {current_proc.num_threads()} 线程")
+                st.caption("💡 GPU 详细信息需要: `sudo python3 system_monitor.py`")
+
+            if auto_refresh:
+                import time
+                time.sleep(2)
+                st.rerun()
+
+        st.markdown("---")
+        st.markdown("### 💠 知识库控制台")
+        if "model_list" not in st.session_state: st.session_state.model_list = []
+
+        # 使用当前工作目录下的 vector_db_storage
+        default_output_path = os.path.join(os.getcwd(), "vector_db_storage")
+        output_base = st.text_input("存储根目录", value=default_output_path)
+        existing_kbs = (setattr(kb_manager, "base_path", output_base), kb_manager.list_all())[1]
+
+        # --- 核心导航 ---
+        st.markdown("#### 📚 知识库管理")
+
+        # 知识库搜索/过滤
+        if len(existing_kbs) > 5:
+            search_kb = st.text_input(
+                "🔍 搜索知识库",
+                placeholder="输入关键词过滤...",
+                key="search_kb",
                 label_visibility="collapsed"
             )
-            # 同步到 path_input
-            if target_path != st.session_state.path_input:
-                st.session_state.path_input = target_path
-        with path_col2:
-            if st.button("📂", help="在Finder中打开", use_container_width=True):
-                if target_path and os.path.exists(target_path):
-                    # macOS: 在Finder中打开
-                    import webbrowser
-                    import urllib.parse
-                    try:
-                        file_url = 'file://' + urllib.parse.quote(os.path.abspath(target_path))
-                        webbrowser.open(file_url)
-                        st.toast("✅ 已在Finder中打开")
-                    except Exception as e:
-                        st.error(f"打开失败: {e}")
-                else:
-                    st.warning("💡 请先输入有效路径，或使用下方上传功能")
-        
-        
-        uploaded_files = st.file_uploader(
-            "⬆️ 或拖入文件/ZIP", 
-            accept_multiple_files=True, 
-            key="uploader",
-            label_visibility="collapsed"
-        )
-        
-        # 文档预览 (v1.6) - 带翻页
-        if uploaded_files:
-            with st.expander(f"📄 已选择 {len(uploaded_files)} 个文件 - 点击预览", expanded=False):
-                # 翻页设置
-                page_size = 10
-                total_pages = (len(uploaded_files) - 1) // page_size + 1
-                
-                if 'preview_page' not in st.session_state:
-                    st.session_state.preview_page = 0
-                
-                # 翻页控制
-                col1, col2, col3 = st.columns([1, 2, 1])
-                if col1.button("⬅️ 上一页", disabled=st.session_state.preview_page == 0):
-                    st.session_state.preview_page -= 1
-                    st.rerun()
-                col2.write(f"第 {st.session_state.preview_page + 1}/{total_pages} 页")
-                if col3.button("下一页 ➡️", disabled=st.session_state.preview_page >= total_pages - 1):
-                    st.session_state.preview_page += 1
-                    st.rerun()
-                
-                st.divider()
-                
-                # 显示当前页的文件
-                start_idx = st.session_state.preview_page * page_size
-                end_idx = min(start_idx + page_size, len(uploaded_files))
-                
-                for idx, uploaded_file in enumerate(uploaded_files[start_idx:end_idx]):
-                    col1, col2, col3 = st.columns([4, 1, 1])
-                    col1.write(f"📎 {uploaded_file.name}")
-                    col2.write(f"{uploaded_file.size / 1024:.1f} KB")
-                    if col3.button("👁️", key=f"preview_{start_idx + idx}_{uploaded_file.name}_{uploaded_file.size}", help="预览"):
-                        st.session_state['preview_file'] = uploaded_file
-                
-                # 显示预览对话框
-                if 'preview_file' in st.session_state and st.session_state.preview_file:
-                    show_upload_preview(st.session_state.preview_file)
-                    st.session_state.preview_file = None
-        
-        # 处理上传 (Stage 4.1 - 使用 UploadHandler)
-        if uploaded_files:
-            if 'last_uploaded_names' not in st.session_state:
-                st.session_state.last_uploaded_names = []
-            
-            current_names = [f.name for f in uploaded_files]
-            
-            # 只在文件列表变化时处理
-            if set(current_names) != set(st.session_state.last_uploaded_names):
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                
-                # 使用 UploadHandler 处理上传
-                handler = UploadHandler(UPLOAD_DIR, logger)
-                
-                for idx, f in enumerate(uploaded_files):
-                    status_text.text(f"验证中: {f.name} ({idx+1}/{len(uploaded_files)})")
-                    progress_bar.progress((idx + 1) / len(uploaded_files))
-                
-                result = handler.process_uploads(uploaded_files)
-                
-                progress_bar.empty()
-                status_text.empty()
-                
-                st.session_state.last_uploaded_names = current_names
-                st.session_state.uploaded_path = os.path.abspath(result.batch_dir)
-                
-                # 显示上传结果
-                if result.success_count > 0:
-                    st.success(f"✅ 成功上传 {result.success_count} 个文件")
-                
-                if result.skipped_count > 0:
-                    st.warning(f"⚠️ 跳过 {result.skipped_count} 个文件")
-                    with st.expander("查看跳过详情", expanded=False):
-                        for reason in result.skip_reasons:
-                            st.text(f"• {reason}")
-                
-                # 为文件上传场景生成智能名称
-                if result.success_count > 0:
-                    try:
-                        # 计算文件类型分布
-                        file_types = {}
-                        for filename in current_names:
-                            ext = os.path.splitext(filename)[1].lower()
-                            file_types[ext] = file_types.get(ext, 0) + 1
-                        
-                        # 使用上传的文件名生成智能名称
-                        folder_name = os.path.basename(result.batch_dir)  # batch_xxx
-                        auto_name = generate_smart_kb_name(result.batch_dir, result.success_count, file_types, folder_name)
-                        
-                        # 存储智能生成的名称
-                        st.session_state.upload_auto_name = auto_name
-                    except Exception as e:
-                        st.session_state.upload_auto_name = None
-                
-                time.sleep(1)
-                if result.success_count > 0:
-                    st.rerun()
-
-
-        # 使用上传路径或手动输入的路径
-        target_path = st.session_state.get('uploaded_path') or target_path
-        
-        auto_name = ""
-        
-        # 优先使用文件上传的智能名称
-        if hasattr(st.session_state, 'upload_auto_name') and st.session_state.upload_auto_name:
-            auto_name = st.session_state.upload_auto_name
-        
-        if target_path:
-            if os.path.exists(target_path):
-                # 使用 UploadHandler 统计文件信息 (Stage 4.1)
-                cnt, file_types, total_size = UploadHandler.get_folder_stats(target_path)
-                
-                # 美化显示
-                size_mb = total_size / (1024 * 1024)
-                folder_name = os.path.basename(target_path.rstrip('/'))
-                
-                st.success(f"✅ **有效数据源**: `{folder_name}`")
-                
-                # 三列统计卡片
-                stat_col1, stat_col2, stat_col3 = st.columns(3)
-                stat_col1.metric("📄 文件数", f"{cnt}")
-                stat_col2.metric("💾 总大小", f"{size_mb:.1f}MB" if size_mb > 1 else f"{total_size/1024:.0f}KB")
-                stat_col3.metric("📂 类型", f"{len(file_types)} 种")
-                
-                # 类型分布（只显示前5种）
-                if file_types:
-                    st.caption("**文件类型分布**")
-                    sorted_types = sorted(file_types.items(), key=lambda x: x[1], reverse=True)[:5]
-                    type_text = " · ".join([f"{ext.replace('.', '')}: {count}" for ext, count in sorted_types])
-                    if len(file_types) > 5:
-                        type_text += f" · 其他: {sum(c for _, c in sorted(file_types.items(), key=lambda x: x[1], reverse=True)[5:])}"
-                    st.caption(type_text)
-                
-                auto_name = folder_name
-                
-                # 智能生成知识库名称
-                if cnt > 0:
-                    auto_name = generate_smart_kb_name(target_path, cnt, file_types, folder_name)
+            if search_kb:
+                filtered_kbs = [kb for kb in existing_kbs if search_kb.lower() in kb.lower()]
+                st.caption(f"找到 {len(filtered_kbs)} 个匹配的知识库")
             else:
-                st.error("❌ 路径不存在，请检查路径是否正确")
-
-        # final_kb_name 必须在 if/else 中被定义，以确保其在模块作用域内
-        st.write("")
-        if is_create_mode:
-            st.markdown("**知识库名称**")
-            
-            # 显示智能建议
-            if auto_name:
-                st.caption(f"💡 建议名称：{auto_name}")
-            
-            final_kb_name = st.text_input(
-                "知识库名称", 
-                value=sanitize_filename(auto_name) if auto_name else "", 
-                placeholder="留空自动生成，或输入自定义名称",
-                label_visibility="collapsed",
-                help="留空将自动生成有意义的名称"
-            )
-            
-            # 如果用户没输入，使用自动生成的名称
-            if not final_kb_name and auto_name:
-                final_kb_name = sanitize_filename(auto_name)
+                filtered_kbs = existing_kbs
         else:
-            final_kb_name = current_kb_name
+            filtered_kbs = existing_kbs
 
-        # 高级选项
-        with st.expander("🔧 高级选项", expanded=False):
-            force_reindex = st.checkbox("🔄 强制重建索引", False, help="删除现有索引，重新构建（用于修复损坏的索引）")
-            st.caption("⚠️ 强制重建会删除现有的向量索引和文档片段，重新解析所有文档")
-            
-            st.write("")
-            st.markdown("**⚡ 性能选项**")
-            extract_metadata = st.checkbox(
-                "提取元数据（关键词、分类等）", 
-                value=False,
-                help="开启后提取文件分类、关键词等信息，但会降低 30% 处理速度"
-            )
-            if extract_metadata:
-                st.caption("📊 完整模式：提取元数据，可查看分类和关键词")
-        
-        st.write("")
-        
-        btn_label = "🚀 立即创建" if is_create_mode else ("➕ 执行追加" if action_mode=="APPEND" else "🔄 执行覆盖")
-        btn_start = st.button(btn_label, type="primary", use_container_width=True)
+        nav_options = ["➕ 新建知识库..."] + [f"📂 {kb}" for kb in filtered_kbs]
 
-    # --- 现有库的管理 ---
-    if not is_create_mode:
-        st.write("")
-        st.divider()
-        
-        # 聊天控制 (P2 优化 - 撤销功能)
-        st.caption("🛠️ 聊天控制")
-        col1, col2 = st.columns(2)
-        
-        # 撤销按钮
-        if col1.button("↩️ 撤销提问", use_container_width=True, disabled=len(state.get_messages()) < 2, help="撤销最后一组问答"):
-            if len(state.get_messages()) >= 2:
-                # 弹出最后两条消息 (User + Assistant)
-                st.session_state.messages.pop()
-                st.session_state.messages.pop()
-                # 保存更新后的历史
-                if current_kb_name:
-                    HistoryManager.save(current_kb_name, state.get_messages())
-                st.toast("✅ 已撤销上一条消息")
-                time.sleep(0.5)
+        # 默认选择"新建知识库"，避免自动加载大知识库
+        default_idx = 0
+        if "current_nav" in st.session_state and st.session_state.current_nav in nav_options:
+            default_idx = nav_options.index(st.session_state.current_nav)
+        # 注释掉自动选择第一个知识库的逻辑
+        # elif len(nav_options) > 1:
+        #     default_idx = 1 
+
+        selected_nav = st.selectbox("选择当前知识库", nav_options, index=default_idx, label_visibility="collapsed")
+
+        # 卸载知识库按钮（释放内存）
+        if not (selected_nav == "➕ 新建知识库...") and st.session_state.get('chat_engine') is not None:
+            if st.button("🔓 卸载知识库（释放内存）", use_container_width=True, help="释放当前知识库占用的内存资源"):
+                st.session_state.chat_engine = None
+                st.session_state.current_kb_id = None
+                cleanup_memory()
+                st.toast("✅ 知识库已卸载，内存已释放")
                 st.rerun()
-        
-        # 清空按钮
-        if col2.button("🧹 清空对话", use_container_width=True, disabled=len(state.get_messages()) == 0):
-            st.session_state.messages = []
-            st.session_state.suggestions_history = []
-            if current_kb_name:
-                HistoryManager.save(current_kb_name, [])
-            st.toast("✅ 对话已清空")
-            time.sleep(0.5)
-            st.rerun()
-        
-        # 对话历史管理
-        if len(state.get_messages()) > 0:
-            col3, col4 = st.columns(2)
-            
-            # 导出对话
-            if col3.button("📥 导出对话", use_container_width=True, help="导出为 Markdown 文件"):
-                export_content = f"# 对话记录 - {current_kb_name}\n\n"
-                export_content += f"**导出时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                export_content += "---\n\n"
-                
-                for i, msg in enumerate(st.session_state.messages, 1):
-                    role = "👤 用户" if msg["role"] == "user" else "🤖 助手"
-                    export_content += f"## {role} ({i})\n\n{msg['content']}\n\n"
-                
-                st.download_button(
-                    "💾 下载 Markdown",
-                    export_content,
-                    file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
-                    mime="text/markdown",
-                    use_container_width=True
-                )
-            
-            # 对话统计
-            if col4.button("📊 对话统计", use_container_width=True):
-                qa_count = len(state.get_messages()) // 2
-                total_chars = sum(len(msg["content"]) for msg in st.session_state.messages)
-                st.info(f"💬 问答轮次: {qa_count}\n\n📝 总字符数: {total_chars}")
-            
-        # 并行对话 (P2 优化 - 响应用户多线程需求)
-        st.write("")
-        st.link_button("🔀 新开窗口 (并行对话)", "http://localhost:8501", help="Streamlit 限制单页面无法并行生成。点击此按钮打开新窗口，即可实现一边生成、一边提问。", use_container_width=True)
 
-        st.write("")
-        st.caption("⚠️ 危险操作")
-        
-        if 'confirm_delete' not in st.session_state:
-            st.session_state.confirm_delete = False
-        
-        if not st.session_state.confirm_delete:
-            if st.button("🗑️ 删除此知识库", use_container_width=True, type="secondary"):
-                st.session_state.confirm_delete = True
+        if selected_nav != st.session_state.get('current_nav'):
+            st.session_state.pop('suggestions_history', None) 
+
+        st.session_state.current_nav = selected_nav
+
+        is_create_mode = (selected_nav == "➕ 新建知识库...")
+        current_kb_name = selected_nav.replace("📂 ", "") if not is_create_mode else None
+
+        # --- 数据源配置区 ---
+        if is_create_mode:
+            st.caption("🛠️ 创建新知识库")
         else:
-            st.warning(f"⚠️ 确认删除 **{current_kb_name}**？\n\n此操作不可恢复，将删除所有文档和对话历史。")
+            st.caption(f"🛠️ 管理: {current_kb_name}")
+
+        with st.container(border=True):
+            if is_create_mode:
+                action_mode = "NEW"
+            else:
+                action_mode = st.radio("操作模式", ["➕ 追加", "🔄 覆盖"], horizontal=True, label_visibility="collapsed")
+                action_mode = "APPEND" if "追加" in action_mode else "NEW"
+
+            st.markdown("**数据源**")
+
+            if "path_val" not in st.session_state: 
+                st.session_state.path_val = os.path.abspath(defaults.get("target_path", ""))
+
+            if 'path_input' not in st.session_state:
+                st.session_state.path_input = ""
+
+            # 如果有上传路径且输入框为空，自动填充
+            if st.session_state.get('uploaded_path') and not st.session_state.path_input:
+                st.session_state.path_input = st.session_state.uploaded_path
+
+            # 优化路径显示
+            path_col1, path_col2 = st.columns([5, 1])
+            with path_col1:
+                target_path = st.text_input(
+                    "文件/文件夹路径", 
+                    value=st.session_state.path_input,
+                    placeholder="📁 /Users/username/docs 或上传后自动生成",
+                    key="path_input_display",
+                    label_visibility="collapsed"
+                )
+                # 同步到 path_input
+                if target_path != st.session_state.path_input:
+                    st.session_state.path_input = target_path
+            with path_col2:
+                if st.button("📂", help="在Finder中打开", use_container_width=True):
+                    if target_path and os.path.exists(target_path):
+                        # macOS: 在Finder中打开
+                        import webbrowser
+                        import urllib.parse
+                        try:
+                            file_url = 'file://' + urllib.parse.quote(os.path.abspath(target_path))
+                            webbrowser.open(file_url)
+                            st.toast("✅ 已在Finder中打开")
+                        except Exception as e:
+                            st.error(f"打开失败: {e}")
+                    else:
+                        st.warning("💡 请先输入有效路径，或使用下方上传功能")
+
+
+            uploaded_files = st.file_uploader(
+                "⬆️ 或拖入文件/ZIP", 
+                accept_multiple_files=True, 
+                key="uploader",
+                label_visibility="collapsed"
+            )
+
+            # 文档预览 (v1.6) - 带翻页
+            if uploaded_files:
+                with st.expander(f"📄 已选择 {len(uploaded_files)} 个文件 - 点击预览", expanded=True):
+                    # 翻页设置
+                    page_size = 10
+                    total_pages = (len(uploaded_files) - 1) // page_size + 1
+
+                    if 'preview_page' not in st.session_state:
+                        st.session_state.preview_page = 0
+
+                    # 翻页控制
+                    col1, col2, col3 = st.columns([1, 2, 1])
+                    if col1.button("⬅️ 上一页", disabled=st.session_state.preview_page == 0):
+                        st.session_state.preview_page -= 1
+                        st.rerun()
+                    col2.write(f"第 {st.session_state.preview_page + 1}/{total_pages} 页")
+                    if col3.button("下一页 ➡️", disabled=st.session_state.preview_page >= total_pages - 1):
+                        st.session_state.preview_page += 1
+                        st.rerun()
+
+                    st.divider()
+
+                    # 显示当前页的文件
+                    start_idx = st.session_state.preview_page * page_size
+                    end_idx = min(start_idx + page_size, len(uploaded_files))
+
+                    for idx, uploaded_file in enumerate(uploaded_files[start_idx:end_idx]):
+                        col1, col2, col3 = st.columns([4, 1, 1])
+                        col1.write(f"📎 {uploaded_file.name}")
+                        col2.write(f"{uploaded_file.size / 1024:.1f} KB")
+                        if col3.button("👁️", key=f"preview_{start_idx + idx}_{uploaded_file.name}_{uploaded_file.size}", help="预览"):
+                            st.session_state['preview_file'] = uploaded_file
+
+                    # 显示预览对话框
+                    if 'preview_file' in st.session_state and st.session_state.preview_file:
+                        show_upload_preview(st.session_state.preview_file)
+                        st.session_state.preview_file = None
+
+            # 处理上传 (Stage 4.1 - 使用 UploadHandler)
+            if uploaded_files:
+                if 'last_uploaded_names' not in st.session_state:
+                    st.session_state.last_uploaded_names = []
+
+                current_names = [f.name for f in uploaded_files]
+
+                # 只在文件列表变化时处理
+                if set(current_names) != set(st.session_state.last_uploaded_names):
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+
+                    # 使用 UploadHandler 处理上传
+                    handler = UploadHandler(UPLOAD_DIR, logger)
+
+                    for idx, f in enumerate(uploaded_files):
+                        status_text.text(f"验证中: {f.name} ({idx+1}/{len(uploaded_files)})")
+                        progress_bar.progress((idx + 1) / len(uploaded_files))
+
+                    result = handler.process_uploads(uploaded_files)
+
+                    progress_bar.empty()
+                    status_text.empty()
+
+                    st.session_state.last_uploaded_names = current_names
+                    st.session_state.uploaded_path = os.path.abspath(result.batch_dir)
+
+                    # 显示上传结果
+                    if result.success_count > 0:
+                        st.success(f"✅ 成功上传 {result.success_count} 个文件")
+
+                    if result.skipped_count > 0:
+                        st.warning(f"⚠️ 跳过 {result.skipped_count} 个文件")
+                        with st.expander("查看跳过详情", expanded=True):
+                            for reason in result.skip_reasons:
+                                st.text(f"• {reason}")
+
+                    # 为文件上传场景生成智能名称
+                    if result.success_count > 0:
+                        try:
+                            # 计算文件类型分布
+                            file_types = {}
+                            for filename in current_names:
+                                ext = os.path.splitext(filename)[1].lower()
+                                file_types[ext] = file_types.get(ext, 0) + 1
+
+                            # 使用上传的文件名生成智能名称
+                            folder_name = os.path.basename(result.batch_dir)  # batch_xxx
+                            auto_name = generate_smart_kb_name(result.batch_dir, result.success_count, file_types, folder_name)
+
+                            # 存储智能生成的名称
+                            st.session_state.upload_auto_name = auto_name
+                        except Exception as e:
+                            st.session_state.upload_auto_name = None
+
+                    time.sleep(1)
+                    if result.success_count > 0:
+                        st.rerun()
+
+
+            # 使用上传路径或手动输入的路径
+            target_path = st.session_state.get('uploaded_path') or target_path
+
+            auto_name = ""
+
+            # 优先使用文件上传的智能名称
+            if hasattr(st.session_state, 'upload_auto_name') and st.session_state.upload_auto_name:
+                auto_name = st.session_state.upload_auto_name
+
+            if target_path:
+                if os.path.exists(target_path):
+                    # 使用 UploadHandler 统计文件信息 (Stage 4.1)
+                    cnt, file_types, total_size = UploadHandler.get_folder_stats(target_path)
+
+                    # 美化显示
+                    size_mb = total_size / (1024 * 1024)
+                    folder_name = os.path.basename(target_path.rstrip('/'))
+
+                    st.success(f"✅ **有效数据源**: `{folder_name}`")
+
+                    # 三列统计卡片
+                    stat_col1, stat_col2, stat_col3 = st.columns(3)
+                    stat_col1.metric("📄 文件数", f"{cnt}")
+                    stat_col2.metric("💾 总大小", f"{size_mb:.1f}MB" if size_mb > 1 else f"{total_size/1024:.0f}KB")
+                    stat_col3.metric("📂 类型", f"{len(file_types)} 种")
+
+                    # 类型分布（只显示前5种）
+                    if file_types:
+                        st.caption("**文件类型分布**")
+                        sorted_types = sorted(file_types.items(), key=lambda x: x[1], reverse=True)[:5]
+                        type_text = " · ".join([f"{ext.replace('.', '')}: {count}" for ext, count in sorted_types])
+                        if len(file_types) > 5:
+                            type_text += f" · 其他: {sum(c for _, c in sorted(file_types.items(), key=lambda x: x[1], reverse=True)[5:])}"
+                        st.caption(type_text)
+
+                    auto_name = folder_name
+
+                    # 智能生成知识库名称
+                    if cnt > 0:
+                        auto_name = generate_smart_kb_name(target_path, cnt, file_types, folder_name)
+                else:
+                    st.error("❌ 路径不存在，请检查路径是否正确")
+
+            # final_kb_name 必须在 if/else 中被定义，以确保其在模块作用域内
+            st.write("")
+            if is_create_mode:
+                st.markdown("**知识库名称**")
+
+                # 显示智能建议
+                if auto_name:
+                    st.caption(f"💡 建议名称：{auto_name}")
+
+                final_kb_name = st.text_input(
+                    "知识库名称", 
+                    value=sanitize_filename(auto_name) if auto_name else "", 
+                    placeholder="留空自动生成，或输入自定义名称",
+                    label_visibility="collapsed",
+                    help="留空将自动生成有意义的名称"
+                )
+
+                # 如果用户没输入，使用自动生成的名称
+                if not final_kb_name and auto_name:
+                    final_kb_name = sanitize_filename(auto_name)
+            else:
+                final_kb_name = current_kb_name
+
+            # 高级选项
+            with st.expander("🔧 高级选项", expanded=True):
+                force_reindex = st.checkbox("🔄 强制重建索引", False, help="删除现有索引，重新构建（用于修复损坏的索引）")
+                st.caption("⚠️ 强制重建会删除现有的向量索引和文档片段，重新解析所有文档")
+
+                st.write("")
+                st.markdown("**⚡ 性能选项**")
+                extract_metadata = st.checkbox(
+                    "提取元数据（关键词、分类等）", 
+                    value=False,
+                    help="开启后提取文件分类、关键词等信息，但会降低 30% 处理速度"
+                )
+                if extract_metadata:
+                    st.caption("📊 完整模式：提取元数据，可查看分类和关键词")
+
+            st.write("")
+
+            btn_label = "🚀 立即创建" if is_create_mode else ("➕ 执行追加" if action_mode=="APPEND" else "🔄 执行覆盖")
+            btn_start = st.button(btn_label, type="primary", use_container_width=True)
+
+        # --- 现有库的管理 ---
+        if not is_create_mode:
+            st.write("")
+            st.divider()
+
+            # 聊天控制 (P2 优化 - 撤销功能)
+            st.caption("🛠️ 聊天控制")
             col1, col2 = st.columns(2)
-            if col1.button("✅ 确认删除", use_container_width=True, type="primary"):
-                try:
-                    with st.spinner(f"正在删除 {current_kb_name}..."):
-                        shutil.rmtree(os.path.join(output_base, current_kb_name), ignore_errors=True)
-                        hist_path = os.path.join(HISTORY_DIR, f"{current_kb_name}.json")
-                        if os.path.exists(hist_path):
-                            os.remove(hist_path)
-                    st.success("✅ 删除成功")
-                    st.session_state.current_nav = "➕ 新建知识库..."
-                    st.session_state.confirm_delete = False
-                    st.session_state.pop('suggestions_history', None)
+
+            # 撤销按钮
+            if col1.button("↩️ 撤销提问", use_container_width=True, disabled=len(state.get_messages()) < 2, help="撤销最后一组问答"):
+                if len(state.get_messages()) >= 2:
+                    # 弹出最后两条消息 (User + Assistant)
+                    st.session_state.messages.pop()
+                    st.session_state.messages.pop()
+                    # 保存更新后的历史
+                    if current_kb_name:
+                        HistoryManager.save(current_kb_name, state.get_messages())
+                    st.toast("✅ 已撤销上一条消息")
                     time.sleep(0.5)
                     st.rerun()
-                except Exception as e:
-                    st.error(f"删除失败: {e}")
-                    st.session_state.confirm_delete = False
-            if col2.button("❌ 取消", use_container_width=True):
+
+            # 清空按钮
+            if col2.button("🧹 清空对话", use_container_width=True, disabled=len(state.get_messages()) == 0):
+                st.session_state.messages = []
+                st.session_state.suggestions_history = []
+                if current_kb_name:
+                    HistoryManager.save(current_kb_name, [])
+                st.toast("✅ 对话已清空")
+                time.sleep(0.5)
+                st.rerun()
+
+            # 对话历史管理
+            if len(state.get_messages()) > 0:
+                col3, col4 = st.columns(2)
+
+                # 导出对话
+                if col3.button("📥 导出对话", use_container_width=True, help="导出为 Markdown 文件"):
+                    export_content = f"# 对话记录 - {current_kb_name}\n\n"
+                    export_content += f"**导出时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                    export_content += "---\n\n"
+
+                    for i, msg in enumerate(st.session_state.messages, 1):
+                        role = "👤 用户" if msg["role"] == "user" else "🤖 助手"
+                        export_content += f"## {role} ({i})\n\n{msg['content']}\n\n"
+
+                    st.download_button(
+                        "💾 下载 Markdown",
+                        export_content,
+                        file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                        mime="text/markdown",
+                        use_container_width=True
+                    )
+
+                # 对话统计
+                if col4.button("📊 对话统计", use_container_width=True):
+                    qa_count = len(state.get_messages()) // 2
+                    total_chars = sum(len(msg["content"]) for msg in st.session_state.messages)
+                    st.info(f"💬 问答轮次: {qa_count}\n\n📝 总字符数: {total_chars}")
+
+            # 并行对话 (P2 优化 - 响应用户多线程需求)
+            st.write("")
+            st.link_button("🔀 新开窗口 (并行对话)", "http://localhost:8501", help="Streamlit 限制单页面无法并行生成。点击此按钮打开新窗口，即可实现一边生成、一边提问。", use_container_width=True)
+
+            st.write("")
+            st.caption("⚠️ 危险操作")
+
+            if 'confirm_delete' not in st.session_state:
                 st.session_state.confirm_delete = False
 
-    # --- 快速开始模式 ---
-    st.write("")
-    if st.button("⚡ 快速开始（使用默认配置）", use_container_width=True, type="primary", help="自动配置 Ollama + 默认嵌入模型，1 分钟开始使用"):
-        # 保存快速配置
-        quick_config = {
-            "llm_type_idx": 0,
-            "llm_url_ollama": "http://127.0.0.1:11434",
-            "llm_model_ollama": "qwen2.5:7b",
-            "embed_provider_index": 0,
-            "embed_model_hf": "BAAI/bge-small-zh-v1.5"
-        }
-        
-        # 合并到现有配置
-        defaults.update(quick_config)
-        
-        # 保存配置文件
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-            json.dump(defaults, f, indent=4, ensure_ascii=False)
-        
-        st.success("✅ 已使用默认配置！\n\n📝 LLM: Ollama (qwen2.5:7b)\n📝 嵌入: BAAI/bge-small-zh-v1.5\n\n现在可以直接创建知识库了！")
-        logger.success("快速开始模式：已配置默认值")
-        time.sleep(1.5)
-        st.rerun()
+            if not st.session_state.confirm_delete:
+                if st.button("🗑️ 删除此知识库", use_container_width=True, type="secondary"):
+                    st.session_state.confirm_delete = True
+            else:
+                st.warning(f"⚠️ 确认删除 **{current_kb_name}**？\n\n此操作不可恢复，将删除所有文档和对话历史。")
+                col1, col2 = st.columns(2)
+                if col1.button("✅ 确认删除", use_container_width=True, type="primary"):
+                    try:
+                        with st.spinner(f"正在删除 {current_kb_name}..."):
+                            shutil.rmtree(os.path.join(output_base, current_kb_name), ignore_errors=True)
+                            hist_path = os.path.join(HISTORY_DIR, f"{current_kb_name}.json")
+                            if os.path.exists(hist_path):
+                                os.remove(hist_path)
+                        st.success("✅ 删除成功")
+                        st.session_state.current_nav = "➕ 新建知识库..."
+                        st.session_state.confirm_delete = False
+                        st.session_state.pop('suggestions_history', None)
+                        time.sleep(0.5)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"删除失败: {e}")
+                        st.session_state.confirm_delete = False
+                if col2.button("❌ 取消", use_container_width=True):
+                    st.session_state.confirm_delete = False
+
+        # --- 快速开始模式 ---
+        st.write("")
+        if st.button("⚡ 快速开始（使用默认配置）", use_container_width=True, type="primary", help="自动配置 Ollama + 默认嵌入模型，1 分钟开始使用"):
+            # 保存快速配置
+            quick_config = {
+                "llm_type_idx": 0,
+                "llm_url_ollama": "http://127.0.0.1:11434",
+                "llm_model_ollama": "qwen2.5:7b",
+                "embed_provider_index": 0,
+                "embed_model_hf": "BAAI/bge-small-zh-v1.5"
+            }
+
+            # 合并到现有配置
+            defaults.update(quick_config)
+
+            # 保存配置文件
+            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(defaults, f, indent=4, ensure_ascii=False)
+
+            st.success("✅ 已使用默认配置！\n\n📝 LLM: Ollama (qwen2.5:7b)\n📝 嵌入: BAAI/bge-small-zh-v1.5\n\n现在可以直接创建知识库了！")
+            logger.success("快速开始模式：已配置默认值")
+            time.sleep(1.5)
+            st.rerun()
+
+        st.caption("💡 提示：快速开始会使用 Ollama 本地模型，需要先安装 Ollama")
+
+        # --- 模型配置区域 (折叠收纳) ---
+        st.write("")
     
-    st.caption("💡 提示：快速开始会使用 Ollama 本地模型，需要先安装 Ollama")
+    with tab_config:
+        st.session_state.current_tab = "config"
+        st.markdown("### ⚙️ 模型配置")
+        
+        # P0改进3: 侧边栏分组 - 基础配置（默认展开）- 使用新组件 (Stage 3.2.2)
+        config_values = render_basic_config(defaults)
+
+        # 提取配置值
+        llm_provider = config_values.get('llm_provider', 'Ollama')
+        llm_url = config_values.get('llm_url', 'http://localhost:11434')
+        llm_model = config_values.get('llm_model', 'qwen2.5:7b')
+        llm_key = config_values.get('llm_key', '')
+        embed_provider = config_values.get('embed_provider', 'HuggingFace (本地/极速)')
+        embed_model = config_values.get('embed_model', 'BAAI/bge-small-zh-v1.5')
+        embed_url = config_values.get('embed_url', '')
+        embed_key = config_values.get('embed_key', '')
+
+        # P0改进3: 高级功能（默认展开）- 使用新组件 (Stage 3.2.3)
+        from src.ui.sidebar_config import SidebarConfig
+        advanced_config = SidebarConfig._render_advanced_config()
+
+    with tab_monitor:
+        st.info("所有监控功能在主页标签中")
     
-    # --- 模型配置区域 (折叠收纳) ---
-    st.write("")
+    with tab_tools:
+        st.info("所有工具功能在主页标签中")
+    
+    with tab_help:
+        st.markdown("### 📖 帮助")
+        st.info("RAG Pro Max v2.1.0 - 横向标签页版本")
+
 # ==========================================
 # 5. 核心逻辑 (RAG & Indexing)
 # ==========================================
@@ -1094,19 +1115,44 @@ def process_knowledge_base_logic():
     logger.log("SUCCESS", f"知识库处理完成: {final_kb_name}, 文档数: {result.doc_count
     }", stage="知识库处理")
     
-    status_container.update(label=f"✅ 知识库 '{final_kb_name}' 处理完成", state="complete", expanded=False)
+    status_container.update(label=f"✅ 知识库 '{final_kb_name}' 处理完成", state="complete", expanded=True)
     
     # 资源清理
     resource_guard.throttler.cleanup_memory()
     logger.info("🧹 资源已清理")
     
-    time.sleep(0.5)
+    # 自动跳转到新建的知识库
+    st.session_state.current_nav = f"📂 {final_kb_name}"
+    st.success(f"🎉 知识库 '{final_kb_name}' 构建完成！已自动切换到该知识库")
+    
+    time.sleep(1.5)
+    st.rerun()  # 刷新页面，显示新知识库
+    
     return result.doc_count
 
 # ==========================================
 # 6. 聊天界面 & 无限追问功能
 # ==========================================
 st.title("🛡️ RAG Pro Max")
+
+# 引入新的优化组件
+from src.utils.enhanced_ocr_optimizer import enhanced_ocr_optimizer
+from src.ui.progress_monitor import progress_monitor
+
+# 显示实时进度监控
+progress_monitor.render_all_tasks()
+
+# 在侧边栏添加性能统计
+with st.sidebar:
+    with st.expander("📊 性能统计", expanded=True):
+        stats = enhanced_ocr_optimizer.get_performance_stats()
+        for key, value in stats.items():
+            st.write(f"**{key}**: {value}")
+        
+        if st.button("🧪 运行性能测试"):
+            with st.spinner("正在运行性能基准测试..."):
+                benchmark_results = enhanced_ocr_optimizer.benchmark_performance()
+                st.json(benchmark_results)
 
 # 紧凑侧边栏CSS样式
 st.markdown("""
@@ -1322,7 +1368,7 @@ if active_kb_name:
             st.session_state.renaming = True
     
     # 文件管理
-    with st.expander("📊 知识库详情与管理", expanded=False):
+    with st.expander("📊 知识库详情与管理", expanded=True):
         if not doc_manager.manifest['files']: 
             st.info("暂无文件")
         else:
@@ -1342,7 +1388,7 @@ if active_kb_name:
                 try:
                     metadata_mgr = MetadataManager(db_path)
                     if metadata_mgr.metadata or metadata_mgr.stats:
-                        with st.expander("📊 元数据统计", expanded=False):
+                        with st.expander("📊 元数据统计", expanded=True):
                             stat_col1, stat_col2, stat_col3 = st.columns(3)
                             
                             with stat_col1:
@@ -1700,11 +1746,11 @@ if active_kb_name:
                         first_line = summary_lines[0] if summary_lines else f['summary']
                         title = first_line if len(first_line) <= 80 else first_line[:80] + "..."
                         
-                        with st.expander(f"📖 {title}", expanded=False):
+                        with st.expander(f"📖 {title}", expanded=True):
                             st.markdown(f.get('summary'))
                     
                     # 文件统计信息
-                    with st.expander(f"📊 详情 - {f['name']}", expanded=False):
+                    with st.expander(f"📊 详情 - {f['name']}", expanded=True):
                         chunk_count = len(f.get('doc_ids', []))
                         
                         # 基础信息（4列紧凑显示）
@@ -1764,7 +1810,7 @@ if active_kb_name:
                             # 文件哈希（折叠）
                             file_hash = f.get('file_hash', '')
                             if file_hash:
-                                with st.expander("🔐 文件哈希", expanded=False):
+                                with st.expander("🔐 文件哈希", expanded=True):
                                     st.code(file_hash, language="text")
                         
                         # 文档ID（紧凑显示）
@@ -1907,7 +1953,7 @@ for msg_idx, msg in enumerate(state.get_messages()):
         
         # 渲染引用源 - 使用新组件 (Stage 3.1)
         if "sources" in msg:
-            render_source_references(msg["sources"], expanded=False)
+            render_source_references(msg["sources"], expanded=True)
         
         # 引用按钮 (P2 恢复功能)
         if role == "assistant":
@@ -2022,7 +2068,7 @@ queue_len = len(st.session_state.question_queue)
 if st.session_state.get('is_processing'):
     if queue_len > 0:
         # 显示队列中的问题
-        with st.expander(f"⏳ 正在处理问题，队列中还有 {queue_len} 个问题等待...", expanded=False):
+        with st.expander(f"⏳ 正在处理问题，队列中还有 {queue_len} 个问题等待...", expanded=True):
             for i, q in enumerate(st.session_state.question_queue, 1):
                 # 截断过长的问题
                 display_q = q[:50] + "..." if len(q) > 50 else q
@@ -2312,7 +2358,7 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     st.caption(stats_simple)
                     
                     # 详细信息 (折叠)
-                    with st.expander("📊 详细统计", expanded=False):
+                    with st.expander("📊 详细统计", expanded=True):
                         st.caption(f"🚀 速度: {tokens_per_sec:.1f} tokens/s")
                         if prompt_tokens:
                             st.caption(f"📥 输入: {prompt_tokens} | 📤 输出: {completion_tokens}")

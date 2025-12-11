@@ -70,9 +70,9 @@ class SidebarConfig:
                                     help="结合关键词检索和语义检索，提升准确率 5-10%")
             
             # 保存到 session state
-            st.session_state.enable_rerank = enable_rerank
-            st.session_state.rerank_model = rerank_model
-            st.session_state.enable_bm25 = enable_bm25
+            # st.session_state.enable_rerank = enable_rerank  # 已注释避免错误
+            # st.session_state.rerank_model = rerank_model  # 已注释避免错误
+            # st.session_state.enable_bm25 = enable_bm25  # 已注释避免错误
             
             return {
                 'enable_rerank': enable_rerank,

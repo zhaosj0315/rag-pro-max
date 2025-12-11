@@ -155,6 +155,63 @@ DEV_RULES.md
 # 原始大视频（146MB，超过 GitHub 限制）
 demo.mp4
 
+
+# v2.2.0 标签页迁移过程临时文件
+exact_config_migrate.py
+fix_config_migrate.py
+manual_config_migrate.py
+complete_config_migrate.py
+fix_config_error.py
+fix_config_consistency.py
+fix_variable_error.py
+fix_create_mode.py
+fix_elif_syntax.py
+migrate_monitor_tab.py
+migrate_monitor_fixed.py
+migrate_tools_tab.py
+migrate_tools_fixed.py
+fix_tabs_issue.py
+fix_direct.py
+config_only_fix.py
+simple_fix.py
+exact_config_replace.py
+fix_duplicate_id.py
+fix_variable_ref.py
+fix_button_error.py
+fix_model_name.py
+fix_syntax_error.py
+fix_dict_get_error.py
+fix_embed_button_key.py
+fix_session_state_error.py
+fix_config_expanded.py
+simple_key_fix.py
+remove_main_config.py
+remove_all_main_config.py
+fix_system_tools.py
+fix_id_expander.py
+add_auto_switch.py
+fix_model_selector_keys.py
+update_readme.py
+add_v22_tests.py
+update_main_tests.py
+fix_auto_switch_test.py
+update_gitignore.py
+
+# 备份文件（迁移过程中的备份）
+src/apppro.py.backup_*
+src/apppro.py.pre-migration
+src/apppro.py.backup2
+src/apppro.py.backup
+src/apppro.py.backup_fix
+
+# 其他临时脚本
+*.backup_*
+*_migrate.py
+*_fix.py
+fix_*.py
+update_*.py
+add_*.py
+
 # ⬆️ 新增临时文件添加到此处 ⬆️
 
 # Python 缓存

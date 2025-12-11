@@ -30,7 +30,7 @@ def render_ollama_model_selector(
     # 刷新按钮
     col_refresh = st.columns([3, 1])[1]
     with col_refresh:
-        if st.button("🔄", key="refresh_ollama_models", help="刷新模型列表", use_container_width=True):
+        if st.button("🔄", key="config_refresh_ollama", help="刷新模型列表", use_container_width=True):
             if ollama_ok:
                 models = _fetch_ollama_models(llm_url)
                 if models:
@@ -59,9 +59,9 @@ def render_ollama_model_selector(
         
         col1, col2 = st.columns([4, 1])
         with col1:
-            selected = st.selectbox("选择/输入模型", options, index=idx, label_visibility="collapsed")
+            selected = st.selectbox("选择/输入模型", options, index=idx, label_visibility="collapsed", key="config_model_selectbox")
         with col2:
-            if st.button("⭐ 默认", key="set_default_llm", use_container_width=True):
+            if st.button("⭐ 默认", key="config_set_default_llm", use_container_width=True):
                 if selected != "✏️ 手动输入...":
                     save_as_default = True
                 else:
@@ -167,6 +167,7 @@ def render_hf_embedding_selector(
             options=preset_models,
             index=default_idx,
             help=model_descriptions.get(preset_models[default_idx], ""),
+            key="config_hf_selectbox",
             label_visibility="collapsed"
         )
     
@@ -187,7 +188,7 @@ def render_hf_embedding_selector(
     
     with col2:
         button_label = "✅ ⭐" if model_exists else "⭐"
-        if st.button(button_label, key="set_default_embed", use_container_width=True, help="设为默认模型"):
+        if st.button(button_label, key="config_set_default_embed", use_container_width=True, help="设为默认模型"):
             # 返回信号，让调用者保存配置
             st.session_state.save_embed_model = embed_model
     
