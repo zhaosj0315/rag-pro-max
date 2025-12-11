@@ -290,6 +290,223 @@ PageStyle.setup_page()
 # 注入 CSS
 st.markdown("""
 <style>
+                    /* 紧凑统计卡片 */
+    [data-testid="metric-container"] {
+        background: rgba(0,0,0,0.02) !important;
+        border: 1px solid rgba(0,0,0,0.05) !important;
+        border-radius: 6px !important;
+        padding: 0.5rem !important;
+        margin: 0.25rem !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    [data-testid="metric-container"]:hover {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+    }
+    
+    /* 统计数字样式 */
+    [data-testid="metric-container"] [data-testid="metric-value"] {
+        font-size: 1.2rem !important;
+        font-weight: 600 !important;
+        color: #1f77b4 !important;
+    }
+    
+    /* 统计标签样式 */
+    [data-testid="metric-container"] [data-testid="metric-label"] {
+        font-size: 0.8rem !important;
+        color: #666 !important;
+        margin-top: 0.25rem !important;
+    }
+    
+    /* 文档详情折叠优化 */
+    .document-details {
+        background: #f8f9fa !important;
+        border-radius: 6px !important;
+        padding: 0.75rem !important;
+        margin: 0.5rem 0 !important;
+        border-left: 3px solid #1f77b4 !important;
+    }
+    
+    .document-summary {
+        background: white !important;
+        padding: 0.5rem !important;
+        border-radius: 4px !important;
+        margin-top: 0.5rem !important;
+        border: 1px solid #dee2e6 !important;
+        font-size: 0.85rem !important;
+        line-height: 1.4 !important;
+    }
+    
+    /* 批量操作按钮 */
+    .batch-operations {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 6px !important;
+        padding: 0.5rem 1rem !important;
+        font-weight: 500 !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .batch-operations:hover {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3) !important;
+    }
+    
+    /* 快速预览提示 */
+    .preview-tooltip {
+        position: absolute !important;
+        background: rgba(0,0,0,0.9) !important;
+        color: white !important;
+        padding: 0.5rem !important;
+        border-radius: 4px !important;
+        font-size: 0.8rem !important;
+        max-width: 300px !important;
+        z-index: 1000 !important;
+        pointer-events: none !important;
+    }
+    
+
+    /* 改进的参考片段样式 */
+    .stMarkdown .reference-box {
+        background: linear-gradient(90deg, #1f77b4 0%, #1f77b4 3px, #f8f9fa 3px) !important;
+        padding: 12px 16px !important;
+        margin: 12px 0 !important;
+        border-radius: 6px !important;
+        border: 1px solid #e9ecef !important;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif !important;
+    }
+    
+    .reference-header {
+        font-size: 0.85rem !important;
+        color: #6c757d !important;
+        margin-bottom: 8px !important;
+        font-weight: 500 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+    }
+    
+    .reference-content {
+        font-size: 0.9rem !important;
+        line-height: 1.5 !important;
+        color: #495057 !important;
+        background: white !important;
+        padding: 8px 12px !important;
+        border-radius: 4px !important;
+        border: 1px solid #dee2e6 !important;
+        max-height: 150px !important;
+        overflow-y: auto !important;
+        white-space: pre-wrap !important;
+        word-wrap: break-word !important;
+    }
+    
+    /* 修复Streamlit markdown显示问题 */
+    .stMarkdown > div > div[style*="border-left"] {
+        max-width: 100% !important;
+        overflow: visible !important;
+    }
+    
+
+    /* 参考片段显示优化 */
+    .reference-snippet {
+        background-color: #f8f9fa !important;
+        border-left: 3px solid #1f77b4 !important;
+        padding: 10px !important;
+        margin: 10px 0 !important;
+        border-radius: 4px !important;
+        font-size: 0.9rem !important;
+        line-height: 1.4 !important;
+    }
+    
+    .reference-header {
+        font-size: 0.85rem !important;
+        color: #666 !important;
+        margin-bottom: 8px !important;
+        font-weight: 500 !important;
+    }
+    
+    .reference-content {
+        color: #333 !important;
+        max-height: 120px !important;
+        overflow-y: auto !important;
+        word-wrap: break-word !important;
+    }
+    
+    /* 修复HTML显示问题 */
+    .stMarkdown div[style*="border-left"] {
+        background-color: #f8f9fa !important;
+        border-radius: 4px !important;
+        margin: 8px 0 !important;
+    }
+    
+
+    /* 中间区域间距优化 */
+    .main .block-container > div {
+        gap: 0.5rem !important;
+    }
+    
+    /* 减少所有容器间距 */
+    .stContainer {
+        padding: 0.25rem !important;
+        margin: 0.25rem 0 !important;
+    }
+    
+    /* 减少markdown间距 */
+    .stMarkdown {
+        margin-bottom: 0.5rem !important;
+    }
+    
+    /* 减少chat消息间距 */
+    .stChatMessage {
+        margin-bottom: 0.5rem !important;
+        padding: 0.5rem !important;
+    }
+    
+    /* 减少expander间距 */
+    .streamlit-expanderContent {
+        padding: 0.5rem !important;
+    }
+    
+    /* 减少按钮组间距 */
+    .stButton {
+        margin-bottom: 0.25rem !important;
+    }
+    
+    /* 整体紧凑布局 */
+    .element-container {
+        margin-bottom: 0.25rem !important;
+    }
+    
+    /* 减少分隔线间距 */
+    hr {
+        margin: 0.5rem 0 !important;
+    }
+    
+
+    /* 顶部区域优化 */
+    .main .block-container {
+        padding-top: 0.5rem !important;
+        margin-top: 0 !important;
+    }
+    
+    /* 标题区域紧凑 */
+    .main h1:first-child {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+    
+    /* Streamlit默认间距优化 */
+    .stApp > header {
+        height: 0 !important;
+    }
+    
+    .stApp > div:first-child {
+        padding-top: 0 !important;
+    }
+    
+
     /* 标签页显示优化 */
     .stTabs [data-baseweb="tab-list"] {
         gap: 2px !important;
