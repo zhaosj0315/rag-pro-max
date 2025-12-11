@@ -72,7 +72,7 @@ class GPUOCRAccelerator:
             # 根据设备类型设置参数
             if self.device == "cuda":
                 self.ocr_engine = PaddleOCR(
-                    use_angle_use_angle_cls=True,
+                    use_angle_cls=True,
                     lang='ch',
                     # GPU优化参数
                     det_db_thresh=0.3,
@@ -84,7 +84,7 @@ class GPUOCRAccelerator:
             else:
                 # CPU或MPS设备
                 self.ocr_engine = PaddleOCR(
-                    use_angle_use_angle_cls=True,
+                    use_angle_cls=True,
                     lang='ch',
                     det_db_thresh=0.3,
                     det_db_box_thresh=0.6,
