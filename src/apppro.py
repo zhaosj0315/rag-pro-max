@@ -13,6 +13,18 @@ initialize_environment()
 
 import os
 import streamlit as st
+
+# 防止HTML内容被截断
+st.set_page_config(
+    page_title="RAG Pro Max",
+    page_icon="🚀",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# 设置不截断HTML显示
+import streamlit.components.v1 as components
+
 import shutil
 import time
 import requests
@@ -404,56 +416,19 @@ st.markdown("""
     }
     
 
-    /* 改进的参考片段样式 */
-    .stMarkdown .reference-box {
-        background: linear-gradient(90deg, #1f77b4 0%, #1f77b4 3px, #f8f9fa 3px) !important;
-        padding: 12px 16px !important;
-        margin: 12px 0 !important;
-        border-radius: 6px !important;
-        border: 1px solid #e9ecef !important;
-        font-family: -apple-system, BlinkMacSystemFont, sans-serif !important;
-    }
-    
-    .reference-header {
-        font-size: 0.85rem !important;
-        color: #6c757d !important;
-        margin-bottom: 8px !important;
-        font-weight: 500 !important;
-        display: flex !important;
-        align-items: center !important;
-        gap: 8px !important;
-    }
-    
-    .reference-content {
-        font-size: 0.9rem !important;
-        line-height: 1.5 !important;
-        color: #495057 !important;
-        background: white !important;
-        padding: 8px 12px !important;
-        border-radius: 4px !important;
-        border: 1px solid #dee2e6 !important;
-        max-height: 150px !important;
-        overflow-y: auto !important;
-        white-space: pre-wrap !important;
-        word-wrap: break-word !important;
-    }
-    
-    /* 修复Streamlit markdown显示问题 */
-    .stMarkdown > div > div[style*="border-left"] {
-        max-width: 100% !important;
-        overflow: visible !important;
-    }
-    
-
-    /* 参考片段显示优化 */
+        /* 完全修复参考片段显示 */
     .reference-snippet {
         background-color: #f8f9fa !important;
         border-left: 3px solid #1f77b4 !important;
-        padding: 10px !important;
+        padding: 12px !important;
         margin: 10px 0 !important;
-        border-radius: 4px !important;
+        border-radius: 6px !important;
         font-size: 0.9rem !important;
-        line-height: 1.4 !important;
+        line-height: 1.5 !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        white-space: pre-wrap !important;
+        max-width: 100% !important;
     }
     
     .reference-header {
@@ -465,199 +440,28 @@ st.markdown("""
     
     .reference-content {
         color: #333 !important;
-        max-height: 120px !important;
-        overflow-y: auto !important;
+        background: white !important;
+        padding: 8px 12px !important;
+        border-radius: 4px !important;
+        border: 1px solid #dee2e6 !important;
+        max-height: none !important;
+        overflow: visible !important;
+        word-break: break-word !important;
+    }
+    
+    /* 确保Streamlit不截断HTML */
+    .stMarkdown > div {
+        max-width: none !important;
+        overflow: visible !important;
+    }
+    
+    .stMarkdown div[style*="border-left"] {
+        max-width: 100% !important;
+        overflow: visible !important;
         word-wrap: break-word !important;
     }
     
-    /* 修复HTML显示问题 */
-    .stMarkdown div[style*="border-left"] {
-        background-color: #f8f9fa !important;
-        border-radius: 4px !important;
-        margin: 8px 0 !important;
-    }
-    
 
-    /* 中间区域间距优化 */
-    .main .block-container > div {
-        gap: 0.5rem !important;
-    }
-    
-    /* 减少所有容器间距 */
-    .stContainer {
-        padding: 0.25rem !important;
-        margin: 0.25rem 0 !important;
-    }
-    
-    /* 减少markdown间距 */
-    .stMarkdown {
-        margin-bottom: 0.5rem !important;
-    }
-    
-    /* 减少chat消息间距 */
-    .stChatMessage {
-        margin-bottom: 0.5rem !important;
-        padding: 0.5rem !important;
-    }
-    
-    /* 减少expander间距 */
-    .streamlit-expanderContent {
-        padding: 0.5rem !important;
-    }
-    
-    /* 减少按钮组间距 */
-    .stButton {
-        margin-bottom: 0.25rem !important;
-    }
-    
-    /* 整体紧凑布局 */
-    .element-container {
-        margin-bottom: 0.25rem !important;
-    }
-    
-    /* 减少分隔线间距 */
-    hr {
-        margin: 0.5rem 0 !important;
-    }
-    
-
-    /* 顶部区域优化 */
-    .main .block-container {
-        padding-top: 0.5rem !important;
-        margin-top: 0 !important;
-    }
-    
-    /* 标题区域紧凑 */
-    .main h1:first-child {
-        margin-top: 0 !important;
-        padding-top: 0 !important;
-    }
-    
-    /* Streamlit默认间距优化 */
-    .stApp > header {
-        height: 0 !important;
-    }
-    
-    .stApp > div:first-child {
-        padding-top: 0 !important;
-    }
-    
-
-    /* 标签页显示优化 */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 2px !important;
-        padding: 2px !important;
-        overflow-x: auto !important;
-        white-space: nowrap !important;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        padding: 6px 8px !important;
-        font-size: 0.8rem !important;
-        min-width: auto !important;
-        flex-shrink: 0 !important;
-    }
-    
-    /* 侧边栏宽度优化 */
-    .css-1d391kg {
-        min-width: 280px !important;
-        max-width: 320px !important;
-    }
-    
-
-    /* 全局布局优化 */
-    .main .block-container {
-        padding: 0.5rem 1rem !important;
-        max-width: 1400px !important;
-    }
-    
-    /* 侧边栏优化 */
-    .css-1d391kg {
-        padding-top: 1rem !important;
-    }
-    
-    /* 标签页样式 */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 4px !important;
-        background: rgba(0,0,0,0.02) !important;
-        border-radius: 8px !important;
-        padding: 2px !important;
-        margin-bottom: 1rem !important;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        padding: 8px 16px !important;
-        border-radius: 6px !important;
-        font-weight: 500 !important;
-        font-size: 0.9rem !important;
-    }
-    
-    .stTabs [aria-selected="true"] {
-        background: #FF4B4B !important;
-        color: white !important;
-    }
-    
-    /* 按钮优化 */
-    div.stButton > button {
-        border-radius: 6px !important;
-        padding: 0.4rem 0.8rem !important;
-        font-size: 0.85rem !important;
-        font-weight: 500 !important;
-        border: 1px solid rgba(0,0,0,0.1) !important;
-        transition: all 0.2s !important;
-    }
-    
-    div.stButton > button:hover {
-        border-color: #FF4B4B !important;
-        color: #FF4B4B !important;
-        background: rgba(255,75,75,0.05) !important;
-    }
-    
-    /* 输入框优化 */
-    .stTextInput > div > div > input,
-    .stTextArea > div > div > textarea {
-        border-radius: 6px !important;
-        font-size: 0.9rem !important;
-        padding: 0.5rem !important;
-    }
-    
-    /* 选择框优化 */
-    .stSelectbox > div > div {
-        border-radius: 6px !important;
-        font-size: 0.9rem !important;
-    }
-    
-    /* 文件上传区域 */
-    .stFileUploader > div {
-        border-radius: 8px !important;
-        padding: 1rem !important;
-        border: 2px dashed rgba(0,0,0,0.1) !important;
-    }
-    
-    /* 展开器优化 */
-    .streamlit-expanderHeader {
-        background: rgba(0,0,0,0.02) !important;
-        border-radius: 6px !important;
-        padding: 0.5rem 0.8rem !important;
-        margin-bottom: 0.5rem !important;
-    }
-    
-    /* 消息容器 */
-    .stChatMessage {
-        border-radius: 8px !important;
-        padding: 0.8rem !important;
-        margin-bottom: 0.8rem !important;
-        border: 1px solid rgba(0,0,0,0.05) !important;
-    }
-    
-    /* 指标卡片 */
-    [data-testid="metric-container"] {
-        background: rgba(0,0,0,0.02) !important;
-        border: 1px solid rgba(0,0,0,0.05) !important;
-        border-radius: 8px !important;
-        padding: 0.8rem !important;
-    }
-    
     /* 减少间距 */
     .element-container {
         margin-bottom: 0.5rem !important;
