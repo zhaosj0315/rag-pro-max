@@ -14,9 +14,17 @@ initialize_environment()
 import os
 # 在最开始设置环境变量，禁用PaddleOCR详细日志
 import os
-os.environ['GLOG_minloglevel'] = '2'
-os.environ['FLAGS_logtostderr'] = '0'
-os.environ['PADDLE_LOG_LEVEL'] = '40'  # ERROR级别
+os.environ['GLOG_minloglevel'] = '3'  # 只显示致命错误
+os.environ['FLAGS_logtostderr'] = '0'  # 不输出到stderr
+os.environ['PADDLE_LOG_LEVEL'] = '50'  # 最高级别，几乎不输出
+os.environ['FLAGS_v'] = '0'  # 禁用详细日志
+os.environ['GLOG_v'] = '0'  # 禁用GLOG详细日志
+
+# 设置多进程相关环境变量，影响进程调度
+os.environ['OMP_NUM_THREADS'] = '1'  # 每个进程只用1个线程
+os.environ['MKL_NUM_THREADS'] = '1'  # Intel MKL只用1个线程
+os.environ['OPENBLAS_NUM_THREADS'] = '1'  # OpenBLAS只用1个线程
+os.environ['VECLIB_MAXIMUM_THREADS'] = '1'  # Apple Accelerate只用1个线程
 
 import streamlit as st
 

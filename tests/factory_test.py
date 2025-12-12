@@ -638,6 +638,9 @@ def main():
     test_v22_component_separation()  # v2.2.1组件分离测试
     test_v22_auto_switch()  # v2.2.1自动跳转测试
     test_v22_ui_optimization()  # v2.2.1界面优化测试
+    test_v222_resource_protection()  # v2.2.2资源保护测试
+    test_v222_ocr_logging()  # v2.2.2 OCR日志测试
+    test_v222_documentation()  # v2.2.2文档测试
     
     # 输出测试结果
     print_header("测试结果汇总")
@@ -775,6 +778,93 @@ def test_v22_ui_optimization():
         
     except Exception as e:
         print(f"  ❌ v2.2.1界面优化测试失败: {e}")
+        return False
+
+def test_v222_resource_protection():
+    """测试v2.2.2资源保护功能"""
+    print("\n🧪 测试 v2.2.2 资源保护...")
+    
+    try:
+        from src.utils.cpu_monitor import get_resource_limiter
+        limiter = get_resource_limiter()
+        
+        # 检查CPU阈值
+        assert limiter.max_cpu_percent == 75.0, f"CPU阈值应为75%，实际为{limiter.max_cpu_percent}%"
+        print("  ✅ CPU阈值设置正确 (75%)")
+        
+        # 检查内存阈值
+        assert limiter.max_memory_percent == 85.0, f"内存阈值应为85%，实际为{limiter.max_memory_percent}%"
+        print("  ✅ 内存阈值设置正确 (85%)")
+        
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ v2.2.2资源保护测试失败: {e}")
+        return False
+
+def test_v222_ocr_logging():
+    """测试v2.2.2 OCR日志记录"""
+    print("\n🧪 测试 v2.2.2 OCR日志记录...")
+    
+    try:
+        from src.utils.optimized_ocr_processor import get_ocr_processor
+        processor = get_ocr_processor()
+        
+        # 检查统计功能
+        assert hasattr(processor, 'get_statistics'), "缺少get_statistics方法"
+        assert hasattr(processor, 'print_statistics'), "缺少print_statistics方法"
+        print("  ✅ 统计功能存在")
+        
+        # 检查统计数据
+        stats = processor.get_statistics()
+        required_keys = ['total_files_processed', 'total_processing_time', 'session_duration']
+        for key in required_keys:
+            assert key in stats, f"统计数据缺少字段: {key}"
+        print("  ✅ 统计数据完整")
+        
+        # 检查日志查看工具
+        assert os.path.exists('view_ocr_logs.py'), "日志查看工具不存在"
+        print("  ✅ 日志查看工具存在")
+        
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ v2.2.2 OCR日志测试失败: {e}")
+        return False
+
+def test_v222_documentation():
+    """测试v2.2.2文档完整性"""
+    print("\n🧪 测试 v2.2.2 文档完整性...")
+    
+    try:
+        # 检查版本信息
+        import json
+        with open('version.json', 'r') as f:
+            version_info = json.load(f)
+        assert version_info.get('version') == '2.2.2', f"版本号错误: {version_info.get('version')}"
+        print("  ✅ 版本信息正确")
+        
+        # 检查文档文件
+        docs = [
+            'docs/OCR_LOGGING_SYSTEM.md',
+            'docs/RESOURCE_PROTECTION_V2.md',
+            'RELEASE_NOTES_v2.2.2.md'
+        ]
+        
+        for doc in docs:
+            assert os.path.exists(doc), f"文档缺失: {doc}"
+        print("  ✅ 文档文件完整")
+        
+        # 检查更新日志
+        with open('CHANGELOG.md', 'r') as f:
+            content = f.read()
+        assert 'v2.2.2' in content, "更新日志缺少v2.2.2"
+        print("  ✅ 更新日志已更新")
+        
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ v2.2.2文档测试失败: {e}")
         return False
 
 if __name__ == "__main__":

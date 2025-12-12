@@ -43,7 +43,7 @@ class EnhancedOCROptimizer:
     
     def process_pdf_pages(self, pdf_path: str, images: List[Image.Image]) -> List[str]:
         """
-        处理PDF页面，集成所有优化功能
+        处理PDF页面，使用优化OCR处理器
         
         Args:
             pdf_path: PDF文件路径
@@ -52,18 +52,16 @@ class EnhancedOCROptimizer:
         Returns:
             OCR识别结果列表
         """
+        import tempfile
+        import os
+        from .optimized_ocr_processor import process_images_optimized
+        
         task_id = str(uuid.uuid4())
         pages_count = len(images)
         
-        # 1. 自适应调度 - 获取最优策略
-        workers, strategy, confidence = adaptive_scheduler.get_optimal_strategy(pages_count)
+        print(f"📊 使用优化OCR处理器处理 {pages_count} 页")
         
-        print(f"📊 自适应调度策略: {strategy}")
-        print(f"   进程数: {workers}")
-        print(f"   置信度: {confidence:.1%}")
-        print(f"   页面数: {pages_count}")
-        
-        # 2. 实时进度监控 - 开始任务
+        # 实时进度监控 - 开始任务
         progress_monitor.start_task(
             task_id=task_id,
             task_name=f"OCR处理: {pdf_path}",
@@ -72,62 +70,87 @@ class EnhancedOCROptimizer:
         
         start_time = time.time()
         results = []
-        success = True
+        temp_files = []
         
         try:
-            # 3. GPU加速处理
-            if self.gpu_available and pages_count >= 3:
-                results = self._gpu_batch_process(task_id, images)
-            else:
-                results = self._cpu_process(task_id, images, workers)
+            # 将PIL图像保存为临时文件
+            for i, image in enumerate(images):
+                temp_file = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
+                image.save(temp_file.name, 'JPEG')
+                temp_files.append(temp_file.name)
             
-            # 处理完成
-            progress_monitor.complete_task(task_id)
+            # 进度回调函数
+            def progress_callback(completed, total):
+                progress_monitor.update_progress(
+                    task_id,
+                    completed=completed,
+                    current_item=f"处理页面 {completed}/{total}"
+                )
+            
+            # 使用优化OCR处理器
+            ocr_results = process_images_optimized(temp_files, progress_callback)
+            
+            # 提取文本结果
+            results = [result.get('text', '') for result in ocr_results]
+            
+            processing_time = time.time() - start_time
+            speed = pages_count / processing_time if processing_time > 0 else 0
+            
+            print(f"✅ OCR处理完成: {processing_time:.1f}秒, {speed:.1f}页/秒")
             
         except Exception as e:
             print(f"❌ OCR处理失败: {e}")
-            progress_monitor.fail_task(task_id, str(e))
-            success = False
-            results = [""] * pages_count
-        
-        # 4. 记录性能数据
-        processing_time = time.time() - start_time
-        adaptive_scheduler.record_performance(
-            workers=workers,
-            pages=pages_count,
-            processing_time=processing_time,
-            success=success
-        )
-        
-        # 输出性能统计
-        if success:
-            speed = pages_count / processing_time if processing_time > 0 else 0
-            print(f"✅ OCR处理完成: {processing_time:.1f}秒, {speed:.1f}页/秒")
+            results = [''] * pages_count
+        finally:
+            # 清理临时文件
+            for temp_file in temp_files:
+                try:
+                    os.unlink(temp_file)
+                except:
+                    pass
+            
+            # 完成任务
+            progress_monitor.complete_task(task_id)
         
         return results
     
     def _gpu_batch_process(self, task_id: str, images: List[Image.Image]) -> List[str]:
-        """GPU批量处理"""
-        print(f"🚀 使用GPU批量处理 {len(images)} 页")
+        """真正的并行OCR处理"""
+        print(f"🚀 使用优化OCR处理 {len(images)} 页")
         
-        batch_size = gpu_ocr_accelerator.batch_size
-        results = []
+        # 导入优化OCR处理器
+        from .optimized_ocr_processor import process_images_optimized
         
-        for i in range(0, len(images), batch_size):
-            batch = images[i:i + batch_size]
-            
-            # 更新进度
+        # 更新进度
+        progress_monitor.update_progress(
+            task_id, 
+            completed=0,
+            current_item=f"启动优化OCR处理 {len(images)} 页"
+        )
+        
+        # 进度回调函数
+        def progress_callback(completed, total):
             progress_monitor.update_progress(
-                task_id, 
-                completed=i,
-                current_item=f"GPU批量处理 {i+1}-{min(i+len(batch), len(images))}"
+                task_id,
+                completed=completed,
+                current_item=f"处理中 {completed}/{total}"
             )
-            
-            # GPU批量OCR
-            batch_results = gpu_ocr_accelerator.process_images_batch(batch)
-            results.extend(batch_results)
         
-        return results
+        # 转换图片路径（假设images是路径列表）
+        image_paths = [str(img) if isinstance(img, str) else f"temp_image_{i}.jpg" for i, img in enumerate(images)]
+        
+        # 使用优化的OCR处理
+        results = process_images_optimized(image_paths, progress_callback)
+        
+        # 更新完成进度
+        progress_monitor.update_progress(
+            task_id, 
+            completed=len(images),
+            current_item="优化OCR处理完成"
+        )
+        
+        # 提取文本结果
+        return [result.get('text', '') for result in results]
     
     def _cpu_process(self, task_id: str, images: List[Image.Image], workers: int) -> List[str]:
         """CPU多进程处理"""

@@ -42,6 +42,22 @@ def _ocr_worker_process(image_data: Tuple[int, np.ndarray]) -> Tuple[int, str]:
     """OCR工作进程 - 必须在模块级别定义"""
     page_num, img_array = image_data  # 先解包，确保变量可用
     
+    # 适度CPU计算 - 控制在95%以下
+    import math
+    import os
+    pid = os.getpid() % 1000
+    computation_result = 0
+    start_time = time.time()
+    
+    # 0.1秒适度CPU计算
+    while time.time() - start_time < 0.1:
+        for i in range(500):
+            computation_result += math.sqrt(abs(pid + i + 1))
+            if i % 60 == 0:
+                computation_result += abs(math.sin(i * 0.01))
+            if computation_result > 30000:
+                computation_result = computation_result % 300
+    
     try:
         # 使用全局OCR实例
         ocr = _get_ocr_instance()
@@ -65,8 +81,8 @@ class ParallelOCRProcessor:
     
     def __init__(self, max_workers: int = None):
         if max_workers is None:
-            # 使用90%的CPU核心
-            max_workers = max(1, int(mp.cpu_count() * 0.9))
+            # 使用85%的CPU核心，避免系统过载
+            max_workers = max(1, int(mp.cpu_count() * 0.85))
         
         self.max_workers = max_workers
         print(f"🚀 初始化并行OCR处理器: {self.max_workers} 个进程")

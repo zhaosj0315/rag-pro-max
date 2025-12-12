@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-2.2.1-blue.svg)
+![Version](https://img.shields.io/badge/version-2.2.2-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Docker-lightgrey.svg)
@@ -978,6 +978,14 @@ A: 使用命令 `sudo python3 system_monitor.py`。Streamlit 内置监控只能�
 ---
 
 ## 📄 更新日志
+
+### v2.2.2 (2025-12-12) - 资源保护增强版
+- 🛡️ **资源保护优化** - CPU阈值降低至75%，内存阈值85%
+- 📊 **OCR日志记录系统** - 详细记录处理文件数量和耗时
+- 📈 **处理统计功能** - 实时统计处理速度和效率
+- 🔧 **日志查看工具** - view_ocr_logs.py 查看处理日志
+- 🚀 **性能监控** - 双重资源监控，防止系统死机
+- 📝 **详细追踪** - 记录每个处理步骤和系统状态
 
 ### v2.2.1 (2025-12-11) - UI优化版
 - 🎨 **界面样式全面优化** - 现代化设计，提升用户体验

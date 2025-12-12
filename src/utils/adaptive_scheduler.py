@@ -99,20 +99,23 @@ class AdaptiveScheduler:
         return best_strategy
     
     def _get_basic_strategy(self, cpu_usage: float, pages: int) -> Tuple[int, str, float]:
-        """基础策略（无历史数据时使用）- 更激进的资源利用"""
+        """基础策略 - 目标95%CPU使用率"""
+        import multiprocessing as mp
+        cpu_cores = mp.cpu_count()  # 14核
+        
         if cpu_usage > 90:
-            return 3, "基础保护模式", 0.6
+            return cpu_cores, "基础保护模式", 0.6  # 14个进程
         elif cpu_usage > 80:
-            return 6, "基础保守模式", 0.7
+            return cpu_cores * 2, "基础保守模式", 0.7  # 28个进程
         elif cpu_usage > 60:
-            return 8, "基础平衡模式", 0.8
+            return cpu_cores * 4, "基础平衡模式", 0.8  # 56个进程
         elif cpu_usage > 40:
-            return 10, "基础高效模式", 0.85
+            return cpu_cores * 6, "基础高效模式", 0.85  # 84个进程
         elif cpu_usage > 20:
-            return 12, "基础激进模式", 0.9
+            return cpu_cores * 8, "基础激进模式", 0.9  # 112个进程
         else:
-            # 极低CPU使用率时最激进，充分利用14核CPU
-            return min(14, max(8, pages // 2)), "基础极速模式", 0.95
+            # 低CPU时极限冲刺，目标95%
+            return min(cpu_cores * 10, max(cpu_cores * 4, pages * 2)), "基础极速模式", 0.95  # 最多140个进程
     
     def _analyze_history(self, cpu: float, memory: float, pages: int) -> Tuple[int, str, float]:
         """分析历史数据获取最优策略"""

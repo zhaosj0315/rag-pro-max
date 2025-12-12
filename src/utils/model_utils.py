@@ -198,7 +198,7 @@ def auto_switch_model(kb_dim, current_model):
     """
     model_map = {
         512: "BAAI/bge-small-zh-v1.5",
-        768: "BAAI/bge-base-zh-v1.5",
+        768: "BAAI/bge-large-zh-v1.5",
         1024: "BAAI/bge-large-zh-v1.5"
     }
     
@@ -221,7 +221,7 @@ def get_model_dimension(model_name):
     """
     dimension_map = {
         "BAAI/bge-small-zh-v1.5": 512,
-        "BAAI/bge-base-zh-v1.5": 768,
+        "BAAI/bge-large-zh-v1.5": 1024,
         "BAAI/bge-large-zh-v1.5": 1024,
         "BAAI/bge-m3": 1024,
         "text-embedding-ada-002": 1536,
