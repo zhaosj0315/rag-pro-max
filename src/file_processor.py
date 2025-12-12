@@ -96,40 +96,71 @@ def _load_single_file(file_info):
     # 屏蔽子进程中的警告和日志
     import warnings
     import logging
+    import os
+    import uuid  # 新增导入
+    from datetime import datetime
+    from llama_index.core import Document
+    
     warnings.filterwarnings('ignore')
     logging.getLogger('streamlit').setLevel(logging.ERROR)
     logging.getLogger('pypdf').setLevel(logging.ERROR)
     logging.getLogger('pdfminer').setLevel(logging.ERROR)
     
-    fp, fname, ext = file_info
     try:
-        size = os.path.getsize(fp)
+        # 正确解包 (path, filename, extension)
+        file_path, file_name, file_ext = file_info
+        
+        # [新增] 1. 提取丰富的系统元数据
+        try:
+            file_stat = os.stat(file_path)
+            creation_date = datetime.fromtimestamp(file_stat.st_ctime).strftime('%Y-%m-%d')
+            last_modified_date = datetime.fromtimestamp(file_stat.st_mtime).strftime('%Y-%m-%d')
+            parent_folder = os.path.basename(os.path.dirname(file_path))
+            
+            base_metadata = {
+                "file_name": file_name,
+                "file_path": str(file_path),
+                "file_size": file_stat.st_size,
+                "creation_date": creation_date,
+                "last_modified_date": last_modified_date,
+                "file_extension": file_ext.lower(),
+                "parent_folder": parent_folder
+            }
+        except Exception as e:
+            # 如果元数据提取失败，使用基础信息兜底
+            base_metadata = {
+                "file_name": file_name,
+                "file_path": str(file_path)
+            }
+            # 仅在调试时打印，避免日志刷屏
+            # print(f"⚠️  元数据提取警告: {e}")
+
+        size = os.path.getsize(file_path)
+        ext = file_ext.lower() # 统一使用小写扩展名
         
         # 检查格式支持
         if ext not in SUPPORTED_FORMATS:
-            return None, fname, 'skipped', f"不支持的格式: {ext}", 'skip'
+            return None, file_name, 'skipped', f"不支持的格式: {ext}", 'skip'
         
         # 检查文件大小
         if size > 100 * 1024 * 1024:  # 100MB
-            return None, fname, 'skipped', "文件过大 (>100MB)", 'skip'
-        
-        # 优化：直接读取文件内容，减少 SimpleDirectoryReader 开销
-        from llama_index.core import Document
+            return None, file_name, 'skipped', "文件过大 (>100MB)", 'skip'
         
         # 根据文件类型快速读取
         if ext in ['.txt', '.md', '.py', '.js', '.json', '.xml', '.html', '.css', '.yaml', '.yml', '.sh', '.sql', 
                    '.log', '.ini', '.conf', '.cfg', '.csv', '.tsv', '.properties', '.env', '.rst', '.toml']:
             # 文本文件：直接读取（快速模式）
-            with open(fp, 'r', encoding='utf-8', errors='ignore') as f:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 text = f.read()
-            docs = [Document(text=text, metadata={'file_name': fname, 'file_path': fp})]
+            # [修改] 注入 base_metadata 并显式设置 doc_id
+            docs = [Document(text=text, metadata=base_metadata, id_=str(uuid.uuid4()))]
             read_mode = 'fast'
         
         elif ext in ['.xlsx', '.xls']:
             # Excel文件：快速读取（只读文本内容，不解析格式）
             try:
                 import openpyxl
-                wb = openpyxl.load_workbook(fp, read_only=True, data_only=True)
+                wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
                 text_parts = []
                 for sheet in wb.worksheets[:5]:  # 只读前5个sheet
                     for row in sheet.iter_rows(max_row=1000, values_only=True):  # 每个sheet最多1000行
@@ -138,18 +169,23 @@ def _load_single_file(file_info):
                             text_parts.append(row_text)
                 wb.close()
                 text = '\n'.join(text_parts)
-                docs = [Document(text=text, metadata={'file_name': fname, 'file_path': fp})]
+                # [修改] 注入 base_metadata 并显式设置 doc_id
+                docs = [Document(text=text, metadata=base_metadata, id_=str(uuid.uuid4()))]
                 read_mode = 'fast'
             except:
                 # 失败则用慢速模式
                 from llama_index.core import SimpleDirectoryReader
-                docs = SimpleDirectoryReader(input_files=[fp]).load_data()
+                docs = SimpleDirectoryReader(input_files=[file_path]).load_data()
+                # [修改] 注入 base_metadata 并确保 ID
+                for d in docs: 
+                    d.metadata.update(base_metadata)
+                    if not d.doc_id: d.doc_id = str(uuid.uuid4())
                 read_mode = 'slow'
         elif ext in ['.pptx', '.ppt']:
             # PowerPoint文件：读取所有文本内容
             try:
                 from pptx import Presentation
-                prs = Presentation(fp)
+                prs = Presentation(file_path)
                 text_parts = []
                 for slide_idx, slide in enumerate(prs.slides):
                     text_parts.append(f"--- 幻灯片 {slide_idx + 1} ---")
@@ -157,14 +193,19 @@ def _load_single_file(file_info):
                         if hasattr(shape, "text") and shape.text.strip():
                             text_parts.append(shape.text)
                 text = '\n'.join(text_parts)
-                docs = [Document(text=text, metadata={'file_name': fname, 'file_path': fp})]
+                # [修改] 注入 base_metadata 并显式设置 doc_id
+                docs = [Document(text=text, metadata=base_metadata, id_=str(uuid.uuid4()))]
                 read_mode = 'fast'
             except Exception as e:
-                return None, fname, 'failed', f"PPTX解析失败: {str(e)[:50]}", 'slow'
+                return None, file_name, 'failed', f"PPTX解析失败: {str(e)[:50]}", 'slow'
         else:
             # 其他格式：使用 SimpleDirectoryReader（慢速模式）
             from llama_index.core import SimpleDirectoryReader
-            docs = SimpleDirectoryReader(input_files=[fp]).load_data()
+            docs = SimpleDirectoryReader(input_files=[file_path]).load_data()
+            # [修改] 注入 base_metadata 并确保 ID
+            for d in docs: 
+                d.metadata.update(base_metadata)
+                if not d.doc_id: d.doc_id = str(uuid.uuid4())
             read_mode = 'slow'
 
             # 如果是PDF且内容为空，尝试 OCR（扫描版PDF）
@@ -187,10 +228,10 @@ def _load_single_file(file_info):
                     print(f"   🔍 检测到扫描版PDF，启用增强OCR处理...")
                     
                     # 转换PDF为图片
-                    images = convert_from_path(fp, dpi=200)
+                    images = convert_from_path(file_path, dpi=200)
                     
                     # 使用增强OCR优化器处理
-                    ocr_results = enhanced_ocr_optimizer.process_pdf_pages(fp, images)
+                    ocr_results = enhanced_ocr_optimizer.process_pdf_pages(file_path, images)
                     
                     # 合并OCR结果
                     full_text = '\n\n'.join([
@@ -200,35 +241,37 @@ def _load_single_file(file_info):
                     
                     if full_text.strip():
                         print(f"   ✅ OCR处理完成: {len(images)} 页，提取 {len(full_text)} 字符")
-                        return full_text
+                        # OCR直接返回文本，上层逻辑会处理，但这里我们需要确保返回的元数据一致性
+                        # 原逻辑直接返回文本字符串，调用方 _process_batch 似乎能处理？
+                        # 检查 _process_batch -> 它是直接返回 _load_single_file 的结果。
+                        # 原逻辑: return full_text (这看起来是个Bug，因为其他路径返回tuple)
+                        # 等等，原代码: return full_text 确实存在。这会导致 _process_batch 拿到字符串而不是tuple。
+                        # 让我们修正这个潜在Bug，返回标准tuple格式
+                        # 实际上原代码中:
+                        # return f"__BATCH_OCR__{task_id}", fname, 'pending_ocr', len(images), 'batch_ocr'
+                        # 是正确返回。但 full_text 的返回似乎不对。
+                        # 修正为：返回单文档列表
+                        return [Document(text=full_text, metadata=base_metadata)], file_name, 'success', (size, 1), 'ocr'
                     else:
                         print(f"   ⚠️  OCR未提取到文本内容")
-                        return "此PDF为扫描版，OCR处理未能提取到文本内容。"
+                        return None, file_name, 'failed', "此PDF为扫描版，OCR处理未能提取到文本内容。", 'ocr'
                     
-                    # 添加到强制触发器
-                    force_batch_ocr_trigger.add_ocr_file({
-                        'file_path': fp,
-                        'task_id': task_id,
-                        'pages': len(images)
-                    })
+                    # 原代码中还有 batch_ocr 逻辑，但这里被上面的 return 覆盖了？
+                    # 看来原代码逻辑是：如果能立即处理完就返回文本，否则扔进队列。
+                    # 为了简化，我这里假设 enhanced_ocr_optimizer 是同步的（根据原代码看似如此）
                     
-                    print(f"   📄 已添加 {len(images)} 页到OCR队列，任务ID: {task_id[:8]}")
-                    
-                    # 返回特殊标记，表示需要批量处理
-                    return f"__BATCH_OCR__{task_id}", fname, 'pending_ocr', len(images), 'batch_ocr'
-                
                 except Exception as e:
-                    return None, fname, 'failed', f"OCR准备失败: {str(e)[:50]}", 'ocr'
+                    return None, file_name, 'failed', f"OCR准备失败: {str(e)[:50]}", 'ocr'
         
         if docs:
             # 过滤掉空文档
             docs = [d for d in docs if d.text and d.text.strip()]
             if docs:
-                return docs, fname, 'success', (size, len(docs)), read_mode
+                return docs, file_name, 'success', (size, len(docs)), read_mode
             else:
-                return None, fname, 'failed', "文件内容为空（所有文档都是空的）", read_mode
+                return None, file_name, 'failed', "文件内容为空（所有文档都是空的）", read_mode
         else:
-            return None, fname, 'failed', "文件内容为空", read_mode
+            return None, file_name, 'failed', "文件内容为空", read_mode
     
     except Exception as e:
         error_msg = str(e)
@@ -241,7 +284,7 @@ def _load_single_file(file_info):
             error_msg = "文件解析失败"
         elif "Unsupported" in error_msg:
             error_msg = "不支持的文件格式"
-        return None, fname, 'failed', error_msg[:100]
+        return None, file_name, 'failed', error_msg[:100]
 
 
 # 批量处理函数（模块级别，用于多进程）
@@ -252,22 +295,8 @@ def _process_batch(batch_files):
     import os
     import time
     
-    # 获取进程ID，用于CPU密集型计算
-    pid = os.getpid() % 10000  # 限制范围避免溢出
-    
-    # 安全的CPU密集型计算
-    start_time = time.time()
-    computation_result = 0
-    
-    # 适度CPU计算，目标80-90%使用率
-    while time.time() - start_time < 0.2:
-        for i in range(600):
-            # 适度数学运算
-            computation_result += math.sqrt(abs(pid + i + 1))
-            if i % 50 == 0:  # 适度计算频率
-                computation_result += abs(math.sin(i * 0.01))
-            if computation_result > 20000:
-                computation_result = computation_result % 200
+    # 获取进程ID
+    pid = os.getpid()
     
     # 原有的文档处理
     batch_results = []
@@ -320,11 +349,11 @@ def scan_directory_safe(input_dir: str) -> Tuple[List, 'FileProcessResult']:
             print(f"   扫描失败 {directory}: {e}")
         return local_files
     
-    # 多线程并行扫描（极限配置：250 线程，冲刺 80% 资源）
+    # 多线程并行扫描（安全配置：32 线程）
     if len(subdirs) > 1:
         from concurrent.futures import ThreadPoolExecutor, as_completed
-        scan_workers = min(250, len(subdirs))  # 250 线程
-        print(f"⚡ [第 2 步] 极限模式：{scan_workers} 线程并行扫描 {len(subdirs)} 个目录（冲刺 80% 资源）")
+        scan_workers = min(32, len(subdirs))  # 32 线程
+        print(f"⚡ [第 2 步] 安全模式：{scan_workers} 线程并行扫描 {len(subdirs)} 个目录")
         
         with ThreadPoolExecutor(max_workers=scan_workers) as executor:
             futures = [executor.submit(scan_dir, d) for d in subdirs]
@@ -350,24 +379,12 @@ def scan_directory_safe(input_dir: str) -> Tuple[List, 'FileProcessResult']:
     fast_count = sum(1 for _, _, ext in file_list if ext in fast_formats)
     fast_ratio = fast_count / len(file_list) if len(file_list) > 0 else 0
     
-    # 极限策略：大幅提升进程数，目标接近95%
-    cpu_cores = mp.cpu_count()  # 14核
-    # 使用大量进程，目标95%CPU使用率
-    if fast_ratio > 0.5:
-        # 文本文件多：每核心10个进程
-        max_workers = min(cpu_cores * 10, len(file_list))  # 14*10=140个进程
-        batch_size = 2  # 极小批次
-        mode_name = "极限全核冲刺"
-    elif fast_ratio > 0.3:
-        # 混合文件：每核心8个进程
-        max_workers = min(cpu_cores * 8, len(file_list))  # 112个进程
-        batch_size = 3
-        mode_name = "高强度全核"
-    else:
-        # PDF/DOCX多：每核心6个进程
-        max_workers = min(cpu_cores * 6, len(file_list))  # 84个进程
-        batch_size = 5
-        mode_name = "重载全核"
+    # 稳定策略：使用合理的核心数，避免死机
+    cpu_cores = mp.cpu_count()
+    # 限制最大进程数，保留部分核心给系统
+    max_workers = min(cpu_cores, 12)
+    batch_size = 10
+    mode_name = "稳定并行"
     
     max_workers = int(max_workers)
     
@@ -375,24 +392,16 @@ def scan_directory_safe(input_dir: str) -> Tuple[List, 'FileProcessResult']:
         # batch_size已在上面动态计算，这里不再重复定义
         
         print(f"🚀 [第 3 步] {mode_name}模式: {max_workers} 进程 | 文本占比: {fast_ratio*100:.1f}%")
-        print(f"📦 [第 3 步] 批量大小: {batch_size} 个/批 | 多进程突破GIL")
+        print(f"📦 [第 3 步] 批量大小: {batch_size} 个/批")
         
         # 使用多进程（突破GIL限制）
         import multiprocessing as mp
         import time as time_module
         
-        # 设置启动方法为fork（macOS默认，避免重新导入）
-        try:
-             mp.set_start_method('fork', force=True)
-        except RuntimeError:
-             pass
+        # 移除强制 set_start_method('fork')，使用默认设置
         
-        # 极限策略：目标95%CPU使用率
-        cpu_cores = mp.cpu_count()  # 14核
-        # 大幅提升进程数，接近95%上限
-        max_safe_processes = int(cpu_cores * 10)  # 140个进程
-        actual_workers = min(max_workers, max_safe_processes)
-        print(f"💻 [第 3 步] 极限冲刺：使用 {actual_workers} 个进程冲击95%CPU使用率（每核约{actual_workers/cpu_cores:.1f}个进程）")
+        actual_workers = max_workers
+        print(f"💻 [第 3 步] 启动处理：使用 {actual_workers} 个进程")
         
         # 统计快速/慢速读取
         fast_count = 0

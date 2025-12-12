@@ -110,8 +110,8 @@ def cpu_task():
     while time.time() < end:
         sum(i*i for i in range(10000))
 
-with ThreadPoolExecutor(max_workers=8) as executor:
-    futures = [executor.submit(cpu_task) for _ in range(8)]
+with ThreadPoolExecutor(max_workers=12) as executor:
+    futures = [executor.submit(cpu_task) for _ in range(12)]
     for f in futures:
         f.result()
 "
@@ -125,8 +125,8 @@ with ThreadPoolExecutor(max_workers=8) as executor:
 - 内存占用：< 10MB
 
 ### 高负载情况
-- 处理速度：降低20-30%（避免系统崩溃）
-- 系统稳定性：显著提升
+- 处理速度：降低10-20%（稳定优先）
+- 系统稳定性：显著提升 (防止死机)
 - 用户体验：流畅可控
 
 ## 🔧 故障排除

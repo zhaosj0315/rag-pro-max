@@ -75,10 +75,10 @@ max_workers = 2
 cpu_threshold = 70
 batch_size = 10
 
-# 高性能配置 (14核系统)
-max_workers = 4
-cpu_threshold = 85
-batch_size = 20
+# 高性能配置 (14核系统 - M4 Max等)
+max_workers = 12  # 稳定并行策略 (保留2核给系统)
+cpu_threshold = 90
+batch_size = 10   # 减小批次以降低延迟
 ```
 
 ### 2. 软件优化
@@ -87,21 +87,17 @@ batch_size = 20
 ```python
 # src/utils/ocr_optimizer.py
 class OCROptimizer:
-    max_cpu_usage = 85.0      # 降低CPU限制
-    max_workers = 4           # 限制进程数
+    max_cpu_usage = 90.0      # 提高CPU利用率
+    max_workers = 12          # 允许更多并发
     timeout_minutes = 10      # 缩短超时
     emergency_threshold = 98.0 # 紧急停止
 ```
 
 **批量处理优化**:
 ```python
-# 小批量处理 (稳定优先)
+# 稳定模式 (默认)
 batch_size = 10
-concurrent_limit = 2
-
-# 大批量处理 (效率优先)
-batch_size = 30
-concurrent_limit = 4
+concurrent_limit = 12
 ```
 
 ### 3. 内存优化
