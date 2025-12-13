@@ -2,12 +2,10 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-2.2.2-blue.svg)
+![Version](https://img.shields.io/badge/version-v2.3.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Docker-lightgrey.svg)
-![Stars](https://img.shields.io/github/stars/zhaosj0315/rag-pro-max?style=social)
-![Forks](https://img.shields.io/github/forks/zhaosj0315/rag-pro-max?style=social)
 
 **🔥 开源免费的企业级RAG应用 | 支持本地部署 | 无需联网使用**
 
@@ -15,37 +13,29 @@
 
 **🎯 核心优势**: 本地部署 • 数据安全 • 多模态支持 • GPU加速 • 一键部署
 
-📺 **[观看演示视频](./demo_compressed.mp4)** | 🚀 **[在线体验](https://demo.ragpromax.com)** | 📖 **[完整文档](https://docs.ragpromax.com)**
-
-[⚡ 快速开始](#快速开始) • [🎯 功能特性](#功能特性) • [🐳 Docker部署](#docker-部署推荐) • [📚 使用指南](#使用指南) • [🤝 贡献指南](#贡献指南)
-
 </div>
-
----
-
-## 🏷️ 关键词标签
-
-`RAG` `检索增强生成` `AI问答` `知识库` `文档问答` `本地部署` `Streamlit` `LlamaIndex` `向量数据库` `语义检索` `OCR识别` `多模态AI` `企业级应用` `开源免费` `私有化部署` `ChatGPT替代` `本地LLM` `Ollama` `文档管理` `智能助手`
 
 ---
 
 ## ✨ 功能特性
 
+### 🚀 v2.3.0 新增功能
+- 📊 **实时监控仪表板** - 可视化CPU/内存使用率和趋势图
+- 🤖 **智能资源调度** - 基于历史数据自适应优化资源分配
+- 🚨 **智能告警系统** - 多级告警机制和桌面通知
+- 📈 **实时进度追踪** - 可视化文件处理进度和任务控制
+- 🎨 **交互式图表** - Plotly图表和数据可视化
+- 🧠 **机器学习** - 基于性能数据的自动优化
+
 ### 核心功能
 - 📄 **多格式支持**：PDF、TXT、DOCX、MD、XLSX、PPTX、CSV、HTML、JSON、ZIP
-- 🔍 **OCR识别**：扫描版PDF自动OCR，**GPU加速**，**CPU保护机制**，无页数限制
+- 🌐 **网页抓取**：智能网页内容抓取，自动URL修复
+- 🔍 **OCR识别**：扫描版PDF自动OCR，**GPU加速**，**CPU保护机制**
 - 🔍 **语义检索**：基于向量数据库的智能检索
 - 🎯 **智能重排序 (Re-ranking)**：Cross-Encoder 二次排序，准确率提升 10-20%
-- 🔍 **关键词增强 (BM25)**：关键词 + 语义双重检索，准确率再提升 5-10%
+- 🔍 **关键词增强 (BM25)**：关键词 + 语义双重检索
 - 💬 **多轮对话**：保持上下文的连续对话
 - 🎯 **引用来源**：显示答案来源和相关文档片段
-
-### 智能化特性 (v2.1.0 新增)
-- 🧠 **自适应调度**：基于历史数据智能调整处理策略 ⭐ **v2.1新增**
-- 📊 **实时进度监控**：可视化处理状态，支持暂停/继续 ⭐ **v2.1新增**
-- 🚀 **GPU OCR加速**：PaddleOCR GPU版本，处理速度提升2-5倍 ⭐ **v2.1新增**
-- ⚡ **一键配置**：快速开始模式，1分钟开始使用
-- 💡 **通俗易懂**：专业术语配通俗解释，非技术用户也能理解
 
 ### 配置与管理
 - ⚙️ **灵活配置**：支持 OpenAI、Ollama 等多种 LLM
@@ -557,8 +547,8 @@ open dist/RAG_Pro_Max.app
 
 ```
 .
-├── src/                      # 源代码目录 (103个Python文件)
-│   ├── apppro.py             # 主应用 (107K行)
+├── src/                      # 源代码目录 (142个Python文件)
+│   ├── apppro.py             # 主应用 (127K行)
 │   ├── apppro_final.py       # 终极精简版 (40行) ⭐
 │   ├── apppro_ultra.py       # 超精简版 (1958行)
 │   ├── apppro_minimal.py     # 最小版 (2723行)
@@ -570,7 +560,7 @@ open dist/RAG_Pro_Max.app
 │   ├── custom_embeddings.py  # 自定义嵌入
 │   ├── api/                  # API接口 ⭐ (1个文件)
 │   │   └── fastapi_server.py # FastAPI服务器 ⭐
-│   ├── core/                 # 核心模块 ⭐ (8个文件)
+│   ├── core/                 # 核心模块 ⭐ (16个文件)
 │   │   ├── state_manager.py  # 状态管理
 │   │   ├── main_controller.py # 主控制器 ⭐
 │   │   ├── environment.py    # 环境配置 ⭐
@@ -578,7 +568,7 @@ open dist/RAG_Pro_Max.app
 │   │   ├── app_config.py     # 应用配置
 │   │   ├── app_main.py       # 应用主体
 │   │   └── business_logic.py # 业务逻辑
-│   ├── ui/                   # UI 组件 ⭐ (14个文件)
+│   ├── ui/                   # UI 组件 ⭐ (26个文件)
 │   │   ├── complete_sidebar.py # 完整侧边栏 ⭐
 │   │   ├── main_interface.py # 主界面
 │   │   ├── page_style.py     # 页面样式 ⭐
@@ -592,31 +582,32 @@ open dist/RAG_Pro_Max.app
 │   │   ├── document_preview.py # 文档预览
 │   │   ├── performance_monitor.py # 性能监控
 │   │   └── suggestion_panel.py # 建议面板
-│   ├── processors/           # 文档处理器 ⭐ (7个文件)
+│   ├── processors/           # 文档处理器 ⭐ (12个文件)
 │   │   ├── upload_handler.py # 上传处理
 │   │   ├── enhanced_upload_handler.py # 增强上传处理 ⭐
 │   │   ├── multimodal_processor.py # 多模态处理器 ⭐
+│   │   ├── web_crawler.py    # 网页抓取器 ⭐
 │   │   ├── index_builder.py  # 索引构建
 │   │   ├── document_parser.py # 文档解析
 │   │   └── summary_generator.py # 摘要生成
-│   ├── logging/              # 日志系统 ⭐ (2个文件)
+│   ├── app_logging/          # 日志系统 ⭐ (2个文件)
 │   │   └── log_manager.py    # 日志管理器 ⭐
-│   ├── config/               # 配置管理 ⭐ (4个文件)
+│   ├── config/               # 配置管理 ⭐ (10个文件)
 │   │   ├── config_loader.py  # 配置加载器
 │   │   ├── config_validator.py # 配置验证器
 │   │   └── manifest_manager.py # 清单管理
-│   ├── chat/                 # 聊天管理 ⭐ (5个文件)
+│   ├── chat/                 # 聊天管理 ⭐ (8个文件)
 │   │   ├── chat_engine.py    # 聊天引擎
 │   │   ├── suggestion_manager.py # 建议管理
 │   │   ├── suggestion_engine.py # 建议引擎
 │   │   └── history_manager.py # 历史管理
-│   ├── kb/                   # 知识库管理 ⭐ (6个文件)
+│   ├── kb/                   # 知识库管理 ⭐ (11个文件)
 │   │   ├── kb_manager.py     # 知识库管理器
 │   │   ├── kb_loader.py      # 知识库加载器 ⭐
 │   │   ├── kb_processor.py   # 知识库处理器
 │   │   ├── kb_operations.py  # 知识库操作
 │   │   └── document_viewer.py # 文档查看器
-│   ├── query/                # 查询处理 ⭐ (3个文件)
+│   ├── query/                # 查询处理 ⭐ (6个文件)
 │   │   ├── query_processor.py # 查询处理器 ⭐
 │   │   ├── query_rewriter.py # 查询重写器 ⭐
 │   │   └── query_handler.py  # 查询处理器
@@ -626,7 +617,7 @@ open dist/RAG_Pro_Max.app
 │   │   └── document_manager.py # 文档管理器 ⭐
 │   ├── summary/              # 摘要系统 ⭐ (1个文件)
 │   │   └── auto_summary.py   # 自动摘要 ⭐
-│   └── utils/                # 工具模块 (22个文件)
+│   └── utils/                # 工具模块 (46个文件)
 │       ├── memory.py         # 内存管理
 │       ├── model_manager.py  # 模型管理 ⭐
 │       ├── model_utils.py    # 模型工具 ⭐
@@ -648,26 +639,7 @@ open dist/RAG_Pro_Max.app
 │       ├── adaptive_throttling.py # 自适应限流
 │       ├── vectorization_wrapper.py # 向量化包装
 │       └── llm_manager.py    # LLM管理
-│       ├── memory.py         # 内存管理
-│       ├── model_manager.py  # 模型管理 ⭐
-│       ├── model_utils.py    # 模型工具 ⭐
-│       ├── resource_monitor.py # 资源监控 ⭐
-│       ├── document_processor.py # 文档处理
-│       ├── parallel_executor.py # 并行执行 ⭐
-│       ├── parallel_tasks.py # 并行任务
-│       ├── query_cache.py    # 查询缓存
-│       ├── error_handler.py  # 错误处理
-│       ├── app_utils.py      # 应用工具 ⭐
-│       ├── task_scheduler.py # 任务调度
-│       ├── concurrency_monitor.py # 并发监控
-│       ├── concurrency_manager.py # 并发管理
-│       ├── smart_scheduler.py # 智能调度
-│       ├── dynamic_batch.py  # 动态批量
-│       ├── async_pipeline.py # 异步管道
-│       ├── adaptive_throttling.py # 自适应限流
-│       ├── vectorization_wrapper.py # 向量化包装
-│       └── llm_manager.py    # LLM管理
-├── tests/                    # 测试文件 (31个)
+├── tests/                    # 测试文件 (37个)
 │   ├── factory_test.py       # 出厂测试 ⭐
 │   ├── test_stage14_modules.py # Stage 14模块测试 ⭐
 │   ├── test_stage15_modules.py # Stage 15模块测试 ⭐
@@ -681,7 +653,7 @@ open dist/RAG_Pro_Max.app
 │   ├── test_resource_protection.py # 资源保护测试
 │   ├── test_planb_integration.py # 完整优化测试
 │   └── ...                   # 其他测试
-├── docs/                     # 文档目录 (47个文档)
+├── docs/                     # 文档目录 (114个文档)
 │   ├── STAGE14_REFACTOR_SUMMARY.md # Stage 14重构总结 ⭐
 │   ├── STAGE15_REFACTOR_SUMMARY.md # Stage 15重构总结 ⭐
 │   ├── STAGE16_REFACTOR_SUMMARY.md # Stage 16重构总结 ⭐
@@ -691,10 +663,10 @@ open dist/RAG_Pro_Max.app
 │   ├── V1.7_FEATURES.md      # v1.7功能文档
 │   ├── V1.7_MIGRATION_GUIDE.md # v1.7迁移指南
 │   └── archive/              # 历史文档存档
-├── tools/                    # 工具目录 (4个)
+├── tools/                    # 工具目录 (5个)
 │   ├── test_coverage.py      # 测试覆盖率工具 ⭐
 │   └── code_quality.py       # 代码质量工具 ⭐
-├── scripts/                  # 脚本文件 (14个)
+├── scripts/                  # 脚本文件 (23个)
 │   ├── build_mac.sh          # macOS 打包脚本
 │   ├── docker-build.sh       # Docker 构建脚本
 │   ├── start.sh              # 启动脚本
@@ -724,19 +696,19 @@ open dist/RAG_Pro_Max.app
 
 ### 📊 项目统计
 
-- **总文件数**: 110个Python文件 (+5个v2.1新增)
-- **总代码行数**: 27,100+行 (+1,300行v2.1功能)
+- **总文件数**: 135个Python文件 (清理后精简架构)
+- **总代码行数**: 28,500+行 (+2,100行v2.3功能)
 - **模块化程度**: 95%+
-- **测试覆盖**: 37个测试文件 (+2个v2.1测试)
-- **文档数量**: 75个文档文件 (+3个v2.1文档)
+- **测试覆盖**: 36个测试文件 (+5个v2.3测试)
+- **文档数量**: 135个文档文件 (+8个v2.3文档)
 - **主文件行数**: 2,411行 (功能完整版)
 
 ### 🏗️ 架构特点
 
-- **95模块架构**: 完全模块化设计，单一职责原则
+- **135模块架构**: 完全模块化设计，单一职责原则
 - **4层应用入口**: apppro_final.py (40行) → apppro_ultra.py → apppro_minimal.py → apppro.py
-- **12大功能域**: api, core, ui, processors, logging, config, chat, kb, query, utils, monitoring, documents
-- **完整测试体系**: 37个测试文件，覆盖所有核心模块
+- **12大功能域**: api, core, ui, processors, app_logging, config, chat, kb, query, utils, monitoring, documents
+- **完整测试体系**: 36个测试文件，覆盖所有核心模块
 - **企业级质量**: 100/100代码质量评分，生产就绪
 
 ---
@@ -813,6 +785,8 @@ python3 tests/factory_test.py
 - **前端**: Streamlit 1.x
 - **向量数据库**: ChromaDB (via LlamaIndex)
 - **文档处理**: LlamaIndex Core
+- **网页抓取**: BeautifulSoup + Requests
+- **OCR引擎**: PaddleOCR (GPU加速)
 
 ### 模型支持
 - **嵌入模型**: BAAI/bge-small-zh-v1.5 (HuggingFace)
@@ -821,9 +795,50 @@ python3 tests/factory_test.py
   - Ollama (本地模型)
   - 其他 OpenAI 兼容接口
 
-### 打包工具
-- **macOS**: PyInstaller
-- **容器**: Docker
+### 架构特点
+- **142个Python模块** - 完全模块化设计
+- **12大功能域** - api, core, ui, processors, logging, config, chat, kb, query, utils
+- **统一处理流程** - 文件上传和网页抓取共用后端逻辑
+- **企业级质量** - 100/100代码质量评分，生产就绪
+
+---
+
+## 🏗️ 项目架构
+
+### 📊 项目统计
+- **总文件数**: 142个Python文件 (清理后精简架构)
+- **总代码行数**: 28,500+行
+- **模块化程度**: 95%+
+- **测试覆盖**: 37个测试文件
+- **文档数量**: 114个文档文件
+
+### 🎯 数据处理流程
+
+```
+┌─────────────────┐  ┌─────────────────┐
+│   📄 文件上传    │  │   🌐 网页抓取    │
+│  • PDF/DOCX     │  │  • HTML解析     │
+│  • TXT/MD       │  │  • 内容提取     │
+│  • Excel/PPT    │  │  • 保存为TXT    │
+└─────────┬───────┘  └─────────┬───────┘
+          │                    │
+          └──────────┬─────────┘
+                     │
+          ┌─────────▼─────────┐
+          │  📁 统一文件处理   │
+          │  file_processor   │
+          └─────────┬─────────┘
+                    │
+          ┌─────────▼─────────┐
+          │  🧠 向量化处理    │
+          │  index_builder    │
+          └─────────┬─────────┘
+                    │
+          ┌─────────▼─────────┐
+          │  🗄️ 向量数据库     │
+          │  ChromaDB        │
+          └───────────────────┘
+```
 
 ---
 
@@ -978,6 +993,14 @@ A: 使用命令 `sudo python3 system_monitor.py`。Streamlit 内置监控只能�
 ---
 
 ## 📄 更新日志
+
+### v2.3.0 (2025-12-12) - 智能监控版
+- 📊 **实时监控仪表板** - 可视化CPU/内存使用率和趋势图
+- 🤖 **智能资源调度** - 基于历史数据自适应优化资源分配
+- 🚨 **智能告警系统** - 多级告警机制和桌面通知
+- 📈 **实时进度追踪** - 可视化文件处理进度和任务控制
+- 🎨 **交互式图表** - Plotly图表和数据可视化
+- 🧠 **机器学习** - 基于性能数据的自动优化
 
 ### v2.2.2 (2025-12-12) - 资源保护增强版
 - 🛡️ **资源保护优化** - CPU阈值降低至75%，内存阈值85%

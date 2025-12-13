@@ -143,6 +143,61 @@ from src.query.query_rewriter import QueryRewriter
 from src.kb.document_viewer import DocumentViewer
 from src.ui.document_preview import show_upload_preview, show_kb_documents
 
+# 文档详情对话框
+@st.dialog("📄 文档详情")
+def show_document_detail_dialog(kb_name: str, file_info: dict) -> None:
+    """显示文档详情对话框"""
+    st.subheader(f"📄 {file_info['name']}")
+    
+    # 基本信息 - 两列布局
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### 📊 基本信息")
+        st.markdown(f"**📂 路径**: `{file_info.get('file_path', 'N/A')}`")
+        st.markdown(f"**📏 大小**: {file_info.get('size', '未知')} ({file_info.get('size_bytes', 0):,} 字节)")
+        st.markdown(f"**📄 类型**: {file_info.get('type', '未知')}")
+        st.markdown(f"**🌐 语言**: {file_info.get('language', '未知')}")
+        
+    with col2:
+        st.markdown("### 🕒 时间信息")
+        st.markdown(f"**📅 添加时间**: {file_info.get('added_at', '未知')}")
+        st.markdown(f"**🕒 最后访问**: {file_info.get('last_accessed', '从未访问') or '从未访问'}")
+        st.markdown(f"**📁 目录**: {file_info.get('parent_folder', '未知')}")
+        st.markdown(f"**🔐 哈希**: `{file_info.get('file_hash', 'N/A')}`")
+    
+    # 统计信息
+    st.markdown("### 📈 统计信息")
+    stat_col1, stat_col2, stat_col3 = st.columns(3)
+    stat_col1.metric("🧩 向量片段", len(file_info.get('doc_ids', [])))
+    stat_col2.metric("🔥 查询命中", file_info.get('hit_count', 0))
+    stat_col3.metric("⭐ 平均评分", f"{file_info.get('avg_score', 0.0):.2f}" if file_info.get('avg_score') else 'N/A')
+    
+    # 分类和关键词
+    if file_info.get('category') or file_info.get('keywords'):
+        st.markdown("### 🏷️ 分类标签")
+        tag_col1, tag_col2 = st.columns(2)
+        tag_col1.markdown(f"**📚 分类**: {file_info.get('category', '未分类')}")
+        if file_info.get('keywords'):
+            tag_col2.markdown(f"**🏷️ 关键词**: {', '.join(file_info.get('keywords', [])[:8])}")
+    
+    # 向量片段ID
+    if file_info.get('doc_ids'):
+        st.markdown("### 🧬 向量片段ID")
+        with st.expander(f"查看 {len(file_info['doc_ids'])} 个片段ID", expanded=False):
+            st.text_area(
+                "片段ID列表", 
+                value='\n'.join(file_info['doc_ids']), 
+                height=200,
+                label_visibility="collapsed"
+            )
+    
+    # 关闭按钮
+    if st.button("✅ 关闭", use_container_width=True):
+        st.session_state.show_doc_detail = None
+        st.session_state.show_doc_detail_kb = None
+        st.rerun()
+
 def generate_smart_kb_name(target_path, cnt, file_types, folder_name):
     """智能生成知识库名称 - 重点优化多文件和文件夹场景"""
     import re
@@ -477,12 +532,17 @@ st.markdown("""
     
 
     /* 减少间距 */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
+
     .element-container {
-        margin-bottom: 0.5rem !important;
+        margin-bottom: 0.2rem !important;
     }
     
     h1, h2, h3 {
-        margin: 0.5rem 0 !important;
+        margin: 0.2rem 0 !important;
     }
     
     [data-testid="column"] {
@@ -672,97 +732,209 @@ with st.sidebar:
             st.caption(f"🛠️ 管理: {current_kb_name}")
 
         with st.container(border=True):
-            if is_create_mode:
-                action_mode = "NEW"
-            else:
-                action_mode = st.radio("操作模式", ["➕ 追加", "🔄 覆盖"], horizontal=True, label_visibility="collapsed")
-                action_mode = "APPEND" if "追加" in action_mode else "NEW"
-
-            st.markdown("**数据源**")
-
+            # 头部控制区 - 单行布局
             if "path_val" not in st.session_state: 
                 st.session_state.path_val = os.path.abspath(defaults.get("target_path", ""))
-
             if 'path_input' not in st.session_state:
                 st.session_state.path_input = ""
-
-            # 如果有上传路径且输入框为空，自动填充
             if st.session_state.get('uploaded_path') and not st.session_state.path_input:
                 st.session_state.path_input = st.session_state.uploaded_path
 
-            # 优化路径显示
-            path_col1, path_col2 = st.columns([5, 1])
-            with path_col1:
-                target_path = st.text_input(
-                    "文件/文件夹路径", 
-                    value=st.session_state.path_input,
-                    placeholder="📁 /Users/username/docs 或上传后自动生成",
-                    key="path_input_display",
-                    label_visibility="collapsed"
-                )
-                # 同步到 path_input
-                if target_path != st.session_state.path_input:
-                    st.session_state.path_input = target_path
-            with path_col2:
-                if st.button("📂", help="在Finder中打开", use_container_width=True):
-                    if target_path and os.path.exists(target_path):
-                        # macOS: 在Finder中打开
-                        import webbrowser
-                        import urllib.parse
-                        try:
-                            file_url = 'file://' + urllib.parse.quote(os.path.abspath(target_path))
-                            webbrowser.open(file_url)
-                            st.toast("✅ 已在Finder中打开")
-                        except Exception as e:
-                            st.error(f"打开失败: {e}")
+            # 创建布局列
+            if is_create_mode:
+                action_mode = "NEW"
+                path_col1, path_col2 = st.columns([5, 1])
+                
+                with path_col1:
+                    target_path = st.text_input(
+                        "文件/文件夹路径", 
+                        value=st.session_state.path_input,
+                        placeholder="📁 /Users/username/docs 或上传后自动生成",
+                        key="path_input_display",
+                        label_visibility="collapsed"
+                    )
+                with path_col2:
+                    if st.button("📂", help="在Finder中打开", use_container_width=True):
+                        # ... Finder 打开逻辑 ...
+                        if target_path and os.path.exists(target_path):
+                            import webbrowser
+                            import urllib.parse
+                            try:
+                                file_url = 'file://' + urllib.parse.quote(os.path.abspath(target_path))
+                                webbrowser.open(file_url)
+                                st.toast("✅ 已打开")
+                            except: pass
+                        else:
+                            st.warning("请先输入路径")
+            else:
+                # 管理模式：左侧操作模式，右侧路径
+                mode_col, path_col1, path_col2 = st.columns([2, 4, 1])
+                
+                with mode_col:
+                    action_mode_sel = st.radio("模式", ["➕ 追加", "🔄 覆盖"], horizontal=True, label_visibility="collapsed")
+                    action_mode = "APPEND" if "追加" in action_mode_sel else "NEW"
+                
+                with path_col1:
+                    target_path = st.text_input(
+                        "路径",
+                        value=st.session_state.path_input,
+                        placeholder="📁 路径",
+                        key="path_input_display",
+                        label_visibility="collapsed"
+                    )
+                with path_col2:
+                    if st.button("📂", help="打开", use_container_width=True):
+                         if target_path and os.path.exists(target_path):
+                            import webbrowser
+                            import urllib.parse
+                            try:
+                                file_url = 'file://' + urllib.parse.quote(os.path.abspath(target_path))
+                                webbrowser.open(file_url)
+                                st.toast("✅ 已打开")
+                            except: pass
+
+            if target_path != st.session_state.path_input:
+                st.session_state.path_input = target_path
+
+
+            # 数据源输入选项卡
+            st.write("")
+            src_tab_local, src_tab_web = st.tabs(["📂 本地文件", "🌐 网页抓取"])
+            
+            with src_tab_local:
+                local_type = st.radio("方式", ["📄 上传文件", "✍️ 粘贴文本"], horizontal=True, label_visibility="collapsed")
+                
+                if "上传文件" in local_type:
+                    uploaded_files = st.file_uploader(
+                        "拖入文件 (PDF, DOCX, TXT, MD)", 
+                        accept_multiple_files=True, 
+                        key="uploader",
+                        label_visibility="collapsed"
+                    )
+                    st.caption("支持格式: PDF, DOCX, TXT, MD, Excel | 单个文件最大 100MB")
+                else:
+                    text_input_content = st.text_area("直接输入文本内容", height=200, placeholder="在此粘贴或输入需要分析的文本内容...")
+                    col_txt1, col_txt2 = st.columns([1, 4])
+                    txt_filename = col_txt1.text_input("文件名", value="manual_input.txt", label_visibility="collapsed")
+                    
+                    if col_txt2.button("💾 保存文本", use_container_width=True):
+                        if text_input_content.strip():
+                            # 保存为临时文件
+                            try:
+                                save_dir = os.path.join(UPLOAD_DIR, f"text_{int(time.time())}")
+                                if not os.path.exists(save_dir):
+                                    os.makedirs(save_dir)
+                                
+                                safe_name = sanitize_filename(txt_filename) or "manual_input.txt"
+                                if not safe_name.endswith('.txt'): safe_name += ".txt"
+                                
+                                with open(os.path.join(save_dir, safe_name), 'w', encoding='utf-8') as f:
+                                    f.write(text_input_content)
+                                    
+                                st.session_state.uploaded_path = os.path.abspath(save_dir)
+                                st.session_state.upload_auto_name = f"Text_{safe_name.split('.')[0]}"
+                                st.success("✅ 文本已保存")
+                                time.sleep(0.5)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"保存失败: {e}")
+                        else:
+                            st.warning("内容不能为空")
+            
+            with src_tab_web:
+                # 基础配置 - 紧凑布局
+                crawl_url = st.text_input("🔗 网址", placeholder="python.org", help="支持自动添加https://")
+                
+                col1, col2, col3 = st.columns([2, 1, 1])
+                with col1:
+                    parser_type = st.selectbox("解析器", ["default", "article", "documentation"], help="内容提取模式")
+                with col2:
+                    crawl_depth = st.number_input("深度", 1, 5, 2, help="递归层级")
+                with col3:
+                    max_pages = st.number_input("页数", 1, 9999, 10, help="最大页数")
+                
+                # 排除配置 - 可选
+                with st.expander("🚫 排除链接 (可选)", expanded=False):
+                    exclude_text = st.text_area("每行一个，支持 * 通配符", 
+                                               placeholder="*/admin/*\n*.pdf", 
+                                               height=68)
+                    exclude_patterns = [line.strip() for line in exclude_text.split('\n') if line.strip()] if exclude_text else []
+                
+                # 抓取按钮
+                if st.button("🕷️ 开始抓取", use_container_width=True, type="primary"):
+                    if not crawl_url:
+                        st.error("请输入网址")
                     else:
-                        st.warning("💡 请先输入有效路径，或使用下方上传功能")
-
-
-            uploaded_files = st.file_uploader(
-                "⬆️ 或拖入文件/ZIP", 
-                accept_multiple_files=True, 
-                key="uploader",
-                label_visibility="collapsed"
-            )
-
-            # 文档预览 (v1.6) - 带翻页
-            if uploaded_files:
-                with st.expander(f"📄 已选择 {len(uploaded_files)} 个文件 - 点击预览", expanded=True):
-                    # 翻页设置
-                    page_size = 10
-                    total_pages = (len(uploaded_files) - 1) // page_size + 1
-
-                    if 'preview_page' not in st.session_state:
-                        st.session_state.preview_page = 0
-
-                    # 翻页控制
-                    col1, col2, col3 = st.columns([1, 2, 1])
-                    if col1.button("⬅️ 上一页", disabled=st.session_state.preview_page == 0):
-                        st.session_state.preview_page -= 1
-                        st.rerun()
-                    col2.write(f"第 {st.session_state.preview_page + 1}/{total_pages} 页")
-                    if col3.button("下一页 ➡️", disabled=st.session_state.preview_page >= total_pages - 1):
-                        st.session_state.preview_page += 1
-                        st.rerun()
-
-                    st.divider()
-
-                    # 显示当前页的文件
-                    start_idx = st.session_state.preview_page * page_size
-                    end_idx = min(start_idx + page_size, len(uploaded_files))
-
-                    for idx, uploaded_file in enumerate(uploaded_files[start_idx:end_idx]):
-                        col1, col2, col3 = st.columns([4, 1, 1])
-                        col1.write(f"📎 {uploaded_file.name}")
-                        col2.write(f"{uploaded_file.size / 1024:.1f} KB")
-                        if col3.button("👁️", key=f"preview_{start_idx + idx}_{uploaded_file.name}_{uploaded_file.size}", help="预览"):
-                            st.session_state['preview_file'] = uploaded_file
-
-                    # 显示预览对话框
-                    if 'preview_file' in st.session_state and st.session_state.preview_file:
-                        show_upload_preview(st.session_state.preview_file)
-                        st.session_state.preview_file = None
+                        try:
+                            from src.processors.web_crawler import WebCrawler
+                            crawler = WebCrawler()
+                            
+                            progress_bar = st.progress(0)
+                            status_text = st.empty()
+                            crawled_count = [0]
+                            
+                            def update_status(msg):
+                                status_text.text(f"📡 {msg}")
+                                if "已保存" in msg:
+                                    crawled_count[0] += 1
+                                    progress = min(crawled_count[0] / max_pages, 1.0)
+                                    progress_bar.progress(progress)
+                            
+                            with st.spinner("抓取中..."):
+                                saved_files = crawler.crawl_advanced(
+                                    start_url=crawl_url,
+                                    max_depth=crawl_depth,
+                                    max_pages=max_pages,
+                                    exclude_patterns=exclude_patterns,
+                                    parser_type=parser_type,
+                                    status_callback=update_status
+                                )
+                            
+                            progress_bar.progress(1.0)
+                            
+                            if saved_files:
+                                st.success(f"✅ 完成！获取 {len(saved_files)} 页")
+                                
+                                # 简洁的结果显示
+                                with st.expander("📊 抓取详情", expanded=False):
+                                    for i, file_path in enumerate(saved_files[:3], 1):
+                                        file_name = os.path.basename(file_path)
+                                        file_size = os.path.getsize(file_path)
+                                        st.text(f"{i}. {file_name} ({file_size:,} bytes)")
+                                    if len(saved_files) > 3:
+                                        st.text(f"... 还有 {len(saved_files) - 3} 个文件")
+                                
+                                # 推荐问题 - 紧凑显示
+                                try:
+                                    from src.chat.web_suggestion_engine import WebSuggestionEngine
+                                    web_engine = WebSuggestionEngine()
+                                    web_suggestions = web_engine.generate_suggestions_from_crawl(crawl_url, saved_files)
+                                    
+                                    if web_suggestions:
+                                        st.markdown("**💡 推荐问题:**")
+                                        for i, suggestion in enumerate(web_suggestions[:4], 1):
+                                            if st.button(suggestion, key=f"web_q_{i}", use_container_width=True):
+                                                st.session_state.suggested_question = suggestion
+                                                st.rerun()
+                                except:
+                                    pass
+                                
+                                # 设置上传路径
+                                st.session_state.uploaded_path = os.path.abspath(crawler.output_dir)
+                                from urllib.parse import urlparse
+                                domain = urlparse(crawler._fix_url(crawl_url)).netloc.replace('.', '_')
+                                st.session_state.upload_auto_name = f"Web_{domain}_{len(saved_files)}"
+                                
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.warning("未获取到内容")
+                                
+                        except Exception as e:
+                            st.error(f"抓取失败: {str(e)}")
+                
+                # 简洁的使用提示
+                st.caption("💡 支持 python.org 等简化输入，自动添加 https:// 前缀")
 
             # 处理上传 (Stage 4.1 - 使用 UploadHandler)
             if uploaded_files:
@@ -892,18 +1064,17 @@ with st.sidebar:
 
             # 高级选项
             with st.expander("🔧 高级选项", expanded=True):
-                force_reindex = st.checkbox("🔄 强制重建索引", False, help="删除现有索引，重新构建（用于修复损坏的索引）")
-                st.caption("⚠️ 强制重建会删除现有的向量索引和文档片段，重新解析所有文档")
+                adv_col1, adv_col2 = st.columns(2)
+                with adv_col1:
+                    force_reindex = st.checkbox("🔄 强制重建索引", False, help="删除现有索引，重新构建（用于修复损坏的索引）")
+                with adv_col2:
+                    extract_metadata = st.checkbox(
+                        "📊 提取元数据", 
+                        value=False,
+                        help="开启后提取文件分类、关键词等信息，但会降低 30% 处理速度"
+                    )
+                    # st.caption("📊 完整模式：提取元数据，可查看分类和关键词") # Removed as redundant now
 
-                st.write("")
-                st.markdown("**⚡ 性能选项**")
-                extract_metadata = st.checkbox(
-                    "提取元数据（关键词、分类等）", 
-                    value=False,
-                    help="开启后提取文件分类、关键词等信息，但会降低 30% 处理速度"
-                )
-                if extract_metadata:
-                    st.caption("📊 完整模式：提取元数据，可查看分类和关键词")
 
             st.write("")
 
@@ -913,123 +1084,123 @@ with st.sidebar:
         # --- 现有库的管理 ---
         if not is_create_mode:
             st.write("")
-            st.divider()
-
-            # 聊天控制 (P2 优化 - 撤销功能)
-            st.caption("🛠️ 聊天控制")
-            col1, col2 = st.columns(2)
+            
+            # 聊天控制 - 单行紧凑布局
+            chat_cols = st.columns(4)
 
             # 撤销按钮
-            if col1.button("↩️ 撤销提问", use_container_width=True, disabled=len(state.get_messages()) < 2, help="撤销最后一组问答"):
+            if chat_cols[0].button("↩️ 撤销", use_container_width=True, disabled=len(state.get_messages()) < 2, help="撤销上一组问答"):
                 if len(state.get_messages()) >= 2:
-                    # 弹出最后两条消息 (User + Assistant)
                     st.session_state.messages.pop()
                     st.session_state.messages.pop()
-                    # 保存更新后的历史
                     if current_kb_name:
                         HistoryManager.save(current_kb_name, state.get_messages())
-                    st.toast("✅ 已撤销上一条消息")
+                    st.toast("✅ 已撤销")
                     time.sleep(0.5)
                     st.rerun()
 
             # 清空按钮
-            if col2.button("🧹 清空对话", use_container_width=True, disabled=len(state.get_messages()) == 0):
+            if chat_cols[1].button("🧹 清空", use_container_width=True, disabled=len(state.get_messages()) == 0, help="清空所有对话"):
                 st.session_state.messages = []
                 st.session_state.suggestions_history = []
                 if current_kb_name:
                     HistoryManager.save(current_kb_name, [])
-                st.toast("✅ 对话已清空")
+                st.toast("✅ 已清空")
+                time.sleep(0.5)
+                st.rerun()
+            
+            # 导出按钮
+            if chat_cols[2].button("📥 导出", use_container_width=True, disabled=len(state.get_messages()) == 0, help="导出为Markdown"):
+                export_content = f"# 对话记录 - {current_kb_name}\n\n"
+                export_content += f"**导出时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                export_content += "---\n\n"
+                for i, msg in enumerate(st.session_state.messages, 1):
+                    role = "👤 用户" if msg["role"] == "user" else "🤖 助手"
+                    export_content += f"## {role} ({i})\n\n{msg['content']}\n\n"
+                
+                # 这里有点 tricky，button 无法直接触发 download_button 的动作。
+                # 我们可以用 state 标记，或者直接渲染 download_button
+                # 为了保持单行布局，最好的办法是直接在这里放 download_button
+                # 但 download_button 点击后会重载。
+                # 让我们尝试把 download_button 直接放在列里，而不是先 button 再 download
+                pass # 逻辑将在下面修正
+            
+            # 修正：直接在列中渲染 download_button
+            # 注意：download_button 需要 data 参数
+            export_content = ""
+            if len(state.get_messages()) > 0:
+                export_content = f"# 对话记录 - {current_kb_name}\n\n**导出时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n\n"
+                for i, msg in enumerate(st.session_state.messages, 1):
+                    role = "👤 用户" if msg["role"] == "user" else "🤖 助手"
+                    export_content += f"## {role} ({i})\n\n{msg['content']}\n\n"
+
+            chat_cols[2].download_button(
+                "📥 导出",
+                export_content,
+                file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d')}.md",
+                mime="text/markdown",
+                use_container_width=True,
+                disabled=len(state.get_messages()) == 0
+            )
+
+            # 统计按钮
+            if chat_cols[3].button("📊 统计", use_container_width=True, disabled=len(state.get_messages()) == 0, help="查看统计"):
+                qa_count = len(state.get_messages()) // 2
+                total_chars = sum(len(msg["content"]) for msg in st.session_state.messages)
+                st.toast(f"💬 {qa_count} 轮对话 | 📝 {total_chars} 字符")
+
+            # 底部工具栏 - 单行布局
+            st.write("")
+            tool_cols = st.columns(3)
+            
+            # 1. 并行对话
+            tool_cols[0].link_button("🔀 新窗口", "http://localhost:8501", help="新开窗口并行对话", use_container_width=True)
+            
+            # 2. 快速开始
+            if tool_cols[1].button("⚡ 快速开始", use_container_width=True, help="一键配置默认环境"):
+                # 保存快速配置
+                quick_config = {
+                    "llm_type_idx": 0,
+                    "llm_url_ollama": "http://127.0.0.1:11434",
+                    "llm_model_ollama": "qwen2.5:7b",
+                    "embed_provider_index": 0,
+                    "embed_model_hf": "BAAI/bge-small-zh-v1.5"
+                }
+                defaults.update(quick_config)
+                with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(defaults, f, indent=4, ensure_ascii=False)
+                st.toast("✅ 已应用默认配置")
                 time.sleep(0.5)
                 st.rerun()
 
-            # 对话历史管理
-            if len(state.get_messages()) > 0:
-                col3, col4 = st.columns(2)
-
-                # 导出对话
-                if col3.button("📥 导出对话", use_container_width=True, help="导出为 Markdown 文件"):
-                    export_content = f"# 对话记录 - {current_kb_name}\n\n"
-                    export_content += f"**导出时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                    export_content += "---\n\n"
-
-                    for i, msg in enumerate(st.session_state.messages, 1):
-                        role = "👤 用户" if msg["role"] == "user" else "🤖 助手"
-                        export_content += f"## {role} ({i})\n\n{msg['content']}\n\n"
-
-                    st.download_button(
-                        "💾 下载 Markdown",
-                        export_content,
-                        file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
-                        mime="text/markdown",
-                        use_container_width=True
-                    )
-
-                # 对话统计
-                if col4.button("📊 对话统计", use_container_width=True):
-                    qa_count = len(state.get_messages()) // 2
-                    total_chars = sum(len(msg["content"]) for msg in st.session_state.messages)
-                    st.info(f"💬 问答轮次: {qa_count}\n\n📝 总字符数: {total_chars}")
-
-            # 并行对话 (P2 优化 - 响应用户多线程需求)
-            st.write("")
-            st.link_button("🔀 新开窗口 (并行对话)", "http://localhost:8501", help="Streamlit 限制单页面无法并行生成。点击此按钮打开新窗口，即可实现一边生成、一边提问。", use_container_width=True)
-
-            st.write("")
-            st.caption("⚠️ 危险操作")
-
+            # 3. 删除知识库
             if 'confirm_delete' not in st.session_state:
                 st.session_state.confirm_delete = False
 
-            if not st.session_state.confirm_delete:
-                if st.button("🗑️ 删除此知识库", use_container_width=True, type="secondary"):
-                    st.session_state.confirm_delete = True
-            else:
-                st.warning(f"⚠️ 确认删除 **{current_kb_name}**？\n\n此操作不可恢复，将删除所有文档和对话历史。")
-                col1, col2 = st.columns(2)
-                if col1.button("✅ 确认删除", use_container_width=True, type="primary"):
+            if tool_cols[2].button("🗑️ 删除", use_container_width=True, type="secondary", help="删除当前知识库"):
+                st.session_state.confirm_delete = not st.session_state.confirm_delete
+
+            # 删除确认区 (显示在下方)
+            if st.session_state.confirm_delete:
+                st.warning(f"⚠️ 确认删除 **{current_kb_name}**？")
+                del_cols = st.columns(2)
+                if del_cols[0].button("✅ 确认", use_container_width=True, type="primary"):
                     try:
-                        with st.spinner(f"正在删除 {current_kb_name}..."):
+                        with st.spinner(f"正在删除..."):
                             shutil.rmtree(os.path.join(output_base, current_kb_name), ignore_errors=True)
                             hist_path = os.path.join(HISTORY_DIR, f"{current_kb_name}.json")
                             if os.path.exists(hist_path):
                                 os.remove(hist_path)
-                        st.success("✅ 删除成功")
                         st.session_state.current_nav = "➕ 新建知识库..."
                         st.session_state.confirm_delete = False
                         st.session_state.pop('suggestions_history', None)
-                        time.sleep(0.5)
                         st.rerun()
                     except Exception as e:
                         st.error(f"删除失败: {e}")
-                        st.session_state.confirm_delete = False
-                if col2.button("❌ 取消", use_container_width=True):
+                
+                if del_cols[1].button("❌ 取消", use_container_width=True):
                     st.session_state.confirm_delete = False
-
-        # --- 快速开始模式 ---
-        st.write("")
-        if st.button("⚡ 快速开始（使用默认配置）", use_container_width=True, type="primary", help="自动配置 Ollama + 默认嵌入模型，1 分钟开始使用"):
-            # 保存快速配置
-            quick_config = {
-                "llm_type_idx": 0,
-                "llm_url_ollama": "http://127.0.0.1:11434",
-                "llm_model_ollama": "qwen2.5:7b",
-                "embed_provider_index": 0,
-                "embed_model_hf": "BAAI/bge-small-zh-v1.5"
-            }
-
-            # 合并到现有配置
-            defaults.update(quick_config)
-
-            # 保存配置文件
-            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-                json.dump(defaults, f, indent=4, ensure_ascii=False)
-
-            st.success("✅ 已使用默认配置！\n\n📝 LLM: Ollama (qwen2.5:7b)\n📝 嵌入: BAAI/bge-small-zh-v1.5\n\n现在可以直接创建知识库了！")
-            logger.success("快速开始模式：已配置默认值")
-            time.sleep(1.5)
-            st.rerun()
-
-        st.caption("💡 提示：快速开始会使用 Ollama 本地模型，需要先安装 Ollama")
+                    st.rerun()
 
     
     with tab_config:
@@ -1058,8 +1229,14 @@ with st.sidebar:
         advanced_config = SidebarConfig._render_advanced_config()
 
     with tab_monitor:
-        # v1.5.1: 性能监控面板
-        perf_monitor.render_panel()
+        # v2.3.0: 智能监控面板
+        try:
+            from src.core.v23_integration import get_v23_integration
+            v23 = get_v23_integration()
+            v23.render_monitoring_tab()
+        except ImportError:
+            # 降级到v1.5.1性能监控面板
+            perf_monitor.render_panel()
     
     with tab_tools:
         st.markdown("### 🔧 工具箱")
@@ -1087,14 +1264,14 @@ with st.sidebar:
                 pass
 
             with monitor_placeholder.container():
-                col1, col2 = st.columns([3, 1])
+                col1, col2 = st.columns([4, 1])
                 with col1:
                     st.metric("CPU 使用率", f"{cpu_percent:.1f}%")
                 with col2:
                     st.caption(f"{psutil.cpu_count()} 核")
                 st.progress(cpu_percent / 100)
 
-                col1, col2 = st.columns([3, 1])
+                col1, col2 = st.columns([4, 1])
                 with col1:
                     st.metric("GPU 状态", "活跃" if gpu_active else "空闲")
                 with col2:
@@ -1104,14 +1281,14 @@ with st.sidebar:
                 else:
                     st.progress(0.0)
 
-                col1, col2 = st.columns([3, 1])
+                col1, col2 = st.columns([4, 1])
                 with col1:
                     st.metric("内存使用", f"{mem.percent:.1f}%")
                 with col2:
                     st.caption(f"{mem.used/1024**3:.1f}GB")
                 st.progress(mem.percent / 100)
 
-                col1, col2 = st.columns([3, 1])
+                col1, col2 = st.columns([4, 1])
                 with col1:
                     st.metric("磁盘使用", f"{disk.percent:.1f}%")
                 with col2:
@@ -1138,6 +1315,144 @@ with st.sidebar:
     with tab_help:
         st.markdown("### 📖 帮助")
         st.info("RAG Pro Max v2.2.1 - 横向标签页版本")
+
+# ==========================================
+# 主功能区域 - 双引擎选择
+# ==========================================
+
+# 功能模式选择
+st.markdown("## 🚀 RAG Pro Max - 智能助手")
+mode_col1, mode_col2 = st.columns(2)
+
+with mode_col1:
+    rag_selected = st.button(
+        "📄 文档问答 (RAG)", 
+        type="primary" if st.session_state.get('main_mode', 'rag') == 'rag' else "secondary",
+        use_container_width=True,
+        help="基于文档知识库的智能问答"
+    )
+    if rag_selected:
+        st.session_state.main_mode = 'rag'
+
+with mode_col2:
+    sql_selected = st.button(
+        "📊 数据分析 (SQL)", 
+        type="primary" if st.session_state.get('main_mode', 'rag') == 'sql' else "secondary",
+        use_container_width=True,
+        help="基于数据表的智能分析"
+    )
+    if sql_selected:
+        st.session_state.main_mode = 'sql'
+
+st.divider()
+
+# 根据选择的模式显示对应功能
+if st.session_state.get('main_mode', 'rag') == 'sql':
+    # ==========================================
+    # 📊 数据分析模式
+    # ==========================================
+    st.markdown("### 📊 数据分析 (Text-to-SQL)")
+    
+    # 初始化SQL引擎
+    if 'sql_engine' not in st.session_state:
+        try:
+            from src.engines.sql_engine import SQLEngine
+            st.session_state.sql_engine = SQLEngine()
+        except ImportError:
+            st.error("SQL引擎模块未找到")
+            st.stop()
+
+    col1, col2 = st.columns([1, 2])
+
+    with col1:
+        st.markdown("#### 📁 数据导入")
+        
+        uploaded_data = st.file_uploader(
+            "上传Excel/CSV文件", 
+            type=['xlsx', 'csv'],
+            key="main_data_uploader"
+        )
+        
+        if uploaded_data:
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_data.name.split('.')[-1]}") as tmp:
+                tmp.write(uploaded_data.getvalue())
+                tmp_path = tmp.name
+            
+            if st.button("📥 导入数据", type="primary", key="main_import"):
+                with st.spinner("导入中..."):
+                    try:
+                        result = st.session_state.sql_engine.import_excel_csv(tmp_path)
+                        st.success(result)
+                        st.session_state.main_data_imported = True
+                    except Exception as e:
+                        st.error(f"导入失败: {str(e)}")
+        
+        # 显示数据结构
+        if st.session_state.get('main_data_imported'):
+            st.markdown("#### 📋 数据结构")
+            try:
+                schema = st.session_state.sql_engine.get_schema()
+                for table, columns in schema.items():
+                    with st.expander(f"📊 {table}"):
+                        st.write(f"字段: {', '.join(columns)}")
+            except:
+                st.write("暂无数据")
+
+    with col2:
+        st.markdown("#### 💬 数据问答")
+        
+        if st.session_state.get('main_data_imported'):
+            data_query = st.text_input(
+                "输入您的数据分析问题", 
+                placeholder="例如: 统计各部门的总人数、计算平均工资",
+                key="main_data_query"
+            )
+            
+            if st.button("🔍 分析", type="primary", key="main_analyze") and data_query:
+                with st.spinner("正在分析..."):
+                    try:
+                        if not hasattr(st.session_state, 'llm') or not st.session_state.llm:
+                            st.error("请先在左侧配置页面设置LLM模型")
+                        else:
+                            sql = st.session_state.sql_engine.text_to_sql(data_query, st.session_state.llm)
+                            
+                            with st.expander("📝 生成的SQL语句"):
+                                st.code(sql, language="sql")
+                            
+                            result = st.session_state.sql_engine.execute_sql(sql)
+                            
+                            if result['success']:
+                                st.success(f"✅ 查询成功，返回 {result['rows']} 行数据")
+                                if result['data']:
+                                    import pandas as pd
+                                    df = pd.DataFrame(result['data'])
+                                    st.dataframe(df, use_container_width=True)
+                                    
+                                    # 简单图表
+                                    if len(df.columns) >= 2 and len(df) > 1:
+                                        chart_col1, chart_col2 = st.columns(2)
+                                        with chart_col1:
+                                            if st.button("📊 柱状图"):
+                                                st.bar_chart(df.set_index(df.columns[0]))
+                                        with chart_col2:
+                                            if st.button("📈 折线图"):
+                                                st.line_chart(df.set_index(df.columns[0]))
+                                else:
+                                    st.info("查询无结果")
+                            else:
+                                st.error(f"❌ 查询失败: {result['error']}")
+                    except Exception as e:
+                        st.error(f"处理失败: {str(e)}")
+        else:
+            st.info("👆 请先上传数据文件")
+            
+    # 停止后续执行，确保只显示数据分析界面
+    st.stop()
+
+# ==========================================
+# 📄 RAG文档问答模式 (原有功能)
+# ==========================================
 
 # ==========================================
 # 5. 核心逻辑 (RAG & Indexing)
@@ -1273,6 +1588,14 @@ progress_monitor.render_all_tasks()
 
 # 在侧边栏添加性能统计
 with st.sidebar:
+    # v2.3.0: 智能监控状态
+    try:
+        from src.core.v23_integration import get_v23_integration
+        v23 = get_v23_integration()
+        v23.render_v23_sidebar()
+    except ImportError:
+        pass
+    
     with st.expander("📊 性能统计", expanded=True):
         stats = enhanced_ocr_optimizer.get_performance_stats()
         for key, value in stats.items():
@@ -1674,7 +1997,7 @@ if active_kb_name:
             st.divider()
             
             # 搜索筛选排序（单行超紧凑布局）
-            col1, col2, col3, col4, col5, col6, col7 = st.columns([3, 1, 1, 1, 1, 1.2, 0.8])
+            col1, col2, col3, col4, col5, col6, col7 = st.columns([2.5, 1.2, 1.2, 1.2, 1.2, 1.5, 1])
             search_term = col1.text_input("🔍", "", key="file_search", placeholder="搜索文件名...", label_visibility="collapsed")
             filter_type = col2.selectbox("📂", ["全部"] + sorted(set(f.get('type', 'Unknown') for f in doc_manager.manifest['files'])), label_visibility="collapsed")
             
@@ -1808,220 +2131,191 @@ if active_kb_name:
                 else:
                     cols[0].markdown("**✨**")
                 
-                cols[1].markdown("**文件名**")
-                cols[2].markdown("**类型**")
-                cols[3].markdown("**片段**")
-                cols[4].markdown("**大小**")
-                cols[5].markdown("**质量**")
-                cols[6].markdown("**时间**")
-                cols[7].markdown("**操作**")
+                cols[1].caption(f"**文件列表 (共 {total_files} 个)**")
+                cols[2].caption("**操作**")
                 st.divider()
                 
-                # 渲染文件列表
+                # 注入极致紧凑 CSS
+                st.markdown("""
+                <style>
+                /* 极致压缩垂直间距 */
+                div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] {
+                    gap: 0.1rem !important;
+                }
+                /* 卡片内部 padding 最小化 */
+                div[data-testid="stContainer"] {
+                    padding: 0.3rem 0.6rem !important;
+                    margin-bottom: 0.1rem !important;
+                }
+                /* Expander 标题栏高度压缩 & 移除外边距 */
+                .streamlit-expanderHeader {
+                    height: 1.8rem !important;
+                    padding-top: 0 !important;
+                    padding-bottom: 0 !important;
+                    min-height: unset !important;
+                    margin-bottom: 0 !important; /* 关键 */
+                }
+                /* Expander 整体上移 */
+                div[data-testid="stExpander"] {
+                    margin-top: -0.2rem !important;
+                    border: none !important;
+                    box-shadow: none !important;
+                }
+                /* Expander 内容区域去顶距 */
+                div[data-testid="stExpanderDetails"] {
+                    padding-top: 0 !important;
+                    padding-bottom: 0.2rem !important;
+                }
+                /* 分割线紧凑 */
+                hr {
+                    margin-top: 0.1rem !important;
+                    margin-bottom: 0.1rem !important;
+                }
+                /* 文本紧凑 */
+                p, h5, span {
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    line-height: 1.3 !important;
+                }
+                /* 按钮紧凑 */
+                button {
+                    height: 1.6rem !important;
+                    padding-top: 0 !important;
+                    padding-bottom: 0 !important;
+                    min-height: unset !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+
+                # 渲染文件列表 (One-Line Card 模式)
                 for i in range(start_idx, end_idx):
                     f = filtered_files[i]
-                    # 找到原始索引用于删除
                     orig_idx = doc_manager.manifest['files'].index(f)
-                    
-                    cols = st.columns([0.5, 2.5, 1, 0.8, 1, 0.8, 1.2, 0.8])
-                    
-                    # 摘要复选框（仅对没有摘要的文件显示）
-                    if not f.get('summary') and f.get('doc_ids'):
-                        # 根据 session_state 设置复选框的值
-                        is_checked = f['name'] in st.session_state.selected_for_summary
-                        checked = cols[0].checkbox("选择", value=is_checked, key=f"sum_{f['name']}_{st.session_state.file_page}", label_visibility="collapsed")
-                        
-                        # 更新 session_state
-                        if checked:
-                            st.session_state.selected_for_summary.add(f['name'])
-                        else:
-                            st.session_state.selected_for_summary.discard(f['name'])
-                    else:
-                        cols[0].write("")
-                    
-                    # 文件名（带图标）
-                    cols[1].caption(f'{f["icon"]} {f["name"]}')
-                    
-                    # 类型
-                    cols[2].caption(f['type'])
-                    
-                    # 片段数
                     chunk_count = len(f.get('doc_ids', []))
-                    cols[3].caption(str(chunk_count))
                     
-                    # 大小
-                    cols[4].caption(f['size'])
+                    # 准备元数据
+                    display_date = f.get('creation_date', f.get('added_at', '')[:10])
                     
-                    # 质量指示器（新增）
+                    # 质量评估
                     if chunk_count == 0:
-                        quality_icon = "❌"
+                        q_icon = "❌"
                     elif chunk_count < 2:
-                        quality_icon = "⚠️"
+                        q_icon = "⚠️"
                     elif chunk_count < 10:
-                        quality_icon = "✅"
+                        q_icon = "✅"
                     else:
-                        quality_icon = "🎉"
-                    cols[5].caption(quality_icon)
-                    
-                    # 时间
-                    cols[6].caption(f['added_at'])
-                    
-                    # 删除按钮
-                    if cols[7].button("🗑️", key=f"del_{orig_idx}_{i}"):
-                        with st.status(f"正在删除 {f['name']}...", expanded=True) as status:
-                            try:
-                                ctx = StorageContext.from_defaults(persist_dir=db_path)
-                                idx = load_index_from_storage(ctx)
-                                for did in f.get('doc_ids', []):
-                                    idx.delete_ref_doc(did, delete_from_docstore=True)
-                                idx.storage_context.persist(persist_dir=db_path)
-                                remove_file_from_manifest(db_path, f['name'])
-                                status.update(label="✅ 已删除", state="complete")
-                                st.session_state.chat_engine = None
-                                time.sleep(1); st.rerun()
-                            except Exception as e: st.error(str(e))
-                    
-                    # 文件摘要展开
-                    if f.get('summary'):
-                        # 获取摘要的第一行作为标题，如果太长则截取
-                        summary_lines = f['summary'].split('\n')
-                        first_line = summary_lines[0] if summary_lines else f['summary']
-                        title = first_line if len(first_line) <= 80 else first_line[:80] + "..."
+                        q_icon = "🎉"
+
+                    # === 极简卡片容器 ===
+                    with st.container(border=True):
+                        # 单行布局：标题 + 元数据 + 摘要 + 详情 + 操作
+                        col_info, col_summary, col_detail, col_ops = st.columns([5.5, 1.5, 1.5, 1.5])
                         
-                        with st.expander(f"📖 {title}", expanded=True):
-                            st.markdown(f.get('summary'))
-                    
-                    # 文件统计信息
-                    with st.expander(f"📊 详情 - {f['name']}", expanded=True):
-                        chunk_count = len(f.get('doc_ids', []))
-                        
-                        # 基础信息（4列紧凑显示）
-                        detail_cols = st.columns(4)
-                        detail_cols[0].metric("📦 片段", chunk_count)
-                        detail_cols[1].metric("💾 大小", f['size'])
-                        detail_cols[2].metric("📅 时间", f['added_at'][:10])
-                        detail_cols[3].metric("🏷️ 类型", f['type'])
-                        
-                        # 质量评估（单行紧凑显示）
-                        if chunk_count == 0:
-                            quality_info = "❌ 解析失败"
-                        elif chunk_count < 2:
-                            quality_info = "⚠️ 低质（内容过少）"
-                        elif chunk_count < 10:
-                            quality_info = "✅ 正常"
-                        else:
-                            quality_info = "🎉 优秀（内容丰富）"
-                        
-                        estimated_chars = chunk_count * 500
-                        st.caption(f"**质量**: {quality_info} · **字符**: ~{estimated_chars:,} · **向量**: {chunk_count}")
-                        
-                        # 元数据信息（新增）
-                        if f.get('hit_count', 0) > 0 or f.get('keywords') or f.get('category'):
-                            st.divider()
-                            meta_cols = st.columns(4)
+                        with col_info:
+                            # 核心改动：一行显示所有关键信息
+                            # 格式：📄 文件名.pdf  [灰色小字: 2.5MB · 2023-12-12 · 质量 · 命中3次]
+                            file_icon = f.get('icon', '📄')
                             
-                            # 检索统计
+                            # 截断超长文件名
+                            fname = f['name']
+                            if len(fname) > 25: fname = fname[:23] + "..."
+                            
+                            # 添加更多关键信息到一行中
                             hit_count = f.get('hit_count', 0)
-                            avg_score = f.get('avg_score', 0.0)
-                            heat = "🔥" if hit_count > 10 else "📊" if hit_count > 3 else "📦" if hit_count > 0 else "❄️"
+                            category = f.get('category', '')
+                            hit_info = f"命中{hit_count}次" if hit_count > 0 else ""
+                            category_info = f"{category}" if category and category != '未分类' else ""
                             
-                            meta_cols[0].metric("🔥 命中", f"{hit_count} 次")
-                            meta_cols[1].metric("⭐ 得分", f"{avg_score:.2f}")
-                            meta_cols[2].metric("🌡️ 热度", heat)
+                            # 组合额外信息
+                            extra_info = " · ".join(filter(None, [hit_info, category_info]))
+                            if extra_info:
+                                extra_info = " · " + extra_info
                             
-                            # 最后访问
-                            last_accessed = f.get('last_accessed')
-                            if last_accessed:
-                                meta_cols[3].metric("🕐 访问", last_accessed[:10])
-                            else:
-                                meta_cols[3].metric("🕐 访问", "从未")
+                            line_html = f"""
+                            <div style='display: flex; align-items: baseline; white-space: nowrap; overflow: hidden;'>
+                                <span style='font-weight: 600; font-size: 1rem; margin-right: 0.5rem;'>{file_icon} {fname}</span>
+                                <span style='color: gray; font-size: 0.75rem;'>
+                                    {f['size']} · {chunk_count}片段 · {display_date} · {q_icon}{extra_info}
+                                </span>
+                            </div>
+                            """
+                            st.markdown(line_html, unsafe_allow_html=True)
                             
-                            # 分类和语言
-                            category = f.get('category', '其他')
-                            language = f.get('language', 'unknown')
-                            lang_map = {"zh": "🇨🇳", "en": "🇬🇧", "zh-en": "🌐", "unknown": "❓"}
-                            lang_icon = lang_map.get(language, "❓")
-                            
-                            st.caption(f"**📂 分类**: {category} · **🌍 语言**: {lang_icon} {language}")
-                            
-                            # 关键词
-                            keywords = f.get('keywords', [])
-                            if keywords:
-                                st.caption(f"**🏷️ 关键词**: {' · '.join(keywords[:5])}")
-                            
-                            # 文件哈希（折叠）
-                            file_hash = f.get('file_hash', '')
-                            if file_hash:
-                                with st.expander("🔐 文件哈希", expanded=True):
-                                    st.code(file_hash, language="text")
+                            # 显示摘要（如果有的话）
+                            if f.get('summary'):
+                                summary_text = f['summary']
+                                if len(summary_text) > 100:
+                                    summary_text = summary_text[:97] + "..."
+                                st.caption(f"📝 {summary_text}")
                         
-                        # 文档ID（紧凑显示）
-                        if f.get('doc_ids'):
-                            if len(f['doc_ids']) <= 3:
-                                st.caption(f"**片段ID**: `{', '.join(f['doc_ids'])}`")
-                            else:
-                                st.caption(f"**片段ID**: `{f['doc_ids'][0]}` ... (共{len(f['doc_ids'])}个)")
-                                with st.expander("查看全部ID", expanded=False):
-                                    st.code('\n'.join(f['doc_ids']), language=None)
-                        else:
-                            st.warning("⚠️ 未生成片段 · 可能原因：文件为空/格式不支持/已损坏/加密")
-                        
-                        # 相似文件（紧凑显示）
-                        if chunk_count > 0:
-                            similar_files = [
-                                other for other in doc_manager.manifest['files']
-                                if other['name'] != f['name']
-                                and other['type'] == f['type']
-                                and abs(len(other.get('doc_ids', [])) - chunk_count) < chunk_count * 0.5
-                            ][:3]
-                            
-                            if similar_files:
-                                similar_names = [f"{s['icon']} {s['name'][:20]}..." for s in similar_files]
-                                st.caption(f"**相似**: {' · '.join(similar_names)}")
-                        # 生成摘要按钮（只对有片段的文件显示）
-                        if not f.get('summary') and f.get('doc_ids'):
-                            if st.button("✨ 生成摘要", key=f"gen_sum_{f['name']}", use_container_width=True):
-                                with st.spinner("生成中..."):
-                                    try:
-                                        # 使用检索器获取文档内容
-                                        from llama_index.core import StorageContext, load_index_from_storage as load_idx
-                                        storage_context = StorageContext.from_defaults(persist_dir=db_path)
-                                        idx = load_idx(storage_context)
-                                        
-                                        # 使用文件名作为查询，检索相关内容
-                                        retriever = idx.as_retriever(similarity_top_k=3)
-                                        nodes = retriever.retrieve(f['name'])
-                                        
-                                        doc_text = ""
-                                        for node in nodes:
-                                            if hasattr(node, 'node') and hasattr(node.node, 'text'):
-                                                doc_text += node.node.text + "\n"
-                                            elif hasattr(node, 'text'):
-                                                doc_text += node.text + "\n"
-                                            if len(doc_text) > 2000:
-                                                break
-                                        
-                                        if doc_text.strip():
-                                            # 生成摘要
-                                            summary = generate_doc_summary(doc_text, f['name'])
+                        with col_summary:
+                            # 摘要生成按钮
+                            if not f.get('summary') and f.get('doc_ids'):
+                                if st.button("✨ 摘要", key=f"summary_{i}", help="生成文档摘要"):
+                                    with st.spinner("生成中..."):
+                                        try:
+                                            # 直接从索引获取文档内容
+                                            from llama_index.core import StorageContext, load_index_from_storage
                                             
-                                            # 更新 manifest
-                                            manifest = ManifestManager.load(db_path)
-                                            for file in manifest['files']:
-                                                if file['name'] == f['name']:
-                                                    file['summary'] = summary
+                                            storage_context = StorageContext.from_defaults(persist_dir=db_path)
+                                            index = load_index_from_storage(storage_context)
+                                            retriever = index.as_retriever(similarity_top_k=3)
+                                            
+                                            nodes = retriever.retrieve(f['name'])
+                                            
+                                            doc_text = ""
+                                            for node in nodes:
+                                                if hasattr(node, 'node') and hasattr(node.node, 'text'):
+                                                    doc_text += node.node.text + "\n"
+                                                elif hasattr(node, 'text'):
+                                                    doc_text += node.text + "\n"
+                                                if len(doc_text) > 2000:
                                                     break
                                             
-                                            # 保存 manifest
-                                            with open(ManifestManager.get_path(db_path), 'w', encoding='utf-8') as mf:
-                                                json.dump(manifest, mf, indent=4, ensure_ascii=False)
-                                            
-                                            st.success("✅ 摘要已生成")
-                                        else:
-                                            st.error("❌ 无法读取文档内容")
-                                        time.sleep(0.5)
-                                    except Exception as e:
-                                        st.error(f"生成失败: {e}")
+                                            if doc_text.strip():
+                                                summary = generate_doc_summary(doc_text, f['name'])
+                                                if summary:
+                                                    # 更新manifest
+                                                    f['summary'] = summary
+                                                    doc_manager.manifest['files'][orig_idx]['summary'] = summary
+                                                    
+                                                    # 保存manifest
+                                                    from src.config.manifest_manager import ManifestManager
+                                                    ManifestManager.save(db_path, doc_manager.manifest['files'], doc_manager.manifest.get('embed_model', 'Unknown'))
+                                                    
+                                                    st.success("✅ 摘要生成成功！")
+                                                    st.rerun()
+                                                else:
+                                                    st.error("❌ 生成失败")
+                                            else:
+                                                st.warning("⚠️ 无内容")
+                                        except Exception as e:
+                                            st.error(f"❌ 失败: {str(e)}")
+                            elif f.get('summary'):
+                                st.caption("📖 已有摘要")
+                        
+                        with col_detail:
+                            # 更多详情按钮 - 打开文档详情对话框
+                            if st.button("🔍 详情", key=f"detail_{i}", help="查看文档详情"):
+                                st.session_state['show_doc_detail'] = f
+                                st.session_state['show_doc_detail_kb'] = active_kb_name
+                        
+                        with col_ops:
+                            # 操作区：仅保留删除按钮，节省空间
+                            # 这里的 key 必须唯一
+                            if st.button("🗑️", key=f"del_{i}", help="删除文件"):
+                                with st.status(f"删除中...", expanded=True) as status:
+                                    try:
+                                        ctx = StorageContext.from_defaults(persist_dir=db_path)
+                                        idx = load_index_from_storage(ctx)
+                                        for did in f.get('doc_ids', []):
+                                            idx.delete_ref_doc(did, delete_from_docstore=True)
+                                        idx.storage_context.persist(persist_dir=db_path)
+                                        remove_file_from_manifest(db_path, f['name'])
+                                        status.update(label="已删除", state="complete")
+                                        st.session_state.chat_engine = None
+                                        time.sleep(0.5); st.rerun()
+                                    except Exception as e: st.error(str(e))
                 
                 # 底部分页（方便翻页）
                 if total_pages > 1:
@@ -2035,9 +2329,12 @@ if active_kb_name:
                         if page_cols[2].button("➡️", key="next_bottom", disabled=st.session_state.file_page >= total_pages):
                             st.session_state.file_page += 1
 
-    st.divider()
+# 文档详情对话框调用
+if st.session_state.get('show_doc_detail') and st.session_state.get('show_doc_detail_kb'):
+    show_document_detail_dialog(st.session_state.show_doc_detail_kb, st.session_state.show_doc_detail)
 
-elif is_create_mode:
+# 创建模式的欢迎界面
+if is_create_mode:
     st.markdown("""
     <div class="welcome-box">
         <h2>👋 欢迎使用知识库</h2>

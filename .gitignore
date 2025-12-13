@@ -149,6 +149,14 @@ PUSH_CHECKLIST.md
 # 开发过程临时文件
 DEV_RULES.md
 
+# 版本对齐和维护文件
+VERSION_ALIGNMENT_SUMMARY.md
+GITHUB_PUSH_CHECKLIST.md
+
+# 备份目录
+archive/
+docs/archive/process_docs_backup_*/
+
 # ⬇️ 新增临时文件添加到此处 ⬇️
 # 格式：文件名或目录名/
 

@@ -69,25 +69,23 @@ def show_kb_documents(kb_name: str) -> None:
     
     for doc in docs:
         with st.container():
-            col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+            # 使用更紧凑的列布局
+            col_name, col_view, col_del = st.columns([5, 0.8, 0.8])
             
-            # 文档名称
-            col1.write(f"📄 {doc.name}")
+            # 文档名称和大小
+            col_name.write(f"📄 {doc.name} ({doc.size_mb:.2f} MB)")
             
-            # 文件大小
-            col2.write(f"{doc.size_mb:.2f} MB")
-            
-            # 查看按钮
-            if col3.button("👁️", key=f"view_{doc.name}", help="查看详情"):
+            # 查看按钮 (图标)
+            if col_view.button("👁️", key=f"view_{doc.name}", help="查看详情", use_container_width=True):
                 st.session_state['show_doc_detail'] = doc
                 st.session_state['show_doc_kb'] = kb_name
             
-            # 删除按钮
-            if col4.button("🗑️", key=f"del_{doc.name}", help="删除文档"):
+            # 删除按钮 (图标)
+            if col_del.button("🗑️", key=f"del_{doc.name}", help="删除文档", use_container_width=True):
                 st.session_state['confirm_delete_doc'] = doc
                 st.session_state['confirm_delete_kb'] = kb_name
             
-            st.divider()
+            # 移除 st.divider() 以进一步压缩空间
     
     # 只显示一个对话框
     if 'show_doc_detail' in st.session_state and st.session_state.show_doc_detail:

@@ -641,6 +641,7 @@ def main():
     test_v222_resource_protection()  # v2.2.2资源保护测试
     test_v222_ocr_logging()  # v2.2.2 OCR日志测试
     test_v222_documentation()  # v2.2.2文档测试
+    test_v230_features()  # v2.3.0功能测试
     
     # 输出测试结果
     print_header("测试结果汇总")
@@ -841,7 +842,7 @@ def test_v222_documentation():
         import json
         with open('version.json', 'r') as f:
             version_info = json.load(f)
-        assert version_info.get('version') == '2.2.2', f"版本号错误: {version_info.get('version')}"
+        assert version_info.get('version') == '2.3.0', f"版本号错误: {version_info.get('version')}"
         print("  ✅ 版本信息正确")
         
         # 检查文档文件
@@ -865,6 +866,45 @@ def test_v222_documentation():
         
     except Exception as e:
         print(f"  ❌ v2.2.2文档测试失败: {e}")
+        return False
+
+def test_v230_features():
+    """测试v2.3.0新功能"""
+    print("\n🧪 测试 v2.3.0 智能监控功能...")
+    
+    try:
+        # 测试智能调度器
+        from src.utils.smart_scheduler import SmartScheduler, TaskType
+        scheduler = SmartScheduler()
+        config = scheduler.get_optimal_workers()
+        assert 'cpu_workers' in config
+        print("  ✅ 智能调度器正常")
+        
+        # 测试告警系统
+        from src.utils.alert_system import AlertSystem
+        alert_system = AlertSystem()
+        status = alert_system.check_system_status()
+        assert 'cpu_percent' in status
+        print("  ✅ 告警系统正常")
+        
+        # 测试监控面板
+        from src.ui.monitoring_dashboard import MonitoringDashboard
+        dashboard = MonitoringDashboard()
+        metrics = dashboard.get_system_metrics()
+        assert 'cpu_percent' in metrics
+        print("  ✅ 监控面板正常")
+        
+        # 测试进度追踪
+        from src.ui.progress_tracker import ProgressTracker
+        tracker = ProgressTracker()
+        task_id = tracker.create_task("测试", 10)
+        assert task_id is not None
+        print("  ✅ 进度追踪正常")
+        
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ v2.3.0功能测试失败: {e}")
         return False
 
 if __name__ == "__main__":

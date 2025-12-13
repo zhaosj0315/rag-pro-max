@@ -44,11 +44,11 @@ class TestDocumentationFeasibility(unittest.TestCase):
     def test_stage_documentation_exists(self):
         """测试阶段文档是否存在"""
         stage_docs = [
-            "STAGE14_REFACTOR_SUMMARY.md",
-            "STAGE15_REFACTOR_SUMMARY.md", 
-            "STAGE16_REFACTOR_SUMMARY.md",
-            "STAGE17_FINAL_OPTIMIZATION.md",
-            "MAIN_FILE_SIMPLIFICATION.md"
+            "core/STAGE14_REFACTOR_SUMMARY.md",
+            "core/STAGE15_REFACTOR_SUMMARY.md", 
+            "core/STAGE16_REFACTOR_SUMMARY.md",
+            "core/STAGE17_FINAL_OPTIMIZATION.md",
+            "core/MAIN_FILE_SIMPLIFICATION.md"
         ]
         
         for doc in stage_docs:
@@ -109,7 +109,7 @@ class TestDocumentationFeasibility(unittest.TestCase):
         content = readme_path.read_text(encoding='utf-8')
         
         # 检查版本信息
-        self.assertIn("v1.7.2", content, "版本信息需要更新")
+        self.assertIn("v2.3.0", content, "版本信息需要更新")
         
         # 检查功能特性
         required_features = [
@@ -134,7 +134,7 @@ class TestDocumentationFeasibility(unittest.TestCase):
             content = changelog_path.read_text(encoding='utf-8')
             
             # 检查最新版本
-            self.assertIn("v1.7.2", content, "CHANGELOG 需要更新最新版本")
+            self.assertIn("v2.3.0", content, "CHANGELOG 需要更新最新版本")
             
             # 检查重构记录
             stage_keywords = ["Stage 14", "Stage 15", "Stage 16", "重构"]

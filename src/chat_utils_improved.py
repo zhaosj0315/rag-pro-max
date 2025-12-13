@@ -259,56 +259,92 @@ def _is_similar_question(q1, q2, threshold=0.7):
     return False
 
 
-def generate_follow_up_questions_safe(context_text, num_questions=3, existing_questions=None, timeout=15, logger=None, query_engine=None, llm_model=None):
+def generate_follow_up_questions_safe(context_text, num_questions=3, existing_questions=None, timeout=60, logger=None, query_engine=None, llm_model=None):
     """
-    安全的追问生成（带降级策略）- 优化版
-    - 智能降级问题
-    - 基于内容类型的问题模板
-    - 知识库相关性增强
+    安全地生成追问（带超时控制和错误处理）
+    
+    Args:
+        context_text: 上下文文本（回答内容）
+        num_questions: 需要生成的问题数量
+        existing_questions: 已存在的问题列表（用于去重）
+        timeout: 超时时间（秒），默认60秒
+        logger: 日志记录器
+        query_engine: 查询引擎（用于获取LLM）
+        llm_model: 直接传入LLM模型
+        
+    Returns:
+        list: 生成的问题列表
     """
     result = {"questions": []}
     
-    # 分析内容类型，生成针对性降级问题
-    def get_smart_fallback(text):
+    # 基于知识库内容生成针对性降级问题
+    def get_smart_fallback(text, query_engine=None):
         fallback = []
         
-        # 基于内容特征生成问题
-        if any(word in text for word in ["读书", "阅读", "书籍", "作者"]):
-            fallback.extend([
-                "这本书的核心观点是什么？",
-                "作者的写作背景如何？", 
-                "有哪些实用的阅读技巧？"
-            ])
-        elif any(word in text for word in ["培养", "思维", "创新", "能力"]):
-            fallback.extend([
-                "如何在日常生活中应用这些方法？",
-                "有什么具体的训练方式？",
-                "这种能力对个人发展有何帮助？"
-            ])
-        elif any(word in text for word in ["组织", "管理", "团队", "领导"]):
-            fallback.extend([
-                "在实际工作中如何实施？",
-                "可能遇到哪些挑战？",
-                "成功案例有哪些特点？"
-            ])
-        elif any(word in text for word in ["技术", "方法", "工具", "系统"]):
-            fallback.extend([
-                "这个方法的适用场景是什么？",
-                "与其他方案相比有何优势？",
-                "实施过程中需要注意什么？"
-            ])
-        else:
-            # 通用但更有针对性的问题
-            fallback.extend([
-                "这个观点的依据是什么？",
-                "在实践中效果如何？",
-                "还有哪些相关的要点？"
-            ])
+        # 如果有查询引擎，尝试从知识库获取相关主题
+        if query_engine:
+            try:
+                # 提取关键词并查询知识库
+                keywords = _extract_keywords(text, max_keywords=2)
+                if keywords:
+                    # 查询知识库中的相关内容
+                    kb_results = query_engine.query(f"关于{keywords[0]}的内容")
+                    if hasattr(kb_results, 'source_nodes') and kb_results.source_nodes:
+                        # 基于知识库实际内容生成问题
+                        for node in kb_results.source_nodes[:2]:
+                            node_text = node.text if hasattr(node, 'text') else str(node)
+                            if len(node_text) > 50:
+                                # 基于实际文档内容生成问题
+                                if "方法" in node_text or "步骤" in node_text:
+                                    fallback.append(f"文档中提到的{keywords[0]}具体方法是什么？")
+                                elif "原因" in node_text or "因为" in node_text:
+                                    fallback.append(f"为什么{keywords[0]}会产生这样的结果？")
+                                elif "案例" in node_text or "例子" in node_text:
+                                    fallback.append(f"有哪些关于{keywords[0]}的具体案例？")
+                                else:
+                                    fallback.append(f"文档中还有哪些关于{keywords[0]}的信息？")
+            except Exception as e:
+                if logger:
+                    logger.log_warning("推荐问题", f"知识库查询失败: {e}")
         
-        # 添加基于关键词的问题
-        keywords = _extract_keywords(text, max_keywords=3)
-        if keywords:
-            fallback.append(f"关于{keywords[0]}还有什么需要了解的？")
+        # 如果知识库查询失败或没有结果，使用基于内容的降级
+        if not fallback:
+            # 基于回答内容特征生成问题
+            if any(word in text for word in ["方案", "解决", "处理", "应对"]):
+                fallback.extend([
+                    "这个方案的具体实施步骤是什么？",
+                    "可能遇到哪些实际问题？",
+                    "有没有其他替代方案？"
+                ])
+            elif any(word in text for word in ["分析", "研究", "调查", "数据"]):
+                fallback.extend([
+                    "这个分析的数据来源是什么？",
+                    "结论的可靠性如何？",
+                    "还有哪些相关的研究发现？"
+                ])
+            elif any(word in text for word in ["技术", "工具", "系统", "平台"]):
+                fallback.extend([
+                    "这个技术的适用范围是什么？",
+                    "与现有方案相比有何优势？",
+                    "实际应用中的效果如何？"
+                ])
+            else:
+                # 基于关键词生成知识库相关问题
+                keywords = _extract_keywords(text, max_keywords=2)
+                if keywords:
+                    fallback.extend([
+                        f"文档中还有哪些关于{keywords[0]}的详细信息？",
+                        f"除了{keywords[0]}，还涉及哪些相关概念？",
+                        f"这些内容在实际应用中如何体现？"
+                    ])
+                else:
+                    fallback.extend([
+                        "文档中还有哪些相关的重要信息？",
+                        "这些内容如何与其他部分关联？",
+                        "在实际应用中需要注意什么？"
+                    ])
+        
+        return fallback[:num_questions]
         
         return fallback[:num_questions]
 
@@ -339,8 +375,8 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
             print(f"🔍 使用query_engine._llm: {type(query_engine._llm)}")
         
         if not llm:
-            print("⚠️ LLM未设置，使用降级策略")
-            result["questions"] = get_smart_fallback(context_text)
+            print("⚠️ LLM未设置，使用知识库感知降级策略")
+            result["questions"] = get_smart_fallback(context_text, query_engine)
             return
         
         print(f"🔍 LLM获取成功，开始生成推荐问题...")
@@ -420,7 +456,7 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
                 print(f"🔍 LLM响应: {text[:100]}...")
             except Exception as e:
                 print(f"❌ LLM调用失败: {e}")
-                result["questions"] = get_smart_fallback(context_text)
+                result["questions"] = get_smart_fallback(context_text, query_engine)
                 return
             
             # 解析生成的问题
@@ -442,7 +478,7 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
                 return
             
             # 如果没有问题，使用fallback
-            result["questions"] = get_smart_fallback(context_text)
+            result["questions"] = get_smart_fallback(context_text, query_engine)
             print(f"🔍 使用fallback: {result}")
             return
                 
@@ -451,7 +487,7 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
             if logger:
                 logger.log_error("追问生成", str(e))
             if result is not None:
-                result["questions"] = get_smart_fallback(context_text)
+                result["questions"] = get_smart_fallback(context_text, query_engine)
     
     # 使用线程执行并设置超时
     thread = threading.Thread(target=_generate, daemon=True)
@@ -467,7 +503,7 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
             print(f"⏰ 最终超时，使用fallback")
             if logger:
                 logger.log_error("追问生成", "最终超时")
-            return get_smart_fallback(context_text)
+            return get_smart_fallback(context_text, query_engine)
         else:
             print(f"✅ 后台生成完成")
     
@@ -475,7 +511,7 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
     
     if result is None or "questions" not in result:
         print(f"🔍 result为空或无questions，返回fallback")
-        return get_smart_fallback(context_text)
+        return get_smart_fallback(context_text, query_engine)
     
     print(f"🔍 函数最终返回: {result['questions']}")
     return result["questions"]

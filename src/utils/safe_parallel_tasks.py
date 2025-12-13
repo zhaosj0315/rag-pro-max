@@ -7,7 +7,7 @@ import os
 import json
 from typing import Dict, Any, Tuple
 
-def safe_process_node_worker(task_data: Tuple[Dict[str, Any], str]) -> str:
+def safe_process_node_worker(task_data: Tuple[Dict[str, Any], str]) -> Dict[str, Any]:
     """
     多进程安全的节点处理函数
     
@@ -15,7 +15,7 @@ def safe_process_node_worker(task_data: Tuple[Dict[str, Any], str]) -> str:
         task_data: (node_data, kb_name) 元组
         
     Returns:
-        str: 处理结果的HTML字符串
+        Dict: 包含节点信息的字典（用于前端渲染）
     """
     try:
         node_data, kb_name = task_data
@@ -24,33 +24,31 @@ def safe_process_node_worker(task_data: Tuple[Dict[str, Any], str]) -> str:
         metadata = node_data.get('metadata', {})
         score = node_data.get('score', 0.0)
         text = node_data.get('text', '')
+        node_id = node_data.get('node_id', 'unknown')
         
         # 安全地获取文件名
         file_name = metadata.get('file_name', '未知文件')
-        if isinstance(file_name, str) and len(file_name) > 50:
-            file_name = file_name[:47] + "..."
         
         # 安全地获取页码
         page_label = metadata.get('page_label', '')
-        if page_label:
-            page_info = f" (第{page_label}页)"
-        else:
-            page_info = ""
         
-        # 生成简洁的文本格式（避免HTML截断）
-        content_preview = text[:200] + "..." if len(text) > 200 else text
-        
-        result_text = f"""📌 相关度: {score:.3f} | 📄 {file_name}{page_info}
-        
-{content_preview}
-
----"""
-        
-        return result_text.strip()
+        # 返回结构化数据
+        return {
+            'file_name': file_name,
+            'page_label': page_label,
+            'score': score,
+            'text': text,
+            'node_id': node_id,
+            'metadata': metadata
+        }
         
     except Exception as e:
-        # 返回错误信息而不是抛出异常
-        return f'<div style="color: red;">处理节点时出错: {str(e)}</div>'
+        # 返回错误信息的字典结构
+        return {
+            'error': str(e),
+            'file_name': 'Error',
+            'text': f"处理节点时出错: {str(e)}"
+        }
 
 def extract_metadata_task(file_path: str) -> Dict[str, Any]:
     """

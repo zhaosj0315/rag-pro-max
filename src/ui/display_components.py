@@ -115,26 +115,57 @@ def render_message_stats(stats: Dict[str, Any]) -> None:
             st.caption(f"💻 资源: CPU {cpu:.1f}% | 内存 {mem:.1f}% | GPU {gpu:.1f}%")
 
 
-def render_source_references(sources: List[str], expanded: bool = False) -> None:
+def render_source_references(sources: List[Any], expanded: bool = False) -> None:
     """
-    渲染引用来源 - 修复版本
+    渲染引用来源 - 卡片式优化版本
     
     Args:
-        sources: 来源文本列表（已格式化的文本）
+        sources: 来源列表（可以是旧版的字符串，也可以是新版的字典）
         expanded: 是否默认展开
     """
     if not sources:
         return
     
-    with st.expander(f"📚 参考 {len(sources)} 个片段", expanded=expanded):
+    with st.expander(f"📚 参考来源 ({len(sources)})", expanded=expanded):
         for idx, src in enumerate(sources):
-            if src and isinstance(src, str):
-                # 直接显示格式化的文本，不使用HTML
+            # 处理新版结构化数据
+            if isinstance(src, dict):
+                with st.container(border=True):
+                    # 1. 标题行：文件名 + 分数
+                    col1, col2 = st.columns([7, 3])
+                    with col1:
+                        fname = src.get('file_name', '未知文件')
+                        page = src.get('page_label')
+                        title_text = f"📄 **{fname}**"
+                        if page:
+                            title_text += f" (Page {page})"
+                        st.markdown(title_text)
+                    
+                    with col2:
+                        score = src.get('score', 0.0)
+                        label = get_relevance_label(score)
+                        st.caption(f"{label} ({score:.3f})")
+                    
+                    # 2. 正文内容
+                    text = src.get('text', '').strip()
+                    # 智能截断：显示前200字，如果很长则提供折叠
+                    if len(text) > 250:
+                        st.caption(text[:250] + "...")
+                        with st.expander("查看全文", expanded=False):
+                            st.text(text)
+                    else:
+                        st.caption(text)
+                    
+                    # 3. 底部信息 (Node ID) - 极简风格
+                    node_id = src.get('node_id', 'unknown')
+                    st.markdown(f"<span style='color:gray; font-size:0.8em'>ID: `{node_id}`</span>", unsafe_allow_html=True)
+            
+            # 兼容旧版字符串数据
+            elif isinstance(src, str):
                 st.markdown(src)
-                
-                # 分隔线（最后一个不显示）
                 if idx < len(sources) - 1:
                     st.divider()
+
 
 
 def render_kb_info_card(kb_name: str, doc_count: int, total_chunks: int) -> None:

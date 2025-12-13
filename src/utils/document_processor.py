@@ -93,48 +93,40 @@ def get_file_info(file_path: str, metadata_mgr=None) -> dict:
         file_name = os.path.basename(file_path)
         file_type, file_icon = get_file_type(file_name)
         
+        # [新增] 提取更多系统元数据
+        file_stat = os.stat(file_path)
+        creation_date = datetime.fromtimestamp(file_stat.st_ctime).strftime('%Y-%m-%d')
+        last_modified = datetime.fromtimestamp(file_stat.st_mtime).strftime('%Y-%m-%d')
+        parent_folder = os.path.basename(os.path.dirname(file_path))
+        
         info = {
             "name": file_name,
             "size": size_str,
             "size_bytes": size_bytes,
             "added_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "creation_date": creation_date,
+            "last_modified": last_modified,
+            "parent_folder": parent_folder,
             "type": file_type,
-            "icon": file_icon,
-            "doc_ids": [],
-            "summary": "",
-            "file_hash": "",
-            "keywords": [],
-            "language": "unknown",
-            "category": "其他文档",
-            "hit_count": 0,
-            "avg_score": 0.0,
-            "last_accessed": None
+            "icon": file_icon
         }
         
-        # 如果有元数据管理器，加载扩展信息
+        # 尝试从 metadata_mgr 获取更多智能信息
         if metadata_mgr:
             meta = metadata_mgr.get_metadata(file_name)
             if meta:
-                info.update({
-                    "file_hash": meta.get("file_hash", ""),
-                    "keywords": meta.get("keywords", []),
-                    "language": meta.get("language", "unknown"),
-                    "category": meta.get("category", "其他文档"),
-                    "summary": meta.get("summary", "")
-                })
-            
-            stats = metadata_mgr.get_file_stats(file_name)
-            if stats:
-                info.update({
-                    "hit_count": stats.get("hit_count", 0),
-                    "avg_score": stats.get("avg_score", 0.0),
-                    "last_accessed": stats.get("last_accessed")
-                })
-        
+                info.update(meta)
+                
         return info
     except Exception as e:
         print(f"❌ 获取文件信息失败: {e}")
-        return None
+        return {
+            "name": os.path.basename(file_path),
+            "size": "0 KB",
+            "type": "UNKNOWN",
+            "icon": "❓",
+            "error": str(e)
+        }
 
 
 def get_relevance_label(score: float) -> str:
