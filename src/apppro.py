@@ -2603,49 +2603,56 @@ for msg_idx, msg in enumerate(state.get_messages()):
             
         suggestions_fragment()
 
-# 模型与任务设置
-with st.expander("🤖 模型与任务设置", expanded=False):
-    # 获取可用模型列表
-    try:
-        ollama_url = st.session_state.get('llm_url', "http://localhost:11434")
-        models, error = fetch_remote_models(ollama_url, "")
-        
-        if models:
-            available_models = models
-        else:
-            # logger.warning(f"无法获取模型列表: {error}")
-            available_models = ["llama3", "mistral", "gemma", "deepseek-coder", "qwen2.5:7b"] # Fallback list
-    except Exception as e:
-        # logger.error(f"获取模型列表异常: {e}")
-        available_models = ["llama3", "mistral", "qwen2.5:7b"]
-        
-    # 获取当前模型
-    current_model = st.session_state.get('selected_model', 'qwen2.5:7b')
-    if current_model not in available_models:
-        # 如果当前模型不在列表中（可能是初次加载），尝试匹配
-        if available_models:
-            # 优先保持当前设置（如果只是列表获取失败），否则选第一个
-            if current_model not in ["llama3", "mistral", "qwen2.5:7b"]:
-                 current_model = available_models[0]
-            
-    # 模型选择下拉框
-    selected_model_new = st.selectbox(
-        "选择 AI 模型 (根据任务需求切换)",
-        options=available_models,
-        index=available_models.index(current_model) if current_model in available_models else 0,
-        key="model_selector_dropdown",
-        help="Code: 写代码 | Vision: 看图 | Chat: 闲聊"
-    )
+# 紧凑型工具栏：模型选择与查询优化
+with st.container():
+    col_tools_1, col_tools_2 = st.columns([3, 1])
     
-    # 检测模型变更
-    if selected_model_new != st.session_state.get('selected_model'):
-        st.session_state.selected_model = selected_model_new
-        # 切换全局 LLM
-        # 假设都是 Ollama 模型，如果有其他 provider 需要更复杂的逻辑
-        if set_global_llm_model("Ollama", selected_model_new, api_url=ollama_url):
-            st.toast(f"✅ 已切换到模型: {selected_model_new}", icon="🤖")
-        else:
-            st.toast(f"❌ 切换模型失败: {selected_model_new}", icon="⚠️")
+    with col_tools_1:
+        # 获取可用模型列表
+        try:
+            ollama_url = st.session_state.get('llm_url', "http://localhost:11434")
+            models, error = fetch_remote_models(ollama_url, "")
+            
+            if models:
+                available_models = models
+            else:
+                available_models = ["llama3", "mistral", "gemma", "deepseek-coder", "qwen2.5:7b"] # Fallback list
+        except Exception as e:
+            available_models = ["llama3", "mistral", "qwen2.5:7b"]
+            
+        # 获取当前模型
+        current_model = st.session_state.get('selected_model', 'qwen2.5:7b')
+        if current_model not in available_models:
+            if available_models:
+                if current_model not in ["llama3", "mistral", "qwen2.5:7b"]:
+                     current_model = available_models[0]
+        
+        # 模型选择下拉框 (隐藏标签，节省空间)
+        selected_model_new = st.selectbox(
+            "选择模型",
+            options=available_models,
+            index=available_models.index(current_model) if current_model in available_models else 0,
+            key="model_selector_dropdown",
+            label_visibility="collapsed",
+            help="🤖 选择 AI 模型: Code(写代码) | Vision(看图) | Chat(闲聊)"
+        )
+
+        # 检测模型变更
+        if selected_model_new != st.session_state.get('selected_model'):
+            st.session_state.selected_model = selected_model_new
+            if set_global_llm_model("Ollama", selected_model_new, api_url=ollama_url):
+                st.toast(f"✅ 已切换到模型: {selected_model_new}", icon="🤖")
+            else:
+                st.toast(f"❌ 切换模型失败: {selected_model_new}", icon="⚠️")
+
+    with col_tools_2:
+        # 查询优化开关
+        enable_query_optimization = st.checkbox(
+            "✨ 智能优化", 
+            value=st.session_state.get('enable_query_optimization', False),
+            help="启用后，AI会分析并优化你的提问，提升检索准确性"
+        )
+        st.session_state.enable_query_optimization = enable_query_optimization
 
 # 引用内容预览区
 if st.session_state.get("quote_content"):
@@ -2659,20 +2666,6 @@ if st.session_state.get("quote_content"):
         if col2.button("取消引用", key="cancel_quote", use_container_width=True):
             st.session_state.quote_content = None
             st.rerun()
-
-# 查询优化设置
-with st.expander("🔧 查询设置", expanded=False):
-    enable_query_optimization = st.checkbox(
-        "💡 启用查询优化", 
-        value=st.session_state.get('enable_query_optimization', False),
-        help="AI会分析并优化你的问题，提升检索准确性"
-    )
-    st.session_state.enable_query_optimization = enable_query_optimization
-    
-    if enable_query_optimization:
-        st.caption("✅ 系统会建议优化查询，由你选择是否使用")
-    else:
-        st.caption("📝 直接使用原问题进行检索")
 
 # 处理输入
 user_input = st.chat_input("输入问题...")
