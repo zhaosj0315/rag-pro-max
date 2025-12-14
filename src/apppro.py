@@ -48,6 +48,55 @@ import time
 import requests
 import ollama
 import re
+
+# 🧹 启动时自动清理临时文件
+def cleanup_temp_files():
+    """清理超过24小时的临时文件"""
+    temp_dir = "temp_uploads"
+    if not os.path.exists(temp_dir):
+        return
+    
+    # 安全检查：确保目录路径正确
+    temp_dir = os.path.abspath(temp_dir)
+    if not temp_dir.endswith("temp_uploads"):
+        print("⚠️ 清理路径异常，跳过清理")
+        return
+    
+    current_time = time.time()
+    cleaned_count = 0
+    
+    try:
+        for filename in os.listdir(temp_dir):
+            # 跳过隐藏文件和系统文件
+            if filename.startswith('.'):
+                continue
+                
+            filepath = os.path.join(temp_dir, filename)
+            
+            # 安全检查：确保是文件且有读写权限
+            if not os.path.isfile(filepath):
+                continue
+            if not os.access(filepath, os.R_OK | os.W_OK):
+                continue
+                
+            # 检查文件修改时间
+            try:
+                file_time = os.path.getmtime(filepath)
+                # 如果文件超过24小时（86400秒）
+                if current_time - file_time > 86400:
+                    os.remove(filepath)
+                    cleaned_count += 1
+            except (OSError, IOError) as e:
+                print(f"清理文件 {filename} 时出错: {e}")
+                continue
+        
+        if cleaned_count > 0:
+            print(f"🧹 已清理 {cleaned_count} 个临时文件")
+    except Exception as e:
+        print(f"清理临时文件时出错: {e}")
+
+# 执行启动清理
+cleanup_temp_files()
 import json
 import zipfile
 from datetime import datetime
@@ -851,6 +900,13 @@ with st.sidebar:
                     with col3:
                         parser_type = st.selectbox("解析器", ["default", "article", "documentation"])
                     
+                    # 🛑 安全警告
+                    estimated_pages = max_pages ** crawl_depth
+                    if estimated_pages > 1000:
+                        st.warning(f"⚠️ 预估抓取页面: {estimated_pages:,} 页，可能耗时很长！系统最大限制: 50,000 页")
+                    elif estimated_pages > 100:
+                        st.info(f"ℹ️ 预估抓取页面: {estimated_pages:,} 页")
+                    
                 else:  # current_mode == "search"
                     # 关键词搜索模式
                     crawl_url = None
@@ -864,6 +920,13 @@ with st.sidebar:
                         max_pages = st.number_input("每层页数", 1, 500, 20, help="每个搜索引擎/每一层抓取的最大页数")
                     with col3:
                         parser_type = st.selectbox("解析器", ["default", "article", "documentation"])
+                    
+                    # 🛑 安全警告
+                    estimated_pages = max_pages ** crawl_depth
+                    if estimated_pages > 1000:
+                        st.warning(f"⚠️ 预估抓取页面: {estimated_pages:,} 页，可能耗时很长！系统最大限制: 50,000 页")
+                    elif estimated_pages > 100:
+                        st.info(f"ℹ️ 预估抓取页面: {estimated_pages:,} 页")
                     
                     # crawl_depth 由用户输入控制，不再固定为 1
                 
@@ -2499,6 +2562,13 @@ if active_kb_name and st.session_state.chat_engine and not st.session_state.mess
                 resp = st.session_state.chat_engine.stream_chat(prompt)
                 
                 for t in resp.response_gen:
+                    # 🛑 检查停止信号
+                    if st.session_state.get('stop_generation'):
+                        st.session_state.stop_generation = False
+                        full += "\n\n⏹ **生成已停止**"
+                        summary_placeholder.markdown(full)
+                        break
+                    
                     full += t
                     summary_placeholder.markdown(full + "▌")
                 
@@ -2692,7 +2762,21 @@ if st.session_state.get("quote_content"):
             st.rerun()
 
 # 处理输入
-user_input = st.chat_input("输入问题...")
+# 🛑 停止按钮功能
+if st.session_state.get('is_processing'):
+    # 正在处理时显示停止按钮
+    col1, col2 = st.columns([4, 1])
+    with col1:
+        st.chat_input("正在生成回答中...", disabled=True)
+    with col2:
+        if st.button("⏹ 停止", type="primary", use_container_width=True):
+            st.session_state.is_processing = False
+            st.session_state.stop_generation = True
+            st.success("✅ 已停止生成")
+            st.rerun()
+else:
+    # 正常输入状态
+    user_input = st.chat_input("输入问题...")
 
 # 如果有新输入，加入队列
 if user_input:
@@ -2904,6 +2988,13 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         full_text = ""
                         
                         for token in response.response_gen:
+                            # 🛑 检查停止信号
+                            if st.session_state.get('stop_generation'):
+                                st.session_state.stop_generation = False
+                                full_text += "\n\n⏹ **生成已停止**"
+                                msg_placeholder.markdown(full_text)
+                                break
+                            
                             full_text += token
                             msg_placeholder.markdown(full_text + "▌")
                             token_count += 1

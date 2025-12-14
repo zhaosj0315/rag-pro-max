@@ -131,15 +131,12 @@ def render_source_references(sources: List[Any], expanded: bool = False) -> None
             # 处理新版结构化数据
             if isinstance(src, dict):
                 with st.container(border=True):
-                    # 1. 标题行：文件名 + 分数
+                    # 1. 标题行：文件名 + 页码 + 分数
                     col1, col2 = st.columns([7, 3])
                     with col1:
-                        fname = src.get('file_name', '未知文件')
-                        page = src.get('page_label')
-                        title_text = f"📄 **{fname}**"
-                        if page:
-                            title_text += f" (Page {page})"
-                        st.markdown(title_text)
+                        # 🔍 使用display_name（包含页码信息）
+                        display_name = src.get('display_name', src.get('file_name', '未知文件'))
+                        st.markdown(f"📄 **{display_name}**")
                     
                     with col2:
                         score = src.get('score', 0.0)

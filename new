@@ -1,3 +1,0 @@
-#!/bin/bash
-# 快速启动新实例
-./start_new_instance.sh

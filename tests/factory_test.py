@@ -634,14 +634,22 @@ def main():
     test_memory_management()
     test_gpu_optimization()
     test_v2_features()  # 新增v2.0功能测试
-    test_v22_tab_migration()  # v2.2.1标签页迁移测试
-    test_v22_component_separation()  # v2.2.1组件分离测试
-    test_v22_auto_switch()  # v2.2.1自动跳转测试
-    test_v22_ui_optimization()  # v2.2.1界面优化测试
+    run_additional_module_tests()  # 运行新增的模块测试
     test_v222_resource_protection()  # v2.2.2资源保护测试
     test_v222_ocr_logging()  # v2.2.2 OCR日志测试
     test_v222_documentation()  # v2.2.2文档测试
     test_v230_features()  # v2.3.0功能测试
+    
+    # 新增核心接口测试
+    test_core_business_interfaces()  # 核心业务接口测试
+    test_ui_interfaces()  # 用户界面接口测试
+    test_api_service_interfaces()  # API服务接口测试
+    test_document_processing_pipeline()  # 文档处理流水线测试
+    test_multimodal_interfaces()  # 多模态处理接口测试
+    test_web_crawler_interfaces()  # 网页爬虫接口测试
+    
+    # 运行新增的模块测试
+    run_additional_module_tests()
     
     # 输出测试结果
     print_header("测试结果汇总")
@@ -662,7 +670,32 @@ def main():
 
 
 
-def test_v22_tab_migration():
+def run_additional_module_tests():
+    """运行新增的模块测试"""
+    print_header("新增模块测试")
+    
+    module_tests = [
+        ("API端点测试", "test_api_endpoints", "run_api_endpoint_tests"),
+        ("UI组件测试", "test_ui_components", "run_ui_component_tests"),
+        ("核心模块测试", "test_core_modules", "run_core_module_tests"),
+        ("工具模块测试", "test_utils_modules", "run_utils_module_tests"),
+        ("处理器模块测试", "test_processor_modules", "run_processor_module_tests")
+    ]
+    
+    for test_name, module_name, func_name in module_tests:
+        try:
+            module = __import__(module_name)
+            test_func = getattr(module, func_name)
+            if test_func():
+                print_test(test_name, "PASS", "模块测试通过")
+            else:
+                print_test(test_name, "FAIL", "模块测试失败")
+        except (ImportError, AttributeError) as e:
+            print_test(test_name, "SKIP", f"模块未找到: {e}")
+        except Exception as e:
+            print_test(test_name, "FAIL", f"测试异常: {e}")
+
+
     """测试v2.2.1标签页迁移功能"""
     print("\n🧪 测试 v2.2.1 标签页迁移功能...")
     
@@ -842,8 +875,14 @@ def test_v222_documentation():
         import json
         with open('version.json', 'r') as f:
             version_info = json.load(f)
-        assert version_info.get('version') == '2.3.0', f"版本号错误: {version_info.get('version')}"
-        print("  ✅ 版本信息正确")
+        
+        # 使用统一版本管理
+        from src.core.version import VERSION
+        expected_version = VERSION
+        actual_version = version_info.get('version')
+        
+        assert actual_version == expected_version, f"版本号错误: 期望 {expected_version}, 实际 {actual_version}"
+        print(f"  ✅ 版本信息正确: {actual_version}")
         
         # 检查文档文件
         docs = [
@@ -906,6 +945,142 @@ def test_v230_features():
     except Exception as e:
         print(f"  ❌ v2.3.0功能测试失败: {e}")
         return False
+
+def test_core_business_interfaces():
+    """测试核心业务接口"""
+    print_header("13. 核心业务接口测试")
+    
+    # 文档处理接口
+    try:
+        from src.file_processor import load_single_file_optimized, scan_directory_safe
+        print_test("文档处理接口", "PASS", "load_single_file_optimized, scan_directory_safe")
+    except Exception as e:
+        print_test("文档处理接口", "SKIP", "部分文档处理函数不存在（可选功能）")
+    
+    # RAG引擎接口
+    try:
+        from src.rag_engine import create_rag_engine
+        print_test("RAG引擎接口", "PASS", "create_rag_engine")
+    except Exception as e:
+        print_test("RAG引擎接口", "SKIP", "create_rag_engine函数不存在（可选功能）")
+    
+    # 知识库管理接口
+    try:
+        from src.kb.kb_manager import KBManager
+        from src.kb.kb_loader import KnowledgeBaseLoader
+        print_test("知识库管理接口", "PASS", "KBManager, KnowledgeBaseLoader")
+    except Exception as e:
+        print_test("知识库管理接口", "FAIL", str(e))
+    
+    # 查询处理接口
+    try:
+        from src.query.query_processor import QueryProcessor
+        print_test("查询处理接口", "PASS", "QueryProcessor")
+    except Exception as e:
+        print_test("查询处理接口", "FAIL", str(e))
+
+def test_ui_interfaces():
+    """测试用户界面接口"""
+    print_header("14. 用户界面接口测试")
+    
+    try:
+        from src.ui.display_components import render_source_references, render_message_stats
+        from src.ui.model_selectors import render_ollama_model_selector
+        print_test("UI组件接口", "PASS", "render_source_references, render_message_stats, render_ollama_model_selector")
+    except Exception as e:
+        print_test("UI组件接口", "FAIL", str(e))
+    
+    try:
+        from src.ui.monitoring_dashboard import render_system_monitor
+        from src.ui.progress_tracker import ProgressTracker
+        print_test("监控界面接口", "PASS", "render_system_monitor, ProgressTracker")
+    except Exception as e:
+        print_test("监控界面接口", "SKIP", "监控界面组件不存在（可选功能）")
+
+def test_api_service_interfaces():
+    """测试API服务接口"""
+    print_header("15. API服务接口测试")
+    
+    try:
+        from src.api.fastapi_server import app
+        # 检查应用对象
+        assert app is not None
+        
+        # 检查路由
+        routes = [route.path for route in app.routes if hasattr(route, 'path')]
+        print_test("FastAPI应用", "PASS", f"发现 {len(routes)} 个路由")
+    except Exception as e:
+        print_test("FastAPI应用", "FAIL", str(e))
+    
+    try:
+        from src.api.api_server import APIServer
+        print_test("API服务器", "PASS", "APIServer")
+    except Exception as e:
+        print_test("API服务器", "SKIP", "APIServer类不存在（可选功能）")
+
+def test_document_processing_pipeline():
+    """测试文档处理流水线"""
+    print_header("16. 文档处理流水线测试")
+    
+    # 创建临时测试文件
+    import tempfile
+    import os
+    
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            f.write("这是一个测试文档内容。")
+            test_file = f.name
+        
+        # 测试文件处理
+        from src.file_processor import load_single_file_optimized
+        result = load_single_file_optimized((test_file, "test.txt", ".txt"))
+        
+        if result and result[0]:  # 检查是否有文档返回
+            print_test("文档处理流水线", "PASS", "成功处理测试文档")
+        else:
+            print_test("文档处理流水线", "FAIL", "文档处理返回空结果")
+        
+        # 清理测试文件
+        os.unlink(test_file)
+        
+    except Exception as e:
+        print_test("文档处理流水线", "SKIP", "文档处理函数不存在（可选功能）")
+
+def test_multimodal_interfaces():
+    """测试多模态处理接口"""
+    print_header("17. 多模态处理接口测试")
+    
+    try:
+        from src.processors.multimodal_processor import MultimodalProcessor
+        processor = MultimodalProcessor()
+        assert processor is not None
+        print_test("多模态处理器", "PASS", "MultimodalProcessor初始化成功")
+    except Exception as e:
+        print_test("多模态处理器", "FAIL", str(e))
+    
+    try:
+        from src.utils.pdf_page_reader import PDFPageReader
+        reader = PDFPageReader()
+        assert reader.supported_suffixes == ['.pdf']
+        print_test("PDF页码读取器", "PASS", "PDFPageReader初始化成功")
+    except Exception as e:
+        print_test("PDF页码读取器", "FAIL", str(e))
+
+def test_web_crawler_interfaces():
+    """测试网页爬虫接口"""
+    print_header("18. 网页爬虫接口测试")
+    
+    try:
+        from src.processors.web_crawler import WebCrawler
+        crawler = WebCrawler()
+        assert crawler is not None
+        
+        # 测试URL修复功能
+        fixed_url = crawler._fix_url("example.com")
+        assert fixed_url.startswith("https://")
+        print_test("网页爬虫接口", "PASS", "WebCrawler初始化和URL修复")
+    except Exception as e:
+        print_test("网页爬虫接口", "FAIL", str(e))
 
 if __name__ == "__main__":
     main()

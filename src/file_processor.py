@@ -181,6 +181,24 @@ def _load_single_file(file_info):
                     d.metadata.update(base_metadata)
                     if not d.doc_id: d.doc_id = str(uuid.uuid4())
                 read_mode = 'slow'
+        elif ext == '.pdf':
+            # 📄 PDF文件：使用支持页码的读取器
+            try:
+                from src.utils.pdf_page_reader import read_pdf_with_pages
+                docs = read_pdf_with_pages(file_path, base_metadata)
+                # 确保每个文档都有ID
+                for d in docs:
+                    if not d.doc_id: d.doc_id = str(uuid.uuid4())
+                read_mode = 'pdf_with_pages'
+            except Exception as e:
+                # 回退到标准读取器
+                from llama_index.core import SimpleDirectoryReader
+                docs = SimpleDirectoryReader(input_files=[file_path]).load_data()
+                # [修改] 注入 base_metadata 并确保 ID
+                for d in docs: 
+                    d.metadata.update(base_metadata)
+                    if not d.doc_id: d.doc_id = str(uuid.uuid4())
+                read_mode = 'slow'
         elif ext in ['.pptx', '.ppt']:
             # PowerPoint文件：读取所有文本内容
             try:
@@ -208,13 +226,13 @@ def _load_single_file(file_info):
                 if not d.doc_id: d.doc_id = str(uuid.uuid4())
             read_mode = 'slow'
 
-            # 如果是PDF且内容为空，尝试 OCR（扫描版PDF）
-            needs_ocr = False
-            if ext == '.pdf' and docs:
-                if not docs[0].text or len(docs[0].text.strip()) == 0:
-                    needs_ocr = True
-            
-            if needs_ocr:
+        # 如果是PDF且内容为空，尝试 OCR（扫描版PDF）
+        needs_ocr = False
+        if ext == '.pdf' and docs:
+            if not docs[0].text or len(docs[0].text.strip()) == 0:
+                needs_ocr = True
+        
+        if needs_ocr:
                 # 检查OCR设置：优先检查前台控制，其次检查环境变量
                 import streamlit as st
                 use_ocr_frontend = st.session_state.get('use_ocr', True) if hasattr(st, 'session_state') else True

@@ -159,6 +159,13 @@ class WebCrawler:
         Returns:
             list: 已保存的文件路径列表
         """
+        # 🛑 安全熔断：全局最大页面限制
+        GLOBAL_MAX_PAGES = 50000
+        if max_pages > GLOBAL_MAX_PAGES:
+            if status_callback:
+                status_callback(f"⚠️ 安全熔断：页面数量限制为 {GLOBAL_MAX_PAGES}，已自动调整")
+            max_pages = GLOBAL_MAX_PAGES
+        
         # 自动修复URL格式
         start_url = self._fix_url(start_url)
         

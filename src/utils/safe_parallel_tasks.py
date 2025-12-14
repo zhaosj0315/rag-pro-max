@@ -29,13 +29,27 @@ def safe_process_node_worker(task_data: Tuple[Dict[str, Any], str]) -> Dict[str,
         # 安全地获取文件名
         file_name = metadata.get('file_name', '未知文件')
         
-        # 安全地获取页码
-        page_label = metadata.get('page_label', '')
+        # 🔍 提取页码信息
+        page_info = ""
+        if 'page_number' in metadata:
+            page_num = metadata['page_number']
+            if isinstance(page_num, (int, str)) and str(page_num).isdigit():
+                page_info = f"[第{page_num}页]"
+        elif 'page_label' in metadata:
+            page_label = metadata['page_label']
+            if page_label:
+                page_info = f"[{page_label}]"
+        
+        # 构建显示名称
+        display_name = file_name
+        if page_info:
+            display_name = f"{file_name} {page_info}"
         
         # 返回结构化数据
         return {
             'file_name': file_name,
-            'page_label': page_label,
+            'display_name': display_name,
+            'page_info': page_info,
             'score': score,
             'text': text,
             'node_id': node_id,
@@ -47,6 +61,7 @@ def safe_process_node_worker(task_data: Tuple[Dict[str, Any], str]) -> Dict[str,
         return {
             'error': str(e),
             'file_name': 'Error',
+            'display_name': 'Error',
             'text': f"处理节点时出错: {str(e)}"
         }
 

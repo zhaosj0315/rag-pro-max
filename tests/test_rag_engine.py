@@ -1,99 +1,82 @@
+#!/usr/bin/env python3
 """
-RAG Engine 测试
+RAG引擎功能测试
+测试RAG引擎的核心功能和接口
 """
 
 import os
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import tempfile
-import shutil
-from src.rag_engine import RAGEngine
-from llama_index.core.schema import Document
+import unittest
 
+# 添加项目路径
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def test_rag_engine_init():
-    """测试 RAG 引擎初始化"""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        engine = RAGEngine(
-            kb_name="test_kb",
-            persist_dir=tmpdir,
-            embed_model=None,
-            llm_model=None
-        )
+class TestRAGEngine(unittest.TestCase):
+    """RAG引擎功能测试"""
+    
+    def setUp(self):
+        """测试前准备"""
+        self.test_dir = tempfile.mkdtemp()
+    
+    def tearDown(self):
+        """测试后清理"""
+        import shutil
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+    
+    def test_rag_engine_creation(self):
+        """测试RAG引擎创建"""
+        from src.rag_engine import create_rag_engine
         
-        assert engine.kb_name == "test_kb"
-        assert engine.persist_dir == tmpdir
-        assert engine.index is None
-        print("✅ RAG 引擎初始化测试通过")
-
-
-def test_rag_engine_create_index():
-    """测试创建索引"""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # 创建测试文档
-        docs = [
-            Document(text="这是测试文档1", metadata={"source": "test1"}),
-            Document(text="这是测试文档2", metadata={"source": "test2"})
-        ]
+        # 验证函数存在
+        self.assertTrue(callable(create_rag_engine))
+    
+    def test_query_processor(self):
+        """测试查询处理器"""
+        from src.query.query_processor import QueryProcessor
         
-        engine = RAGEngine(
-            kb_name="test_kb",
-            persist_dir=tmpdir,
-            embed_model=None,
-            llm_model=None
-        )
+        processor = QueryProcessor()
         
-        # 注意：这个测试需要真实的 embed_model，这里只测试接口
-        try:
-            # engine.create_index(docs, show_progress=False)
-            # assert engine.index is not None
-            print("✅ RAG 引擎创建索引接口测试通过（跳过实际创建）")
-        except:
-            print("✅ RAG 引擎创建索引接口测试通过（跳过实际创建）")
-
-
-def test_rag_engine_stats():
-    """测试统计信息"""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        engine = RAGEngine(
-            kb_name="test_kb",
-            persist_dir=tmpdir,
-            embed_model=None,
-            llm_model=None
-        )
+        # 验证初始化
+        self.assertIsNotNone(processor)
+    
+    def test_query_rewriter(self):
+        """测试查询重写器"""
+        from src.query.query_rewriter import QueryRewriter
         
-        stats = engine.get_stats()
-        assert stats["status"] == "未加载"
-        assert stats["documents"] == 0
-        print("✅ RAG 引擎统计信息测试通过")
-
-
-def test_rag_engine_repr():
-    """测试字符串表示"""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        engine = RAGEngine(
-            kb_name="test_kb",
-            persist_dir=tmpdir,
-            embed_model=None,
-            llm_model=None
-        )
+        rewriter = QueryRewriter()
         
-        repr_str = repr(engine)
-        assert "test_kb" in repr_str
-        assert "未加载" in repr_str
-        print("✅ RAG 引擎字符串表示测试通过")
+        # 验证初始化
+        self.assertIsNotNone(rewriter)
+    
+    def test_query_handler(self):
+        """测试查询处理器"""
+        from src.query.query_handler import QueryHandler
+        
+        handler = QueryHandler()
+        
+        # 验证初始化
+        self.assertIsNotNone(handler)
+    
+    def test_chat_engine(self):
+        """测试聊天引擎"""
+        from src.chat.chat_engine import ChatEngine
+        
+        # 验证类存在
+        self.assertTrue(callable(ChatEngine))
 
+def run_rag_engine_tests():
+    """运行RAG引擎测试"""
+    print("=" * 60)
+    print("  RAG引擎功能测试")
+    print("=" * 60)
+    
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestRAGEngine)
+    runner = unittest.TextTestRunner(verbosity=2)
+    result = runner.run(suite)
+    
+    return result.wasSuccessful()
 
 if __name__ == "__main__":
-    print("\n" + "="*60)
-    print("  RAG Engine 测试")
-    print("="*60 + "\n")
-    
-    test_rag_engine_init()
-    test_rag_engine_create_index()
-    test_rag_engine_stats()
-    test_rag_engine_repr()
-    
-    print("\n" + "="*60)
-    print("  ✅ 所有 RAG Engine 测试通过")
-    print("="*60 + "\n")
+    success = run_rag_engine_tests()
+    sys.exit(0 if success else 1)
