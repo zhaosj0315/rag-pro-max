@@ -1701,26 +1701,6 @@ from src.ui.progress_monitor import progress_monitor
 # 显示实时进度监控
 progress_monitor.render_all_tasks()
 
-# 在侧边栏添加性能统计
-with st.sidebar:
-    # v2.3.0: 智能监控状态
-    try:
-        from src.core.v23_integration import get_v23_integration
-        v23 = get_v23_integration()
-        v23.render_v23_sidebar()
-    except ImportError:
-        pass
-    
-    with st.expander("📊 性能统计", expanded=True):
-        stats = enhanced_ocr_optimizer.get_performance_stats()
-        for key, value in stats.items():
-            st.write(f"**{key}**: {value}")
-        
-        if st.button("🧪 运行性能测试"):
-            with st.spinner("正在运行性能基准测试..."):
-                benchmark_results = enhanced_ocr_optimizer.benchmark_performance()
-                st.json(benchmark_results)
-
 # 紧凑侧边栏CSS样式
 st.markdown("""
 <style>
