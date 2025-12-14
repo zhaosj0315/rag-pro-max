@@ -35,6 +35,9 @@ class VectorizationWrapper:
             avg_doc_size=1000
         )
         
+        if show_progress:
+            print(f"ℹ️ [向量化] 准备处理 {len(documents)} 个片段 (批量大小: {optimal_batch})")
+        
         # 构建索引（LlamaIndex 内部会处理向量化）
         # 批量优化主要通过内存管理实现
         index = VectorStoreIndex.from_documents(

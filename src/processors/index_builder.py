@@ -23,6 +23,7 @@ from src.utils.parallel_tasks import extract_metadata_task
 from src.utils.concurrency_manager import ConcurrencyManager
 from src.utils.vectorization_wrapper import VectorizationWrapper
 from src.utils.dynamic_batch import DynamicBatchOptimizer
+from src.app_logging.progress_logger import ProgressLogger
 
 
 @dataclass
@@ -60,31 +61,47 @@ class IndexBuilder:
               action_mode: str = "NEW", status_callback=None) -> BuildResult:
         """构建索引"""
         start_time = time.time()
+        # 初始化详细进度记录器
+        progress = ProgressLogger(total_steps=6, logger=self.logger)
         
         try:
             # 设置嵌入模型
             Settings.embed_model = self.embed_model
             
             # 步骤1: 检查现有索引
+            progress.start_step(1, "检查现有索引")
             index = self._load_existing_index(force_reindex, action_mode, status_callback)
+            progress.end_step("索引检查完成")
             
             # 步骤2: 扫描文件
+            progress.start_step(2, f"扫描文件夹: {os.path.basename(source_path)}")
             total_files = self._scan_files(source_path, status_callback)
+            progress.end_step(f"发现 {total_files} 个文件")
             
             # 步骤3: 读取文档
+            progress.start_step(3, f"读取文档内容 (共 {total_files} 个文件)")
             docs, summary = self._read_documents(source_path, total_files, status_callback)
+            progress.end_step(f"成功读取 {summary['success']} 个文件")
             
             # 步骤4: 构建清单
+            progress.start_step(4, "构建文件清单")
             file_map = self._build_manifest(source_path, status_callback)
+            progress.end_step(f"登记 {len(file_map)} 个文件")
             
             # 步骤5: 解析片段
+            progress.start_step(5, f"解析文档片段 (共 {len(docs)} 个)")
             valid_docs = self._parse_documents(docs, file_map, source_path, status_callback)
+            progress.end_step(f"生成 {len(valid_docs)} 个有效片段")
             
             # 步骤6: 构建索引
+            progress.start_step(6, "向量化和索引构建")
             index = self._build_index(index, valid_docs, action_mode, status_callback)
+            progress.end_step("索引构建完成")
             
             # 保存 manifest
             self._save_manifest(file_map)
+            
+            progress.finish_all(success=True)
             
             duration = time.time() - start_time
             return BuildResult(
@@ -96,6 +113,7 @@ class IndexBuilder:
             )
             
         except Exception as e:
+            progress.finish_all(success=False)
             duration = time.time() - start_time
             return BuildResult(
                 success=False,
@@ -135,9 +153,6 @@ class IndexBuilder:
     
     def _scan_files(self, source_path, callback) -> int:
         """扫描文件"""
-        if callback:
-            callback("step", 2, f"扫描文件夹: {os.path.basename(source_path)}")
-        
         all_files = []
         for root, _, filenames in os.walk(source_path):
             for f in filenames:
@@ -152,9 +167,6 @@ class IndexBuilder:
     
     def _read_documents(self, source_path, total_files, callback):
         """读取文档"""
-        if callback:
-            callback("step", 3, f"读取文档内容 (共 {total_files} 个文件)")
-        
         docs, process_result = scan_directory_safe(source_path)
         summary = process_result.get_summary()
         
@@ -171,9 +183,6 @@ class IndexBuilder:
     
     def _build_manifest(self, source_path, callback) -> Dict:
         """构建文件清单"""
-        if callback:
-            callback("step", 4, "构建文件清单")
-        
         file_map = {}
         for root, _, filenames in os.walk(source_path):
             for f in filenames:
@@ -190,9 +199,6 @@ class IndexBuilder:
     
     def _parse_documents(self, docs, file_map, source_path, callback):
         """解析文档片段"""
-        if callback:
-            callback("step", 5, f"解析文档片段 (共 {len(docs)} 个)")
-        
         # 映射文档ID
         file_text_samples = {}
         for d in docs:
@@ -303,9 +309,6 @@ class IndexBuilder:
     
     def _build_index(self, index, valid_docs, action_mode, callback):
         """构建向量索引"""
-        if callback:
-            callback("step", 6, "向量化和索引构建")
-        
         if index and action_mode == "APPEND":
             # 追加模式
             if callback:
