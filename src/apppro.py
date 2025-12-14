@@ -207,6 +207,24 @@ def show_document_detail_dialog(kb_name: str, file_info: dict) -> None:
 
 def generate_smart_kb_name(target_path, cnt, file_types, folder_name):
     """智能生成知识库名称 - 使用优化器确保唯一性"""
+    
+    # 策略1：单文件特例处理 - 直接使用文件名作为知识库名称
+    if cnt == 1 and os.path.exists(target_path):
+        try:
+            # 查找目录中的那个唯一文件（忽略隐藏文件）
+            files = [f for f in os.listdir(target_path) if not f.startswith('.') and os.path.isfile(os.path.join(target_path, f))]
+            if len(files) >= 1:
+                single_file = files[0]
+                name_without_ext = os.path.splitext(single_file)[0]
+                suggested_name = sanitize_filename(name_without_ext)
+                
+                # 如果文件名有效，直接使用它
+                if suggested_name and len(suggested_name) > 1:
+                    from src.core.app_config import output_base
+                    return KBNameOptimizer.generate_unique_name(suggested_name, output_base)
+        except Exception:
+            pass # 出错则回退到原有逻辑
+
     # 使用优化器的建议名称功能
     suggested_name = KBNameOptimizer.suggest_name_from_content(target_path, cnt, list(file_types.keys()))
     
