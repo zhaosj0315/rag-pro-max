@@ -1431,34 +1431,8 @@ with st.sidebar:
         st.info("RAG Pro Max v2.2.1 - 横向标签页版本")
 
 # ==========================================
-# 主功能区域 - 双引擎选择
+# 主功能区域
 # ==========================================
-
-# 功能模式选择
-st.markdown("## 🚀 RAG Pro Max - 智能助手")
-mode_col1, mode_col2 = st.columns(2)
-
-with mode_col1:
-    rag_selected = st.button(
-        "📄 文档问答 (RAG)", 
-        type="primary" if st.session_state.get('main_mode', 'rag') == 'rag' else "secondary",
-        use_container_width=True,
-        help="基于文档知识库的智能问答"
-    )
-    if rag_selected:
-        st.session_state.main_mode = 'rag'
-
-with mode_col2:
-    sql_selected = st.button(
-        "📊 数据分析 (SQL)", 
-        type="primary" if st.session_state.get('main_mode', 'rag') == 'sql' else "secondary",
-        use_container_width=True,
-        help="基于数据表的智能分析"
-    )
-    if sql_selected:
-        st.session_state.main_mode = 'sql'
-
-st.divider()
 
 # 根据选择的模式显示对应功能
 if st.session_state.get('main_mode', 'rag') == 'sql':
