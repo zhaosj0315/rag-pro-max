@@ -1264,6 +1264,17 @@ with st.sidebar:
 
         # --- 现有库的管理 ---
         if not is_create_mode:
+            # 知识库详情展示 (移至此处)
+            st.markdown(f"### 📂 {current_kb_name}")
+            
+            # 获取并显示统计信息
+            try:
+                stats = kb_manager.get_stats(current_kb_name)
+                if stats:
+                    st.caption(f"📅 创建: {stats.get('created_time', '未知')}  |  📄 文件: {stats.get('file_count', 0)}  |  💾 大小: {KBManager.format_size(stats.get('size', 0))}")
+            except Exception:
+                pass
+            
             st.write("")
             
             # 💬 聊天控制 - 2×2布局

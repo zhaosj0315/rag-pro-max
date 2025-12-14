@@ -29,26 +29,6 @@ def render_compact_sidebar():
                     current_kb = kb_list[0]
                     st.session_state.active_kb_name = current_kb
                 
-                # 1. 显式展示完整名称 (解决下拉框遮挡问题)
-                st.markdown(
-                    f"""
-                    <div style="
-                        background-color: #f0f7ff;
-                        border-left: 4px solid #0068c9;
-                        padding: 10px;
-                        margin-bottom: 10px;
-                        border-radius: 4px;
-                        font-size: 0.9em;
-                        word-wrap: break-word;
-                        line-height: 1.4;
-                    ">
-                        <div style="color: #555; font-size: 0.8em; margin-bottom: 4px;">当前知识库</div>
-                        <div style="color: #0068c9; font-weight: 600;">{current_kb}</div>
-                    </div>
-                    """, 
-                    unsafe_allow_html=True
-                )
-
                 # 2. 切换选择器 (使用 index定位)
                 try:
                     current_index = kb_list.index(current_kb)
@@ -60,7 +40,6 @@ def render_compact_sidebar():
                     kb_list, 
                     index=current_index,
                     key="kb_selector",
-                    label_visibility="collapsed",  # 隐藏标签，上面已经有显示了
                     help="点击切换其他知识库"
                 )
                 
@@ -151,28 +130,7 @@ def render_compact_sidebar():
             
             similarity_threshold = st.slider("相似度阈值", 0.0, 1.0, 0.7, 0.1, key="similarity")
         
-        # 5. 系统监控
-        with st.expander("📊 系统状态"):
-            # 获取系统信息
-            cpu_percent = psutil.cpu_percent(interval=0.1)
-            memory = psutil.virtual_memory()
-            
-            # 显示指标
-            col1, col2 = st.columns(2)
-            with col1:
-                color = "🟢" if cpu_percent < 70 else "🟡" if cpu_percent < 90 else "🔴"
-                st.metric("CPU", f"{cpu_percent:.0f}%", delta=color)
-            with col2:
-                color = "🟢" if memory.percent < 70 else "🟡" if memory.percent < 85 else "🔴"
-                st.metric("内存", f"{memory.percent:.0f}%", delta=color)
-            
-            # 快速操作
-            if st.button("🧹 清理内存", use_container_width=True, key="cleanup_memory"):
-                import gc
-                collected = gc.collect()
-                st.success(f"已清理 {collected} 个对象")
-        
-        # 6. 工具箱
+        # 5. 工具箱
         with st.expander("🛠️ 工具"):
             col1, col2 = st.columns(2)
             with col1:
