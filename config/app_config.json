@@ -13,6 +13,7 @@
   "embed_provider_idx": 0,
   "embed_url_ollama": "",
   "embed_model_ollama": "",
+  "skip_ocr": true,
   "version": "2.2.1",
   "last_updated": "2025-12-11"
 }

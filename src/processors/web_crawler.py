@@ -16,7 +16,15 @@ class WebCrawler:
         self.visited_urls = set()
         self.session = requests.Session()
         self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Ch-Ua-Platform": '"macOS"'
         })
 
     def _is_valid_url(self, url):
@@ -65,8 +73,14 @@ class WebCrawler:
             full_url = urljoin(base_url, href)
             parsed_url = urlparse(full_url)
             
-            # 只处理同域名链接
-            if parsed_url.netloc != base_domain:
+            # 判断是否允许外部链接
+            is_search_engine = any(se in base_domain for se in [
+                'google.com', 'bing.com', 'baidu.com', 'yahoo.com', 
+                'duckduckgo.com', 'sogou.com', 'so.com', 'zhihu.com'
+            ])
+            
+            # 如果不是搜索引擎，则只处理同域名链接
+            if not is_search_engine and parsed_url.netloc != base_domain:
                 continue
             
             # 移除fragment

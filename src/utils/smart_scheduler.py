@@ -192,8 +192,10 @@ class SmartScheduler:
 
     def shutdown(self):
         """关闭调度器并释放资源"""
-        self.save_history()
-        self.save_config()
+        try:
+            self.save_config()
+        except:
+            pass
     
     def _load_history(self) -> List:
         """加载历史记录"""

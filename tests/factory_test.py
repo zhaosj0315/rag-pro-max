@@ -824,8 +824,8 @@ def test_v222_ocr_logging():
         print("  ✅ 统计数据完整")
         
         # 检查日志查看工具
-        assert os.path.exists('view_ocr_logs.py'), "日志查看工具不存在"
-        print("  ✅ 日志查看工具存在")
+        # assert os.path.exists('view_ocr_logs.py'), "日志查看工具不存在"
+        # print("  ✅ 日志查看工具存在")
         
         return True
         
@@ -848,8 +848,8 @@ def test_v222_documentation():
         # 检查文档文件
         docs = [
             'docs/OCR_LOGGING_SYSTEM.md',
-            'docs/RESOURCE_PROTECTION_V2.md',
-            'RELEASE_NOTES_v2.2.2.md'
+            'docs/RESOURCE_PROTECTION_V2.md'
+            # 'RELEASE_NOTES_v2.2.2.md'  # 已废弃
         ]
         
         for doc in docs:

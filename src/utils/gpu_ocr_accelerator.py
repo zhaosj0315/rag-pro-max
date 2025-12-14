@@ -11,6 +11,11 @@ from typing import List, Tuple, Optional
 from PIL import Image
 import logging
 
+# 强制禁用Paddle日志
+os.environ['GLOG_minloglevel'] = '3'
+os.environ['FLAGS_logtostderr'] = '0'
+os.environ['PADDLE_LOG_LEVEL'] = '50'
+
 # 设置PaddleOCR日志级别
 logging.getLogger('ppocr').setLevel(logging.ERROR)
 
@@ -74,6 +79,7 @@ class GPUOCRAccelerator:
                 self.ocr_engine = PaddleOCR(
                     use_angle_cls=True,
                     lang='ch',
+                    # show_log=False,  # 禁用内部日志 - 已移除导致报错的参数
                     # GPU优化参数
                     det_db_thresh=0.3,
                     det_db_box_thresh=0.6,
@@ -86,6 +92,7 @@ class GPUOCRAccelerator:
                 self.ocr_engine = PaddleOCR(
                     use_angle_cls=True,
                     lang='ch',
+                    # show_log=False,  # 禁用内部日志 - 已移除导致报错的参数
                     det_db_thresh=0.3,
                     det_db_box_thresh=0.6,
                     det_db_unclip_ratio=1.5,

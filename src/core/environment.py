@@ -12,6 +12,9 @@ import llama_index.core.schema as schema_module
 
 def setup_environment():
     """设置环境配置"""
+    # 禁用模型源检查（减少启动日志）
+    os.environ['DISABLE_MODEL_SOURCE_CHECK'] = 'True'
+    
     # 设置离线模式
     os.environ['HF_HUB_OFFLINE'] = '1'
     os.environ['TRANSFORMERS_OFFLINE'] = '1'

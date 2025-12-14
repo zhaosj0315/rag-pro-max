@@ -187,7 +187,7 @@ class WebToKBProcessor:
                     try:
                         files = crawler.crawl_advanced(
                             start_url=result['url'],
-                            max_depth=1,  # 搜索结果只抓取1层
+                            max_depth=2,  # 搜索结果需要抓取2层
                             max_pages=max_pages // len(search_results),
                             status_callback=status_callback
                         )
@@ -224,25 +224,51 @@ class WebToKBProcessor:
             
             # 构建知识库索引
             try:
-                # 这里需要调用实际的索引构建逻辑
-                # 模拟构建过程
-                for i, file_path in enumerate(crawled_files):
-                    if status_callback:
-                        status_callback(f"📄 处理文件 {i+1}/{len(crawled_files)}: {os.path.basename(file_path)}")
+                if status_callback:
+                    status_callback("🔨 正在构建索引...")
                 
-                # 如果在Streamlit环境中，自动切换知识库
-                if auto_switch and 'st' in globals():
-                    st.session_state.selected_kb = kb_name
-                    if status_callback:
-                        status_callback(f"✅ 已自动切换到知识库: {kb_name}")
+                # 获取知识库路径
+                kb_info = self.kb_manager.get_info(kb_name)
+                if not kb_info:
+                    return {"success": False, "message": f"无法获取知识库信息: {kb_name}"}
                 
-                return {
-                    "success": True,
-                    "kb_name": kb_name,
-                    "files_count": len(crawled_files),
-                    "files": crawled_files,
-                    "message": f"✅ 成功创建知识库 '{kb_name}'，包含 {len(crawled_files)} 个文档"
-                }
+                kb_path = kb_info['path']
+                
+                # 获取当前嵌入模型
+                from llama_index.core import Settings
+                
+                # 初始化索引构建器
+                # 注意：这里重新初始化是为了确保使用正确的参数
+                self.index_builder = IndexBuilder(
+                    kb_name=kb_name,
+                    persist_dir=kb_path,
+                    embed_model=Settings.embed_model
+                )
+                
+                # 执行构建
+                build_result = self.index_builder.build(
+                    source_path=unique_output_dir,
+                    action_mode="NEW",
+                    status_callback=lambda _, msg, *args: status_callback(f"🔨 {msg}" if isinstance(msg, str) else "处理中...")
+                )
+                
+                if build_result.success:
+                    # 如果在Streamlit环境中，自动切换知识库
+                    if auto_switch and 'st' in globals():
+                        st.session_state.selected_kb = kb_name
+                        if status_callback:
+                            status_callback(f"✅ 已自动切换到知识库: {kb_name}")
+                    
+                    return {
+                        "success": True,
+                        "kb_name": kb_name,
+                        "files_count": build_result.file_count,
+                        "doc_count": build_result.doc_count,
+                        "files": crawled_files,
+                        "message": f"✅ 成功创建知识库 '{kb_name}'，包含 {build_result.file_count} 个文件 ({build_result.doc_count} 个片段)"
+                    }
+                else:
+                    return {"success": False, "message": f"索引构建失败: {build_result.error}"}
                 
             except Exception as e:
                 return {"success": False, "message": f"构建索引失败: {e}"}

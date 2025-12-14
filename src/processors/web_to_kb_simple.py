@@ -123,7 +123,7 @@ def crawl_and_create_kb(url: str = None,
                     try:
                         files = crawler.crawl_advanced(
                             start_url=search_url,
-                            max_depth=1,
+                            max_depth=2, # 深度2才能抓取搜索结果
                             max_pages=max_pages // len(sites),
                             status_callback=status_callback
                         )

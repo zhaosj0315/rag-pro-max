@@ -868,10 +868,19 @@ with st.sidebar:
                         # 网址抓取模式
                         try:
                             from src.processors.web_crawler import WebCrawler
-                            # 使用唯一的时间戳目录
+                            # 使用带域名的唯一目录
+                            from urllib.parse import urlparse
                             from datetime import datetime
+                            
+                            try:
+                                domain = urlparse(crawl_url).netloc.replace('.', '_').replace(':', '')
+                                if not domain: domain = "unknown"
+                            except:
+                                domain = "unknown"
+                                
                             timestamp_dir = datetime.now().strftime('%Y%m%d_%H%M%S')
-                            unique_output_dir = os.path.join("temp_uploads", f"web_crawl_{timestamp_dir}")
+                            unique_output_dir = os.path.join("temp_uploads", f"Web_{domain}_{timestamp_dir}")
+                            
                             crawler = WebCrawler(output_dir=unique_output_dir)
                             
                             progress_bar = st.progress(0)
@@ -910,18 +919,14 @@ with st.sidebar:
                                 if web_kb_name:
                                     kb_name = web_kb_name
                                 else:
-                                    # 自动生成名称
-                                    from urllib.parse import urlparse
-                                    from datetime import datetime
-                                    domain = urlparse(crawler._fix_url(crawl_url)).netloc.replace('.', '_').replace('-', '_')
-                                    timestamp = datetime.now().strftime('%Y%m%d')
-                                    kb_name = f"Web_{domain}_{timestamp}"
+                                    # 使用统一的命名优化器
+                                    from src.core.app_config import output_base
+                                    kb_name = KBNameOptimizer.generate_name_from_url(crawl_url, output_base)
 
-                                # 使用统一的命名逻辑确保唯一性
-                                from src.core.app_config import output_base
-                                if not web_kb_name:
-                                    base_name = f"Web_{domain}"
-                                    kb_name = KBNameOptimizer.generate_unique_name(base_name, output_base)
+                                # 确保名称唯一（generate_name_from_url 内部已调用 generate_unique_name）
+                                # 但为了保险再次确认（如果是用户输入的自定义名称）
+                                if web_kb_name:
+                                    kb_name = KBNameOptimizer.generate_unique_name(kb_name, output_base)
                                 
                                 st.success(f"✅ 抓取完成！获取 {len(saved_files)} 页，正在创建知识库: {kb_name}")
                                 
@@ -977,10 +982,16 @@ with st.sidebar:
                         # 关键词全网搜索
                         try:
                             from src.processors.web_crawler import WebCrawler
-                            # 使用唯一的时间戳目录
+                            # 使用带关键词的唯一目录
                             from datetime import datetime
+                            
+                            # 清理关键词文件名
+                            safe_keyword = "".join([c for c in search_keyword if c.isalnum() or c in (' ', '_', '-')]).strip().replace(' ', '_')[:30]
+                            if not safe_keyword: safe_keyword = "keyword"
+                            
                             timestamp_dir = datetime.now().strftime('%Y%m%d_%H%M%S')
-                            unique_output_dir = os.path.join("temp_uploads", f"web_crawl_search_{timestamp_dir}")
+                            unique_output_dir = os.path.join("temp_uploads", f"Search_{safe_keyword}_{timestamp_dir}")
+                            
                             crawler = WebCrawler(output_dir=unique_output_dir)
                             
                             progress_bar = st.progress(0)
@@ -1014,7 +1025,7 @@ with st.sidebar:
                                     with st.spinner(f"搜索 {engine_name}..."):
                                         saved_files = crawler.crawl_advanced(
                                             start_url=search_url,
-                                            max_depth=1,
+                                            max_depth=2,  # 深度2才能抓取搜索结果链接指向的页面
                                             max_pages=max_pages,  # 每个搜索引擎使用完整的页数
                                             exclude_patterns=exclude_patterns,
                                             parser_type=parser_type,
@@ -1033,14 +1044,14 @@ with st.sidebar:
                             if all_saved_files:
                                 # 生成基础名称
                                 if web_kb_name:
-                                    base_name = web_kb_name
+                                    kb_name = web_kb_name
+                                    # 确保自定义名称唯一
+                                    from src.core.app_config import output_base
+                                    kb_name = KBNameOptimizer.generate_unique_name(kb_name, output_base)
                                 else:
-                                    # 自动生成名称
-                                    base_name = f"Search_{search_keyword.replace(' ', '_')[:10]}"
-                                
-                                # 使用统一的命名逻辑确保唯一性
-                                from src.core.app_config import output_base
-                                kb_name = KBNameOptimizer.generate_unique_name(base_name, output_base)
+                                    # 使用统一的命名优化器
+                                    from src.core.app_config import output_base
+                                    kb_name = KBNameOptimizer.generate_name_from_keyword(search_keyword, output_base)
                                 
                                 st.success(f"✅ 全网搜索完成！获取 {len(all_saved_files)} 页，正在创建知识库: {kb_name}")
                                 
@@ -1175,11 +1186,15 @@ with st.sidebar:
                             type_text += f" · 其他: {sum(c for _, c in sorted(file_types.items(), key=lambda x: x[1], reverse=True)[5:])}"
                         st.caption(type_text)
 
-                    auto_name = folder_name
+                    # 仅在没有预设名称时使用文件夹名
+                    if not (hasattr(st.session_state, 'upload_auto_name') and st.session_state.upload_auto_name):
+                        auto_name = folder_name
 
                     # 智能生成知识库名称
                     if cnt > 0:
-                        auto_name = generate_smart_kb_name(target_path, cnt, file_types, folder_name)
+                        # 如果已有来自爬虫的特定名称，不要覆盖
+                        if not (hasattr(st.session_state, 'upload_auto_name') and st.session_state.upload_auto_name):
+                            auto_name = generate_smart_kb_name(target_path, cnt, file_types, folder_name)
                 else:
                     st.error("❌ 路径不存在，请检查路径是否正确")
 
@@ -2583,6 +2598,50 @@ for msg_idx, msg in enumerate(state.get_messages()):
                         st.warning("未能生成更多追问，请尝试输入新问题。")
             
         suggestions_fragment()
+
+# 模型与任务设置
+with st.expander("🤖 模型与任务设置", expanded=False):
+    # 获取可用模型列表
+    try:
+        ollama_url = st.session_state.get('llm_url', "http://localhost:11434")
+        models, error = fetch_remote_models(ollama_url, "")
+        
+        if models:
+            available_models = models
+        else:
+            # logger.warning(f"无法获取模型列表: {error}")
+            available_models = ["llama3", "mistral", "gemma", "deepseek-coder", "qwen2.5:7b"] # Fallback list
+    except Exception as e:
+        # logger.error(f"获取模型列表异常: {e}")
+        available_models = ["llama3", "mistral", "qwen2.5:7b"]
+        
+    # 获取当前模型
+    current_model = st.session_state.get('selected_model', 'qwen2.5:7b')
+    if current_model not in available_models:
+        # 如果当前模型不在列表中（可能是初次加载），尝试匹配
+        if available_models:
+            # 优先保持当前设置（如果只是列表获取失败），否则选第一个
+            if current_model not in ["llama3", "mistral", "qwen2.5:7b"]:
+                 current_model = available_models[0]
+            
+    # 模型选择下拉框
+    selected_model_new = st.selectbox(
+        "选择 AI 模型 (根据任务需求切换)",
+        options=available_models,
+        index=available_models.index(current_model) if current_model in available_models else 0,
+        key="model_selector_dropdown",
+        help="Code: 写代码 | Vision: 看图 | Chat: 闲聊"
+    )
+    
+    # 检测模型变更
+    if selected_model_new != st.session_state.get('selected_model'):
+        st.session_state.selected_model = selected_model_new
+        # 切换全局 LLM
+        # 假设都是 Ollama 模型，如果有其他 provider 需要更复杂的逻辑
+        if set_global_llm_model("Ollama", selected_model_new, api_url=ollama_url):
+            st.toast(f"✅ 已切换到模型: {selected_model_new}", icon="🤖")
+        else:
+            st.toast(f"❌ 切换模型失败: {selected_model_new}", icon="⚠️")
 
 # 引用内容预览区
 if st.session_state.get("quote_content"):

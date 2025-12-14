@@ -215,11 +215,16 @@ def _load_single_file(file_info):
                     needs_ocr = True
             
             if needs_ocr:
-                # 快速模式：跳过扫描版PDF，避免OCR处理延迟
-                skip_ocr = os.environ.get('SKIP_OCR', 'false').lower() == 'true'
-                if skip_ocr:
-                    print(f"   ⚡ 快速模式：跳过扫描版PDF OCR处理")
-                    return "此PDF为扫描版，已跳过OCR处理以提升速度。如需OCR识别，请设置环境变量 SKIP_OCR=false"
+                # 检查OCR设置：优先检查前台控制，其次检查环境变量
+                import streamlit as st
+                use_ocr_frontend = st.session_state.get('use_ocr', True) if hasattr(st, 'session_state') else True
+                skip_ocr_env = os.environ.get('SKIP_OCR', 'false').lower() == 'true'
+                
+                # 如果前台禁用OCR或环境变量设置跳过，则跳过OCR
+                if not use_ocr_frontend or skip_ocr_env:
+                    source = "前台设置" if not use_ocr_frontend else "环境变量"
+                    print(f"   ⚡ 跳过OCR处理（{source}控制）")
+                    return "此PDF为扫描版，已跳过OCR处理。如需OCR识别，请在前台勾选'启用OCR识别'"
                 
                 try:
                     from pdf2image import convert_from_path

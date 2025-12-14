@@ -1,0 +1,22 @@
+{
+  "export_time": "2025-12-14T07:23:47.989217",
+  "total_messages": 4,
+  "messages": [
+    {
+      "role": "user",
+      "content": "什么是人工智能？"
+    },
+    {
+      "role": "assistant",
+      "content": "人工智能是计算机科学的一个分支..."
+    },
+    {
+      "role": "user",
+      "content": "如何学习机器学习？"
+    },
+    {
+      "role": "assistant",
+      "content": "学习机器学习可以从以下几个方面开始..."
+    }
+  ]
+}
