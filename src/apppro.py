@@ -857,13 +857,15 @@ with st.sidebar:
                     search_keyword = st.text_input("🔍 搜索关键词", placeholder="Python编程、机器学习、人工智能", help="全网搜索相关内容")
                     
                     # 搜索参数
-                    col1, col2 = st.columns(2)
+                    col1, col2, col3 = st.columns(3)
                     with col1:
-                        max_pages = st.number_input("每引擎页数", 10, 500, 50, help="每个搜索引擎抓取的页数（共5个引擎：Google、Bing、维基百科、知乎、百度百科）")
+                        crawl_depth = st.number_input("递归深度", 1, 5, 2, help="搜索结果链接的抓取深度")
                     with col2:
+                        max_pages = st.number_input("每层页数", 1, 500, 20, help="每个搜索引擎/每一层抓取的最大页数")
+                    with col3:
                         parser_type = st.selectbox("解析器", ["default", "article", "documentation"])
                     
-                    crawl_depth = 1  # 搜索模式固定深度1
+                    # crawl_depth 由用户输入控制，不再固定为 1
                 
                 # 排除配置 - 可选
                 with st.expander("🚫 排除链接 (可选)", expanded=False):
@@ -1047,7 +1049,7 @@ with st.sidebar:
                                     with st.spinner(f"搜索 {engine_name}..."):
                                         saved_files = crawler.crawl_advanced(
                                             start_url=search_url,
-                                            max_depth=2,  # 深度2才能抓取搜索结果链接指向的页面
+                                            max_depth=crawl_depth,  # 使用用户设定的递归深度
                                             max_pages=max_pages,  # 每个搜索引擎使用完整的页数
                                             exclude_patterns=exclude_patterns,
                                             parser_type=parser_type,
