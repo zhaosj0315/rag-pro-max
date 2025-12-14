@@ -2583,56 +2583,65 @@ for msg_idx, msg in enumerate(state.get_messages()):
             
         suggestions_fragment()
 
-# 紧凑型工具栏：模型选择与查询优化
+# 极简工具栏：模型与设置
 with st.container():
-    col_tools_1, col_tools_2 = st.columns([3, 1])
+    # 使用极窄列宽放置按钮，右侧显示状态
+    col_pop, col_info = st.columns([0.08, 0.92])
     
-    with col_tools_1:
-        # 获取可用模型列表
-        try:
-            ollama_url = st.session_state.get('llm_url', "http://localhost:11434")
-            models, error = fetch_remote_models(ollama_url, "")
+    with col_pop:
+        with st.popover("⚙️", help="模型与任务设置"):
+            st.markdown("### 🤖 模型设置")
+            # 获取可用模型列表
+            try:
+                ollama_url = st.session_state.get('llm_url', "http://localhost:11434")
+                models, error = fetch_remote_models(ollama_url, "")
+                
+                if models:
+                    available_models = models
+                else:
+                    available_models = ["llama3", "mistral", "gemma", "deepseek-coder", "qwen2.5:7b"] # Fallback list
+            except Exception as e:
+                available_models = ["llama3", "mistral", "qwen2.5:7b"]
+                
+            # 获取当前模型
+            current_model = st.session_state.get('selected_model', 'qwen2.5:7b')
+            if current_model not in available_models:
+                if available_models:
+                    if current_model not in ["llama3", "mistral", "qwen2.5:7b"]:
+                         current_model = available_models[0]
             
-            if models:
-                available_models = models
-            else:
-                available_models = ["llama3", "mistral", "gemma", "deepseek-coder", "qwen2.5:7b"] # Fallback list
-        except Exception as e:
-            available_models = ["llama3", "mistral", "qwen2.5:7b"]
+            # 模型选择下拉框
+            selected_model_new = st.selectbox(
+                "选择 AI 模型",
+                options=available_models,
+                index=available_models.index(current_model) if current_model in available_models else 0,
+                key="model_selector_dropdown",
+                help="Code: 写代码 | Vision: 看图 | Chat: 闲聊"
+            )
+
+            # 检测模型变更
+            if selected_model_new != st.session_state.get('selected_model'):
+                st.session_state.selected_model = selected_model_new
+                if set_global_llm_model("Ollama", selected_model_new, api_url=ollama_url):
+                    st.toast(f"✅ 已切换到模型: {selected_model_new}", icon="🤖")
+                else:
+                    st.toast(f"❌ 切换模型失败: {selected_model_new}", icon="⚠️")
             
-        # 获取当前模型
-        current_model = st.session_state.get('selected_model', 'qwen2.5:7b')
-        if current_model not in available_models:
-            if available_models:
-                if current_model not in ["llama3", "mistral", "qwen2.5:7b"]:
-                     current_model = available_models[0]
-        
-        # 模型选择下拉框 (隐藏标签，节省空间)
-        selected_model_new = st.selectbox(
-            "选择模型",
-            options=available_models,
-            index=available_models.index(current_model) if current_model in available_models else 0,
-            key="model_selector_dropdown",
-            label_visibility="collapsed",
-            help="🤖 选择 AI 模型: Code(写代码) | Vision(看图) | Chat(闲聊)"
-        )
+            st.divider()
+            
+            # 查询优化开关
+            enable_query_optimization = st.checkbox(
+                "✨ 启用智能查询优化", 
+                value=st.session_state.get('enable_query_optimization', False),
+                help="启用后，AI会分析并优化你的提问，提升检索准确性"
+            )
+            st.session_state.enable_query_optimization = enable_query_optimization
 
-        # 检测模型变更
-        if selected_model_new != st.session_state.get('selected_model'):
-            st.session_state.selected_model = selected_model_new
-            if set_global_llm_model("Ollama", selected_model_new, api_url=ollama_url):
-                st.toast(f"✅ 已切换到模型: {selected_model_new}", icon="🤖")
-            else:
-                st.toast(f"❌ 切换模型失败: {selected_model_new}", icon="⚠️")
-
-    with col_tools_2:
-        # 查询优化开关
-        enable_query_optimization = st.checkbox(
-            "✨ 智能优化", 
-            value=st.session_state.get('enable_query_optimization', False),
-            help="启用后，AI会分析并优化你的提问，提升检索准确性"
-        )
-        st.session_state.enable_query_optimization = enable_query_optimization
+    with col_info:
+        # 显示当前状态摘要
+        curr_model = st.session_state.get('selected_model', 'qwen2.5:7b')
+        opt_status = "✅ 开启" if st.session_state.get('enable_query_optimization', False) else "⬜ 关闭"
+        st.caption(f"**当前模型**: `{curr_model}` &nbsp;&nbsp;|&nbsp;&nbsp; **智能优化**: {opt_status}")
 
 # 引用内容预览区
 if st.session_state.get("quote_content"):
