@@ -19,6 +19,10 @@ def setup_environment():
     
     # 强制使用本地模型，避免 OpenAI 默认
     os.environ['LLAMA_INDEX_EMBED_MODEL'] = 'local'
+    
+    # 强制绕过代理（解决Surge等代理软件拦截本地请求的问题）
+    os.environ['NO_PROXY'] = 'localhost,127.0.0.1,0.0.0.0'
+    os.environ['no_proxy'] = 'localhost,127.0.0.1,0.0.0.0'
 
 
 def suppress_warnings():
