@@ -23,6 +23,10 @@ def render_compact_sidebar():
             if kb_list:
                 selected_kb = st.selectbox("当前知识库", kb_list, key="kb_selector")
                 st.session_state.active_kb_name = selected_kb
+                
+                # 如果名称太长，显示完整名称提示
+                if len(selected_kb) > 18:
+                    st.caption(f"📌 {selected_kb}")
             else:
                 st.info("暂无知识库")
                 st.session_state.active_kb_name = None

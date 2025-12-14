@@ -368,6 +368,13 @@ st.markdown("""
         height: auto !important;
     }
     
+    /* 修复下拉框文字截断问题 */
+    div[data-testid="stSelectbox"] > div > div {
+        white-space: normal !important;
+        height: auto !important;
+        min-height: 40px !important;
+    }
+    
     /* 统计区域容器 */
     .stats-container {
         background: white !important;
