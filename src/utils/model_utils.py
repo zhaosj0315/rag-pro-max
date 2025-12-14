@@ -129,18 +129,30 @@ def get_kb_embedding_dim(db_path):
     print(f"🔍 开始检测维度: {db_path}")
     
     try:
-        # 方法0: 先检查保存的 KB 信息
+        # 方法0: 优先检查保存的 KB 信息 (.kb_info.json)
+        # 这是最准确的来源，因为它是在构建时写入的
         kb_info_file = os.path.join(db_path, ".kb_info.json")
         if os.path.exists(kb_info_file):
             try:
                 with open(kb_info_file, 'r') as f:
                     kb_info = json.load(f)
-                    if 'embedding_dim' in kb_info:
+                    
+                    # 优先获取明确记录的维度
+                    if 'embedding_dim' in kb_info and isinstance(kb_info['embedding_dim'], int) and kb_info['embedding_dim'] > 0:
                         dim = kb_info['embedding_dim']
                         model = kb_info.get('embedding_model', 'unknown')
                         print(f"✅ 从 KB 信息读取维度: {dim}D (模型: {model})")
                         st.session_state.kb_dimensions[kb_cache_key] = dim
                         return dim
+                    
+                    # 如果没有维度但有模型名称，尝试推断
+                    if 'embedding_model' in kb_info:
+                        model_name = kb_info['embedding_model']
+                        inferred_dim = get_model_dimension(model_name)
+                        print(f"⚠️ 未找到明确维度，根据模型名推断: {model_name} -> {inferred_dim}D")
+                        st.session_state.kb_dimensions[kb_cache_key] = inferred_dim
+                        return inferred_dim
+                        
             except Exception as e:
                 print(f"⚠️ 读取 KB 信息失败: {e}")
         

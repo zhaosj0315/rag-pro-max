@@ -4,6 +4,10 @@ import os
 os.environ['DISABLE_MODEL_SOURCE_CHECK'] = 'True'
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
+# 抑制烦人的 Pydantic 警告
+import warnings
+warnings.filterwarnings("ignore", message=".*UnsupportedFieldAttributeWarning.*")
+
 
 import sys
 import os

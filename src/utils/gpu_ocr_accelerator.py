@@ -7,6 +7,7 @@ import os
 import time
 import torch
 import numpy as np
+import multiprocessing
 from typing import List, Tuple, Optional
 from PIL import Image
 import logging
@@ -62,6 +63,12 @@ class GPUOCRAccelerator:
         """初始化OCR引擎"""
         if self.initialized:
             return True
+            
+        # 防止在 Worker 进程中重复初始化
+        current_process_name = multiprocessing.current_process().name
+        if "SpawnPoolWorker" in current_process_name or "ForkPoolWorker" in current_process_name:
+            # print(f"⚠️ Worker进程检测到: {current_process_name}, 跳过 GPU OCR 初始化")
+            return False
         
         try:
             # 尝试导入PaddleOCR
