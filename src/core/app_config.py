@@ -10,6 +10,7 @@ from src.app_logging import LogManager
 logger = LogManager()
 
 CONFIG_FILE = "rag_config.json"
+output_base = "vector_db_storage"
 
 def load_config():
     """加载配置文件"""
