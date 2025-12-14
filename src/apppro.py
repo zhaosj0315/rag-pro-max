@@ -1306,10 +1306,11 @@ with st.sidebar:
                 
                 st.divider()
                 
-                # 底部：操作栏 (一行排列)
-                c1, c2, c3, c4, c5 = st.columns(5)
+                # 底部：操作栏 (2x3网格布局)
+                # 第一行：常用操作
+                r1_c1, r1_c2, r1_c3 = st.columns(3)
                 
-                with c1:
+                with r1_c1:
                     if st.button("🔄 撤销", use_container_width=True, disabled=len(state.get_messages()) < 2, help="撤销最近一轮对话"):
                         if len(state.get_messages()) >= 2:
                             st.session_state.messages.pop()
@@ -1320,7 +1321,7 @@ with st.sidebar:
                             time.sleep(0.5)
                             st.rerun()
                 
-                with c2:
+                with r1_c2:
                     if st.button("🧹 清空", use_container_width=True, disabled=len(state.get_messages()) == 0, help="清空当前对话记录"):
                         st.session_state.messages = []
                         st.session_state.suggestions_history = []
@@ -1330,7 +1331,7 @@ with st.sidebar:
                         time.sleep(0.5)
                         st.rerun()
                 
-                with c3:
+                with r1_c3:
                     export_content = ""
                     if len(state.get_messages()) > 0:
                         export_content = f"# 对话记录 - {current_kb_name}\n\n**导出时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n\n"
@@ -1340,13 +1341,19 @@ with st.sidebar:
                     
                     st.download_button("📥 导出", export_content, file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d')}.md", mime="text/markdown", use_container_width=True, disabled=len(state.get_messages()) == 0)
                 
-                with c4:
+                # 第二行：系统操作
+                st.write("") # 增加一点间距
+                r2_c1, r2_c2, r2_c3 = st.columns(3)
+                
+                with r2_c1:
                     st.link_button("🔀 新窗口", "http://localhost:8501", use_container_width=True, help="打开新窗口进行多任务处理")
 
-                with c5:
+                with r2_c2:
                     if st.button("🗑️ 删除", use_container_width=True, type="primary", disabled=not current_kb_name, help="永久删除该知识库"):
                         st.session_state.confirm_delete = True
                         st.rerun()
+                
+                # r2_c3 留空保持对齐
             
             # 删除确认对话框 (放在卡片外，避免嵌套问题)
             if st.session_state.get('confirm_delete', False):
