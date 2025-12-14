@@ -2018,11 +2018,11 @@ if active_kb_name:
             # 快速操作区
             st.markdown("**⚡ 快速操作**")
             
-            # 快速操作按钮组
-            quick_col1, quick_col2 = st.columns(2)
+            # 快速操作按钮组 - 合并为单行
+            op_col1, op_col2, op_col3, op_col4 = st.columns(4)
             
-            # 打开知识库目录
-            with quick_col1:
+            # 1. 打开知识库目录
+            with op_col1:
                 if st.button("📂 打开目录", use_container_width=True, help="在Finder中打开知识库文件夹"):
                     import webbrowser
                     import urllib.parse
@@ -2033,82 +2033,87 @@ if active_kb_name:
                     except Exception as e:
                         st.error(f"打开失败: {e}")
             
-            # 复制路径
-            with quick_col2:
+            # 2. 复制路径
+            with op_col2:
                 if st.button("📋 复制路径", use_container_width=True, help="复制知识库路径到剪贴板"):
                     try:
                         import subprocess
                         subprocess.run(["pbcopy"], input=db_path.encode(), check=True)
-                        st.toast(f"✅ 已复制: {db_path}")
+                        st.toast(f"✅ 已复制")
                     except Exception as e:
                         st.info(f"📁 路径: {db_path}")
             
-            st.write("")
-            
-            # 批量生成摘要
+            # 准备摘要数据
             files_without_summary = [f for f in doc_manager.manifest['files'] if not f.get('summary') and f.get('doc_ids')]
-            if files_without_summary:
-                if 'selected_for_summary' not in st.session_state:
-                    st.session_state.selected_for_summary = set()
-                
-                selected_count = len(st.session_state.selected_for_summary)
-                
+            if 'selected_for_summary' not in st.session_state:
+                st.session_state.selected_for_summary = set()
+            selected_count = len(st.session_state.selected_for_summary)
+            
+            # 3. 生成摘要
+            run_summary = False
+            with op_col3:
                 # 始终显示按钮，但根据选中数量决定是否禁用
-                button_label = f"✨ 生成摘要 ({selected_count})" if selected_count > 0 else "✨ 生成摘要 (请先勾选文件)"
+                button_label = f"✨ 摘要 ({selected_count})" if selected_count > 0 else "✨ 生成摘要"
                 button_disabled = selected_count == 0
                 
-                if st.button(button_label, use_container_width=True, type="primary", disabled=button_disabled):
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-                    
-                    from llama_index.core import StorageContext, load_index_from_storage as load_idx
-                    storage_context = StorageContext.from_defaults(persist_dir=db_path)
-                    idx = load_idx(storage_context)
-                    retriever = idx.as_retriever(similarity_top_k=3)
-                    
-                    success_count = 0
-                    for i, fname in enumerate(st.session_state.selected_for_summary):
-                        status_text.text(f"正在处理: {fname} ({i+1}/{selected_count})")
-                        try:
-                            file_info = next((f for f in doc_manager.manifest['files'] if f['name'] == fname), None)
-                            if file_info and file_info.get('doc_ids'):
-                                # 使用检索器获取文档内容
-                                nodes = retriever.retrieve(fname)
-                                
-                                doc_text = ""
-                                for node in nodes:
-                                    if hasattr(node, 'node') and hasattr(node.node, 'text'):
-                                        doc_text += node.node.text + "\n"
-                                    elif hasattr(node, 'text'):
-                                        doc_text += node.text + "\n"
-                                    if len(doc_text) > 2000:
-                                        break
-                                
-                                if doc_text.strip():
-                                    summary = generate_doc_summary(doc_text, fname)
-                                    file_info['summary'] = summary
-                                    success_count += 1
-                        except Exception as e:
-                            st.warning(f"⚠️ {fname}: {str(e)}")
-                            
-                            progress_bar.progress((i + 1) / selected_count)
-                        
-                        # 保存 manifest
-                        with open(ManifestManager.get_path(db_path), 'w', encoding='utf-8') as f:
-                            json.dump(doc_manager.manifest, f, indent=4, ensure_ascii=False)
-                        
-                        status_text.empty()
-                        progress_bar.empty()
-                        st.success(f"✅ 已生成 {success_count}/{selected_count} 个摘要")
-                        st.session_state.selected_for_summary = set()
-                        time.sleep(1)
-                        st.rerun()  # 立即刷新页面显示摘要
-                
-                if st.button("📥 导出清单", use_container_width=True):
+                if st.button(button_label, use_container_width=True, type="primary", disabled=button_disabled, help="为选中的文件生成AI摘要"):
+                    run_summary = True
+
+            # 4. 导出清单
+            with op_col4:
+                if st.button("📥 导出清单", use_container_width=True, help="导出当前文件列表"):
                     export_data = f"知识库: {active_kb_name}\n文件数: {stats['file_cnt']}\n片段数: {stats['total_chunks']}\n\n文件列表:\n"
                     for f in doc_manager.manifest['files']:
                         export_data += f"- {f['name']} ({f['type']}, {len(f.get('doc_ids', []))} 片段)\n"
                     st.download_button("下载", export_data, f"{active_kb_name}_清单.txt", use_container_width=True)
+
+            # 执行摘要生成逻辑
+            if run_summary and files_without_summary:
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                from llama_index.core import StorageContext, load_index_from_storage as load_idx
+                storage_context = StorageContext.from_defaults(persist_dir=db_path)
+                idx = load_idx(storage_context)
+                retriever = idx.as_retriever(similarity_top_k=3)
+                
+                success_count = 0
+                for i, fname in enumerate(st.session_state.selected_for_summary):
+                    status_text.text(f"正在处理: {fname} ({i+1}/{selected_count})")
+                    try:
+                        file_info = next((f for f in doc_manager.manifest['files'] if f['name'] == fname), None)
+                        if file_info and file_info.get('doc_ids'):
+                            # 使用检索器获取文档内容
+                            nodes = retriever.retrieve(fname)
+                            
+                            doc_text = ""
+                            for node in nodes:
+                                if hasattr(node, 'node') and hasattr(node.node, 'text'):
+                                    doc_text += node.node.text + "\n"
+                                elif hasattr(node, 'text'):
+                                    doc_text += node.text + "\n"
+                                if len(doc_text) > 2000:
+                                    break
+                            
+                            if doc_text.strip():
+                                summary = generate_doc_summary(doc_text, fname)
+                                file_info['summary'] = summary
+                                success_count += 1
+                    except Exception as e:
+                        st.warning(f"⚠️ {fname}: {str(e)}")
+                        
+                        progress_bar.progress((i + 1) / selected_count)
+                    
+                    # 保存 manifest
+                    with open(ManifestManager.get_path(db_path), 'w', encoding='utf-8') as f:
+                        json.dump(doc_manager.manifest, f, indent=4, ensure_ascii=False)
+                    
+                    status_text.empty()
+                    progress_bar.empty()
+                    st.success(f"✅ 已生成 {success_count}/{selected_count} 个摘要")
+                    st.session_state.selected_for_summary = set()
+                    time.sleep(1)
+                    st.rerun()  # 立即刷新页面显示摘要
             
             # 文档列表标签页 (v1.6)
             with tab2:
