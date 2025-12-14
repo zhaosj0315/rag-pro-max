@@ -24,9 +24,26 @@ def render_compact_sidebar():
                 selected_kb = st.selectbox("当前知识库", kb_list, key="kb_selector")
                 st.session_state.active_kb_name = selected_kb
                 
-                # 如果名称太长，显示完整名称提示
-                if len(selected_kb) > 18:
-                    st.caption(f"📌 {selected_kb}")
+                # 增强的名称显示 - 解决遮挡问题
+                if len(selected_kb) > 15:
+                    st.markdown(
+                        f"""
+                        <div style="
+                            background-color: #e6f3ff;
+                            border: 1px solid #b3d7ff;
+                            padding: 8px;
+                            border-radius: 4px;
+                            font-size: 0.85em;
+                            word-wrap: break-word;
+                            margin-top: -10px;
+                            margin-bottom: 10px;
+                            color: #004085;
+                        ">
+                            📍 <b>完整名称:</b><br/>{selected_kb}
+                        </div>
+                        """, 
+                        unsafe_allow_html=True
+                    )
             else:
                 st.info("暂无知识库")
                 st.session_state.active_kb_name = None
