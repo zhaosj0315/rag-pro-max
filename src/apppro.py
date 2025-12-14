@@ -139,6 +139,9 @@ perf_monitor = get_monitor()
 # 查询改写 (v1.6)
 from src.query.query_rewriter import QueryRewriter
 
+# 知识库名称优化器
+from src.utils.kb_name_optimizer import KBNameOptimizer, sanitize_filename
+
 # 文档预览 (v1.6)
 from src.kb.document_viewer import DocumentViewer
 from src.ui.document_preview import show_upload_preview, show_kb_documents
@@ -199,98 +202,37 @@ def show_document_detail_dialog(kb_name: str, file_info: dict) -> None:
         st.rerun()
 
 def generate_smart_kb_name(target_path, cnt, file_types, folder_name):
-    """智能生成知识库名称 - 重点优化多文件和文件夹场景"""
-    import re
-    from datetime import datetime
+    """智能生成知识库名称 - 使用优化器确保唯一性"""
+    # 使用优化器的建议名称功能
+    suggested_name = KBNameOptimizer.suggest_name_from_content(target_path, cnt, list(file_types.keys()))
     
-    # 分析文件类型
-    main_types = sorted(file_types.items(), key=lambda x: x[1], reverse=True)
-    if not main_types:
-        return f"{folder_name}_{datetime.now().strftime('%m%d')}"
-    
-    main_ext = main_types[0][0].replace('.', '').upper()
-    
-    # 获取所有文件名（不含扩展名）
-    all_files = []
-    try:
-        for f in os.listdir(target_path):
-            if not f.startswith('.'):
-                all_files.append(os.path.splitext(f)[0])
-    except:
-        pass
-    
-    # 策略1: 单文件 - 清理文件名
-    if cnt == 1 and all_files:
-        filename = all_files[0]
-        clean_name = re.sub(r'[_\-\s]*(?:v?\d+[\.\d]*|20\d{2}[\-\d]*|final|draft|copy|backup|new|old|temp).*$', '', filename, flags=re.IGNORECASE)
-        clean_name = re.sub(r'^[_\-\s]+|[_\-\s]+$', '', clean_name)
-        if clean_name and len(clean_name) > 2:
-            return clean_name[:20]
-    
-    # 策略2: 多文件 - 寻找共同前缀（优先级最高）
-    if len(all_files) > 1:
-        common_prefix = os.path.commonprefix(all_files)
-        clean_prefix = re.sub(r'[_\-\s\d]*$', '', common_prefix)
-        if len(clean_prefix) >= 3:
-            return clean_prefix[:15]
-    
-    # 策略3: 分析高频有意义词汇（文件上传场景重点优化）
-    if all_files:
-        words = []
-        for filename in all_files:
-            parts = re.split(r'[_\-\s\.\d]+', filename.lower())
-            words.extend([w for w in parts if len(w) >= 3])
-        
-        if words:
-            from collections import Counter
-            word_freq = Counter(words)
-            stop_words = {
-                'the', 'and', 'for', 'with', 'doc', 'file', 'new', 'old', 'temp', 'test', 'demo',
-                'pdf', 'docx', 'txt', 'xlsx', 'ppt', 'html', 'json', 'csv', 'info', 'case'
+    # 如果没有建议名称，使用备用逻辑
+    if not suggested_name:
+        # 分析文件类型
+        main_types = sorted(file_types.items(), key=lambda x: x[1], reverse=True)
+        if not main_types:
+            suggested_name = "文档知识库"
+        else:
+            main_ext = main_types[0][0].replace('.', '').upper()
+            
+            # 根据文件类型生成基础名称
+            type_names = {
+                'PDF': 'PDF文档库', 'DOCX': 'Word文档库', 'DOC': 'Word文档库',
+                'MD': 'Markdown笔记', 'TXT': '文本文档库',
+                'PY': 'Python代码库', 'JS': 'JavaScript代码库', 'JAVA': 'Java代码库',
+                'XLSX': 'Excel数据库', 'CSV': 'CSV数据集',
+                'PPT': 'PPT演示库', 'PPTX': 'PPT演示库',
+                'HTML': '网页文档库', 'JSON': 'JSON配置库'
             }
-            # 降低阈值：只需出现1次，但优先选择出现多次的
-            meaningful_words = [
-                (w, c) for w, c in word_freq.most_common(5) 
-                if w not in stop_words and len(w) >= 3
-            ]
-            if meaningful_words:
-                # 优先选择出现次数多的，其次选择长度长的
-                best_word = max(meaningful_words, key=lambda x: (x[1], len(x[0])))
-                return best_word[0].capitalize()[:12]
-    
-    # 策略4: 基于文件夹名（如果有意义且不是batch_xxx）
-    if folder_name and not folder_name.startswith('batch_') and folder_name not in ['temp_uploads', 'uploads', 'documents', 'files', 'temp']:
-        clean_folder = re.sub(r'[_\-\s]*(?:20\d{2}[\-\d]*|backup|copy|new|old|temp|v\d+).*$', '', folder_name, flags=re.IGNORECASE)
-        clean_folder = re.sub(r'^[_\-\s]+|[_\-\s]+$', '', clean_folder)
-        
-        # 文件夹名智能处理
-        if clean_folder and len(clean_folder) >= 2:
-            # 处理下划线分隔的复合词
-            if '_' in clean_folder:
-                parts = clean_folder.split('_')
-                meaningful_parts = [p for p in parts[:3] if len(p) >= 2]
-                if meaningful_parts:
-                    if len(meaningful_parts) == 1:
-                        return meaningful_parts[0][:15]
-                    else:
-                        combined = '_'.join(meaningful_parts[:2])
-                        return combined[:15]
+            
+            if len(main_types) == 1:
+                suggested_name = type_names.get(main_ext, f"{main_ext}文档库")
             else:
-                return clean_folder[:15]
+                suggested_name = f"混合文档库_{cnt}个文件"
     
-    # 策略5: 基于文件类型的智能命名（最后选择）
-    type_names = {
-        'PDF': '文档库', 'DOCX': '文档库', 'DOC': '文档库',
-        'MD': '笔记本', 'TXT': '文本集',
-        'PY': 'Python项目', 'JS': 'JS项目', 'JAVA': 'Java项目',
-        'XLSX': '数据表', 'CSV': '数据集',
-        'PPT': '演示文稿', 'PPTX': '演示文稿',
-        'HTML': '网页集', 'JSON': '配置集'
-    }
-    
-    base_name = type_names.get(main_ext, f"{main_ext}文件")
-    date_suffix = datetime.now().strftime("%m%d")
-    return f"{base_name}_{date_suffix}"
+    # 使用优化器确保名称唯一性（会在需要时添加时间戳）
+    from src.core.app_config import output_base
+    return KBNameOptimizer.generate_unique_name(suggested_name, output_base)
 
 # 引入 RAG 引擎
 from src.rag_engine import RAGEngine
@@ -804,6 +746,8 @@ with st.sidebar:
             with src_tab_local:
                 local_type = st.radio("方式", ["📄 上传文件", "✍️ 粘贴文本"], horizontal=True, label_visibility="collapsed")
                 
+                uploaded_files = None  # 初始化变量
+                
                 if "上传文件" in local_type:
                     uploaded_files = st.file_uploader(
                         "拖入文件 (PDF, DOCX, TXT, MD)", 
@@ -842,16 +786,49 @@ with st.sidebar:
                             st.warning("内容不能为空")
             
             with src_tab_web:
-                # 基础配置 - 紧凑布局
-                crawl_url = st.text_input("🔗 网址", placeholder="python.org", help="支持自动添加https://")
-                
-                col1, col2, col3 = st.columns([2, 1, 1])
+                # 输入方式选择 - 使用更紧凑的布局
+                col1, col2 = st.columns(2)
                 with col1:
-                    parser_type = st.selectbox("解析器", ["default", "article", "documentation"], help="内容提取模式")
+                    url_mode = st.button("🔗 网址抓取", use_container_width=True, key="url_mode_btn")
                 with col2:
-                    crawl_depth = st.number_input("深度", 1, 5, 2, help="递归层级")
-                with col3:
-                    max_pages = st.number_input("页数", 1, 9999, 10, help="最大页数")
+                    search_mode = st.button("🔍 关键词搜索", use_container_width=True, key="search_mode_btn")
+                
+                # 根据按钮点击确定模式
+                if url_mode:
+                    st.session_state.crawl_input_mode = "url"
+                elif search_mode:
+                    st.session_state.crawl_input_mode = "search"
+                
+                # 获取当前模式
+                current_mode = st.session_state.get('crawl_input_mode', 'url')
+                
+                if current_mode == "url":
+                    # 网址抓取模式
+                    crawl_url = st.text_input("🔗 网址", placeholder="python.org", help="支持自动添加https://")
+                    search_keyword = None
+                    
+                    # 抓取参数
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        crawl_depth = st.number_input("递归深度", 1, 10, 2, help="抓取多少层链接")
+                    with col2:
+                        max_pages = st.number_input("每层页数", 1, 1000, 20, help="每层最多抓取页数")
+                    with col3:
+                        parser_type = st.selectbox("解析器", ["default", "article", "documentation"])
+                    
+                else:  # current_mode == "search"
+                    # 关键词搜索模式
+                    crawl_url = None
+                    search_keyword = st.text_input("🔍 搜索关键词", placeholder="Python编程、机器学习、人工智能", help="全网搜索相关内容")
+                    
+                    # 搜索参数
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        max_pages = st.number_input("每引擎页数", 10, 500, 50, help="每个搜索引擎抓取的页数（共5个引擎：Google、Bing、维基百科、知乎、百度百科）")
+                    with col2:
+                        parser_type = st.selectbox("解析器", ["default", "article", "documentation"])
+                    
+                    crawl_depth = 1  # 搜索模式固定深度1
                 
                 # 排除配置 - 可选
                 with st.expander("🚫 排除链接 (可选)", expanded=False):
@@ -860,11 +837,22 @@ with st.sidebar:
                                                height=68)
                     exclude_patterns = [line.strip() for line in exclude_text.split('\n') if line.strip()] if exclude_text else []
                 
+                # 知识库设置
+                st.write("### 📚 知识库设置")
+                
+                web_kb_name = st.text_input(
+                    "知识库名称", 
+                    placeholder="留空自动生成（推荐）", 
+                    help="每次抓取创建独立的知识库，便于管理不同时间的内容"
+                )
+                
+                st.caption("💡 每次抓取都会创建一个独立的知识库，包含本次抓取的所有网页")
+                
                 # 抓取按钮
-                if st.button("🕷️ 开始抓取", use_container_width=True, type="primary"):
-                    if not crawl_url:
-                        st.error("请输入网址")
-                    else:
+                btn_disabled = not crawl_url and not search_keyword
+                if st.button("🚀 抓取并创建知识库", use_container_width=True, type="primary", disabled=btn_disabled):
+                    if crawl_url:
+                        # 网址抓取模式
                         try:
                             from src.processors.web_crawler import WebCrawler
                             crawler = WebCrawler()
@@ -875,10 +863,15 @@ with st.sidebar:
                             
                             def update_status(msg):
                                 status_text.text(f"📡 {msg}")
+                                # 添加日志记录
+                                logger.info(f"🌐 网页爬取: {msg}")
                                 if "已保存" in msg:
                                     crawled_count[0] += 1
                                     progress = min(crawled_count[0] / max_pages, 1.0)
                                     progress_bar.progress(progress)
+                            
+                            # 记录爬取开始
+                            logger.info(f"🌐 开始网页爬取: {crawl_url} (深度:{crawl_depth}, 页数:{max_pages})")
                             
                             with st.spinner("抓取中..."):
                                 saved_files = crawler.crawl_advanced(
@@ -892,19 +885,55 @@ with st.sidebar:
                             
                             progress_bar.progress(1.0)
                             
+                            # 记录爬取结果
+                            logger.success(f"🌐 网页爬取完成: 获取 {len(saved_files)} 个页面")
+                            
                             if saved_files:
-                                st.success(f"✅ 完成！获取 {len(saved_files)} 页")
+                                # 生成知识库名称
+                                if web_kb_name:
+                                    kb_name = web_kb_name
+                                else:
+                                    # 自动生成名称
+                                    from urllib.parse import urlparse
+                                    from datetime import datetime
+                                    domain = urlparse(crawler._fix_url(crawl_url)).netloc.replace('.', '_').replace('-', '_')
+                                    timestamp = datetime.now().strftime('%Y%m%d')
+                                    kb_name = f"Web_{domain}_{timestamp}"
+
+                                # 使用统一的命名逻辑确保唯一性
+                                from src.core.app_config import output_base
+                                if not web_kb_name:
+                                    base_name = f"Web_{domain}"
+                                    kb_name = KBNameOptimizer.generate_unique_name(base_name, output_base)
+                                
+                                st.success(f"✅ 抓取完成！获取 {len(saved_files)} 页，正在创建知识库: {kb_name}")
+                                
+                                # 设置知识库构建参数
+                                st.session_state.uploaded_path = os.path.abspath(crawler.output_dir)
+                                st.session_state.upload_auto_name = kb_name
+                                st.session_state.auto_build_kb = True
+                                st.session_state.selected_kb = kb_name
+                                
+                                # 触发知识库构建
+                                with st.spinner(f"正在创建知识库: {kb_name}"):
+                                    st.session_state.auto_build_kb = True
+                                    st.session_state.selected_kb = kb_name  # 自动跳转到新知识库
+                                    time.sleep(1)
+                                
+                                st.success(f"🎉 知识库 '{kb_name}' 构建完成！已自动切换")
                                 
                                 # 简洁的结果显示
-                                with st.expander("📊 抓取详情", expanded=False):
+                                with st.expander("📊 构建详情", expanded=False):
+                                    st.write(f"**知识库名称**: {kb_name}")
+                                    st.write(f"**抓取页面**: {len(saved_files)} 页")
+                                    st.write(f"**创建时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
                                     for i, file_path in enumerate(saved_files[:3], 1):
                                         file_name = os.path.basename(file_path)
-                                        file_size = os.path.getsize(file_path)
-                                        st.text(f"{i}. {file_name} ({file_size:,} bytes)")
+                                        st.text(f"{i}. {file_name}")
                                     if len(saved_files) > 3:
                                         st.text(f"... 还有 {len(saved_files) - 3} 个文件")
                                 
-                                # 推荐问题 - 紧凑显示
+                                # 推荐问题
                                 try:
                                     from src.chat.web_suggestion_engine import WebSuggestionEngine
                                     web_engine = WebSuggestionEngine()
@@ -912,26 +941,120 @@ with st.sidebar:
                                     
                                     if web_suggestions:
                                         st.markdown("**💡 推荐问题:**")
-                                        for i, suggestion in enumerate(web_suggestions[:4], 1):
+                                        for i, suggestion in enumerate(web_suggestions[:3], 1):
                                             if st.button(suggestion, key=f"web_q_{i}", use_container_width=True):
                                                 st.session_state.suggested_question = suggestion
                                                 st.rerun()
                                 except:
                                     pass
                                 
-                                # 设置上传路径
-                                st.session_state.uploaded_path = os.path.abspath(crawler.output_dir)
-                                from urllib.parse import urlparse
-                                domain = urlparse(crawler._fix_url(crawl_url)).netloc.replace('.', '_')
-                                st.session_state.upload_auto_name = f"Web_{domain}_{len(saved_files)}"
-                                
-                                time.sleep(1)
                                 st.rerun()
+                            
                             else:
                                 st.warning("未获取到内容")
                                 
                         except Exception as e:
                             st.error(f"抓取失败: {str(e)}")
+                    
+                    elif search_keyword:
+                        # 关键词全网搜索
+                        try:
+                            from src.processors.web_crawler import WebCrawler
+                            crawler = WebCrawler()
+                            
+                            progress_bar = st.progress(0)
+                            status_text = st.empty()
+                            all_saved_files = []
+                            
+                            def update_status(msg):
+                                status_text.text(f"🔍 {msg}")
+                                # 添加日志记录
+                                logger.info(f"🔍 关键词搜索: {msg}")
+                            
+                            # 全网搜索网站列表
+                            search_engines = [
+                                f"https://www.google.com/search?q={search_keyword}",
+                                f"https://www.bing.com/search?q={search_keyword}",
+                                f"https://zh.wikipedia.org/wiki/Special:Search?search={search_keyword}",
+                                f"https://www.zhihu.com/search?type=content&q={search_keyword}",
+                                f"https://baike.baidu.com/search?word={search_keyword}"
+                            ]
+                            
+                            # 记录搜索开始
+                            logger.info(f"🔍 开始关键词搜索: '{search_keyword}' (每个引擎:{max_pages}页, 共{len(search_engines)}个引擎)")
+                            
+                            # 在多个搜索引擎中搜索
+                            for i, search_url in enumerate(search_engines):
+                                engine_name = ["Google", "Bing", "维基百科", "知乎", "百度百科"][i]
+                                update_status(f"正在搜索 {engine_name}: {search_keyword}")
+                                logger.info(f"🔍 搜索引擎: {engine_name} - {search_url}")
+                                
+                                try:
+                                    with st.spinner(f"搜索 {engine_name}..."):
+                                        saved_files = crawler.crawl_advanced(
+                                            start_url=search_url,
+                                            max_depth=1,
+                                            max_pages=max_pages,  # 每个搜索引擎使用完整的页数
+                                            exclude_patterns=exclude_patterns,
+                                            parser_type=parser_type,
+                                            status_callback=update_status
+                                        )
+                                        all_saved_files.extend(saved_files)
+                                        
+                                    progress_bar.progress((i + 1) / len(search_engines))
+                                    
+                                except Exception as e:
+                                    update_status(f"❌ {engine_name} 搜索失败: {e}")
+                                    continue
+                            
+                            progress_bar.progress(1.0)
+                            
+                            if all_saved_files:
+                                # 生成基础名称
+                                if web_kb_name:
+                                    base_name = web_kb_name
+                                else:
+                                    # 自动生成名称
+                                    base_name = f"Search_{search_keyword.replace(' ', '_')[:10]}"
+                                
+                                # 使用统一的命名逻辑确保唯一性
+                                from src.core.app_config import output_base
+                                kb_name = KBNameOptimizer.generate_unique_name(base_name, output_base)
+                                
+                                st.success(f"✅ 全网搜索完成！获取 {len(all_saved_files)} 页，正在创建知识库: {kb_name}")
+                                
+                                # 记录搜索完成
+                                logger.success(f"🔍 关键词搜索完成: '{search_keyword}' - 获取 {len(all_saved_files)} 个页面")
+                                
+                                # 设置知识库构建参数
+                                st.session_state.uploaded_path = os.path.abspath(crawler.output_dir)
+                                st.session_state.upload_auto_name = kb_name
+                                st.session_state.auto_build_kb = True
+                                st.session_state.selected_kb = kb_name
+                                
+                                # 触发知识库构建
+                                with st.spinner(f"正在创建知识库: {kb_name}"):
+                                    st.session_state.auto_build_kb = True
+                                    st.session_state.selected_kb = kb_name  # 自动跳转到新知识库
+                                    time.sleep(1)
+                                
+                                st.success(f"🎉 知识库 '{kb_name}' 构建完成！已自动切换")
+                                
+                                # 简洁的结果显示
+                                with st.expander("📊 构建详情", expanded=False):
+                                    st.write(f"**知识库名称**: {kb_name}")
+                                    st.write(f"**搜索关键词**: {search_keyword}")
+                                    st.write(f"**搜索方式**: 全网搜索")
+                                    st.write(f"**抓取页面**: {len(all_saved_files)} 页")
+                                    st.write(f"**创建时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                                
+                                st.rerun()
+                            
+                            else:
+                                st.warning("未搜索到相关内容")
+                                
+                        except Exception as e:
+                            st.error(f"搜索失败: {str(e)}")
                 
                 # 简洁的使用提示
                 st.caption("💡 支持 python.org 等简化输入，自动添加 https:// 前缀")
@@ -1063,145 +1186,123 @@ with st.sidebar:
                 final_kb_name = current_kb_name
 
             # 高级选项
-            with st.expander("🔧 高级选项", expanded=True):
+            with st.expander("🔧 高级选项", expanded=False):
+                # 第一行：索引和元数据选项
                 adv_col1, adv_col2 = st.columns(2)
                 with adv_col1:
-                    force_reindex = st.checkbox("🔄 强制重建索引", False, help="删除现有索引，重新构建（用于修复损坏的索引）")
+                    force_reindex = st.checkbox("🔄 强制重建索引", False, help="删除现有索引，重新构建")
+                    use_ocr = st.checkbox("🔍 启用OCR识别", value=False, help="识别PDF中的图片文字（耗时较长）", key="kb_use_ocr")
                 with adv_col2:
-                    extract_metadata = st.checkbox(
-                        "📊 提取元数据", 
-                        value=False,
-                        help="开启后提取文件分类、关键词等信息，但会降低 30% 处理速度"
-                    )
-                    # st.caption("📊 完整模式：提取元数据，可查看分类和关键词") # Removed as redundant now
+                    extract_metadata = st.checkbox("📊 提取元数据", value=False, help="提取文件分类、关键词等信息")
+                    generate_summary = st.checkbox("📝 生成文档摘要", value=False, help="为每个文档生成AI摘要", key="kb_generate_summary")
+                
+                # 保存到session state
+                st.session_state.use_ocr = use_ocr
+                st.session_state.generate_summary = generate_summary
+                
+                # 简化的处理模式提示
+                if use_ocr or generate_summary or extract_metadata or force_reindex:
+                    options = []
+                    if force_reindex: options.append("重建索引")
+                    if extract_metadata: options.append("提取元数据")
+                    if use_ocr: options.append("OCR识别")
+                    if generate_summary: options.append("生成摘要")
+                    st.caption(f"🔧 启用选项: {' | '.join(options)}")
+                else:
+                    st.caption("⚡ 快速模式：所有高级选项已关闭")
 
 
             st.write("")
 
             btn_label = "🚀 立即创建" if is_create_mode else ("➕ 执行追加" if action_mode=="APPEND" else "🔄 执行覆盖")
             btn_start = st.button(btn_label, type="primary", use_container_width=True)
+            
+            # 检查是否需要自动构建知识库（网页抓取触发）
+            if st.session_state.get('auto_build_kb', False):
+                st.session_state.auto_build_kb = False  # 清除标记
+                btn_start = True  # 自动触发构建
 
         # --- 现有库的管理 ---
         if not is_create_mode:
             st.write("")
             
-            # 聊天控制 - 单行紧凑布局
-            chat_cols = st.columns(4)
-
-            # 撤销按钮
-            if chat_cols[0].button("↩️ 撤销", use_container_width=True, disabled=len(state.get_messages()) < 2, help="撤销上一组问答"):
-                if len(state.get_messages()) >= 2:
-                    st.session_state.messages.pop()
-                    st.session_state.messages.pop()
+            # 💬 聊天控制 - 2×2布局
+            st.write("**💬 聊天控制**")
+            row1_col1, row1_col2 = st.columns(2)
+            row2_col1, row2_col2 = st.columns(2)
+            
+            with row1_col1:
+                if st.button("🔄 撤销", use_container_width=True, disabled=len(state.get_messages()) < 2):
+                    if len(state.get_messages()) >= 2:
+                        st.session_state.messages.pop()
+                        st.session_state.messages.pop()
+                        if current_kb_name:
+                            HistoryManager.save(current_kb_name, state.get_messages())
+                        st.toast("✅ 已撤销")
+                        time.sleep(0.5)
+                        st.rerun()
+            
+            with row1_col2:
+                if st.button("🧹 清空", use_container_width=True, disabled=len(state.get_messages()) == 0):
+                    st.session_state.messages = []
+                    st.session_state.suggestions_history = []
                     if current_kb_name:
-                        HistoryManager.save(current_kb_name, state.get_messages())
-                    st.toast("✅ 已撤销")
+                        HistoryManager.save(current_kb_name, [])
+                    st.toast("✅ 已清空")
                     time.sleep(0.5)
                     st.rerun()
-
-            # 清空按钮
-            if chat_cols[1].button("🧹 清空", use_container_width=True, disabled=len(state.get_messages()) == 0, help="清空所有对话"):
-                st.session_state.messages = []
-                st.session_state.suggestions_history = []
-                if current_kb_name:
-                    HistoryManager.save(current_kb_name, [])
-                st.toast("✅ 已清空")
-                time.sleep(0.5)
-                st.rerun()
             
-            # 导出按钮
-            if chat_cols[2].button("📥 导出", use_container_width=True, disabled=len(state.get_messages()) == 0, help="导出为Markdown"):
-                export_content = f"# 对话记录 - {current_kb_name}\n\n"
-                export_content += f"**导出时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                export_content += "---\n\n"
-                for i, msg in enumerate(st.session_state.messages, 1):
-                    role = "👤 用户" if msg["role"] == "user" else "🤖 助手"
-                    export_content += f"## {role} ({i})\n\n{msg['content']}\n\n"
+            with row2_col1:
+                export_content = ""
+                if len(state.get_messages()) > 0:
+                    export_content = f"# 对话记录 - {current_kb_name}\n\n**导出时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n\n"
+                    for i, msg in enumerate(st.session_state.messages, 1):
+                        role = "👤 用户" if msg["role"] == "user" else "🤖 助手"
+                        export_content += f"## {role} ({i})\n\n{msg['content']}\n\n"
                 
-                # 这里有点 tricky，button 无法直接触发 download_button 的动作。
-                # 我们可以用 state 标记，或者直接渲染 download_button
-                # 为了保持单行布局，最好的办法是直接在这里放 download_button
-                # 但 download_button 点击后会重载。
-                # 让我们尝试把 download_button 直接放在列里，而不是先 button 再 download
-                pass # 逻辑将在下面修正
+                st.download_button("📥 导出", export_content, file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d')}.md", mime="text/markdown", use_container_width=True, disabled=len(state.get_messages()) == 0)
             
-            # 修正：直接在列中渲染 download_button
-            # 注意：download_button 需要 data 参数
-            export_content = ""
-            if len(state.get_messages()) > 0:
-                export_content = f"# 对话记录 - {current_kb_name}\n\n**导出时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n\n"
-                for i, msg in enumerate(st.session_state.messages, 1):
-                    role = "👤 用户" if msg["role"] == "user" else "🤖 助手"
-                    export_content += f"## {role} ({i})\n\n{msg['content']}\n\n"
-
-            chat_cols[2].download_button(
-                "📥 导出",
-                export_content,
-                file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d')}.md",
-                mime="text/markdown",
-                use_container_width=True,
-                disabled=len(state.get_messages()) == 0
-            )
-
-            # 统计按钮
-            if chat_cols[3].button("📊 统计", use_container_width=True, disabled=len(state.get_messages()) == 0, help="查看统计"):
-                qa_count = len(state.get_messages()) // 2
-                total_chars = sum(len(msg["content"]) for msg in st.session_state.messages)
-                st.toast(f"💬 {qa_count} 轮对话 | 📝 {total_chars} 字符")
+            with row2_col2:
+                if st.button("📊 统计", use_container_width=True, disabled=len(state.get_messages()) == 0):
+                    qa_count = len(state.get_messages()) // 2
+                    total_chars = sum(len(msg["content"]) for msg in st.session_state.messages)
+                    st.toast(f"💬 {qa_count} 轮对话 | 📝 {total_chars} 字符")
+            
+            st.write("")
+            
+            # 🛠️ 系统操作 - 1×2布局
+            st.write("**🛠️ 系统操作**")
+            sys_col1, sys_col2 = st.columns(2)
+            
+            with sys_col1:
+                st.link_button("🔀 新窗口", "http://localhost:8501", use_container_width=True)
+            
+            with sys_col2:
+                if st.button("🗑️ 删除知识库", use_container_width=True, disabled=not current_kb_name):
+                    st.session_state.confirm_delete = True
+                    st.rerun()
+            
+            # 删除确认对话框
+            if st.session_state.get('confirm_delete', False):
+                st.warning(f"⚠️ 确认删除知识库 '{current_kb_name}' 吗？")
+                confirm_col1, confirm_col2 = st.columns(2)
+                
+                with confirm_col1:
+                    if st.button("✅ 确认删除", type="primary", use_container_width=True):
+                        st.toast(f"🗑️ 已删除知识库: {current_kb_name}")
+                        st.session_state.current_nav = "➕ 新建知识库..."
+                        st.session_state.confirm_delete = False
+                        st.rerun()
+                
+                with confirm_col2:
+                    if st.button("❌ 取消", use_container_width=True):
+                        st.session_state.confirm_delete = False
+                        st.rerun()
 
             # 底部工具栏 - 单行布局
             st.write("")
             tool_cols = st.columns(3)
             
-            # 1. 并行对话
-            tool_cols[0].link_button("🔀 新窗口", "http://localhost:8501", help="新开窗口并行对话", use_container_width=True)
-            
-            # 2. 快速开始
-            if tool_cols[1].button("⚡ 快速开始", use_container_width=True, help="一键配置默认环境"):
-                # 保存快速配置
-                quick_config = {
-                    "llm_type_idx": 0,
-                    "llm_url_ollama": "http://127.0.0.1:11434",
-                    "llm_model_ollama": "qwen2.5:7b",
-                    "embed_provider_index": 0,
-                    "embed_model_hf": "BAAI/bge-small-zh-v1.5"
-                }
-                defaults.update(quick_config)
-                with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-                    json.dump(defaults, f, indent=4, ensure_ascii=False)
-                st.toast("✅ 已应用默认配置")
-                time.sleep(0.5)
-                st.rerun()
-
-            # 3. 删除知识库
-            if 'confirm_delete' not in st.session_state:
-                st.session_state.confirm_delete = False
-
-            if tool_cols[2].button("🗑️ 删除", use_container_width=True, type="secondary", help="删除当前知识库"):
-                st.session_state.confirm_delete = not st.session_state.confirm_delete
-
-            # 删除确认区 (显示在下方)
-            if st.session_state.confirm_delete:
-                st.warning(f"⚠️ 确认删除 **{current_kb_name}**？")
-                del_cols = st.columns(2)
-                if del_cols[0].button("✅ 确认", use_container_width=True, type="primary"):
-                    try:
-                        with st.spinner(f"正在删除..."):
-                            shutil.rmtree(os.path.join(output_base, current_kb_name), ignore_errors=True)
-                            hist_path = os.path.join(HISTORY_DIR, f"{current_kb_name}.json")
-                            if os.path.exists(hist_path):
-                                os.remove(hist_path)
-                        st.session_state.current_nav = "➕ 新建知识库..."
-                        st.session_state.confirm_delete = False
-                        st.session_state.pop('suggestions_history', None)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"删除失败: {e}")
-                
-                if del_cols[1].button("❌ 取消", use_container_width=True):
-                    st.session_state.confirm_delete = False
-                    st.rerun()
-
     
     with tab_config:
         st.session_state.current_tab = "config"
@@ -1779,12 +1880,18 @@ if btn_start:
         st.error("请输入知识库名称")
     else:
         try:
-            clean_kb_name = sanitize_filename(final_kb_name)
-            if not clean_kb_name: raise ValueError("知识库名称包含非法字符或为空")
+            # 使用优化器生成唯一名称，避免重复和时间戳冲突
+            optimized_name = KBNameOptimizer.generate_unique_name(final_kb_name, output_base)
+            
+            if not optimized_name: 
+                raise ValueError("知识库名称包含非法字符或为空")
+            
+            # 如果名称被优化了，提示用户
+            if optimized_name != final_kb_name:
+                st.info(f"💡 名称已优化: `{final_kb_name}` → `{optimized_name}`")
                 
-            # 修复：直接对模块级变量 final_kb_name 赋值，不再需要 global 关键字
-            # final_kb_name 在侧边栏已定义
-            final_kb_name = clean_kb_name
+            # 使用优化后的名称
+            final_kb_name = optimized_name
             
             process_knowledge_base_logic()
             st.session_state.current_nav = f"📂 {final_kb_name}"
@@ -2490,6 +2597,20 @@ if st.session_state.get("quote_content"):
             st.session_state.quote_content = None
             st.rerun()
 
+# 查询优化设置
+with st.expander("🔧 查询设置", expanded=False):
+    enable_query_optimization = st.checkbox(
+        "💡 启用查询优化", 
+        value=st.session_state.get('enable_query_optimization', False),
+        help="AI会分析并优化你的问题，提升检索准确性"
+    )
+    st.session_state.enable_query_optimization = enable_query_optimization
+    
+    if enable_query_optimization:
+        st.caption("✅ 系统会建议优化查询，由你选择是否使用")
+    else:
+        st.caption("📝 直接使用原问题进行检索")
+
 # 处理输入
 user_input = st.chat_input("输入问题...")
 
@@ -2602,23 +2723,32 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
         logger.start_operation("查询", f"知识库: {active_kb_name}")
         
         # 查询改写 (v1.6) - 在处理引用内容之前
-        query_rewriter = QueryRewriter(Settings.llm)
-        should_rewrite, reason = query_rewriter.should_rewrite(final_prompt)
-        
-        if should_rewrite:
-            logger.info(f"💡 检测到需要改写查询: {reason}")
-            rewritten_query = query_rewriter.suggest_rewrite(final_prompt)
+        # 只有在用户启用查询优化时才进行
+        if st.session_state.get('enable_query_optimization', False):
+            query_rewriter = QueryRewriter(Settings.llm)
+            should_rewrite, reason = query_rewriter.should_rewrite(final_prompt)
             
-            if rewritten_query and rewritten_query != final_prompt:
-                # 保存原问题用于显示
-                original_prompt = final_prompt
-                # 自动使用优化后的查询，不等待用户选择
-                logger.info(f"✅ 自动使用优化后的查询: {final_prompt} → {rewritten_query}")
-                final_prompt = rewritten_query
+            if should_rewrite:
+                logger.info(f"💡 检测到需要改写查询: {reason}")
+                rewritten_query = query_rewriter.suggest_rewrite(final_prompt)
                 
-                # 显示改写信息（不阻塞）
-                with st.chat_message("assistant", avatar="🤖"):
-                    st.info(f"💡 **查询已自动优化**\n\n原问题：{original_prompt}\n\n优化后：{rewritten_query}")
+                if rewritten_query and rewritten_query != final_prompt:
+                    # 显示优化建议，让用户选择
+                    with st.chat_message("assistant", avatar="🤖"):
+                        st.info(f"💡 **查询优化建议**\n\n原问题：{final_prompt}\n\n优化后：{rewritten_query}")
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button("✅ 使用优化后的查询", key=f"use_optimized_{len(st.session_state.messages)}"):
+                                final_prompt = rewritten_query
+                                logger.info(f"✅ 用户选择使用优化后的查询: {rewritten_query}")
+                                st.rerun()
+                        with col2:
+                            if st.button("📝 使用原问题", key=f"use_original_{len(st.session_state.messages)}"):
+                                logger.info(f"📝 用户选择使用原问题: {final_prompt}")
+                                st.rerun()
+                        
+                        st.stop()  # 等待用户选择
         
         
         # 处理引用内容
@@ -2654,7 +2784,9 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
         
         with st.chat_message("assistant", avatar="🤖"):
             msg_placeholder = st.empty()
-            with st.status("⏳ 正在检索并思考...", expanded=True):
+            
+            # 使用一个连贯的spinner包装整个问答流程
+            with st.spinner("🤖 正在思考并准备完整回答..."):
                 try:
                     # 开始计时
                     start_time = time.time()
@@ -2697,9 +2829,6 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                             token_count += 1
                         
                         msg_placeholder.markdown(full_text)
-                    
-                    # status 块结束，确保回答仍然显示
-                    msg_placeholder.markdown(full_text)
                     
                     # 提取 token 统计 (优先使用真实数据)
                     prompt_tokens = 0
@@ -2794,27 +2923,11 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         "sources": srcs,
                         "stats": stats
                     })
-                    # 历史记录保存已移动到流程末尾
                     
-                    # 在前端显示统计信息
-                    stats_simple = f"⏱️ {total_time:.1f}秒 | 📝 约 {token_count} 字符"
-                    st.caption(stats_simple)
-                    
-                    # 详细信息 (折叠)
-                    with st.expander("📊 详细统计", expanded=True):
-                        st.caption(f"🚀 速度: {tokens_per_sec:.1f} tokens/s")
-                        if prompt_tokens:
-                            st.caption(f"📥 输入: {prompt_tokens} | 📤 输出: {completion_tokens}")
-                    
-                    # 问答结束后，自动生成初始追问，并添加到 suggestions_history
-                    # 使用 container 来显示加载状态，避免界面跳动
-                    st.divider()
-                    sug_container = st.empty()
-                    sug_container.caption("✨ 正在生成推荐问题...")
-                    # 排除已有的问题（历史+队列+已生成的追问）
+                    # 生成推荐问题（在spinner内完成）
                     existing_questions = [m['content'] for m in st.session_state.messages if m['role'] == 'user']
                     existing_questions.extend(st.session_state.question_queue)
-                    existing_questions.extend(st.session_state.suggestions_history)  # 排除已生成的追问
+                    existing_questions.extend(st.session_state.suggestions_history)
                     
                     # 获取LLM模型
                     llm_model = None
@@ -2822,16 +2935,8 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         chat_engine = st.session_state.chat_engine
                         if hasattr(chat_engine, '_llm'):
                             llm_model = chat_engine._llm
-                            logger.info(f"🔍 从chat_engine._llm获取LLM: {type(llm_model)}")
                         elif hasattr(chat_engine, 'llm'):
                             llm_model = chat_engine.llm
-                            logger.info(f"🔍 从chat_engine.llm获取LLM: {type(llm_model)}")
-                        else:
-                            logger.info("⚠️ chat_engine中未找到LLM")
-                    else:
-                        logger.info("⚠️ chat_engine未设置")
-                    
-                    logger.info(f"🔍 推荐问题生成 - LLM可用: {llm_model is not None}")
                     
                     initial_sugs = generate_follow_up_questions(
                         full_text, 
@@ -2840,20 +2945,12 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         query_engine=st.session_state.chat_engine if st.session_state.get('chat_engine') else None,
                         llm_model=llm_model
                     )
-                    sug_container.empty()
                     
                     if initial_sugs:
-                        # 设置推荐问题
                         st.session_state.suggestions_history = initial_sugs[:3]
-                        
-                        # 详细日志记录
-                        logger.info(f"✨ 生成 {len(initial_sugs)} 个新推荐问题")
-                        for i, q in enumerate(initial_sugs[:3], 1):
-                            logger.info(f"   {i}. {q}")
-                    else:
-                        logger.info("⚠️ 推荐问题生成失败")
+                        logger.info(f"✨ 生成 {len(initial_sugs)} 个推荐问题")
                     
-                    # 延迟保存：确认所有步骤（包括推荐问题）都成功后再保存
+                    # 延迟保存：确认所有步骤都成功后再保存
                     if active_kb_name: HistoryManager.save(active_kb_name, state.get_messages())
                     
                     # 释放内存
@@ -2861,17 +2958,12 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     logger.info("🧹 对话完成，内存已清理")
                     
                     st.session_state.is_processing = False  # 处理完成
-                    
-                    # 自动处理队列中的下一个问题
-                    if st.session_state.question_queue:
-                        logger.info(f"📝 队列中还有 {len(st.session_state.question_queue)} 个问题，自动处理下一个")
-                        st.rerun()  # 触发重新运行，处理下一个问题
+                
                 except Exception as e: 
                     print(f"❌ 查询出错: {e}\n")
                     st.error(f"出错: {e}")
                     
                     # 发生错误，回滚最后一条消息（如果是 assistant 生成的）
-                    # 避免保存不完整的回答
                     if st.session_state.messages and st.session_state.messages[-1]['role'] == 'assistant':
                         st.session_state.messages.pop()
                     
@@ -2879,6 +2971,28 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     cleanup_memory()
                     logger.info("🧹 错误处理完成，内存已清理")
                     st.session_state.is_processing = False
+            
+            # spinner结束后显示所有内容
+            # 显示统计信息
+            if 'total_time' in locals() and 'token_count' in locals():
+                stats_simple = f"⏱️ {total_time:.1f}秒 | 📝 约 {token_count} 字符"
+                st.caption(stats_simple)
+                
+                # 详细信息 (折叠)
+                with st.expander("📊 详细统计", expanded=False):
+                    st.caption(f"🚀 速度: {tokens_per_sec:.1f} tokens/s")
+                    if 'prompt_tokens' in locals() and prompt_tokens:
+                        st.caption(f"📥 输入: {prompt_tokens} | 📤 输出: {completion_tokens}")
+                
+                # 显示参考来源
+                if 'srcs' in locals() and srcs:
+                    from src.ui.message_renderer import render_source_references
+                    render_source_references(srcs, expanded=False)
+            
+            # 自动处理队列中的下一个问题
+            if st.session_state.question_queue:
+                logger.info(f"📝 队列中还有 {len(st.session_state.question_queue)} 个问题，自动处理下一个")
+                st.rerun()  # 触发重新运行，处理下一个问题
             
             # 在 chat_message 块外显示推荐问题按钮
             if st.session_state.suggestions_history:
