@@ -868,7 +868,11 @@ with st.sidebar:
                         # 网址抓取模式
                         try:
                             from src.processors.web_crawler import WebCrawler
-                            crawler = WebCrawler()
+                            # 使用唯一的时间戳目录
+                            from datetime import datetime
+                            timestamp_dir = datetime.now().strftime('%Y%m%d_%H%M%S')
+                            unique_output_dir = os.path.join("temp_uploads", f"web_crawl_{timestamp_dir}")
+                            crawler = WebCrawler(output_dir=unique_output_dir)
                             
                             progress_bar = st.progress(0)
                             status_text = st.empty()
@@ -973,7 +977,11 @@ with st.sidebar:
                         # 关键词全网搜索
                         try:
                             from src.processors.web_crawler import WebCrawler
-                            crawler = WebCrawler()
+                            # 使用唯一的时间戳目录
+                            from datetime import datetime
+                            timestamp_dir = datetime.now().strftime('%Y%m%d_%H%M%S')
+                            unique_output_dir = os.path.join("temp_uploads", f"web_crawl_search_{timestamp_dir}")
+                            crawler = WebCrawler(output_dir=unique_output_dir)
                             
                             progress_bar = st.progress(0)
                             status_text = st.empty()

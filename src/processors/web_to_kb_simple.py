@@ -80,7 +80,11 @@ def crawl_and_create_kb(url: str = None,
         dict: 处理结果
     """
     try:
-        crawler = WebCrawler()
+        # 使用唯一的时间戳目录，确保每次抓取隔离
+        timestamp_dir = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_output_dir = os.path.join("temp_uploads", f"web_crawl_{timestamp_dir}")
+        
+        crawler = WebCrawler(output_dir=unique_output_dir)
         crawled_files = []
         
         if url:
