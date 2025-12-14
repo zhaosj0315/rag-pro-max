@@ -1191,7 +1191,20 @@ with st.sidebar:
                     size_mb = total_size / (1024 * 1024)
                     folder_name = os.path.basename(target_path.rstrip('/'))
 
-                    st.success(f"✅ **有效数据源**: `{folder_name}`")
+                    # 智能计算名称 (提前计算以优化显示)
+                    if hasattr(st.session_state, 'upload_auto_name') and st.session_state.upload_auto_name:
+                        auto_name = st.session_state.upload_auto_name
+                    elif cnt > 0:
+                        auto_name = generate_smart_kb_name(target_path, cnt, file_types, folder_name)
+                    else:
+                        auto_name = folder_name
+
+                    # 决定显示名称：如果是临时目录名，则显示智能名称
+                    display_name = folder_name
+                    if folder_name.startswith(('batch_', 'Web_', 'Search_')) and auto_name:
+                        display_name = auto_name
+
+                    st.success(f"✅ **数据源已就绪**: `{display_name}`")
 
                     # 三列统计卡片
                     stat_col1, stat_col2, stat_col3 = st.columns(3)
@@ -1207,16 +1220,6 @@ with st.sidebar:
                         if len(file_types) > 5:
                             type_text += f" · 其他: {sum(c for _, c in sorted(file_types.items(), key=lambda x: x[1], reverse=True)[5:])}"
                         st.caption(type_text)
-
-                    # 仅在没有预设名称时使用文件夹名
-                    if not (hasattr(st.session_state, 'upload_auto_name') and st.session_state.upload_auto_name):
-                        auto_name = folder_name
-
-                    # 智能生成知识库名称
-                    if cnt > 0:
-                        # 如果已有来自爬虫的特定名称，不要覆盖
-                        if not (hasattr(st.session_state, 'upload_auto_name') and st.session_state.upload_auto_name):
-                            auto_name = generate_smart_kb_name(target_path, cnt, file_types, folder_name)
                 else:
                     st.error("❌ 路径不存在，请检查路径是否正确")
 
