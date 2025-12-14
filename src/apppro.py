@@ -1280,97 +1280,91 @@ with st.sidebar:
                 st.session_state.auto_build_kb = False  # 清除标记
                 btn_start = True  # 自动触发构建
 
-        # --- 现有库的管理 ---
+        # --- 现有库的管理 (卡片式布局) ---
         if not is_create_mode:
-            # 知识库详情展示 (移至此处)
-            st.markdown(f"### 📂 {current_kb_name}")
-            
-            # 获取并显示统计信息
-            try:
-                stats = kb_manager.get_stats(current_kb_name)
-                if stats:
-                    st.caption(f"📅 创建: {stats.get('created_time', '未知')}  |  📄 文件: {stats.get('file_count', 0)}  |  💾 大小: {KBManager.format_size(stats.get('size', 0))}")
-            except Exception:
-                pass
-            
-            st.write("")
-            
-            # 💬 聊天控制 - 2×2布局
-            st.write("**💬 聊天控制**")
-            row1_col1, row1_col2 = st.columns(2)
-            row2_col1, row2_col2 = st.columns(2)
-            
-            with row1_col1:
-                if st.button("🔄 撤销", use_container_width=True, disabled=len(state.get_messages()) < 2):
-                    if len(state.get_messages()) >= 2:
-                        st.session_state.messages.pop()
-                        st.session_state.messages.pop()
+            with st.container(border=True):
+                # 顶部：信息栏
+                col_info, col_stats = st.columns([2, 3])
+                with col_info:
+                    st.markdown(f"#### 📂 {current_kb_name}")
+                
+                with col_stats:
+                    # 获取并显示统计信息
+                    try:
+                        stats = kb_manager.get_stats(current_kb_name)
+                        if stats:
+                            st.caption(
+                                f"📅 {stats.get('created_time', '').split(' ')[0]} | "
+                                f"📄 {stats.get('file_count', 0)} 文件 | "
+                                f"💾 {KBManager.format_size(stats.get('size', 0))}"
+                            )
+                    except Exception:
+                        pass
+                
+                st.divider()
+                
+                # 底部：操作栏 (一行排列)
+                c1, c2, c3, c4, c5 = st.columns(5)
+                
+                with c1:
+                    if st.button("🔄 撤销", use_container_width=True, disabled=len(state.get_messages()) < 2, help="撤销最近一轮对话"):
+                        if len(state.get_messages()) >= 2:
+                            st.session_state.messages.pop()
+                            st.session_state.messages.pop()
+                            if current_kb_name:
+                                HistoryManager.save(current_kb_name, state.get_messages())
+                            st.toast("✅ 已撤销")
+                            time.sleep(0.5)
+                            st.rerun()
+                
+                with c2:
+                    if st.button("🧹 清空", use_container_width=True, disabled=len(state.get_messages()) == 0, help="清空当前对话记录"):
+                        st.session_state.messages = []
+                        st.session_state.suggestions_history = []
                         if current_kb_name:
-                            HistoryManager.save(current_kb_name, state.get_messages())
-                        st.toast("✅ 已撤销")
+                            HistoryManager.save(current_kb_name, [])
+                        st.toast("✅ 已清空")
                         time.sleep(0.5)
                         st.rerun()
-            
-            with row1_col2:
-                if st.button("🧹 清空", use_container_width=True, disabled=len(state.get_messages()) == 0):
-                    st.session_state.messages = []
-                    st.session_state.suggestions_history = []
-                    if current_kb_name:
-                        HistoryManager.save(current_kb_name, [])
-                    st.toast("✅ 已清空")
-                    time.sleep(0.5)
-                    st.rerun()
-            
-            with row2_col1:
-                export_content = ""
-                if len(state.get_messages()) > 0:
-                    export_content = f"# 对话记录 - {current_kb_name}\n\n**导出时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n\n"
-                    for i, msg in enumerate(st.session_state.messages, 1):
-                        role = "👤 用户" if msg["role"] == "user" else "🤖 助手"
-                        export_content += f"## {role} ({i})\n\n{msg['content']}\n\n"
                 
-                st.download_button("📥 导出", export_content, file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d')}.md", mime="text/markdown", use_container_width=True, disabled=len(state.get_messages()) == 0)
+                with c3:
+                    export_content = ""
+                    if len(state.get_messages()) > 0:
+                        export_content = f"# 对话记录 - {current_kb_name}\n\n**导出时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n\n"
+                        for i, msg in enumerate(st.session_state.messages, 1):
+                            role = "👤 用户" if msg["role"] == "user" else "🤖 助手"
+                            export_content += f"## {role} ({i})\n\n{msg['content']}\n\n"
+                    
+                    st.download_button("📥 导出", export_content, file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d')}.md", mime="text/markdown", use_container_width=True, disabled=len(state.get_messages()) == 0)
+                
+                with c4:
+                    st.link_button("🔀 新窗口", "http://localhost:8501", use_container_width=True, help="打开新窗口进行多任务处理")
+
+                with c5:
+                    if st.button("🗑️ 删除", use_container_width=True, type="primary", disabled=not current_kb_name, help="永久删除该知识库"):
+                        st.session_state.confirm_delete = True
+                        st.rerun()
             
-            with row2_col2:
-                if st.button("📊 统计", use_container_width=True, disabled=len(state.get_messages()) == 0):
-                    qa_count = len(state.get_messages()) // 2
-                    total_chars = sum(len(msg["content"]) for msg in st.session_state.messages)
-                    st.toast(f"💬 {qa_count} 轮对话 | 📝 {total_chars} 字符")
-            
-            st.write("")
-            
-            # 🛠️ 系统操作 - 1×2布局
-            st.write("**🛠️ 系统操作**")
-            sys_col1, sys_col2 = st.columns(2)
-            
-            with sys_col1:
-                st.link_button("🔀 新窗口", "http://localhost:8501", use_container_width=True)
-            
-            with sys_col2:
-                if st.button("🗑️ 删除知识库", use_container_width=True, disabled=not current_kb_name):
-                    st.session_state.confirm_delete = True
-                    st.rerun()
-            
-            # 删除确认对话框
+            # 删除确认对话框 (放在卡片外，避免嵌套问题)
             if st.session_state.get('confirm_delete', False):
-                st.warning(f"⚠️ 确认删除知识库 '{current_kb_name}' 吗？")
-                confirm_col1, confirm_col2 = st.columns(2)
+                st.warning(f"⚠️ 确认永久删除知识库 '{current_kb_name}' 吗？此操作不可恢复！")
+                confirm_col1, confirm_col2 = st.columns([1, 1])
                 
                 with confirm_col1:
                     if st.button("✅ 确认删除", type="primary", use_container_width=True):
+                        kb_manager.delete(current_kb_name) # 确保实际调用删除逻辑
                         st.toast(f"🗑️ 已删除知识库: {current_kb_name}")
-                        st.session_state.current_nav = "➕ 新建知识库..."
+                        # 重置状态
+                        st.session_state.active_kb_name = None
                         st.session_state.confirm_delete = False
+                        st.session_state.current_nav = "➕ 新建知识库..."
+                        time.sleep(1)
                         st.rerun()
                 
                 with confirm_col2:
                     if st.button("❌ 取消", use_container_width=True):
                         st.session_state.confirm_delete = False
                         st.rerun()
-
-            # 底部工具栏 - 单行布局
-            st.write("")
-            tool_cols = st.columns(3)
             
     
     with tab_config:
