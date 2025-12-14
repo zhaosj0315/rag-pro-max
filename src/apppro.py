@@ -2971,6 +2971,9 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     logger.info("🧹 对话完成，内存已清理")
                     
                     st.session_state.is_processing = False  # 处理完成
+                    
+                    # 整体处理完成反馈
+                    st.toast("✅ 回答生成完毕", icon="🎉")
                 
                 except Exception as e: 
                     print(f"❌ 查询出错: {e}\n")
