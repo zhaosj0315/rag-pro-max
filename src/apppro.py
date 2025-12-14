@@ -375,6 +375,12 @@ st.markdown("""
         min-height: 40px !important;
     }
     
+    /* 增加侧边栏宽度，防止内容过窄 */
+    section[data-testid="stSidebar"] {
+        min-width: 350px !important;
+        width: 350px !important;
+    }
+    
     /* 统计区域容器 */
     .stats-container {
         background: white !important;

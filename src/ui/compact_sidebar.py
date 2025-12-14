@@ -21,29 +21,53 @@ def render_compact_sidebar():
                 kb_list = [d for d in os.listdir(kb_dir) if os.path.isdir(os.path.join(kb_dir, d))]
             
             if kb_list:
-                selected_kb = st.selectbox("当前知识库", kb_list, key="kb_selector")
-                st.session_state.active_kb_name = selected_kb
+                # 获取当前选中的知识库
+                current_kb = st.session_state.get('active_kb_name')
                 
-                # 增强的名称显示 - 解决遮挡问题
-                if len(selected_kb) > 15:
-                    st.markdown(
-                        f"""
-                        <div style="
-                            background-color: #e6f3ff;
-                            border: 1px solid #b3d7ff;
-                            padding: 8px;
-                            border-radius: 4px;
-                            font-size: 0.85em;
-                            word-wrap: break-word;
-                            margin-top: -10px;
-                            margin-bottom: 10px;
-                            color: #004085;
-                        ">
-                            📍 <b>完整名称:</b><br/>{selected_kb}
-                        </div>
-                        """, 
-                        unsafe_allow_html=True
-                    )
+                # 如果未初始化或不在列表中，默认选第一个
+                if not current_kb or current_kb not in kb_list:
+                    current_kb = kb_list[0]
+                    st.session_state.active_kb_name = current_kb
+                
+                # 1. 显式展示完整名称 (解决下拉框遮挡问题)
+                st.markdown(
+                    f"""
+                    <div style="
+                        background-color: #f0f7ff;
+                        border-left: 4px solid #0068c9;
+                        padding: 10px;
+                        margin-bottom: 10px;
+                        border-radius: 4px;
+                        font-size: 0.9em;
+                        word-wrap: break-word;
+                        line-height: 1.4;
+                    ">
+                        <div style="color: #555; font-size: 0.8em; margin-bottom: 4px;">当前知识库</div>
+                        <div style="color: #0068c9; font-weight: 600;">{current_kb}</div>
+                    </div>
+                    """, 
+                    unsafe_allow_html=True
+                )
+
+                # 2. 切换选择器 (使用 index定位)
+                try:
+                    current_index = kb_list.index(current_kb)
+                except ValueError:
+                    current_index = 0
+                    
+                selected_kb = st.selectbox(
+                    "切换知识库", 
+                    kb_list, 
+                    index=current_index,
+                    key="kb_selector",
+                    label_visibility="collapsed",  # 隐藏标签，上面已经有显示了
+                    help="点击切换其他知识库"
+                )
+                
+                # 更新状态
+                if selected_kb != st.session_state.active_kb_name:
+                    st.session_state.active_kb_name = selected_kb
+                    st.rerun()
             else:
                 st.info("暂无知识库")
                 st.session_state.active_kb_name = None
