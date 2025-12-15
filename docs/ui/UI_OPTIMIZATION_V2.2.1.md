@@ -1,4 +1,4 @@
-# RAG Pro Max v2.2.1 UI优化文档
+# RAG Pro Max v2.3.1 UI优化文档
 
 ## 📅 更新时间
 2025-12-11 21:45
@@ -97,4 +97,4 @@ div.stButton > button:hover {
   - `fix_tabs_display.py`
 
 ## 🎉 版本发布
-RAG Pro Max v2.2.1 - UI优化版已完成，提供更好的用户体验和界面设计。
+RAG Pro Max v2.3.1 - UI优化版已完成，提供更好的用户体验和界面设计。

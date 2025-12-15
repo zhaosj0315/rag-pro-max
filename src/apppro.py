@@ -875,7 +875,7 @@ with st.sidebar:
                 with col1:
                     url_mode = st.button("🔗 网址抓取", use_container_width=True, key="url_mode_btn")
                 with col2:
-                    search_mode = st.button("🔍 关键词搜索", use_container_width=True, key="search_mode_btn")
+                    search_mode = st.button("🔍 智能行业搜索", use_container_width=True, key="search_mode_btn")
                 
                 # 根据按钮点击确定模式
                 if url_mode:
@@ -908,16 +908,27 @@ with st.sidebar:
                         st.info(f"ℹ️ 预估抓取页面: {estimated_pages:,} 页")
                     
                 else:  # current_mode == "search"
-                    # 关键词搜索模式
+                    # 智能行业搜索模式
                     crawl_url = None
-                    search_keyword = st.text_input("🔍 搜索关键词", placeholder="Python编程、机器学习、人工智能", help="全网搜索相关内容")
+                    
+                    # 行业选择 - 单独占一行
+                    try:
+                        from src.config.unified_sites import get_industry_list
+                        industries = get_industry_list()
+                        selected_industry = st.selectbox("🏢 选择目标行业", industries, help="选择目标行业，系统将在该行业的专业网站中搜索")
+                    except ImportError:
+                        # 备用配置
+                        selected_industry = "🔧 技术开发 - 编程语言、开发工具、云服务技术"
+                    
+                    # 搜索关键词 - 单独占一行
+                    search_keyword = st.text_input("🔍 搜索关键词", placeholder="Python编程、机器学习、人工智能", help="系统将智能选择该行业最相关的2-3个权威网站进行搜索")
                     
                     # 搜索参数
                     col1, col2, col3 = st.columns(3)
                     with col1:
-                        crawl_depth = st.number_input("递归深度", 1, 5, 2, help="搜索结果链接的抓取深度")
+                        crawl_depth = st.number_input("递归深度", 1, 5, 2, help="搜索内容的抓取深度")
                     with col2:
-                        max_pages = st.number_input("每层页数", 1, 500, 20, help="每个搜索引擎/每一层抓取的最大页数")
+                        max_pages = st.number_input("总页数", 1, 500, 20, help="所有网站总共抓取的页数（会智能分配到2-3个相关网站）")
                     with col3:
                         parser_type = st.selectbox("解析器", ["default", "article", "documentation"])
                     
@@ -1090,40 +1101,60 @@ with st.sidebar:
                                 # 添加日志记录
                                 logger.info(f"🔍 关键词搜索: {msg}")
                             
-                            # 全网搜索网站列表
-                            search_engines = [
-                                f"https://www.google.com/search?q={search_keyword}",
-                                f"https://www.bing.com/search?q={search_keyword}",
-                                f"https://zh.wikipedia.org/wiki/Special:Search?search={search_keyword}",
-                                f"https://www.zhihu.com/search?type=content&q={search_keyword}",
-                                f"https://baike.baidu.com/search?word={search_keyword}"
-                            ]
+                            # 根据选择的行业导入对应网站配置
+                            try:
+                                from src.config.unified_sites import get_industry_sites
+                                search_engines, site_names = get_industry_sites(selected_industry)
+                            except ImportError:
+                                # 备用配置
+                                search_engines = [
+                                    "https://www.runoob.com/",
+                                    "https://docs.python.org/zh-cn/3/",
+                                    "https://help.aliyun.com/",
+                                    "https://www.eastmoney.com/",
+                                    "https://www.icourse163.org/"
+                                ]
+                                site_names = ["菜鸟教程", "Python文档", "阿里云", "东方财富", "中国大学MOOC"]
                             
                             # 记录搜索开始
-                            logger.info(f"🔍 开始关键词搜索: '{search_keyword}' (每个引擎:{max_pages}页, 共{len(search_engines)}个引擎)")
+                            logger.info(f"🔍 开始智能行业搜索: '{search_keyword}' ({selected_industry}, 深度:{crawl_depth}, 总页数:{max_pages})")
                             
-                            # 在多个搜索引擎中搜索
-                            for i, search_url in enumerate(search_engines):
-                                engine_name = ["Google", "Bing", "维基百科", "知乎", "百度百科"][i]
+                            # 智能选择最相关的网站（而非全部爬取）
+                            # 根据关键词智能选择2-3个最权威的网站
+                            selected_sites = search_engines[:3]  # 选择前3个最权威的网站
+                            selected_names = site_names[:3]
+                            
+                            # 平均分配页数到选中的网站
+                            pages_per_site = max(1, max_pages // len(selected_sites))
+                            
+                            # 在选中的网站中搜索
+                            for i, search_url in enumerate(selected_sites):
+                                engine_name = selected_names[i] if i < len(selected_names) else f"网站{i+1}"
                                 update_status(f"正在搜索 {engine_name}: {search_keyword}")
-                                logger.info(f"🔍 搜索引擎: {engine_name} - {search_url}")
+                                logger.info(f"🔍 搜索网站: {engine_name} - {search_url} (分配页数: {pages_per_site})")
                                 
                                 try:
                                     with st.spinner(f"搜索 {engine_name}..."):
                                         saved_files = crawler.crawl_advanced(
                                             start_url=search_url,
-                                            max_depth=crawl_depth,  # 使用用户设定的递归深度
-                                            max_pages=max_pages,  # 每个搜索引擎使用完整的页数
+                                            max_depth=crawl_depth,
+                                            max_pages=pages_per_site,  # 使用分配的页数
                                             exclude_patterns=exclude_patterns,
                                             parser_type=parser_type,
                                             status_callback=update_status
                                         )
-                                        all_saved_files.extend(saved_files)
                                         
-                                    progress_bar.progress((i + 1) / len(search_engines))
+                                        if saved_files:
+                                            all_saved_files.extend(saved_files)
+                                            logger.success(f"🔍 {engine_name}搜索完成: 获取 {len(saved_files)} 个页面")
+                                        else:
+                                            logger.warning(f"🔍 {engine_name}搜索无结果")
+                                        
+                                    progress_bar.progress((i + 1) / len(selected_sites))
                                     
                                 except Exception as e:
                                     update_status(f"❌ {engine_name} 搜索失败: {e}")
+                                    logger.error(f"🔍 {engine_name}搜索失败: {e}")
                                     continue
                             
                             progress_bar.progress(1.0)
@@ -1140,10 +1171,10 @@ with st.sidebar:
                                     from src.core.app_config import output_base
                                     kb_name = KBNameOptimizer.generate_name_from_keyword(search_keyword, output_base)
                                 
-                                st.success(f"✅ 全网搜索完成！获取 {len(all_saved_files)} 页，正在创建知识库: {kb_name}")
+                                st.success(f"✅ 智能行业搜索完成！获取 {len(all_saved_files)} 页，正在创建知识库: {kb_name}")
                                 
                                 # 记录搜索完成
-                                logger.success(f"🔍 关键词搜索完成: '{search_keyword}' - 获取 {len(all_saved_files)} 个页面")
+                                logger.success(f"🔍 智能行业搜索完成: '{search_keyword}' ({selected_industry}) - 获取 {len(all_saved_files)} 个页面")
                                 
                                 # 设置知识库构建参数
                                 st.session_state.uploaded_path = os.path.abspath(crawler.output_dir)
@@ -1557,7 +1588,7 @@ with st.sidebar:
     
     with tab_help:
         st.markdown("### 📖 帮助")
-        st.info("RAG Pro Max v2.2.1 - 横向标签页版本")
+        st.info("RAG Pro Max v2.3.1 - 智能行业搜索增强版")
 
 # ==========================================
 # 主功能区域

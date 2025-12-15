@@ -3,7 +3,7 @@
 ## 🎯 核心文档
 
 ### 📖 项目概览
-- [📄 README.md](README.md) - 项目主文档 (v2.0.0)
+- [📄 README.md](README.md) - 项目主文档 (v2.3.1)
 - [📝 CHANGELOG.md](CHANGELOG.md) - 版本更新日志
 - [🚀 v2.0功能文档](docs/V2.0_FEATURES.md) - v2.0 完整功能说明 ⭐
 - [📜 LICENSE](LICENSE) - 开源许可证

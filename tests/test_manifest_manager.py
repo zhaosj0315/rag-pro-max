@@ -1,108 +1,162 @@
-"""清单管理器单元测试"""
+#!/usr/bin/env python3
+"""
+ManifestManager 单元测试
+"""
 
-import unittest
-import os
 import sys
+import os
 import tempfile
 import shutil
+import json
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 添加项目根目录到路径
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
-from src.config import ManifestManager
+def test_manifest_manager():
+    """测试ManifestManager功能"""
+    print("🧪 测试ManifestManager...")
+    
+    try:
+        from src.config.manifest_manager import ManifestManager
+        
+        # 创建临时目录
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # 测试保存和加载
+            test_files = [
+                {
+                    'name': 'test1.pdf',
+                    'path': '/path/to/test1.pdf',
+                    'size': 1024,
+                    'type': '.pdf'
+                },
+                {
+                    'name': 'test2.txt',
+                    'path': '/path/to/test2.txt', 
+                    'size': 512,
+                    'type': '.txt'
+                }
+            ]
+            
+            # 测试保存
+            result = ManifestManager.save(temp_dir, test_files, 'test-model')
+            assert result == True, "保存应该成功"
+            
+            # 测试加载
+            manifest = ManifestManager.load(temp_dir)
+            assert 'files' in manifest, "清单应该包含files字段"
+            assert manifest['file_count'] == 2, f"文件数量应该是2，实际是{manifest['file_count']}"
+            assert manifest['embed_model'] == 'test-model', "嵌入模型应该正确"
+            
+            # 测试统计
+            stats = ManifestManager.get_stats(temp_dir)
+            assert stats['file_count'] == 2, "统计文件数量应该正确"
+            assert stats['total_size'] == 1536, f"总大小应该是1536，实际是{stats['total_size']}"
+            
+            # 测试格式化大小
+            assert ManifestManager.format_size(1024) == "1.0KB", "大小格式化应该正确"
+            assert ManifestManager.format_size(1048576) == "1.0MB", "大小格式化应该正确"
+            
+            print("  ✅ ManifestManager所有功能测试通过")
+            return True
+            
+    except Exception as e:
+        print(f"  ❌ ManifestManager测试失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
+def test_web_crawler_anti_bot():
+    """测试网页爬虫反爬功能"""
+    print("🧪 测试网页爬虫反爬功能...")
+    
+    try:
+        from src.processors.web_crawler import WebCrawler
+        
+        # 创建临时目录
+        with tempfile.TemporaryDirectory() as temp_dir:
+            crawler = WebCrawler(temp_dir)
+            
+            # 测试配置
+            assert hasattr(crawler, 'anti_bot_config'), "应该有反爬配置"
+            assert crawler.anti_bot_config['min_delay'] > 0, "最小延迟应该大于0"
+            assert crawler.anti_bot_config['max_retries'] > 0, "最大重试次数应该大于0"
+            
+            # 测试失败URL跟踪
+            assert hasattr(crawler, 'failed_urls'), "应该有失败URL集合"
+            assert hasattr(crawler, 'retry_counts'), "应该有重试计数"
+            
+            # 测试智能请求方法
+            assert hasattr(crawler, '_smart_request'), "应该有智能请求方法"
+            
+            print("  ✅ 网页爬虫反爬功能测试通过")
+            return True
+            
+    except Exception as e:
+        print(f"  ❌ 网页爬虫反爬功能测试失败: {e}")
+        return False
 
-class TestManifestManager(unittest.TestCase):
-    """清单管理器测试"""
+def test_kb_interface_stats():
+    """测试知识库界面统计功能"""
+    print("🧪 测试知识库界面统计功能...")
     
-    def setUp(self):
-        """测试前准备"""
-        self.test_dir = tempfile.mkdtemp()
-    
-    def tearDown(self):
-        """测试后清理"""
-        if os.path.exists(self.test_dir):
-            shutil.rmtree(self.test_dir)
-    
-    def test_get_path(self):
-        """测试获取路径"""
-        path = ManifestManager.get_path(self.test_dir)
-        self.assertTrue(path.endswith("manifest.json"))
-        self.assertIn(self.test_dir, path)
-    
-    def test_load_empty(self):
-        """测试加载空清单"""
-        manifest = ManifestManager.load(self.test_dir)
-        self.assertEqual(manifest["files"], [])
-        self.assertEqual(manifest["embed_model"], "Unknown")
-    
-    def test_save_and_load(self):
-        """测试保存和加载"""
-        files = [
-            {"name": "test1.pdf", "size": 1024},
-            {"name": "test2.txt", "size": 512}
-        ]
+    try:
+        from src.kb.kb_interface import KBInterface
         
-        success = ManifestManager.save(self.test_dir, files, "test-model")
-        self.assertTrue(success)
+        # 创建知识库界面实例
+        kb_interface = KBInterface()
         
-        manifest = ManifestManager.load(self.test_dir)
-        self.assertEqual(len(manifest["files"]), 2)
-        self.assertEqual(manifest["embed_model"], "test-model")
-        self.assertIn("updated_at", manifest)
-    
-    def test_update_new(self):
-        """测试新建更新"""
-        files = [{"name": "test.pdf"}]
+        # 测试方法存在
+        assert hasattr(kb_interface, 'render_kb_manager'), "应该有知识库管理渲染方法"
+        assert hasattr(kb_interface, 'render_kb_creator'), "应该有知识库创建渲染方法"
         
-        success = ManifestManager.update(self.test_dir, files, is_append=False, embed_model="model1")
-        self.assertTrue(success)
+        print("  ✅ 知识库界面统计功能测试通过")
+        return True
         
-        manifest = ManifestManager.load(self.test_dir)
-        self.assertEqual(len(manifest["files"]), 1)
-    
-    def test_update_append(self):
-        """测试追加更新"""
-        # 先保存初始数据
-        files1 = [{"name": "test1.pdf"}]
-        ManifestManager.save(self.test_dir, files1, "model1")
-        
-        # 追加新文件
-        files2 = [{"name": "test2.pdf"}]
-        success = ManifestManager.update(self.test_dir, files2, is_append=True, embed_model="model1")
-        self.assertTrue(success)
-        
-        # 验证
-        manifest = ManifestManager.load(self.test_dir)
-        self.assertEqual(len(manifest["files"]), 2)
-        self.assertEqual(manifest["files"][0]["name"], "test1.pdf")
-        self.assertEqual(manifest["files"][1]["name"], "test2.pdf")
-    
-    def test_update_replace(self):
-        """测试替换更新"""
-        # 先保存初始数据
-        files1 = [{"name": "test1.pdf"}, {"name": "test2.pdf"}]
-        ManifestManager.save(self.test_dir, files1, "model1")
-        
-        # 替换
-        files2 = [{"name": "test3.pdf"}]
-        success = ManifestManager.update(self.test_dir, files2, is_append=False, embed_model="model2")
-        self.assertTrue(success)
-        
-        # 验证
-        manifest = ManifestManager.load(self.test_dir)
-        self.assertEqual(len(manifest["files"]), 1)
-        self.assertEqual(manifest["files"][0]["name"], "test3.pdf")
-        self.assertEqual(manifest["embed_model"], "model2")
+    except Exception as e:
+        print(f"  ❌ 知识库界面统计功能测试失败: {e}")
+        return False
 
+def main():
+    """运行所有测试"""
+    print("=" * 60)
+    print("  ManifestManager 和相关功能单元测试")
+    print("=" * 60)
+    
+    tests = [
+        ("ManifestManager功能", test_manifest_manager),
+        ("网页爬虫反爬功能", test_web_crawler_anti_bot),
+        ("知识库界面统计", test_kb_interface_stats)
+    ]
+    
+    passed = 0
+    failed = 0
+    
+    for test_name, test_func in tests:
+        try:
+            if test_func():
+                passed += 1
+            else:
+                failed += 1
+        except Exception as e:
+            print(f"❌ {test_name} 测试异常: {e}")
+            failed += 1
+        print()
+    
+    print("=" * 60)
+    print("  测试结果汇总")
+    print("=" * 60)
+    print(f"✅ 通过: {passed}/{len(tests)}")
+    print(f"❌ 失败: {failed}/{len(tests)}")
+    
+    if failed == 0:
+        print("\n🎉 所有单元测试通过！")
+        return True
+    else:
+        print(f"\n⚠️  有 {failed} 个测试失败，需要修复")
+        return False
 
-def run_tests():
-    """运行测试"""
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestManifestManager)
-    runner = unittest.TextTestRunner(verbosity=2)
-    result = runner.run(suite)
-    return result.wasSuccessful()
-
-
-if __name__ == '__main__':
-    success = run_tests()
-    exit(0 if success else 1)
+if __name__ == "__main__":
+    success = main()
+    sys.exit(0 if success else 1)

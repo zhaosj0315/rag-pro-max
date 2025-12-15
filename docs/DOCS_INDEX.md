@@ -4,8 +4,8 @@
 
 ### 🚀 快速开始
 - [README.md](../README.md) - 项目主文档
-- [MIGRATION_GUIDE_V2.2.md](MIGRATION_GUIDE_V2.2.md) - v2.2.0 迁移指南 ⭐ **最新**
-- [FEATURE_COMPARISON_V2.2.md](FEATURE_COMPARISON_V2.2.md) - v2.2.0 功能对比 ⭐ **最新**
+- [MIGRATION_GUIDE_V2.2.md](MIGRATION_GUIDE_V2.2.md) - v2.3.1 迁移指南 ⭐ **最新**
+- [FEATURE_COMPARISON_V2.2.md](FEATURE_COMPARISON_V2.2.md) - v2.3.1 功能对比 ⭐ **最新**
 
 ### 📋 版本文档
 - [HOTFIX_MAC_FREEZE.md](HOTFIX_MAC_FREEZE.md) - Mac死机问题修复说明 (Hotfix v2.3.1) ⭐ **重要**
@@ -21,10 +21,10 @@
 - [V1.7_FEATURES.md](V1.7_FEATURES.md) - v1.7功能文档
 - [V1.7_MIGRATION_GUIDE.md](V1.7_MIGRATION_GUIDE.md) - v1.7迁移指南
 
-## 🎯 v2.2.0 标签页迁移版 (最新)
+## 🎯 v2.3.1 标签页迁移版 (最新)
 
 ### 📖 用户文档
-- **[迁移指南](MIGRATION_GUIDE_V2.2.md)** - 从v2.1.0升级到v2.2.0的完整指南
+- **[迁移指南](MIGRATION_GUIDE_V2.2.md)** - 从v2.3.1升级到v2.3.1的完整指南
 - **[功能对比](FEATURE_COMPARISON_V2.2.md)** - 详细的版本功能对比分析
 - **[迁移完成报告](TAB_MIGRATION_COMPLETE.md)** - 技术实现和测试验证
 
@@ -82,12 +82,12 @@
 ## 📝 文档维护
 
 ### 更新记录
-- **2025-12-11**: 添加v2.2.0标签页迁移版文档
-- **2025-12-10**: 更新v2.1.0智能化增强版文档
+- **2025-12-11**: 添加v2.3.1标签页迁移版文档
+- **2025-12-10**: 更新v2.3.1智能化增强版文档
 - **2025-12-09**: 完善架构重构文档
 
 ### 文档状态
-- ✅ **最新**: v2.2.0相关文档
+- ✅ **最新**: v2.3.1相关文档
 - ✅ **完整**: 覆盖所有主要版本
 - ✅ **准确**: 与代码实现保持同步
 

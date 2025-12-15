@@ -2,12 +2,12 @@
 
 ## 概述
 
-RAG Pro Max v2.3.0 提供完整的 RESTful API 接口，支持程序化调用所有核心功能。
+RAG Pro Max v2.3.1 提供完整的 RESTful API 接口，支持程序化调用所有核心功能。
 
 ## 基础信息
 
 - **Base URL**: `http://localhost:8000`
-- **API版本**: v2.3.0
+- **API版本: v2.3.1
 - **认证方式**: 暂无（本地部署）
 - **数据格式**: JSON
 

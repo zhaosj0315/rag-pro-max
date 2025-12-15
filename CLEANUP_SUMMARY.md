@@ -12,7 +12,7 @@
 - `CLEANUP_REPORT.md` - 旧清理报告
 - `GITHUB_PUSH_CHECKLIST.md` - 推送检查清单
 - `CPU_PROTECTION_SUMMARY.md` - CPU保护总结
-- `RELEASE_NOTES_v2.3.0.md` - 旧版本发布说明
+- `RELEASE_NOTES_v2.3.1.md` - 旧版本发布说明
 
 ### 临时脚本
 - `cleanup_*.sh` - 各种清理脚本

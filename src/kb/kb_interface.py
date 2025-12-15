@@ -160,19 +160,73 @@ class KBInterface:
             with col_stats:
                 # 显示统计信息
                 try:
-                    from src.kb import KBManager
-                    kb_manager = KBManager()
-                    stats = kb_manager.get_stats(kb_name)
-                    if stats:
+                    from src.config.manifest_manager import ManifestManager
+                    output_base = os.path.join(os.getcwd(), "vector_db_storage")
+                    kb_path = os.path.join(output_base, kb_name)
+                    
+                    stats = ManifestManager.get_stats(kb_path)
+                    if stats and stats.get('file_count', 0) > 0:
                         st.caption(
-                            f"📅 {stats.get('created_time', '').split(' ')[0]} | "
+                            f"📅 {stats.get('created_time', '').split('T')[0]} | "
                             f"📄 {stats.get('file_count', 0)} 文件 | "
-                            f"💾 {KBManager.format_size(stats.get('size', 0))}"
+                            f"🧩 {stats.get('doc_count', 0)} 片段 | "
+                            f"💾 {ManifestManager.format_size(stats.get('total_size', 0))}"
                         )
-                except Exception:
-                    pass
+                        
+                        # 显示详细统计
+                        stat_col1, stat_col2, stat_col3 = st.columns(3)
+                        stat_col1.metric("📄 文档数", f"{stats.get('file_count', 0)}")
+                        stat_col2.metric("🧩 片段数", f"{stats.get('doc_count', 0)}")
+                        stat_col3.metric("💾 大小", ManifestManager.format_size(stats.get('total_size', 0)))
+                    else:
+                        st.caption("📊 统计信息加载中...")
+                except Exception as e:
+                    st.caption(f"⚠️ 统计信息获取失败: {e}")
             
             st.divider()
+            
+            # 文件管理
+            with st.expander("📊 知识库详情与管理", expanded=False):
+                try:
+                    from src.config.manifest_manager import ManifestManager
+                    output_base = os.path.join(os.getcwd(), "vector_db_storage")
+                    kb_path = os.path.join(output_base, kb_name)
+                    
+                    stats = ManifestManager.get_stats(kb_path)
+                    files = stats.get('files', [])
+                    
+                    if not files:
+                        st.info("暂无文件")
+                    else:
+                        st.markdown(f"**文件列表** ({len(files)} 个文件)")
+                        
+                        for i, file_info in enumerate(files):
+                            with st.container():
+                                col1, col2, col3 = st.columns([3, 1, 1])
+                                
+                                with col1:
+                                    file_name = file_info.get('name', '未知文件')
+                                    file_type = file_info.get('type', '').upper().replace('.', '')
+                                    st.markdown(f"📄 **{file_name}**")
+                                    
+                                with col2:
+                                    file_size = file_info.get('size', 0)
+                                    st.caption(f"💾 {ManifestManager.format_size(file_size)}")
+                                    
+                                with col3:
+                                    if file_type:
+                                        st.caption(f"📋 {file_type}")
+                                
+                                if i < len(files) - 1:
+                                    st.divider()
+                        
+                        # 总计信息
+                        st.markdown("---")
+                        total_size = sum(f.get('size', 0) for f in files)
+                        st.caption(f"📊 总计: {len(files)} 个文件, {ManifestManager.format_size(total_size)}")
+                        
+                except Exception as e:
+                    st.error(f"文件列表加载失败: {e}")
             
             # 操作按钮
             self.render_kb_operations(kb_name)

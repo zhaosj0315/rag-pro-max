@@ -14,23 +14,131 @@ class WebCrawler:
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         self.visited_urls = set()
+        self.failed_urls = set()
+        self.retry_counts = {}
+        
+        # 创建会话，增强反爬处理
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
             "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
             "Connection": "keep-alive",
             "Upgrade-Insecure-Requests": "1",
-            "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-            "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Platform": '"macOS"'
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Cache-Control": "max-age=0"
         })
+        
+        # 设置重试策略
+        try:
+            from urllib3.util.retry import Retry
+            from requests.adapters import HTTPAdapter
+            
+            retry_strategy = Retry(
+                total=3,
+                backoff_factor=1,
+                status_forcelist=[429, 500, 502, 503, 504],
+            )
+            
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+            self.session.mount("http://", adapter)
+            self.session.mount("https://", adapter)
+        except ImportError:
+            pass  # 如果没有urllib3，使用基本重试
+        
+        # 反爬处理配置
+        self.anti_bot_config = {
+            'min_delay': 0.5,      # 最小延迟
+            'max_delay': 2.0,      # 最大延迟
+            'retry_delay': 5.0,    # 重试延迟
+            'max_retries': 3,      # 最大重试次数
+            'timeout': 15,         # 请求超时
+        }
 
     def _is_valid_url(self, url):
         parsed = urlparse(url)
         return bool(parsed.netloc) and bool(parsed.scheme)
     
+    
+    def _smart_request(self, url: str, status_callback=None) -> requests.Response:
+        """智能请求，处理反爬机制"""
+        import random
+        
+        # 检查是否已经失败过多次
+        if url in self.failed_urls:
+            raise Exception(f"URL已被标记为失败: {url}")
+        
+        retry_count = self.retry_counts.get(url, 0)
+        if retry_count >= self.anti_bot_config['max_retries']:
+            self.failed_urls.add(url)
+            raise Exception(f"重试次数超限: {url}")
+        
+        try:
+            # 随机延迟，模拟人类行为
+            delay = random.uniform(
+                self.anti_bot_config['min_delay'], 
+                self.anti_bot_config['max_delay']
+            )
+            time.sleep(delay)
+            
+            # 随机化User-Agent
+            user_agents = [
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15"
+            ]
+            
+            headers = self.session.headers.copy()
+            headers['User-Agent'] = random.choice(user_agents)
+            
+            # 添加Referer（如果有的话）
+            parsed_url = urlparse(url)
+            if parsed_url.netloc:
+                headers['Referer'] = f"{parsed_url.scheme}://{parsed_url.netloc}/"
+            
+            response = self.session.get(
+                url, 
+                headers=headers,
+                timeout=self.anti_bot_config['timeout'],
+                allow_redirects=True
+            )
+            
+            # 检查响应状态
+            if response.status_code == 403:
+                raise Exception(f"访问被拒绝 (403): {url}")
+            elif response.status_code == 429:
+                # 速率限制，增加延迟后重试
+                if status_callback:
+                    status_callback(f"遇到速率限制，等待 {self.anti_bot_config['retry_delay']} 秒后重试")
+                time.sleep(self.anti_bot_config['retry_delay'])
+                raise Exception(f"速率限制 (429): {url}")
+            elif response.status_code >= 400:
+                raise Exception(f"HTTP错误 ({response.status_code}): {url}")
+            
+            # 重置重试计数
+            if url in self.retry_counts:
+                del self.retry_counts[url]
+            
+            return response
+            
+        except Exception as e:
+            # 增加重试计数
+            self.retry_counts[url] = retry_count + 1
+            
+            # 如果是可重试的错误，抛出异常让上层处理
+            if "429" in str(e) or "timeout" in str(e).lower():
+                if retry_count < self.anti_bot_config['max_retries'] - 1:
+                    if status_callback:
+                        status_callback(f"请求失败，准备重试 ({retry_count + 1}/{self.anti_bot_config['max_retries']}): {e}")
+                    time.sleep(self.anti_bot_config['retry_delay'])
+            
+            raise e
+
     def _fix_url(self, url):
         """自动修复URL格式，添加协议前缀"""
         if not url:
@@ -207,13 +315,9 @@ class WebCrawler:
                     if status_callback:
                         status_callback(f"正在抓取 ({total_count+1}) 第{depth}层 ({level_count+1}/{max_pages}): {url}")
                     
-                    response = self.session.get(url, timeout=15)
+                    # 使用智能请求方法
+                    response = self._smart_request(url, status_callback)
                     response.encoding = response.apparent_encoding
-                    
-                    if response.status_code != 200:
-                        if status_callback:
-                            status_callback(f"跳过 {url} (状态码: {response.status_code})")
-                        continue
                     
                     soup = BeautifulSoup(response.text, 'html.parser')
                     

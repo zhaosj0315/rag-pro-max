@@ -1,0 +1,131 @@
+URL: https://help.aliyun.com/zh/ros/use-cases/use-metadata-to-group-parameters
+标题: 通过Metadata为资源栈参数分组-资源编排-阿里云
+内容长度: 1426 字符
+==================================================
+
+当您使用资源编排服务
+ROS（Resource Orchestration Service）创建资源栈管理多种资源时，需分别配置多种资源对应的参数，这些参数在配置时可能相互干扰。此时您可以使用元数据（Metadata）为不同资源的参数分组，以便在控制台集中配置参数。
+背景信息
+Metadata
+用于对
+Parameters
+中定义的参数进行分组，并且可以为每一组分别定义标签。本文以
+Harbor
+集群版解决方案为例，为您介绍如何使用
+Metadata
+为不同资源的参数进行分组。关于
+Harbor
+集群版解决方案的更多信息，请参见
+Harbor
+集群版解决方案
+。
+Harbor
+集群中共分为以下
+5
+类配置：
+基础资源配置
+Harbor
+配置
+DB
+配置
+Redis
+配置
+SLB
+配置
+您可以将不同的配置参数加入对应分组的
+Parameters
+中，实现参数分组。Metadata
+代码段如下：
+Metadata:
+ALIYUN::ROS::Interface:
+ParameterGroups:
+- Parameters:
+- VSwitchZoneId
+- VPC
+- VSwitch
+- SecurityGroup
+Label:
+default:
+zh-cn: 基础资源配置（必填）
+en: Infrastructure Configuration
+- Parameters:
+- ClusterAmount
+- InstanceType
+- SystemDiskCategory
+- SystemDiskSize
+- Password
+- HarborAdminPassword
+Label:
+default:
+zh-cn: Harbor配置
+en: Harbor Configuration
+- Parameters:
+- DBInstanceEngineAndVersion
+- DBInstanceClass
+- DBInstanceStorage
+- DBUser
+- DBPassword
+Label:
+default:
+zh-cn: DB配置
+en: DB Configuration
+- Parameters:
+- RedisInstanceClass
+- EvictionPolicy
+- RedisPassword
+Label:
+default:
+zh-cn: Redis配置
+en: Redis Configuration
+- Parameters:
+- LoadBalancerSpec
+- Bandwidth
+Label:
+default:
+zh-cn: SLB配置
+en: SLB Configuration
+TemplateTags:
+- Creates one ECS(Harbor) instance - Existing Vpc
+操作步骤
+登录
+资源编排控制台
+。
+在左侧导航栏，单击
+公共模板
+。
+查找模板
+Harbor 集群版（已有
+VPC）
+。
+单击
+创建资源栈
+。
+在
+配置参数
+页面，输入
+资源栈名称
+，完成
+基础资源配置
+、
+Harbor
+配置
+、
+DB
+配置
+、
+Redis
+配置
+和
+SLB
+配置
+。
+单击
+下一步：检查并确认
+。
+然后单击
+创建
+。
+上一篇：基于Mappings自动化配置CentOS系统的yum源
+下一篇：在资源编排控制台动态选择参数配置
+该文章对您有帮助吗？
+反馈

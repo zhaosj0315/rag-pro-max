@@ -1,0 +1,175 @@
+URL: https://help.aliyun.com/zh/cli/filter-results-and-tabulate-output
+标题: 使用CLI过滤JSON输出并以表格格式展示-阿里云CLI-阿里云
+内容长度: 2678 字符
+==================================================
+
+阿里云产品的查询接口会返回
+JSON
+结构化数据，不方便阅读。您可以通过使用阿里云
+CLI
+的高级过滤功能，获取您感兴趣的字段，且默认表格化输出。
+--output
+选项字段说明
+为了使命令输出结果更直观，阿里云
+CLI
+提供了
+--output
+选项，您可以使用该选项提取返回结果中感兴趣的字段，且默认以表格形式输出。
+--output
+选项包含以下字段：
+字段名
+描述
+示例值
+cols
+表格列名。
+使用
+--output
+选项时需要以
+cols="<column1>,<column2>"
+形式确定表格与数据的映射关系。多个列名之间使用逗号
+,
+隔开。
+若
+JSON
+数据为
+object
+键值对类型，该字段需要与数据对应键名保持一致。
+若
+JSON
+数据为
+array
+数组类型，该字段可自定义显示名称，同时您需要手动添加数组元素索引。列名与索引之间使用冒号
+:
+隔开。
+object
+类型：cols="InstanceId,Status"
+array
+类型：cols="name:0,type:1"
+rows
+待过滤数据所在的
+JMESPath
+路径。
+阿里云
+CLI
+将通过
+JMESPath
+查询语句来指定表格行在
+JSON
+结果中的数据来源。
+rows="Instances.Instance[]"
+num
+开启行号显示。
+指定该字段为
+true
+可开启行号显示，开启后阿里云
+CLI
+将在表格左侧新增行号列并输出行号，起始行号为
+0
+。该字段默认值为
+false
+。
+num="true"
+过滤示例
+示例场景
+阿里云产品的查询接口会返回
+JSON
+结构化数据，不方便阅读。
+以查询所有
+ECS
+实例信息为例，执行如下命令。
+aliyun ecs DescribeInstances
+系统显示类似如下输出结果（部分省略）。
+{
+"PageNumber": 1,
+"TotalCount": 2,
+"PageSize": 10,
+"RequestId": "2B76ECBD-A296-407E-BE17-7E668A609DDA",
+"Instances": {
+"Instance": [
+{
+"ImageId": "ubuntu_16_0402_64_20G_alibase_20171227.vhd",
+"InstanceTypeFamily": "ecs.xn4",
+"VlanId": "",
+"InstanceId": "i-1234567891234567****",
+"Status": "Stopped",
+"SecurityGroupIds": {
+"SecurityGroupId": [
+"sg-bp12345678912345****",
+"sg-bp98765432198765****"
+]
+}
+},
+{
+"ImageId": "ubuntu_16_0402_64_20G_alibase_20171227.vhd",
+"InstanceTypeFamily": "ecs.xn4",
+"VlanId": "",
+"InstanceId": "i-abcdefghijklmnop****",
+"Status": "Running",
+"SecurityGroupIds": {
+"SecurityGroupId": [
+"sg-bp1abcdefghijklm****",
+"sg-bp1zyxwvutsrqpon****"
+]
+}
+}
+]
+}
+}
+示例一
+执行如下命令，过滤示例场景返回结果中的字段
+RequestId
+。该字段作为根元素，无需指定
+rows
+字段。
+aliyun ecs DescribeInstances --output cols=RequestId
+系统显示类似如下输出结果。
+RequestId
+---------
+2B76ECBD-A296-407E-BE17-7E668A609DDA
+示例二
+执行如下命令，过滤示例场景返回结果中的字段
+InstanceId
+以及
+Status
+。这两个字段所在的
+JMESPath
+路径为
+Instances.Instance[]
+，则
+rows="Instances.Instance[]"
+。具体
+JMESPath
+书写方法，请参见
+JMESPath Tutorial
+。
+aliyun ecs DescribeInstances --output cols="InstanceId,Status" rows="Instances.Instance[]"
+系统显示类似如下输出结果。
+InstanceId             | Status
+----------             | ------
+i-12345678912345678123 | Stopped
+i-abcdefghijklmnopqrst | Running
+如果需要输出行号，则指定
+num=true
+，系统显示类似如下输出结果。
+Num | InstanceId             | Status
+--- | ----------             | ------
+0   | i-12345678912345678123 | Stopped
+1   | i-abcdefghijklmnopqrst | Running
+示例三
+执行如下命令，过滤示例场景返回结果中的数组类型字段
+SecurityGroupId
+的具体元素。数组所在的
+JMESPath
+路径为
+Instances.Instance[].SecurityGroupIds.SecurityGroupId
+。
+aliyun ecs DescribeInstances --output cols="sg1:0,sg2:1" rows="Instances.Instance[].SecurityGroupIds.SecurityGroupId"
+系统显示类似如下输出结果。
+sg1                     | sg2
+---                     | ---
+sg-bp11234567891234**** | sg-bp19876543219876****
+sg-bp1abcdefghijklm**** | sg-bp1zyxwvutsrqpon****
+上一篇：管理OSS资源
+下一篇：聚合分页数据
+该文章对您有帮助吗？
+反馈

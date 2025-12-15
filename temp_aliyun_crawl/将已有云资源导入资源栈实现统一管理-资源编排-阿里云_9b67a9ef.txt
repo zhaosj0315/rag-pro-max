@@ -1,0 +1,191 @@
+URL: https://help.aliyun.com/zh/ros/user-guide/import-an-existing-resource-to-a-stack
+标题: 将已有云资源导入资源栈实现统一管理-资源编排-阿里云
+内容长度: 1807 字符
+==================================================
+
+本文以导入弹性公网
+IP（EIP）资源为例，向您展示如何通过导入资源的方式更新资源栈。
+应用场景
+如果资源编排控制台上有空资源栈或者资源栈中包含您需要管理的云资源，您可以选择使用资源导入的方式将其他需要管理的资源补充到已有资源栈中，从而达到统一管理的目的。
+前提条件
+资源导入前，请提前完成如下事项：
+获取
+EIP
+资源的标识符属性。
+本示例中，获取到的
+EIP
+资源的标识符属性为
+AllocationId，即
+EIP
+的实例
+ID。具体操作，请参见
+获取待导入资源的标识符属性
+。
+获取
+EIP
+的实例
+ID。
+登录
+EIP
+控制台
+，获取要导入的
+EIP
+的实例
+ID。
+注意事项
+模板中的资源必须包含
+DeletionPolicy
+属性，否则导入不成功。使用
+DeletionPolicy
+属性，您可以选择在删除资源栈或移除资源时是否保留该资源。更多信息，请参见
+DeletionPolicy
+属性
+。
+操作步骤
+登录
+资源编排控制台
+。
+在左侧导航栏，单击
+资源栈
+。
+在顶部菜单栏的地域下拉列表，选择资源栈的所在地域，例如：华东
+1（杭州）。
+在
+资源栈列表
+页面，在目标资源栈右侧
+操作
+列，选择
+>
+导入资源
+。
+在
+选择模板
+页面，将
+模板录入方式
+设置为
+输入模板
+，在
+模板内容
+区域修改模板，增加待导入资源，然后单击
+下一步
+。
+本示例中，资源栈中已经存在一个
+EIP，新导入的资源我们命名为
+EIP2。示例模板如下所示：
+说明
+DeletionPolicy
+：取值为
+Retain
+，表示删除保护策略为保留资源。为防止资源被误删除，请务必设置该项。
+导入前
+ROSTemplateFormatVersion: '2015-09-01'
+Resources:
+Eip:
+Type: ALIYUN::VPC::EIP
+DeletionPolicy: Retain
+Properties:
+Bandwidth: 5
+Outputs:
+EipAddress:
+Value:
+Fn::GetAtt:
+- Eip
+- EipAddress
+AllocationId:
+Value:
+Fn::GetAtt:
+- Eip
+- AllocationId
+导入后
+ROSTemplateFormatVersion: '2015-09-01'
+Resources:
+Eip:
+Type: ALIYUN::VPC::EIP
+DeletionPolicy: Retain
+Properties:
+Bandwidth: 5
+Eip2:
+Type: ALIYUN::VPC::EIP
+DeletionPolicy: Retain
+Properties:
+Bandwidth: 5
+Outputs:
+EipAddress:
+Value:
+Fn::GetAtt:
+- Eip
+- EipAddress
+AllocationId:
+Value:
+Fn::GetAtt:
+- Eip
+- AllocationId
+EipAddress2:
+Value:
+Fn::GetAtt:
+- Eip2
+- EipAddress
+AllocationId2:
+Value:
+Fn::GetAtt:
+- Eip2
+- AllocationId
+在
+配置参数
+页面，配置
+资源栈名称
+、
+更改集名称
+。
+在
+配置资源栈
+区块，配置相关参数，单击
+下一步
+。
+本示例使用默认配置。更多信息，请参见
+创建资源栈
+。
+在
+识别资源
+页面，输入资源标识符值（例如：
+eip-bp1s1yz3aja40j377****
+），单击
+下一步
+。
+在合规预检页面，完成合规预检，然后单击下一步。
+关于合规预检的更多信息，请参见
+合规预检
+。
+在
+检查并确认
+页面，单击
+创建更改集
+。
+在
+更改集
+页签，单击更改集右侧
+操作
+列的
+执行
+，执行更改集，开始资源导入。
+在
+资源
+页签，查看
+EIP2
+资源是否已导入。
+相关文档
+当您不需要某个资源，请参见
+从资源栈中移除资源
+。
+检测导入资源的模板配置与实际配置的匹配情况，请参见
+检测资源栈的偏差状态
+。
+调用
+API
+接口创建更改集将现有资源导入已有资源栈，请参见
+CreateChangeSet - 创建更改集
+。
+上一篇：使用现有资源创建资源栈
+下一篇：从资源栈中移除资源
+该文章对您有帮助吗？
+反馈
