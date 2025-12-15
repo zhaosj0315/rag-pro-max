@@ -683,16 +683,16 @@ with st.sidebar:
     
     with tab_main:
         # P0改进1: 快速开始模式
-        st.markdown("### ⚡ 快速开始")
-
-        if st.button("⚡ 一键配置（推荐新手）", type="primary", use_container_width=True, help="自动配置默认设置，1分钟开始使用"):
-            # 使用新的配置加载器快速配置 (Stage 8)
-            ConfigLoader.quick_setup()
-            st.success("✅ 已使用默认配置！\n\n💡 下一步：创建知识库 → 上传文档 → 开始对话")
-            time.sleep(2)
-            st.rerun()
-
-        st.caption("💡 或手动配置（高级用户）")
+        col1, col2 = st.columns([9, 1])
+        with col1:
+            if st.button("⚡ 一键配置", type="primary", use_container_width=True, help="自动配置默认设置，1分钟开始使用"):
+                # 使用新的配置加载器快速配置 (Stage 8)
+                ConfigLoader.quick_setup()
+                st.success("✅ 已使用默认配置！\n\n💡 下一步：创建知识库 → 上传文档 → 开始对话")
+                time.sleep(2)
+                st.rerun()
+        with col2:
+            st.markdown("❓", help="可手动配置，适合高级用户")
 
         st.markdown("---")
         st.markdown("### 💠 知识库控制台")
@@ -1371,9 +1371,9 @@ with st.sidebar:
                 
                 st.divider()
                 
-                # 底部：操作栏 (2x3网格布局)
-                # 第一行：常用操作
-                r1_c1, r1_c2, r1_c3 = st.columns(3)
+                # 底部：操作栏 (2x3网格布局 - 优化版)
+                # 第一行：撤销、清空
+                r1_c1, r1_c2 = st.columns(2)
                 
                 with r1_c1:
                     if st.button("🔄 撤销", use_container_width=True, disabled=len(state.get_messages()) < 2, help="撤销最近一轮对话"):
@@ -1396,7 +1396,11 @@ with st.sidebar:
                         time.sleep(0.5)
                         st.rerun()
                 
-                with r1_c3:
+                # 第二行：导出、新窗口
+                st.write("") # 增加一点间距
+                r2_c1, r2_c2 = st.columns(2)
+                
+                with r2_c1:
                     export_content = ""
                     if len(state.get_messages()) > 0:
                         export_content = f"# 对话记录 - {current_kb_name}\n\n**导出时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n\n"
@@ -1405,20 +1409,20 @@ with st.sidebar:
                             export_content += f"## {role} ({i})\n\n{msg['content']}\n\n"
                     
                     st.download_button("📥 导出", export_content, file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d')}.md", mime="text/markdown", use_container_width=True, disabled=len(state.get_messages()) == 0)
-                
-                # 第二行：系统操作
-                st.write("") # 增加一点间距
-                r2_c1, r2_c2, r2_c3 = st.columns(3)
-                
-                with r2_c1:
-                    st.link_button("🔀 新窗口", "http://localhost:8501", use_container_width=True, help="打开新窗口进行多任务处理")
 
                 with r2_c2:
+                    st.link_button("🔀 新窗口", "http://localhost:8501", use_container_width=True, help="打开新窗口进行多任务处理")
+
+                # 第三行：删除、(空)
+                st.write("") # 增加一点间距
+                r3_c1, r3_c2 = st.columns(2)
+                
+                with r3_c1:
                     if st.button("🗑️ 删除", use_container_width=True, type="primary", disabled=not current_kb_name, help="永久删除该知识库"):
                         st.session_state.confirm_delete = True
                         st.rerun()
                 
-                # r2_c3 留空保持对齐
+                # r3_c2 留空
             
             # 删除确认对话框 (放在卡片外，避免嵌套问题)
             if st.session_state.get('confirm_delete', False):
@@ -1739,6 +1743,7 @@ def process_knowledge_base_logic():
         embed_model=embed,
         embed_model_name=embed_model,
         extract_metadata=extract_metadata,  # 传递性能选项
+        generate_summary=generate_summary,  # 传递摘要选项
         logger=logger
     )
     
@@ -2036,6 +2041,35 @@ if active_kb_name:
         if not doc_manager.manifest['files']: 
             st.info("暂无文件")
         else:
+            # 🔧 高级选项处理统计
+            total_files = len(doc_manager.manifest['files'])
+            ocr_files = sum(1 for f in doc_manager.manifest['files'] if f.get('used_ocr', False))
+            metadata_files = sum(1 for f in doc_manager.manifest['files'] if f.get('keywords') or f.get('category'))
+            summary_files = sum(1 for f in doc_manager.manifest['files'] if f.get('summary'))
+            
+            st.markdown("#### 🔧 高级选项处理统计")
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("📄 总文档", total_files)
+            with col2:
+                ocr_percentage = (ocr_files / total_files * 100) if total_files > 0 else 0
+                st.metric("🔍 OCR处理", f"{ocr_files}", delta=f"{ocr_percentage:.1f}%")
+            with col3:
+                metadata_percentage = (metadata_files / total_files * 100) if total_files > 0 else 0
+                st.metric("📊 元数据提取", f"{metadata_files}", delta=f"{metadata_percentage:.1f}%")
+            with col4:
+                summary_percentage = (summary_files / total_files * 100) if total_files > 0 else 0
+                st.metric("📝 生成摘要", f"{summary_files}", delta=f"{summary_percentage:.1f}%")
+            
+            # 处理建议
+            if ocr_files == 0 and metadata_files == 0 and summary_files == 0:
+                st.info("💡 **提示**: 在上传文档时启用高级选项，可以获得更丰富的文档信息和更好的检索效果")
+            elif ocr_files < total_files // 2:
+                st.info("💡 **建议**: 对于包含图片或扫描内容的PDF文档，建议启用OCR识别功能")
+            
+            st.divider()
+            
             # 文档列表查看
             tab1, tab2 = st.tabs(["📊 统计信息", "📄 文档列表"])
             
@@ -2176,23 +2210,45 @@ if active_kb_name:
                             
                             if doc_text.strip():
                                 summary = generate_doc_summary(doc_text, fname)
-                                file_info['summary'] = summary
-                                success_count += 1
+                                if summary:
+                                    file_info['summary'] = summary
+                                    
+                                    # 将摘要添加到向量数据库
+                                    try:
+                                        from llama_index.core import Document
+                                        summary_doc = Document(
+                                            text=f"文档摘要 - {fname}:\n{summary}",
+                                            metadata={
+                                                "file_name": fname,
+                                                "file_type": "summary",
+                                                "source_file": fname
+                                            }
+                                        )
+                                        idx.insert(summary_doc)
+                                    except Exception as e:
+                                        logger.warning(f"摘要添加到索引失败: {e}")
+                                    
+                                    success_count += 1
                     except Exception as e:
                         st.warning(f"⚠️ {fname}: {str(e)}")
                         
-                        progress_bar.progress((i + 1) / selected_count)
+                    progress_bar.progress((i + 1) / selected_count)
+                
+                # 保存索引和 manifest
+                try:
+                    idx.storage_context.persist(persist_dir=db_path)
+                except Exception as e:
+                    logger.warning(f"索引保存失败: {e}")
                     
-                    # 保存 manifest
-                    with open(ManifestManager.get_path(db_path), 'w', encoding='utf-8') as f:
-                        json.dump(doc_manager.manifest, f, indent=4, ensure_ascii=False)
-                    
-                    status_text.empty()
-                    progress_bar.empty()
-                    st.success(f"✅ 已生成 {success_count}/{selected_count} 个摘要")
-                    st.session_state.selected_for_summary = set()
-                    time.sleep(1)
-                    st.rerun()  # 立即刷新页面显示摘要
+                with open(ManifestManager.get_path(db_path), 'w', encoding='utf-8') as f:
+                    json.dump(doc_manager.manifest, f, indent=4, ensure_ascii=False)
+                
+                status_text.empty()
+                progress_bar.empty()
+                st.success(f"✅ 已生成 {success_count}/{selected_count} 个摘要并添加到知识库")
+                st.session_state.selected_for_summary = set()
+                time.sleep(1)
+                st.rerun()  # 立即刷新页面显示摘要
             
             # 文档列表标签页 (v1.6)
             with tab2:
@@ -2445,12 +2501,30 @@ if active_kb_name:
                             """
                             st.markdown(line_html, unsafe_allow_html=True)
                             
+                            # 🔧 高级选项处理状态标识
+                            processing_badges = []
+                            if f.get('used_ocr', False):
+                                processing_badges.append('<span style="background: #e8f5e8; color: #2d5a2d; padding: 1px 4px; border-radius: 3px; font-size: 0.7rem; margin-right: 3px;">🔍OCR</span>')
+                            if f.get('keywords') or f.get('category'):
+                                processing_badges.append('<span style="background: #e8f0ff; color: #1a4480; padding: 1px 4px; border-radius: 3px; font-size: 0.7rem; margin-right: 3px;">📊元数据</span>')
+                            if f.get('summary'):
+                                processing_badges.append('<span style="background: #fff3e0; color: #8b4513; padding: 1px 4px; border-radius: 3px; font-size: 0.7rem; margin-right: 3px;">📝摘要</span>')
+                            
+                            if processing_badges:
+                                badges_html = ''.join(processing_badges)
+                                st.markdown(f'<div style="margin-top: 2px; margin-bottom: 4px;">{badges_html}</div>', unsafe_allow_html=True)
+                            
                             # 显示摘要（如果有的话）
                             if f.get('summary'):
                                 summary_text = f['summary']
                                 if len(summary_text) > 100:
                                     summary_text = summary_text[:97] + "..."
                                 st.caption(f"📝 {summary_text}")
+                            
+                            # 显示关键词（如果有的话）
+                            if f.get('keywords'):
+                                keywords = f['keywords'][:5]  # 只显示前5个关键词
+                                st.caption(f"🏷️ {', '.join(keywords)}")
                         
                         with col_summary:
                             # 摘要生成按钮
@@ -2483,11 +2557,27 @@ if active_kb_name:
                                                     f['summary'] = summary
                                                     doc_manager.manifest['files'][orig_idx]['summary'] = summary
                                                     
+                                                    # 将摘要添加到向量数据库
+                                                    try:
+                                                        from llama_index.core import Document
+                                                        summary_doc = Document(
+                                                            text=f"文档摘要 - {f['name']}:\n{summary}",
+                                                            metadata={
+                                                                "file_name": f['name'],
+                                                                "file_type": "summary",
+                                                                "source_file": f['name']
+                                                            }
+                                                        )
+                                                        index.insert(summary_doc)
+                                                        index.storage_context.persist(persist_dir=db_path)
+                                                    except Exception as e:
+                                                        logger.warning(f"摘要添加到索引失败: {e}")
+                                                    
                                                     # 保存manifest
                                                     from src.config.manifest_manager import ManifestManager
                                                     ManifestManager.save(db_path, doc_manager.manifest['files'], doc_manager.manifest.get('embed_model', 'Unknown'))
                                                     
-                                                    st.success("✅ 摘要生成成功！")
+                                                    st.success("✅ 摘要生成成功并已添加到知识库！")
                                                     st.rerun()
                                                 else:
                                                     st.error("❌ 生成失败")
@@ -2777,13 +2867,13 @@ if st.session_state.get('is_processing'):
 else:
     # 正常输入状态
     user_input = st.chat_input("输入问题...")
-
-# 如果有新输入，加入队列
-if user_input:
-    if not st.session_state.chat_engine:
-        st.error("请先点击左侧【🚀 执行处理】启动系统")
-    else:
-        st.session_state.question_queue.append(user_input)
+    
+    # 如果有新输入，加入队列
+    if user_input:
+        if not st.session_state.chat_engine:
+            st.error("请先点击左侧【🚀 执行处理】启动系统")
+        else:
+            st.session_state.question_queue.append(user_input)
 
 # 处理 prompt_trigger（追问按钮）
 if st.session_state.prompt_trigger:

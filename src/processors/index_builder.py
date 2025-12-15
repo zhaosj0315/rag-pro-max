@@ -43,12 +43,14 @@ class IndexBuilder:
     def __init__(self, kb_name: str, persist_dir: str, 
                  embed_model, embed_model_name: str = "Unknown",
                  extract_metadata: bool = True,
+                 generate_summary: bool = False,
                  logger=None):
         self.kb_name = kb_name
         self.persist_dir = persist_dir
         self.embed_model = embed_model
         self.embed_model_name = embed_model_name
         self.extract_metadata = extract_metadata  # 是否提取元数据
+        self.generate_summary = generate_summary  # 是否生成摘要
         self.logger = logger
         self.metadata_mgr = MetadataManager(persist_dir)
         
@@ -95,7 +97,7 @@ class IndexBuilder:
             
             # 步骤6: 构建索引
             progress.start_step(6, "向量化和索引构建")
-            index = self._build_index(index, valid_docs, action_mode, status_callback)
+            index = self._build_index(index, valid_docs, action_mode, status_callback, file_map)
             progress.end_step("索引构建完成")
             
             # 保存 manifest
@@ -215,8 +217,12 @@ class IndexBuilder:
             if callback:
                 callback("info", "⚡ 跳过元数据提取（快速模式）")
         
-        # 生成摘要（后台）
-        self._queue_summaries(docs, file_map, callback)
+        # 生成摘要（可选）
+        if self.generate_summary:
+            self._queue_summaries(docs, file_map, callback)
+        else:
+            if callback:
+                callback("info", "⚡ 跳过摘要生成（快速模式）")
         
         # 过滤有效文档
         valid_docs = [d for d in docs if d.text and d.text.strip()]
@@ -261,16 +267,79 @@ class IndexBuilder:
                 })
     
     def _queue_summaries(self, docs, file_map, callback):
-        """将摘要任务加入队列（异步）"""
-        summary_tasks = []
+        """生成摘要并添加到索引（立即执行）"""
+        # 按文件名去重，每个文件只生成一次摘要
+        file_texts = {}
         for d in docs:
             fname = d.metadata.get('file_name')
             if fname and fname in file_map and d.text.strip() and not file_map[fname].get('summary'):
-                summary_tasks.append((fname, d.text[:2000]))
+                if fname not in file_texts:
+                    file_texts[fname] = d.text[:2000]  # 只取第一个片段的前2000字符
+        
+        summary_tasks = list(file_texts.items())
         
         if not summary_tasks:
             return
         
+        if callback:
+            callback("info", f"正在生成摘要: {len(summary_tasks)} 个文件")
+        
+        # 立即生成摘要（并行处理）
+        try:
+            # 导入摘要生成函数
+            from src.utils.app_utils import generate_doc_summary
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            import threading
+            
+            def generate_single_summary(fname, text):
+                """生成单个文件的摘要"""
+                try:
+                    summary = generate_doc_summary(text, fname)
+                    return fname, summary, None
+                except Exception as e:
+                    return fname, None, str(e)
+            
+            # 并行生成摘要
+            max_workers = min(4, len(summary_tasks))  # 最多4个线程
+            completed_count = 0
+            
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # 提交所有任务
+                future_to_fname = {
+                    executor.submit(generate_single_summary, fname, text): fname 
+                    for fname, text in summary_tasks
+                }
+                
+                # 处理完成的任务
+                for future in as_completed(future_to_fname):
+                    fname, summary, error = future.result()
+                    completed_count += 1
+                    
+                    if callback:
+                        callback("progress", completed_count, len(summary_tasks), f"生成摘要: {fname}")
+                    
+                    if summary:
+                        # 保存到 file_map
+                        file_map[fname]['summary'] = summary
+                        if callback:
+                            callback("info", f"✅ 摘要生成成功: {fname}")
+                    elif error:
+                        if self.logger:
+                            self.logger.warning(f"⚠️ 摘要生成失败 {fname}: {error}")
+                        if callback:
+                            callback("warning", f"摘要生成失败: {fname}")
+            
+            if callback:
+                callback("info", f"摘要生成完成: {len(summary_tasks)} 个文件（并行处理）")
+                
+        except ImportError:
+            # 如果无法导入摘要生成函数，回退到队列模式
+            if callback:
+                callback("warning", "摘要生成函数不可用，使用队列模式")
+            self._queue_summaries_async(summary_tasks, callback)
+    
+    def _queue_summaries_async(self, summary_tasks, callback):
+        """异步队列模式（备用方案）"""
         if callback:
             callback("info", f"摘要生成已加入后台队列 ({len(summary_tasks)} 个文件)")
         
@@ -297,7 +366,6 @@ class IndexBuilder:
         # 启动后台线程
         thread = threading.Thread(target=write_queue_async, daemon=True)
         thread.start()
-        # 不等待完成，立即返回
     
     @staticmethod
     def _clean_text(text: str) -> str:
@@ -307,7 +375,7 @@ class IndexBuilder:
         except:
             return ""
     
-    def _build_index(self, index, valid_docs, action_mode, callback):
+    def _build_index(self, index, valid_docs, action_mode, callback, file_map=None):
         """构建向量索引"""
         if index and action_mode == "APPEND":
             # 追加模式
@@ -340,13 +408,52 @@ class IndexBuilder:
                 if self.logger:
                     self.logger.warning(f"优化向量化失败，降级到标准模式: {e}")
                 index = VectorStoreIndex.from_documents(valid_docs, show_progress=True)
+        
+        # 添加摘要文档到索引
+        if self.generate_summary and file_map:
+            self._add_summaries_to_index(index, file_map, callback)
             
-            index.storage_context.persist(persist_dir=self.persist_dir)
-            
-            # 保存知识库信息
-            self._save_kb_info()
+        index.storage_context.persist(persist_dir=self.persist_dir)
+        
+        # 保存知识库信息
+        self._save_kb_info()
         
         return index
+    
+    def _add_summaries_to_index(self, index, file_map, callback):
+        """将摘要添加到向量索引"""
+        summary_docs = []
+        
+        for fname, file_info in file_map.items():
+            if file_info.get('summary'):
+                try:
+                    from llama_index.core import Document
+                    summary_doc = Document(
+                        text=f"文档摘要 - {fname}:\n{file_info['summary']}",
+                        metadata={
+                            "file_name": fname,
+                            "file_type": "summary",
+                            "source_file": fname
+                        }
+                    )
+                    summary_docs.append(summary_doc)
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"摘要文档创建失败 {fname}: {e}")
+        
+        if summary_docs:
+            if callback:
+                callback("info", f"添加摘要到索引: {len(summary_docs)} 个")
+            
+            for doc in summary_docs:
+                try:
+                    index.insert(doc)
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"摘要插入失败: {e}")
+            
+            if callback:
+                callback("info", f"✅ 摘要已添加到索引: {len(summary_docs)} 个")
     
     def _save_kb_info(self):
         """保存知识库信息"""
