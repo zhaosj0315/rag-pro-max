@@ -18,9 +18,14 @@ class ManifestManager:
         return {'files': []}
     
     @staticmethod
+    def get_path(db_path: str) -> str:
+        """获取清单文件路径"""
+        return os.path.join(db_path, "manifest.json")
+    
+    @staticmethod
     def load(db_path: str) -> Dict[str, Any]:
         """静态加载方法"""
-        manifest_file = os.path.join(db_path, "manifest.json")
+        manifest_file = ManifestManager.get_path(db_path)  # 使用统一的路径方法
         if os.path.exists(manifest_file):
             try:
                 with open(manifest_file, 'r', encoding='utf-8') as f:
