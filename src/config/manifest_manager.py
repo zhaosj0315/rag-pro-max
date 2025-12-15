@@ -1,61 +1,47 @@
-"""知识库清单管理器"""
+"""
+清单管理器 - 最小实现
+"""
 
-import os
 import json
-from typing import Dict, List
-from datetime import datetime
-
+import os
 
 class ManifestManager:
-    """知识库清单管理器"""
+    """清单管理器"""
     
-    MANIFEST_FILE = "manifest.json"
+    def __init__(self):
+        pass
     
-    @classmethod
-    def get_path(cls, persist_dir: str) -> str:
-        """获取清单文件路径"""
-        return os.path.join(persist_dir, cls.MANIFEST_FILE)
+    def get_manifest(self):
+        """获取清单"""
+        return {'files': []}
     
-    @classmethod
-    def load(cls, persist_dir: str) -> Dict:
-        """加载知识库清单"""
-        path = cls.get_path(persist_dir)
-        if os.path.exists(path):
+    @staticmethod
+    def load(db_path):
+        """静态加载方法"""
+        manifest_file = os.path.join(db_path, "manifest.json")
+        if os.path.exists(manifest_file):
             try:
-                with open(path, 'r', encoding='utf-8') as f:
+                with open(manifest_file, 'r', encoding='utf-8') as f:
                     return json.load(f)
-            except Exception:
+            except:
                 pass
-        return {"files": [], "embed_model": "Unknown"}
+        return {'files': []}
     
-    @classmethod
-    def save(cls, persist_dir: str, files: List[Dict], embed_model: str = "Unknown") -> bool:
-        """保存知识库清单"""
+    @staticmethod
+    def save(db_path, files, embed_model=None):
+        """静态保存方法 - 兼容原版本参数"""
         try:
-            data = {
-                "files": files,
-                "embed_model": embed_model,
-                "updated_at": datetime.now().isoformat()
-            }
-            path = cls.get_path(persist_dir)
-            with open(path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-            return True
-        except Exception:
-            return False
-    
-    @classmethod
-    def update(cls, persist_dir: str, new_files: List[Dict], 
-               is_append: bool = False, embed_model: str = "Unknown") -> bool:
-        """更新知识库清单"""
-        try:
-            if is_append:
-                manifest = cls.load(persist_dir)
-                files = manifest.get("files", [])
-                files.extend(new_files)
-            else:
-                files = new_files
+            os.makedirs(db_path, exist_ok=True)
+            manifest_file = os.path.join(db_path, "manifest.json")
             
-            return cls.save(persist_dir, files, embed_model)
-        except Exception:
-            return False
+            manifest = {
+                'files': files if isinstance(files, list) else [],
+                'embed_model': embed_model or 'Unknown',
+                'created_time': str(os.path.getctime(db_path)) if os.path.exists(db_path) else '',
+                'file_count': len(files) if isinstance(files, list) else 0
+            }
+            
+            with open(manifest_file, 'w', encoding='utf-8') as f:
+                json.dump(manifest, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"保存清单失败: {e}")

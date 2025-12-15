@@ -151,7 +151,7 @@ class WebCrawler:
         Args:
             start_url: 起始URL
             max_depth: 最大深度 (1-5)
-            max_pages: 最大页面数量限制
+            max_pages: 每层最大页面数量
             exclude_patterns: 排除链接模式列表（支持通配符）
             parser_type: 页面解析器类型 ("default", "article", "documentation")
             status_callback: 状态回调函数 func(msg)
@@ -161,10 +161,11 @@ class WebCrawler:
         """
         # 🛑 安全熔断：全局最大页面限制
         GLOBAL_MAX_PAGES = 50000
-        if max_pages > GLOBAL_MAX_PAGES:
+        total_estimated = max_pages ** max_depth
+        if total_estimated > GLOBAL_MAX_PAGES:
             if status_callback:
-                status_callback(f"⚠️ 安全熔断：页面数量限制为 {GLOBAL_MAX_PAGES}，已自动调整")
-            max_pages = GLOBAL_MAX_PAGES
+                status_callback(f"⚠️ 安全熔断：预估页面数 {total_estimated} 超过限制 {GLOBAL_MAX_PAGES}")
+            max_pages = min(max_pages, int(GLOBAL_MAX_PAGES ** (1/max_depth)))
         
         # 自动修复URL格式
         start_url = self._fix_url(start_url)
@@ -173,76 +174,87 @@ class WebCrawler:
             raise ValueError(f"Invalid URL '{start_url}': No scheme supplied. Perhaps you meant https://{start_url.replace('https://', '').replace('http://', '')}?")
         
         self.visited_urls = set()
-        # 使用队列存储 (url, depth, parent_url)
-        queue = [(start_url, 1, None)]
+        # 按层级组织队列: {depth: [urls]}
+        current_level = [start_url]
         saved_files = []
-        count = 0
+        total_count = 0
         
         base_domain = urlparse(start_url).netloc
         
         if status_callback:
-            status_callback(f"开始爬取: {start_url} (最大深度: {max_depth}, 最大页数: {max_pages})")
+            status_callback(f"开始爬取: {start_url} (最大深度: {max_depth}, 每层最大页数: {max_pages})")
         
-        while queue and count < max_pages:
-            url, depth, parent_url = queue.pop(0)
-            
-            if url in self.visited_urls:
-                continue
-            
-            self.visited_urls.add(url)
-            
-            try:
-                if status_callback:
-                    status_callback(f"正在抓取 ({count+1}/{max_pages}) 深度{depth}: {url}")
+        for depth in range(1, max_depth + 1):
+            if not current_level:
+                break
                 
-                response = self.session.get(url, timeout=15)
-                response.encoding = response.apparent_encoding
-                
-                if response.status_code != 200:
-                    if status_callback:
-                        status_callback(f"跳过 {url} (状态码: {response.status_code})")
+            next_level = []
+            level_count = 0
+            
+            # 限制当前层的页面数
+            current_level = current_level[:max_pages]
+            
+            if status_callback:
+                status_callback(f"📂 第{depth}层开始: 准备处理 {len(current_level)} 个链接")
+            
+            for url in current_level:
+                if url in self.visited_urls or level_count >= max_pages:
                     continue
                 
-                soup = BeautifulSoup(response.text, 'html.parser')
+                self.visited_urls.add(url)
                 
-                # 根据解析器类型提取内容
-                content = self._extract_content_by_parser(soup, parser_type)
-                
-                title = soup.title.string if soup.title else "No Title"
-                title = self._clean_text(title)
-                
-                # 保存内容
-                filepath = self._save_content(url, title, content)
-                if filepath:
-                    saved_files.append(filepath)
-                    count += 1
+                try:
                     if status_callback:
-                        status_callback(f"✅ 已保存: {title} ({len(content)} 字符)")
-                
-                # 如果还没达到最大深度，提取下一级链接
-                if depth < max_depth:
-                    links = self._extract_links(soup, url, exclude_patterns)
+                        status_callback(f"正在抓取 ({total_count+1}) 第{depth}层 ({level_count+1}/{max_pages}): {url}")
                     
-                    # 限制每页提取的链接数量，避免爆炸式增长
-                    max_links_per_page = min(20, max_pages - count)
-                    links = links[:max_links_per_page]
+                    response = self.session.get(url, timeout=15)
+                    response.encoding = response.apparent_encoding
                     
-                    for link in links:
-                        if link not in self.visited_urls and (link, depth + 1, url) not in queue:
-                            queue.append((link, depth + 1, url))
+                    if response.status_code != 200:
+                        if status_callback:
+                            status_callback(f"跳过 {url} (状态码: {response.status_code})")
+                        continue
                     
-                    if status_callback and links:
-                        status_callback(f"发现 {len(links)} 个新链接，添加到队列")
-                
-                time.sleep(0.5)  # 礼貌爬取
-                
-            except Exception as e:
-                if status_callback:
-                    status_callback(f"抓取失败 {url}: {e}")
-                continue
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    
+                    # 根据解析器类型提取内容
+                    content = self._extract_content_by_parser(soup, parser_type)
+                    
+                    title = soup.title.string if soup.title else "No Title"
+                    title = self._clean_text(title)
+                    
+                    # 保存内容
+                    filepath = self._save_content(url, title, content)
+                    if filepath:
+                        saved_files.append(filepath)
+                        level_count += 1
+                        total_count += 1
+                        if status_callback:
+                            status_callback(f"✅ 已保存: {title} ({len(content)} 字符)")
+                    
+                    # 如果还没达到最大深度，提取下一级链接
+                    if depth < max_depth:
+                        links = self._extract_links(soup, url, exclude_patterns)
+                        next_level.extend(links)
+                        
+                        if status_callback and links:
+                            status_callback(f"发现 {len(links)} 个新链接，添加到第{depth+1}层队列")
+                    
+                    time.sleep(0.5)  # 礼貌爬取
+                    
+                except Exception as e:
+                    if status_callback:
+                        status_callback(f"抓取失败 {url}: {e}")
+                    continue
+            
+            # 准备下一层
+            current_level = list(set(next_level))  # 去重
+            
+            if status_callback:
+                status_callback(f"🎯 第{depth}层完成: 成功抓取 {level_count} 页，发现 {len(current_level)} 个下级链接")
         
         if status_callback:
-            status_callback(f"🎉 爬取完成！共获取 {len(saved_files)} 个页面")
+            status_callback(f"🎉 爬取完成！总共获取 {len(saved_files)} 个页面 (共{max_depth}层)")
                 
         return saved_files
 
