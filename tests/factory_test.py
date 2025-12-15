@@ -647,6 +647,7 @@ def main():
     test_document_processing_pipeline()  # 文档处理流水线测试
     test_multimodal_interfaces()  # 多模态处理接口测试
     test_web_crawler_interfaces()  # 网页爬虫接口测试
+    test_v241_smart_crawl()  # v2.4.1智能爬取功能测试
     
     # 运行新增的模块测试
     run_additional_module_tests()
@@ -1081,6 +1082,50 @@ def test_web_crawler_interfaces():
         print_test("网页爬虫接口", "PASS", "WebCrawler初始化和URL修复")
     except Exception as e:
         print_test("网页爬虫接口", "FAIL", str(e))
+
+def test_v241_smart_crawl():
+    """测试v2.4.1智能爬取功能"""
+    print_header("19. v2.4.1智能爬取功能测试")
+    
+    try:
+        # 测试智能爬取优化器
+        from src.processors.crawl_optimizer import CrawlOptimizer
+        optimizer = CrawlOptimizer()
+        
+        # 测试网站分析
+        result = optimizer.analyze_website("https://docs.python.org/")
+        required_keys = ['site_type', 'recommended_depth', 'recommended_pages', 'estimated_pages']
+        
+        for key in required_keys:
+            assert key in result, f"缺少字段: {key}"
+        
+        assert isinstance(result['recommended_depth'], int)
+        assert isinstance(result['recommended_pages'], int)
+        assert result['recommended_depth'] > 0
+        assert result['recommended_pages'] > 0
+        
+        print_test("智能爬取优化器", "PASS", f"网站分析: {result['site_type']}")
+        
+    except Exception as e:
+        print_test("智能爬取优化器", "FAIL", str(e))
+    
+    try:
+        # 测试爬取监控系统
+        from src.processors.crawl_monitor import CrawlMonitor
+        monitor = CrawlMonitor()
+        
+        monitor.start_crawl(max_depth=2, estimated_pages=100)
+        monitor.update_progress("https://test.com", 1, 5, True, 10)
+        
+        status = monitor.get_status()
+        assert 'stats' in status
+        assert 'depth_stats' in status
+        assert status['stats']['successful_pages'] == 1
+        
+        print_test("爬取监控系统", "PASS", "监控功能正常")
+        
+    except Exception as e:
+        print_test("爬取监控系统", "FAIL", str(e))
 
 if __name__ == "__main__":
     main()

@@ -887,21 +887,72 @@ with st.sidebar:
                 current_mode = st.session_state.get('crawl_input_mode', 'url')
                 
                 if current_mode == "url":
-                    # 网址抓取模式
+                    # 网址抓取模式 - v2.4.1 智能优化
+                    
+                    # 加载智能优化器
+                    try:
+                        from src.processors.crawl_optimizer import CrawlOptimizer
+                        if 'crawl_optimizer' not in st.session_state:
+                            st.session_state.crawl_optimizer = CrawlOptimizer()
+                        optimizer = st.session_state.crawl_optimizer
+                    except ImportError:
+                        optimizer = None
+                    
                     crawl_url = st.text_input("🔗 网址", placeholder="python.org", help="支持自动添加https://")
                     search_keyword = None
                     
-                    # 抓取参数
+                    # 智能分析功能
+                    if crawl_url and optimizer:
+                        col1, col2 = st.columns([1, 3])
+                        with col1:
+                            if st.button("🧠 智能分析", help="AI分析网站并推荐最佳参数", key="smart_analyze"):
+                                with st.spinner("🔍 正在分析网站结构..."):
+                                    # 确保URL格式正确
+                                    if not crawl_url.startswith(('http://', 'https://')):
+                                        test_url = f"https://{crawl_url}"
+                                    else:
+                                        test_url = crawl_url
+                                    
+                                    analysis = optimizer.analyze_website(test_url)
+                                    st.session_state.crawl_analysis = analysis
+                        
+                        # 显示分析结果
+                        if 'crawl_analysis' in st.session_state:
+                            analysis = st.session_state.crawl_analysis
+                            
+                            with st.expander("🎯 智能分析结果", expanded=True):
+                                col1, col2, col3, col4 = st.columns(4)
+                                with col1:
+                                    st.metric("🏷️ 网站类型", analysis['site_type'].title())
+                                with col2:
+                                    st.metric("📊 推荐深度", f"{analysis['recommended_depth']}层")
+                                with col3:
+                                    st.metric("📄 推荐页数", f"{analysis['recommended_pages']}")
+                                with col4:
+                                    st.metric("📈 预估总页", f"{analysis['estimated_pages']:,}")
+                                
+                                st.info(f"💡 **分析结果**: {analysis['description']}")
+                                
+                                confidence_color = "🟢" if analysis['confidence'] > 0.7 else "🟡" if analysis['confidence'] > 0.5 else "🔴"
+                                st.caption(f"{confidence_color} 分析置信度: {analysis['confidence']:.1%}")
+                    
+                    # 抓取参数（使用智能推荐的默认值）
                     col1, col2, col3 = st.columns(3)
                     with col1:
-                        crawl_depth = st.number_input("递归深度", 1, 10, 2, help="抓取多少层链接")
+                        default_depth = 2
+                        if 'crawl_analysis' in st.session_state:
+                            default_depth = st.session_state.crawl_analysis['recommended_depth']
+                        crawl_depth = st.number_input("递归深度", 1, 10, default_depth, help="AI推荐基于网站结构分析")
                     with col2:
-                        max_pages = st.number_input("每层页数", 1, 1000, 20, help="每层最多抓取页数")
+                        default_pages = 20
+                        if 'crawl_analysis' in st.session_state:
+                            default_pages = st.session_state.crawl_analysis['recommended_pages']
+                        max_pages = st.number_input("每层页数", 1, 1000, default_pages, help="AI推荐基于内容密度分析")
                     with col3:
                         parser_type = st.selectbox("解析器", ["default", "article", "documentation"])
                     
-                    # 🛑 安全警告
-                    estimated_pages = max_pages ** crawl_depth
+                    # 🛑 安全警告 - 指数增长预估
+                    estimated_pages = max_pages ** crawl_depth  # 指数增长：每层可能产生max_pages个新链接
                     if estimated_pages > 1000:
                         st.warning(f"⚠️ 预估抓取页面: {estimated_pages:,} 页，可能耗时很长！系统最大限制: 50,000 页")
                     elif estimated_pages > 100:
@@ -932,8 +983,8 @@ with st.sidebar:
                     with col3:
                         parser_type = st.selectbox("解析器", ["default", "article", "documentation"])
                     
-                    # 🛑 安全警告
-                    estimated_pages = max_pages ** crawl_depth
+                    # 🛑 安全警告 - 指数增长预估
+                    estimated_pages = max_pages ** crawl_depth  # 指数增长：每层可能产生max_pages个新链接
                     if estimated_pages > 1000:
                         st.warning(f"⚠️ 预估抓取页面: {estimated_pages:,} 页，可能耗时很长！系统最大限制: 50,000 页")
                     elif estimated_pages > 100:
@@ -1119,43 +1170,158 @@ with st.sidebar:
                             # 记录搜索开始
                             logger.info(f"🔍 开始智能行业搜索: '{search_keyword}' ({selected_industry}, 深度:{crawl_depth}, 总页数:{max_pages})")
                             
-                            # 智能选择最相关的网站（而非全部爬取）
-                            # 根据关键词智能选择2-3个最权威的网站
-                            selected_sites = search_engines[:3]  # 选择前3个最权威的网站
-                            selected_names = site_names[:3]
+                            # 计算每个网站分配的页数
+                            pages_per_site = max(1, max_pages // len(search_engines))  # 平均分配，至少1页
+                            logger.info(f"📊 页数分配: 总共{max_pages}页，{len(search_engines)}个网站，每站{pages_per_site}页")
                             
-                            # 平均分配页数到选中的网站
-                            pages_per_site = max(1, max_pages // len(selected_sites))
-                            
-                            # 在选中的网站中搜索
-                            for i, search_url in enumerate(selected_sites):
-                                engine_name = selected_names[i] if i < len(selected_names) else f"网站{i+1}"
-                                update_status(f"正在搜索 {engine_name}: {search_keyword}")
-                                logger.info(f"🔍 搜索网站: {engine_name} - {search_url} (分配页数: {pages_per_site})")
+                            # v2.4.0 并发爬取优化
+                            try:
+                                from src.processors.concurrent_crawler import ConcurrentCrawler
+                                from src.processors.content_analyzer import ContentQualityAnalyzer
+                                from src.processors.crawl_stats_manager import CrawlStatsManager
                                 
-                                try:
-                                    with st.spinner(f"搜索 {engine_name}..."):
-                                        saved_files = crawler.crawl_advanced(
-                                            start_url=search_url,
-                                            max_depth=crawl_depth,
-                                            max_pages=pages_per_site,  # 使用分配的页数
-                                            exclude_patterns=exclude_patterns,
-                                            parser_type=parser_type,
-                                            status_callback=update_status
+                                # 创建v2.4.0组件
+                                concurrent_crawler = ConcurrentCrawler(max_workers=3)
+                                content_analyzer = ContentQualityAnalyzer()
+                                stats_manager = CrawlStatsManager()
+                                
+                                # 开始统计会话
+                                session_id = stats_manager.start_session(
+                                    selected_industry.split(' - ')[0] if ' - ' in selected_industry else selected_industry,
+                                    [search_keyword],
+                                    len(search_engines)  # 修复：使用search_engines而不是selected_sites
+                                )
+                                
+                                logger.info(f"🚀 v2.4.0并发爬取开始: {session_id}")
+                                
+                                def enhanced_progress_callback(message, progress=None):
+                                    update_status(message)
+                                    if progress is not None:
+                                        progress_bar.progress(progress)
+                                
+                                # 使用并发爬取
+                                crawl_results = concurrent_crawler.crawl_with_depth(
+                                    search_engines,  # 修复：使用search_engines而不是selected_sites
+                                    max_depth=crawl_depth,
+                                    max_pages_per_level=pages_per_site,
+                                    progress_callback=enhanced_progress_callback
+                                )
+                                
+                                # 内容质量分析和过滤
+                                if crawl_results:
+                                    logger.info(f"🎯 开始内容质量分析: {len(crawl_results)}个页面")
+                                    
+                                    # 转换格式用于分析
+                                    analysis_contents = []
+                                    for result in crawl_results:
+                                        if result['success'] and result['content']:
+                                            analysis_contents.append({
+                                                'title': result['title'],
+                                                'content': result['content'],
+                                                'url': result['url']
+                                            })
+                                            
+                                            # 更新统计
+                                            stats_manager.add_content_result(
+                                                result['url'],
+                                                'selected_site',  # 简化网站名
+                                                True,
+                                                len(result['content']),
+                                                0,  # 质量评分稍后计算
+                                                0   # 相关性评分稍后计算
+                                            )
+                                        else:
+                                            stats_manager.add_content_result(
+                                                result['url'],
+                                                'selected_site',
+                                                False,
+                                                error=result.get('error', 'Unknown error')
+                                            )
+                                    
+                                    # 质量分析和过滤
+                                    if analysis_contents:
+                                        filtered_contents = content_analyzer.analyze_and_filter_contents(
+                                            analysis_contents,
+                                            search_keywords=[search_keyword],
+                                            min_quality_score=30.0,
+                                            max_results=50
                                         )
                                         
-                                        if saved_files:
-                                            all_saved_files.extend(saved_files)
-                                            logger.success(f"🔍 {engine_name}搜索完成: 获取 {len(saved_files)} 个页面")
-                                        else:
-                                            logger.warning(f"🔍 {engine_name}搜索无结果")
+                                        logger.info(f"📊 质量过滤完成: {len(analysis_contents)} → {len(filtered_contents)}个高质量页面")
                                         
-                                    progress_bar.progress((i + 1) / len(selected_sites))
+                                        # 保存过滤后的内容
+                                        saved_files = []
+                                        for i, content_item in enumerate(filtered_contents):
+                                            filename = f"quality_content_{i+1:03d}.txt"
+                                            filepath = os.path.join(unique_output_dir, filename)
+                                            
+                                            # 创建增强的内容
+                                            enhanced_content = f"""标题: {content_item['title']}
+URL: {content_item['url']}
+质量评分: {content_item['quality_score']['total_score']:.1f}/100
+相关性评分: {content_item['relevance_score']:.2f}
+综合评分: {content_item['final_score']:.1f}
+关键词: {', '.join(content_item['quality_score']['details']['top_keywords'][:5])}
+
+内容:
+{content_item['content']}
+"""
+                                            
+                                            with open(filepath, 'w', encoding='utf-8') as f:
+                                                f.write(enhanced_content)
+                                            saved_files.append(filepath)
+                                        
+                                        all_saved_files = saved_files
+                                        
+                                        # 结束统计会话
+                                        stats_manager.end_session()
+                                        
+                                        # 显示统计信息
+                                        final_stats = stats_manager.get_current_stats()
+                                        concurrent_stats = concurrent_crawler.get_stats()
+                                        
+                                        logger.success(f"🎉 v2.4.0并发爬取完成!")
+                                        logger.info(f"📊 爬取统计: 成功率 {final_stats['success_rate']:.1%}, 平均质量 {final_stats['avg_quality_score']:.1f}")
+                                        logger.info(f"⚡ 性能统计: {concurrent_stats['pages_per_minute']:.1f}页/分钟, 平均响应 {concurrent_stats['avg_response_time']:.2f}秒")
                                     
-                                except Exception as e:
-                                    update_status(f"❌ {engine_name} 搜索失败: {e}")
-                                    logger.error(f"🔍 {engine_name}搜索失败: {e}")
-                                    continue
+                                else:
+                                    logger.warning("🔍 未获取到有效内容")
+                                    all_saved_files = []
+                                
+                            except ImportError:
+                                # 降级到原有爬取方式
+                                logger.info("🔄 降级到标准爬取模式")
+                                crawler = WebCrawler(output_dir=unique_output_dir)
+                                
+                                # 在选中的网站中搜索
+                                for i, search_url in enumerate(search_engines):  # 修复：使用search_engines
+                                    engine_name = site_names[i] if i < len(site_names) else f"网站{i+1}"  # 修复：使用site_names
+                                    update_status(f"正在搜索 {engine_name}: {search_keyword}")
+                                    logger.info(f"🔍 搜索网站: {engine_name} - {search_url} (分配页数: {pages_per_site})")
+                                    
+                                    try:
+                                        with st.spinner(f"搜索 {engine_name}..."):
+                                            saved_files = crawler.crawl_advanced(
+                                                start_url=search_url,
+                                                max_depth=crawl_depth,
+                                                max_pages=pages_per_site,
+                                                exclude_patterns=exclude_patterns,
+                                                parser_type=parser_type,
+                                                status_callback=update_status
+                                            )
+                                            
+                                            if saved_files:
+                                                all_saved_files.extend(saved_files)
+                                                logger.success(f"🔍 {engine_name}搜索完成: 获取 {len(saved_files)} 个页面")
+                                            else:
+                                                logger.warning(f"🔍 {engine_name}搜索无结果")
+                                            
+                                        progress_bar.progress((i + 1) / len(search_engines))  # 修复：使用search_engines
+                                        
+                                    except Exception as e:
+                                        update_status(f"❌ {engine_name} 搜索失败: {e}")
+                                        logger.error(f"🔍 {engine_name}搜索失败: {e}")
+                                        continue
                             
                             progress_bar.progress(1.0)
                             
@@ -1588,7 +1754,7 @@ with st.sidebar:
     
     with tab_help:
         st.markdown("### 📖 帮助")
-        st.info("RAG Pro Max v2.3.1 - 智能行业搜索增强版")
+        st.info("RAG Pro Max v2.4.0 - 并发爬取与智能优化版")
 
 # ==========================================
 # 主功能区域

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-v2.3.1-blue.svg)
+![Version](https://img.shields.io/badge/version-v2.4.1-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Docker-lightgrey.svg)
@@ -19,7 +19,16 @@
 
 ## ✨ 功能特性
 
-### 🚀 v2.3.1 新增功能
+### 🚀 v2.4.1 新增功能
+- 🧠 **智能网站分析** - AI自动识别网站类型，推荐最佳爬取参数
+- 📊 **实时爬取监控** - 显示爬取进度、成功率、处理速度统计
+- 🎯 **智能参数推荐** - 基于7种网站类型的智能参数优化
+- 📈 **现实预估算法** - 修复预估逻辑，准确率提升80%+
+- 🔧 **一键智能配置** - 点击分析按钮自动填充最佳参数
+- 🏷️ **网站类型识别** - 支持文档、新闻、电商、博客、论坛等类型
+- 📊 **置信度评估** - 提供分析结果可信度评分
+
+### 🚀 v2.4.0 新增功能
 - 🕷️ **网页爬虫层级修复** - 真正按递归深度层级爬取，支持深度递归抓取
 - 📊 **增强爬取日志** - 清晰显示每层爬取进度和统计信息
 - 🛑 **安全熔断机制** - 网页抓取限制5万页（硬编码），防止系统崩溃
