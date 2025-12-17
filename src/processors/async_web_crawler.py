@@ -33,8 +33,9 @@ class AsyncWebCrawler:
         # 🔥 新增：智能优化器
         self.optimizer = CrawlOptimizer()
         
-        # 状态持久化
-        self.state_file = "crawler_state.json"
+        # 状态持久化 - 使用唯一文件名避免冲突
+        import time
+        self.state_file = f"crawler_state_{int(time.time())}.json"
         self.semaphore = None
         
     async def __aenter__(self):
@@ -217,7 +218,17 @@ class AsyncWebCrawler:
     
     async def crawl_url(self, url: str, status_callback: Optional[Callable] = None, ignore_robots: bool = False) -> Optional[Dict]:
         """爬取单个URL"""
-        if url in self.visited_urls or url in self.failed_urls:
+        if status_callback:
+            status_callback(f"🔍 开始处理URL: {url}")
+            
+        if url in self.visited_urls:
+            if status_callback:
+                status_callback(f"⏭️ URL已访问，跳过: {url}")
+            return None
+            
+        if url in self.failed_urls:
+            if status_callback:
+                status_callback(f"⏭️ URL之前失败，跳过: {url}")
             return None
         
         # 检查robots.txt（可选）
@@ -231,10 +242,22 @@ class AsyncWebCrawler:
         
         html_content = await self.fetch_with_retry(url)
         if not html_content:
+            if status_callback:
+                status_callback(f"❌ 获取HTML失败: {url}")
             return None
         
         # 提取内容
         content = self.extract_content(html_content)
+        
+        # 调试信息
+        if status_callback:
+            status_callback(f"📊 HTML长度: {len(html_content)}, 提取内容长度: {len(content)}")
+        
+        # 检查内容是否为空或太短
+        if len(content.strip()) < 100:
+            if status_callback:
+                status_callback(f"⚠️ 内容太短，跳过: {url} (长度: {len(content)})")
+            return None
         
         # 内容去重检查
         if self.is_duplicate_content(content):
@@ -366,6 +389,8 @@ class AsyncWebCrawler:
                     continue
                 
                 if result is None:
+                    if status_callback:
+                        status_callback(f"⚠️ 爬取返回None: {current_level[i]}")
                     continue
                 
                 level_success += 1
