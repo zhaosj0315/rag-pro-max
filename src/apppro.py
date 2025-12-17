@@ -80,53 +80,13 @@ import ollama
 import re
 
 # 🧹 启动时自动清理临时文件
-def cleanup_temp_files():
-    """清理超过一周的临时文件"""
-    temp_dir = "temp_uploads"
-    if not os.path.exists(temp_dir):
-        return
-    
-    # 安全检查：确保目录路径正确
-    temp_dir = os.path.abspath(temp_dir)
-    if not temp_dir.endswith("temp_uploads"):
-        print("⚠️ 清理路径异常，跳过清理")
-        return
-    
-    current_time = time.time()
-    cleaned_count = 0
-    
-    try:
-        for filename in os.listdir(temp_dir):
-            # 跳过隐藏文件和系统文件
-            if filename.startswith('.'):
-                continue
-                
-            filepath = os.path.join(temp_dir, filename)
-            
-            # 安全检查：确保是文件且有读写权限
-            if not os.path.isfile(filepath):
-                continue
-            if not os.access(filepath, os.R_OK | os.W_OK):
-                continue
-                
-            # 检查文件修改时间
-            try:
-                file_time = os.path.getmtime(filepath)
-                # 如果文件超过一周（604800秒）
-                if current_time - file_time > 604800:
-                    os.remove(filepath)
-                    cleaned_count += 1
-            except (OSError, IOError) as e:
-                print(f"清理文件 {filename} 时出错: {e}")
-                continue
-        
-        if cleaned_count > 0:
-            print(f"🧹 已清理 {cleaned_count} 个临时文件")
-    except Exception as e:
-        print(f"清理临时文件时出错: {e}")
+from src.common.utils import cleanup_temp_files
 
-# 执行启动清理
-cleanup_temp_files()
+# 执行启动清理（使用一周=168小时）
+cleaned_count = cleanup_temp_files("temp_uploads", 168)
+if cleaned_count > 0:
+    print(f"🧹 已清理 {cleaned_count} 个临时文件")
+
 import json
 import zipfile
 from datetime import datetime
