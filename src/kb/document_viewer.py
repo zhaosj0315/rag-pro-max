@@ -93,10 +93,19 @@ class DocumentViewer:
                                 doc.size = f.get('size_bytes', 0)
                                 doc.upload_time = f.get('added_at', '未知')
                                 docs.append(doc)
+                            else:
+                                # 文件不存在，但仍从manifest显示记录
+                                doc = DocumentInfo.__new__(DocumentInfo)
+                                doc.file_path = os.path.join(kb_path, file_name) # 假定路径
+                                doc.kb_name = kb_name
+                                doc.name = file_name
+                                doc.size = f.get('size_bytes', 0)
+                                doc.upload_time = f.get('added_at', '未知')
+                                docs.append(doc)
                         else:
                             # 兼容旧格式（字符串路径）
                             file_path = f
-                            if file_path and os.path.exists(file_path):
+                            if file_path:
                                 docs.append(DocumentInfo(file_path, kb_name))
                     
                     return docs

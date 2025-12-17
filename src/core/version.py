@@ -20,14 +20,14 @@ def get_version_info():
     except Exception as e:
         # 默认版本信息
         return {
-            "version": "2.3.1",
-            "release_date": "2025-12-14",
-            "codename": "安全增强版"
+            "version": "2.4.4",
+            "release_date": "2025-12-17",
+            "codename": "UI交互优化版"
         }
 
 def get_version():
     """获取版本号"""
-    return get_version_info().get("version", "2.3.1")
+    return get_version_info().get("version", "2.4.4")
 
 def get_version_tag():
     """获取版本标签"""
@@ -35,11 +35,11 @@ def get_version_tag():
 
 def get_codename():
     """获取版本代号"""
-    return get_version_info().get("codename", "安全增强版")
+    return get_version_info().get("codename", "重构优化版")
 
 def get_release_date():
     """获取发布日期"""
-    return get_version_info().get("release_date", "2025-12-14")
+    return get_version_info().get("release_date", "2025-12-17")
 
 # 版本常量
 VERSION = get_version()

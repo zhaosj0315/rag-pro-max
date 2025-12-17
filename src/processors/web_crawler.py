@@ -512,3 +512,6 @@ class WebCrawler:
             max_pages=max_pages,
             status_callback=status_callback
         )
+    
+    # Alias for backward compatibility
+    crawl_recursive = crawl_advanced

@@ -149,24 +149,25 @@ def load_embedding_model(provider: str, model_name: str, api_key: str = "", api_
     return None
 
 
-def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: str = "", temperature: float = 0.7):
+def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: str = "", temperature: float = 0.7, **kwargs):
     """
     加载 LLM 模型
     
     Args:
-        provider: 供应商 (Ollama/OpenAI)
+        provider: 供应商 (Ollama/OpenAI/Azure OpenAI/Anthropic/Gemini/Moonshot/Groq)
         model_name: 模型名称
-        api_key: API密钥（OpenAI需要）
-        api_url: API地址
+        api_key: API密钥
+        api_url: API地址 (Base URL 或 Endpoint)
         temperature: 温度参数
+        **kwargs: 其他参数 (如 api_version)
     
     Returns:
         LLM 模型实例，失败返回 None
     """
     try:
+        # 1. Ollama
         if provider.startswith("Ollama"):
             clean_proxy()
-            # 修复Ollama URL格式 - LlamaIndex期望不包含/api后缀
             base_url = api_url.rstrip('/')
             if base_url.endswith('/api'):
                 base_url = base_url[:-4]
@@ -178,7 +179,8 @@ def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: s
                 temperature=temperature
             )
             
-        elif provider.startswith("OpenAI"):
+        # 2. OpenAI / Moonshot / Groq (OpenAI-Compatible)
+        elif provider in ["OpenAI", "Moonshot", "Groq"] or provider.startswith("OpenAI-Compatible"):
             return OpenAI(
                 model=model_name,
                 api_key=api_key if api_key else "EMPTY",
@@ -187,8 +189,53 @@ def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: s
                 request_timeout=120.0
             )
             
+        # 3. Azure OpenAI
+        elif provider == "Azure OpenAI":
+            try:
+                from llama_index.llms.azure_openai import AzureOpenAI
+                return AzureOpenAI(
+                    engine=model_name,  # Deployment name
+                    model=model_name,
+                    api_key=api_key,
+                    azure_endpoint=api_url,
+                    api_version=kwargs.get("api_version", "2023-05-15"),
+                    temperature=temperature
+                )
+            except ImportError:
+                logger.error("❌ 未安装 Azure 支持: pip install llama-index-llms-azure-openai")
+                return None
+                
+        # 4. Anthropic (Claude)
+        elif provider == "Anthropic":
+            try:
+                from llama_index.llms.anthropic import Anthropic
+                return Anthropic(
+                    model=model_name,
+                    api_key=api_key,
+                    temperature=temperature
+                )
+            except ImportError:
+                logger.error("❌ 未安装 Anthropic 支持: pip install llama-index-llms-anthropic")
+                return None
+                
+        # 5. Gemini (Google)
+        elif provider == "Gemini":
+            try:
+                from llama_index.llms.gemini import Gemini
+                # Gemini 通常需要 models/ 前缀
+                if not model_name.startswith("models/"):
+                    model_name = f"models/{model_name}"
+                return Gemini(
+                    model=model_name,
+                    api_key=api_key,
+                    temperature=temperature
+                )
+            except ImportError:
+                logger.error("❌ 未安装 Gemini 支持: pip install llama-index-llms-gemini")
+                return None
+            
     except Exception as e:
-        logger.error(f"LLM 加载失败: {e}")
+        logger.error(f"LLM 加载失败 ({provider}): {e}")
         
     return None
 
@@ -214,17 +261,17 @@ def set_global_embedding_model(provider: str, model_name: str, api_key: str = ""
         return False
 
 
-def set_global_llm_model(provider: str, model_name: str, api_key: str = "", api_url: str = "", temperature: float = 0.7):
+def set_global_llm_model(provider: str, model_name: str, api_key: str = "", api_url: str = "", temperature: float = 0.7, **kwargs):
     """
     设置全局 LLM 模型（Settings.llm）
     
     Returns:
         bool: 是否设置成功
     """
-    llm_model = load_llm_model(provider, model_name, api_key, api_url, temperature)
+    llm_model = load_llm_model(provider, model_name, api_key, api_url, temperature, **kwargs)
     if llm_model:
         Settings.llm = llm_model
-        logger.success(f"✅ 全局 LLM 已设置: {model_name}")
+        logger.success(f"✅ 全局 LLM 已设置: {model_name} ({provider})")
         return True
     else:
         logger.error(f"❌ 全局 LLM 设置失败: {model_name}")

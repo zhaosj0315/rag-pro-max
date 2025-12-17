@@ -1,7 +1,7 @@
 # 常见问题 (FAQ)
 
-**版本: v2.3.1  
-**更新日期**: 2025-12-10
+**版本: v2.4.4**  
+**更新日期**: 2025-12-17
 
 ## 📋 目录
 
@@ -141,6 +141,12 @@ export OPENAI_API_KEY="sk-your-key-here"
 3. **控制台日志**: 查看是否有错误信息
 4. **LLM 配置**: 确保 LLM 已正确配置
 
+### Q: 知识库显示"暂无文档"但统计数据显示有文件？
+
+**A**: 
+- **原因**: 知识库对应的原始文件可能已被删除或移动，但元数据仍存在。
+- **解决**: 在 v2.4.4+ 版本中，系统会自动基于元数据显示文件记录，允许您查看和管理，即使物理文件缺失。建议重新上传文件或删除该失效记录。
+
 ### Q: 对话没有引用来源？
 
 **A**: 可能的原因：
@@ -277,7 +283,7 @@ ollama list
 
 ```bash
 # macOS
-sudo python3 system_monitor.py
+sudo python3 src/system_monitor.py
 
 # 查看 GPU 信息
 ```
@@ -337,7 +343,7 @@ sudo python3 system_monitor.py
 **A**: 两种方式：
 
 1. **侧边栏监控**: 点击"📊 系统监控"（简化版）
-2. **命令行监控**: `sudo python3 system_monitor.py`（详细版）
+2. **命令行监控**: `sudo python3 src/system_monitor.py`（详细版）
 
 ### Q: 支持多用户吗？
 
@@ -347,17 +353,16 @@ sudo python3 system_monitor.py
 - 每个用户打开独立的浏览器窗口
 - 使用不同的知识库
 
-**未来计划**: v2.0 将支持多用户系统
+**未来计划**: v2.6 将支持多用户系统
 
 ### Q: 可以通过 API 调用吗？
 
-**A**: 当前版本不支持 API。
+**A**: **支持 (v2.0+)**。
 
-**临时方案**:
-- 使用命令行工具 `kbllama`
-- 直接调用 Python 函数
+如果您的系统安装了 v2.0 模块（IncrementalUpdater等），启动时会自动开启 FastAPI 服务（端口 8000）。
 
-**未来计划**: v1.2 将提供 RESTful API
+- **API文档**: `http://localhost:8000/docs`
+- **基础URL**: `http://localhost:8000/api`
 
 ### Q: 如何备份知识库？
 
@@ -395,7 +400,7 @@ cp app_config.json backup/
 
 **A**: 查看以下文档：
 - [README.md](README.md) - 快速开始
-- [START.md](START.md) - 启动指南
+- [FIRST_TIME_GUIDE.md](FIRST_TIME_GUIDE.md) - 新手引导
 - [TESTING.md](TESTING.md) - 测试说明
 
 ### Q: 支持哪些操作系统？
@@ -404,7 +409,7 @@ cp app_config.json backup/
 - ✅ macOS (推荐)
 - ✅ Linux
 - ✅ Docker (跨平台)
-- ⚠️ Windows (未测试，理论支持)
+- ✅ Windows (支持但需配置)
 
 ### Q: 商业使用需要授权吗？
 
@@ -422,4 +427,4 @@ cp app_config.json backup/
 
 ---
 
-**最后更新**: 2025-12-07
+**最后更新**: 2025-12-17

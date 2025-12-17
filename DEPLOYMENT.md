@@ -1,84 +1,249 @@
-# 🚀 部署指南
+# RAG Pro Max 部署指南
 
-## 系统要求
+## 🎯 部署概述
+
+RAG Pro Max 支持多种部署方式，从本地开发到生产环境，提供完整的部署解决方案。
+
+## 📋 系统要求
 
 ### 最低配置
-- **CPU**: 4核心
-- **内存**: 8GB RAM
-- **存储**: 20GB 可用空间
-- **Python**: 3.8+
+- **操作系统**: macOS 10.15+ / Ubuntu 18.04+ / Windows 10+
+- **Python**: 3.8+ (推荐 3.10+)
+- **内存**: 4GB RAM
+- **磁盘**: 10GB 可用空间
+- **网络**: 可选 (本地模型无需网络)
 
 ### 推荐配置
-- **CPU**: 8核心+
-- **内存**: 16GB+ RAM
-- **GPU**: NVIDIA GPU (可选，用于OCR加速)
-- **存储**: 50GB+ SSD
+- **操作系统**: macOS 12+ / Ubuntu 20.04+ / Windows 11
+- **Python**: 3.10+
+- **内存**: 8GB+ RAM
+- **磁盘**: 50GB+ SSD
+- **GPU**: NVIDIA GPU (CUDA) / Apple Silicon (MPS)
+- **网络**: 稳定网络连接
 
-## 平台支持
+## 🚀 快速部署
 
-- ✅ **macOS** (M1/M2/M3/M4, Intel)
-- ✅ **Linux** (Ubuntu 20.04+, CentOS 8+)
-- ✅ **Windows** (10/11)
-- ✅ **Docker** (跨平台)
-
-## 快速部署
-
-### 1. 自动部署（推荐）
+### 1. 一键部署脚本
 
 #### macOS/Linux
 ```bash
-git clone https://github.com/yourusername/rag-pro-max.git
+# 克隆项目
+git clone https://github.com/zhaosj0315/rag-pro-max.git
 cd rag-pro-max
+
+# 自动部署 (Linux)
 chmod +x scripts/deploy_linux.sh
 ./scripts/deploy_linux.sh
+
+# 手动安装 (macOS)
+pip install -r requirements.txt
 ```
 
 #### Windows
 ```cmd
-git clone https://github.com/yourusername/rag-pro-max.git
+# 克隆项目
+git clone https://github.com/zhaosj0315/rag-pro-max.git
 cd rag-pro-max
+
+# 自动部署
 scripts\deploy_windows.bat
 ```
 
-### 2. Docker 部署
+### 2. 启动应用
 
+#### 推荐方式 (包含测试)
+```bash
+./start.sh
+```
+
+#### 直接启动
+```bash
+streamlit run src/apppro.py
+```
+
+#### 指定端口启动
+```bash
+streamlit run src/apppro.py --server.port 8501
+```
+
+## 🐳 Docker 部署
+
+### 1. 使用预构建镜像
+```bash
+# 拉取镜像
+docker pull ragpromax/rag-pro-max:v2.4.4
+
+# 运行容器
+docker run -d \
+  --name rag-pro-max \
+  -p 8501:8501 \
+  -v $(pwd)/data:/app/data \
+  ragpromax/rag-pro-max:v2.4.4
+```
+
+### 2. 本地构建镜像
 ```bash
 # 构建镜像
 ./scripts/docker-build.sh
 
-# 启动服务
+# 或手动构建
+docker build -t rag-pro-max:local .
+```
+
+### 3. Docker Compose 部署
+```bash
+# 启动完整服务栈
 docker-compose up -d
 
-# 访问应用
-open http://localhost:8501
+# 查看服务状态
+docker-compose ps
+
+# 查看日志
+docker-compose logs -f
 ```
 
-### 3. 手动部署
+#### docker-compose.yml 配置
+```yaml
+version: '3.8'
+services:
+  rag-pro-max:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+    environment:
+      - PYTHONPATH=/app
+      - STREAMLIT_SERVER_PORT=8501
+    restart: unless-stopped
+    
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
 
+volumes:
+  ollama_data:
+```
+
+## ⚙️ 环境配置
+
+### 1. Python 环境
 ```bash
-# 1. 克隆项目
-git clone https://github.com/yourusername/rag-pro-max.git
-cd rag-pro-max
+# 创建虚拟环境
+python -m venv venv
 
-# 2. 创建虚拟环境
-python3 -m venv venv
+# 激活环境
 source venv/bin/activate  # Linux/macOS
-# venv\Scripts\activate  # Windows
+venv\Scripts\activate     # Windows
 
-# 3. 安装依赖
+# 安装依赖
 pip install -r requirements.txt
-
-# 4. 创建必要目录
-mkdir -p vector_db_storage chat_histories temp_uploads hf_cache app_logs
-
-# 5. 启动应用
-streamlit run src/apppro.py
 ```
 
-## 生产环境部署
+### 2. 环境变量配置
+```bash
+# 创建 .env 文件
+cat > .env << EOF
+# 应用配置
+STREAMLIT_SERVER_PORT=8501
+STREAMLIT_SERVER_ADDRESS=0.0.0.0
 
-### 1. 使用 Nginx 反向代理
+# 日志配置
+PADDLE_LOG_LEVEL=50
+GLOG_minloglevel=3
+OMP_NUM_THREADS=1
+OPENBLAS_NUM_THREADS=1
 
+# GPU配置 (可选)
+CUDA_VISIBLE_DEVICES=0
+PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+
+# API配置 (可选)
+OPENAI_API_KEY=your-api-key
+OLLAMA_BASE_URL=http://localhost:11434
+EOF
+```
+
+### 3. 配置文件设置
+```bash
+# 复制配置模板
+cp config/app_config.json.template config/app_config.json
+cp config/rag_config.json.template config/rag_config.json
+
+# 编辑配置文件
+nano config/app_config.json
+```
+
+## 🔧 生产环境部署
+
+### 1. 系统服务配置
+
+#### systemd 服务 (Linux)
+```bash
+# 创建服务文件
+sudo tee /etc/systemd/system/rag-pro-max.service << EOF
+[Unit]
+Description=RAG Pro Max Service
+After=network.target
+
+[Service]
+Type=simple
+User=raguser
+WorkingDirectory=/opt/rag-pro-max
+Environment=PATH=/opt/rag-pro-max/venv/bin
+ExecStart=/opt/rag-pro-max/venv/bin/streamlit run src/apppro.py --server.port 8501
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 启用服务
+sudo systemctl enable rag-pro-max
+sudo systemctl start rag-pro-max
+```
+
+#### launchd 服务 (macOS)
+```bash
+# 创建 plist 文件
+cat > ~/Library/LaunchAgents/com.ragpromax.service.plist << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ragpromax.service</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/streamlit</string>
+        <string>run</string>
+        <string>src/apppro.py</string>
+        <string>--server.port</string>
+        <string>8501</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/opt/rag-pro-max</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>
+EOF
+
+# 加载服务
+launchctl load ~/Library/LaunchAgents/com.ragpromax.service.plist
+```
+
+### 2. 反向代理配置
+
+#### Nginx 配置
 ```nginx
 server {
     listen 80;
@@ -93,145 +258,174 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # WebSocket 支持
+        proxy_read_timeout 86400;
+        proxy_send_timeout 86400;
     }
 }
 ```
 
-### 2. 使用 systemd 服务
-
-```ini
-# /etc/systemd/system/rag-pro-max.service
-[Unit]
-Description=RAG Pro Max Service
-After=network.target
-
-[Service]
-Type=simple
-User=raguser
-WorkingDirectory=/opt/rag-pro-max
-Environment=PATH=/opt/rag-pro-max/venv/bin
-ExecStart=/opt/rag-pro-max/venv/bin/streamlit run src/apppro.py --server.port 8501
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
+#### Apache 配置
+```apache
+<VirtualHost *:80>
+    ServerName your-domain.com
+    
+    ProxyPreserveHost On
+    ProxyRequests Off
+    
+    ProxyPass / http://localhost:8501/
+    ProxyPassReverse / http://localhost:8501/
+    
+    # WebSocket 支持
+    RewriteEngine on
+    RewriteCond %{HTTP:Upgrade} websocket [NC]
+    RewriteCond %{HTTP:Connection} upgrade [NC]
+    RewriteRule ^/?(.*) "ws://localhost:8501/$1" [P,L]
+</VirtualHost>
 ```
 
-启动服务：
+### 3. SSL/HTTPS 配置
 ```bash
-sudo systemctl enable rag-pro-max
-sudo systemctl start rag-pro-max
+# 使用 Let's Encrypt
+sudo certbot --nginx -d your-domain.com
+
+# 或使用自签名证书
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
 ```
 
-### 3. 环境变量配置
+## 🔄 集群部署
 
+### 1. Kubernetes 部署
+```yaml
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-pro-max
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: rag-pro-max
+  template:
+    metadata:
+      labels:
+        app: rag-pro-max
+    spec:
+      containers:
+      - name: rag-pro-max
+        image: ragpromax/rag-pro-max:v2.4.4
+        ports:
+        - containerPort: 8501
+        env:
+        - name: STREAMLIT_SERVER_PORT
+          value: "8501"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-pro-max-service
+spec:
+  selector:
+    app: rag-pro-max
+  ports:
+  - port: 80
+    targetPort: 8501
+  type: LoadBalancer
+```
+
+### 2. Docker Swarm 部署
+```yaml
+# docker-stack.yml
+version: '3.8'
+services:
+  rag-pro-max:
+    image: ragpromax/rag-pro-max:v2.4.4
+    ports:
+      - "8501:8501"
+    deploy:
+      replicas: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+    networks:
+      - rag-network
+
+networks:
+  rag-network:
+    driver: overlay
+```
+
+## 📊 监控和日志
+
+### 1. 应用监控
 ```bash
-# .env 文件
-OPENAI_API_KEY=your_openai_key
-OLLAMA_BASE_URL=http://localhost:11434
-HF_HOME=/path/to/hf_cache
-CUDA_VISIBLE_DEVICES=0
+# 启用监控
+export ENABLE_MONITORING=true
+export METRICS_PORT=9090
+
+# Prometheus 配置
+cat > prometheus.yml << EOF
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'rag-pro-max'
+    static_configs:
+      - targets: ['localhost:9090']
+EOF
 ```
 
-## 性能优化
-
-### 1. GPU 加速配置
-
+### 2. 日志管理
 ```bash
-# 安装CUDA版本的依赖
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-
-# 验证GPU可用性
-python -c "import torch; print(torch.cuda.is_available())"
-```
-
-### 2. 内存优化
-
-```python
-# config/app_config.json
-{
-  "chunk_size": 512,
-  "chunk_overlap": 50,
-  "max_concurrent_tasks": 4,
-  "enable_gpu_acceleration": true
+# 配置日志轮转
+sudo tee /etc/logrotate.d/rag-pro-max << EOF
+/var/log/rag-pro-max/*.log {
+    daily
+    missingok
+    rotate 30
+    compress
+    delaycompress
+    notifempty
+    create 644 raguser raguser
 }
+EOF
 ```
 
-### 3. 缓存配置
-
+### 3. 健康检查
 ```bash
-# 设置模型缓存目录
-export HF_HOME=/data/hf_cache
-export TRANSFORMERS_CACHE=/data/hf_cache
+# 健康检查脚本
+cat > health_check.sh << EOF
+#!/bin/bash
+response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8501/health)
+if [ $response -eq 200 ]; then
+    echo "Service is healthy"
+    exit 0
+else
+    echo "Service is unhealthy"
+    exit 1
+fi
+EOF
+
+chmod +x health_check.sh
 ```
 
-## 监控和日志
-
-### 1. 应用日志
-
-```bash
-# 查看实时日志
-tail -f app_logs/log_$(date +%Y%m%d).jsonl
-
-# 日志分析
-python view_logs.py --stats
-```
-
-### 2. 系统监控
-
-```bash
-# 启动监控
-python src/system_monitor.py
-
-# 查看资源使用
-htop
-nvidia-smi  # GPU监控
-```
-
-## 故障排除
-
-### 常见问题
-
-1. **端口被占用**
-```bash
-# 查找占用进程
-lsof -i :8501
-# 杀死进程
-kill -9 <PID>
-```
-
-2. **内存不足**
-```bash
-# 清理缓存
-rm -rf hf_cache/*
-rm -rf temp_uploads/*
-```
-
-3. **GPU不可用**
-```bash
-# 检查CUDA
-nvidia-smi
-# 重装GPU版本PyTorch
-pip install torch --upgrade --force-reinstall
-```
-
-### 日志分析
-
-```bash
-# 查看错误日志
-grep "ERROR" app_logs/*.jsonl
-
-# 性能分析
-python tools/performance_analyzer.py
-```
-
-## 安全配置
+## 🛡️ 安全配置
 
 ### 1. 防火墙设置
-
 ```bash
 # Ubuntu/Debian
-sudo ufw allow 8501
+sudo ufw allow 8501/tcp
 sudo ufw enable
 
 # CentOS/RHEL
@@ -239,30 +433,92 @@ sudo firewall-cmd --permanent --add-port=8501/tcp
 sudo firewall-cmd --reload
 ```
 
-### 2. SSL/TLS 配置
-
+### 2. 用户权限
 ```bash
-# 使用 Let's Encrypt
-sudo certbot --nginx -d your-domain.com
+# 创建专用用户
+sudo useradd -r -s /bin/false raguser
+sudo chown -R raguser:raguser /opt/rag-pro-max
 ```
 
-## 备份和恢复
-
-### 1. 数据备份
-
+### 3. 数据备份
 ```bash
 # 备份脚本
+cat > backup.sh << EOF
 #!/bin/bash
-tar -czf backup_$(date +%Y%m%d).tar.gz   vector_db_storage/   chat_histories/   config/   app_logs/
+DATE=$(date +%Y%m%d_%H%M%S)
+tar -czf /backup/rag-pro-max_$DATE.tar.gz \
+    /opt/rag-pro-max/vector_db_storage \
+    /opt/rag-pro-max/config \
+    /opt/rag-pro-max/chat_histories
+EOF
+
+# 定时备份
+echo "0 2 * * * /opt/rag-pro-max/backup.sh" | sudo crontab -
 ```
 
-### 2. 恢复数据
+## 🔧 故障排除
 
+### 1. 常见问题
 ```bash
-# 恢复脚本
-tar -xzf backup_20251213.tar.gz
+# 端口占用
+sudo lsof -i :8501
+sudo kill -9 <PID>
+
+# 权限问题
+sudo chown -R $USER:$USER /opt/rag-pro-max
+chmod +x scripts/*.sh
+
+# 依赖问题
+pip install --upgrade -r requirements.txt
 ```
 
----
+### 2. 性能优化
+```bash
+# 系统优化
+echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
+echo 'net.core.rmem_max=134217728' | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+```
 
-更多部署问题请参考 [FAQ文档](./FAQ.md) 或提交 [Issue](https://github.com/yourusername/rag-pro-max/issues)
+### 3. 日志分析
+```bash
+# 查看应用日志
+tail -f app_logs/log_$(date +%Y%m%d).jsonl
+
+# 查看系统日志
+sudo journalctl -u rag-pro-max -f
+```
+
+## 📈 扩展部署
+
+### 1. 多实例部署
+```bash
+# 启动多个实例
+for port in 8501 8502 8503; do
+    streamlit run src/apppro.py --server.port $port &
+done
+```
+
+### 2. 负载均衡
+```nginx
+upstream rag_backend {
+    server localhost:8501;
+    server localhost:8502;
+    server localhost:8503;
+}
+
+server {
+    listen 80;
+    location / {
+        proxy_pass http://rag_backend;
+    }
+}
+```
+
+### 3. 数据库集群
+```bash
+# ChromaDB 集群配置
+export CHROMA_SERVER_HOST=0.0.0.0
+export CHROMA_SERVER_HTTP_PORT=8000
+chroma run --host 0.0.0.0 --port 8000
+```

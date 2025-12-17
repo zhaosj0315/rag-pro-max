@@ -36,7 +36,7 @@ class PageStyle:
         <style>
         /* 舒适的全局样式 */
         .main .block-container {
-            padding-top: 1rem;
+            padding-top: 0.75rem;
             padding-bottom: 1rem;
             max-width: 100%;
         }
@@ -48,7 +48,7 @@ class PageStyle:
         }
         
         section[data-testid="stSidebar"] > div {
-            padding-top: 1rem !important;
+            padding-top: 0.75rem !important;
         }
         
         section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
@@ -82,6 +82,13 @@ class PageStyle:
             padding: 0.5rem 0.75rem !important;
             font-size: 0.9rem !important;
             line-height: 1.4 !important;
+        }
+
+        /* 修复 Selectbox 文字截断 */
+        .stSelectbox > div > div > div {
+            white-space: normal !important;
+            height: auto !important;
+            overflow: visible !important;
         }
         
         /* 舒适的标签页 */

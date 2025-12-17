@@ -1,22 +1,19 @@
 {
-  "version": "2.4.3",
+  "version": "2.4.4",
   "release_date": "2025-12-17",
-  "codename": "重构优化版",
+  "codename": "UI交互优化版",
   "features": [
-    "Phase 2-4重构完成",
-    "公共模块系统",
-    "服务层架构",
-    "主文件重构",
-    "代码重复率降低",
-    "模块化程度98%+",
-    "四层架构设计",
-    "统一配置管理"
+    "Web抓取智能分析UI优化",
+    "知识库管理界面布局重构",
+    "异步爬虫集成增强",
+    "文档列表显示逻辑修复",
+    "知识库详情统计布局优化"
   ],
   "architecture": {
     "layers": 4,
     "modules": 191,
     "services": 3,
     "common_modules": 3,
-    "test_coverage": "86/96"
+    "test_coverage": "88/96"
   }
 }

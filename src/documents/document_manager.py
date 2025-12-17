@@ -82,15 +82,24 @@ class DocumentManager:
         else:
             kb_model = self.manifest.get('embed_model', 'Unknown')
         
-        # 单行紧凑标题 + 统计
-        col1, col2, col3, col4, col5, col6 = st.columns([2, 1, 1, 1, 1, 0.6])
-        col1.markdown(f"### 💬 {kb_name}")
-        col2.metric("📄 文件", file_cnt)
-        col3.metric("💾 大小", f"{total_sz/1024:.1f}MB" if total_sz > 1024 else f"{int(total_sz)}KB")
-        col4.metric("📦 片段", total_chunks)
-        col5.metric("🧬 模型", kb_model.split('/')[-1] if '/' in kb_model else kb_model)
+        # 知识库名称作为标题
+        st.markdown(f"### 💬 {kb_name}")
         
-        return col6
+        # 双行布局：每行两个指标
+        row1_col1, row1_col2 = st.columns(2)
+        with row1_col1:
+            st.metric("📄 文件", file_cnt)
+        with row1_col2:
+            st.metric("💾 大小", f"{total_sz/1024:.1f}MB" if total_sz > 1024 else f"{int(total_sz)}KB")
+            
+        row2_col1, row2_col2 = st.columns(2)
+        with row2_col1:
+            st.metric("📦 片段", total_chunks)
+        with row2_col2:
+            st.metric("🧬 模型", kb_model.split('/')[-1] if '/' in kb_model else kb_model)
+        
+        # 为了兼容性返回最后一列，虽然现在不再是单行布局
+        return row2_col2
     
     def render_detailed_statistics(self, stats):
         """渲染详细统计信息"""

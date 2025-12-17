@@ -11,6 +11,7 @@ import threading
 import streamlit as st
 from llama_index.core import StorageContext, load_index_from_storage
 from llama_index.core.memory import ChatMemoryBuffer
+from llama_index.core.vector_stores import MetadataFilters, ExactMatchFilter
 
 from src.app_logging import LogManager
 from src.config import ManifestManager
@@ -62,7 +63,7 @@ class KnowledgeBaseLoader:
         db_path = os.path.join(self.output_base, kb_name)
         
         if not os.path.exists(db_path):
-            return None, "知识库不存在"
+            return None, "知识库不存在", None
         
         try:
             logger.log("INFO", f"开始加载知识库: {kb_name}", stage="知识库加载")
@@ -98,7 +99,7 @@ class KnowledgeBaseLoader:
                 
         except Exception as e:
             logger.log("ERROR", f"知识库加载失败: {kb_name} - {str(e)}", stage="知识库加载")
-            return None, f"知识库挂载失败：{e}"
+            return None, f"知识库挂载失败：{e}", None
     
     def _load_large_kb(self, db_path, kb_name, vector_files, total_size):
         """加载大型知识库"""
@@ -154,7 +155,7 @@ class KnowledgeBaseLoader:
             time.sleep(1.5)
             progress_placeholder.empty()
             
-            return chat_engine, None
+            return chat_engine, None, index
     
     def _load_small_kb(self, db_path, kb_name, embed_provider, embed_model, embed_key, embed_url):
         """加载小型知识库"""
@@ -181,20 +182,14 @@ class KnowledgeBaseLoader:
                 storage_context = StorageContext.from_defaults(persist_dir=db_path)
                 index = load_index_from_storage(storage_context)
                 
-                chat_engine = index.as_chat_engine(
-                    chat_mode="context",
-                    memory=ChatMemoryBuffer.from_defaults(token_limit=2000),
-                    similarity_top_k=3,
-                    streaming=True,
-                    timeout=25.0,
-                    system_prompt="你是一个精准的知识库助手，请务必仅基于提供的上下文和知识回答问题。如果知识库中没有相关信息，请明确指出。回答应清晰、简洁、专业。"
-                )
+                # 使用通用创建方法（支持过滤）
+                chat_engine = self._create_chat_engine(index, db_path, st.empty())
                 
-                return chat_engine, None
+                return chat_engine, None, index
                 
             except Exception as e:
                 if "shapes" in str(e) and "not aligned" in str(e):
-                    return None, self._handle_dimension_mismatch(embed_model, str(e))
+                    return None, self._handle_dimension_mismatch(embed_model, str(e)), None
                 else:
                     raise
     
@@ -219,12 +214,38 @@ class KnowledgeBaseLoader:
         thread.join()
         return result[0]
     
-    def _create_chat_engine(self, index, db_path, status):
+    def _create_chat_engine(self, index, db_path, status, filters=None):
         """创建聊天引擎"""
         node_postprocessors = []
         similarity_top_k = 5
         retriever = None
         
+        # 1. 准备过滤器
+        if filters is None:
+            # 尝试从 session_state 获取
+            search_filters = st.session_state.get('search_filters', [])
+            if search_filters:
+                metadata_filters = []
+                for f_type in search_filters:
+                    # 简单映射：PDF -> type:pdf
+                    if f_type == 'PDF':
+                        metadata_filters.append(ExactMatchFilter(key='type', value='pdf'))
+                    elif f_type == 'Word':
+                        metadata_filters.append(ExactMatchFilter(key='type', value='docx'))
+                    elif f_type == 'Markdown':
+                        metadata_filters.append(ExactMatchFilter(key='type', value='md'))
+                    elif f_type == 'Web':
+                        # 网页通常没有特定类型，或者 txt? 
+                        # 假设我们有 metadata 标记，或者通过文件名判断?
+                        # 暂时不强制过滤，或者需要 IndexBuilder 写入 metadata
+                        pass 
+                
+                if metadata_filters:
+                    # 使用 OR 逻辑（满足任一类型即可）
+                    from llama_index.core.vector_stores import FilterOperator
+                    filters = MetadataFilters(filters=metadata_filters, condition="or")
+                    status.write(f"   🔍 应用筛选: {search_filters}")
+
         # BM25 混合检索配置
         if st.session_state.get('enable_bm25', False):
             try:
@@ -239,7 +260,10 @@ class KnowledgeBaseLoader:
                     similarity_top_k=5
                 )
                 
-                vector_retriever = index.as_retriever(similarity_top_k=5)
+                vector_retriever = index.as_retriever(
+                    similarity_top_k=5,
+                    filters=filters
+                )
                 
                 retriever = QueryFusionRetriever(
                     retrievers=[vector_retriever, bm25_retriever],
@@ -288,6 +312,7 @@ class KnowledgeBaseLoader:
         else:
             return index.as_chat_engine(
                 chat_mode="context",
+                filters=filters,
                 memory=ChatMemoryBuffer.from_defaults(token_limit=2000),
                 similarity_top_k=3,
                 streaming=True,
@@ -295,6 +320,7 @@ class KnowledgeBaseLoader:
                 system_prompt="你是一个精准的知识库助手，请务必仅基于提供的上下文和知识回答问题。如果知识库中没有相关信息，请明确指出。回答应清晰、简洁、专业。",
                 node_postprocessors=node_postprocessors if node_postprocessors else None
             )
+
     
     def _handle_dimension_mismatch(self, embed_model, error_msg):
         """处理维度不匹配错误"""

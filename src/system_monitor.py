@@ -66,7 +66,13 @@ def get_streamlit_process():
             continue
     return None
 
-from src.common.utils import format_bytes
+def format_bytes(bytes_value):
+    """格式化字节数"""
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if bytes_value < 1024.0:
+            return f"{bytes_value:.1f} {unit}"
+        bytes_value /= 1024.0
+    return f"{bytes_value:.1f} PB"
 
 def format_bar(percent, width=20, bar_type='cpu'):
     """格式化进度条"""

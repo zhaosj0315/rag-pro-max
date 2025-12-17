@@ -53,26 +53,34 @@ class SidebarConfig:
     
     @staticmethod
     def _render_advanced_config():
-        """渲染高级配置"""
+        """渲染高级配置 (优化版)"""
         with st.expander("🔧 高级功能", expanded=False):
-            # Re-ranking 配置
-            enable_rerank = st.checkbox("🎯 启用 Re-ranking 重排序", value=False, 
-                                      help="使用 Cross-Encoder 模型对检索结果重新排序，提升准确率 10-20%")
-            
-            rerank_model = "BAAI/bge-reranker-base"
-            if enable_rerank:
-                rerank_model = st.selectbox("Re-ranking 模型", 
-                                          ["BAAI/bge-reranker-base", "BAAI/bge-reranker-large"],
-                                          help="选择重排序模型")
-            
-            # BM25 混合检索
-            enable_bm25 = st.checkbox("🔍 启用 BM25 混合检索", value=False,
-                                    help="结合关键词检索和语义检索，提升准确率 5-10%")
-            
-            # 保存到 session state
-            # st.session_state.enable_rerank = enable_rerank  # 已注释避免错误
-            # st.session_state.rerank_model = rerank_model  # 已注释避免错误
-            # st.session_state.enable_bm25 = enable_bm25  # 已注释避免错误
+            # 使用卡片式布局
+            with st.container(border=True):
+                st.caption("🎯 检索增强策略")
+                
+                # 双列布局：Re-ranking 和 BM25
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    enable_rerank = st.checkbox("Re-ranking 重排序", value=False, 
+                                              help="使用 Cross-Encoder 模型对检索结果重新排序，提升准确率 10-20%")
+                
+                with col2:
+                    enable_bm25 = st.checkbox("BM25 混合检索", value=False,
+                                            help="结合关键词检索和语义检索，提升准确率 5-10%")
+                
+                # 如果开启 Re-ranking，显示模型选择
+                rerank_model = "BAAI/bge-reranker-base"
+                if enable_rerank:
+                    st.divider()
+                    rerank_model = st.selectbox(
+                        "Re-ranking 模型", 
+                        ["BAAI/bge-reranker-base", "BAAI/bge-reranker-large"],
+                        help="选择重排序模型",
+                        label_visibility="collapsed"
+                    )
+                    st.caption(f"当前模型: {rerank_model}")
             
             return {
                 'enable_rerank': enable_rerank,
