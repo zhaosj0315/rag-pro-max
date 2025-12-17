@@ -23,7 +23,7 @@ def load_config():
         "max_tokens": 2000,
         "llm_provider": "Ollama",
         "llm_url": "http://localhost:11434",
-        "llm_model": "qwen2.5:7b",
+        "llm_model": "gpt-oss:20b",
         "llm_key": "",
         "embed_provider": "HuggingFace (本地/极速)",
         "embed_model": "BAAI/bge-small-zh-v1.5",

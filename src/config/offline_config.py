@@ -8,7 +8,7 @@ USE_LOCAL_LLM_ONLY = True
 # 本地模型配置
 LOCAL_LLM_CONFIG = {
     "api_base": "http://localhost:11434",
-    "model": "qwen2.5:7b",
+    "model": "gpt-oss:20b",
     "temperature": 0.7
 }
 

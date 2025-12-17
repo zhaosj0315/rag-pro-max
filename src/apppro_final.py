@@ -66,5 +66,6 @@ if 'config' in config_data:
     
     # 队列处理（手动模式）
     controller.handle_queue_processing(active_kb, config['embed_provider'], config['embed_model'], config['embed_key'], config['embed_url'], config['llm_model'])
-    elif config_data.get('kb', {}).get('current_nav') == "创建新知识库":
-        PageStyle.render_welcome_message()
+    
+elif config_data.get('kb', {}).get('current_nav') == "创建新知识库":
+    PageStyle.render_welcome_message()

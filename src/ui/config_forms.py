@@ -53,7 +53,7 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str]:
                 st.warning("⚠️ Ollama 未运行")
         
         # 使用模型选择器组件
-        saved_model = defaults.get("llm_model_ollama", "qwen2.5:7b")
+        saved_model = defaults.get("llm_model_ollama", "gpt-oss:20b")
         llm_model, save_as_default = render_ollama_model_selector(llm_url, saved_model, ollama_ok)
         
         # 处理"设为默认"

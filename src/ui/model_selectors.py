@@ -27,6 +27,10 @@ def render_ollama_model_selector(
     """
     save_as_default = False
     
+    # 使用统一的默认模型
+    if not saved_model:
+        saved_model = "gpt-oss:20b"  # 统一默认模型
+    
     # 刷新按钮
     col_refresh = st.columns([3, 1])[1]
     with col_refresh:

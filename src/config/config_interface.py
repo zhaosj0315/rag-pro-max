@@ -79,7 +79,7 @@ class ConfigInterface:
         with col2:
             llm_model = st.text_input(
                 "模型名称",
-                value="qwen2.5:7b",
+                value="gpt-oss:20b",
                 key="config_ollama_model"
             )
         
@@ -361,7 +361,7 @@ class ConfigInterface:
                 config = {
                     "llm_provider": "Ollama",
                     "llm_url": "http://localhost:11434",
-                    "llm_model": "qwen2.5:7b",
+                    "llm_model": "gpt-oss:20b",
                     "llm_key": "",
                     "embed_provider": "HuggingFace (本地/极速)",
                     "embed_model": "BAAI/bge-small-zh-v1.5"

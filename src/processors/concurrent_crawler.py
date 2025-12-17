@@ -15,6 +15,9 @@ from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 import os
 
+# 🔥 新增：导入智能优化器
+from .crawl_optimizer import CrawlOptimizer
+
 def fetch_url_worker(args):
     """多进程工作函数"""
     url, timeout, user_agents, base_delay, max_delay = args
@@ -120,6 +123,9 @@ class ConcurrentCrawler:
         self.base_delay = base_delay
         self.max_delay = max_delay
         
+        # 🔥 新增：智能优化器
+        self.optimizer = CrawlOptimizer()
+        
         # 线程模式才需要session
         if not use_processes:
             self.session = requests.Session()
@@ -139,6 +145,59 @@ class ConcurrentCrawler:
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0'
         ]
+    
+    def get_smart_recommendations(self, url: str) -> Dict:
+        """🔥 新增：获取智能爬取推荐参数"""
+        return self.optimizer.analyze_website(url)
+
+    def crawl_with_smart_params(self, 
+                               start_urls: List[str],
+                               use_smart_params: bool = True,
+                               manual_depth: Optional[int] = None,
+                               manual_pages: Optional[int] = None,
+                               progress_callback: Optional[Callable] = None) -> List[Dict]:
+        """🔥 新增：使用智能参数推荐的并发爬取方法"""
+        
+        if not start_urls:
+            return []
+        
+        # 使用第一个URL进行智能分析
+        main_url = start_urls[0]
+        
+        if use_smart_params:
+            # 获取智能推荐
+            recommendations = self.get_smart_recommendations(main_url)
+            
+            if progress_callback:
+                progress_callback("🧠 智能分析网站...")
+                progress_callback(f"📊 网站类型: {recommendations['site_type']}")
+                progress_callback(f"📝 描述: {recommendations['description']}")
+                progress_callback(f"🎯 推荐深度: {recommendations['recommended_depth']}层")
+                progress_callback(f"📄 推荐页数: {recommendations['recommended_pages']}页/层")
+                progress_callback(f"📈 预估总页数: {recommendations['estimated_pages']:,}页")
+                progress_callback(f"🔍 置信度: {recommendations['confidence']:.1%}")
+            
+            # 使用推荐参数（可被手动参数覆盖）
+            max_depth = manual_depth or recommendations['recommended_depth']
+            max_pages_per_level = manual_pages or recommendations['recommended_pages']
+            
+            if progress_callback:
+                progress_callback(f"⚙️ 最终参数: 深度={max_depth}, 页数={max_pages_per_level}")
+        else:
+            # 使用手动参数或默认值
+            max_depth = manual_depth or 2
+            max_pages_per_level = manual_pages or 20
+            
+            if progress_callback:
+                progress_callback(f"🔧 手动参数: 深度={max_depth}, 页数={max_pages_per_level}")
+        
+        # 调用原有的爬取方法
+        return self.crawl_with_depth(
+            start_urls=start_urls,
+            max_depth=max_depth,
+            max_pages_per_level=max_pages_per_level,
+            progress_callback=progress_callback
+        )
     
     def _fetch_url_thread(self, url: str, timeout=15) -> Dict:
         """线程模式的URL获取"""
@@ -331,35 +390,49 @@ class ConcurrentCrawler:
                         max_depth: int = 2,
                         max_pages_per_level: int = 20,
                         progress_callback: Optional[Callable] = None) -> List[Dict]:
-        """按深度并发爬取"""
+        """按深度并发爬取 - 修复递归逻辑"""
         all_results = []
         current_urls = start_urls
         processed_urls = set()
         
-        for depth in range(max_depth):
+        if progress_callback:
+            progress_callback(f"🚀 开始递归并发爬取: 最大深度={max_depth}, 基础页数={max_pages_per_level}")
+            for d in range(1, max_depth + 1):
+                expected_pages = max_pages_per_level ** d
+                progress_callback(f"   第{d}层预计: {expected_pages} 页")
+        
+        for depth in range(1, max_depth + 1):
             if not current_urls:
                 break
+            
+            # 🔥 关键修复：每层的页面数量应该是 max_pages_per_level^depth
+            current_layer_limit = max_pages_per_level ** depth
+            
+            # 限制当前层处理的URL数量
+            current_urls = current_urls[:current_layer_limit]
                 
             if progress_callback:
                 mode_str = "进程" if self.use_processes else "线程"
-                progress_callback(f"开始第{depth+1}层爬取，准备处理 {len(current_urls)} 个链接 ({mode_str}模式)")
+                progress_callback(f"📂 第{depth}层开始: 处理 {len(current_urls)} 个链接 (限制: {current_layer_limit}, {mode_str}模式)")
             
-            level_urls = [url for url in current_urls[:max_pages_per_level] 
+            level_urls = [url for url in current_urls 
                          if url not in processed_urls]
             
             if not level_urls:
+                if progress_callback:
+                    progress_callback(f"⚠️ 第{depth}层: 无新链接可处理，爬取结束")
                 break
             
             level_results = self.crawl_urls_concurrent(
                 level_urls, 
                 progress_callback,
-                max_pages_per_level
+                len(level_urls)  # 处理所有当前层的URL
             )
             
             all_results.extend(level_results)
             processed_urls.update(level_urls)
             
-            # 收集下一层URL
+            # 收集下一层URL - 🔥 关键修复：收集所有有效链接，不限制数量
             next_urls = []
             for result in level_results:
                 if result['success'] and result['links']:
@@ -368,6 +441,12 @@ class ConcurrentCrawler:
             current_urls = list(set(next_urls) - processed_urls)
             
             if progress_callback:
+                success_count = len([r for r in level_results if r['success']])
+                progress_callback(f"🎯 第{depth}层完成: 成功 {success_count} 页，发现 {len(current_urls)} 个下级链接")
+                if depth < max_depth and current_urls:
+                    next_layer_limit = max_pages_per_level ** (depth + 1)
+                    actual_next = min(len(current_urls), next_layer_limit)
+                    progress_callback(f"📊 递归统计: 第{depth+1}层将处理前 {actual_next} 个链接")
                 success_count = sum(1 for r in level_results if r['success'])
                 progress_callback(f"第{depth+1}层完成: 成功 {success_count}/{len(level_results)} 页，发现 {len(current_urls)} 个新链接")
         
@@ -621,36 +700,50 @@ if __name__ == "__main__":
                         max_depth: int = 2,
                         max_pages_per_level: int = 20,
                         progress_callback: Optional[Callable] = None) -> List[Dict]:
-        """按深度并发爬取"""
+        """按深度并发爬取 - 修复递归逻辑"""
         all_results = []
         current_urls = start_urls
         processed_urls = set()
         
-        for depth in range(max_depth):
+        if progress_callback:
+            progress_callback(f"🚀 开始递归并发爬取: 最大深度={max_depth}, 基础页数={max_pages_per_level}")
+            for d in range(1, max_depth + 1):
+                expected_pages = max_pages_per_level ** d
+                progress_callback(f"   第{d}层预计: {expected_pages} 页")
+        
+        for depth in range(1, max_depth + 1):
             if not current_urls:
                 break
+            
+            # 🔥 关键修复：每层的页面数量应该是 max_pages_per_level^depth
+            current_layer_limit = max_pages_per_level ** depth
+            
+            # 限制当前层处理的URL数量
+            current_urls = current_urls[:current_layer_limit]
                 
             if progress_callback:
-                progress_callback(f"开始第{depth+1}层爬取，准备处理 {len(current_urls)} 个链接")
+                progress_callback(f"📂 第{depth}层开始: 处理 {len(current_urls)} 个链接 (限制: {current_layer_limit})")
             
             # 限制每层的URL数量
-            level_urls = [url for url in current_urls[:max_pages_per_level] 
+            level_urls = [url for url in current_urls 
                          if url not in processed_urls]
             
             if not level_urls:
+                if progress_callback:
+                    progress_callback(f"⚠️ 第{depth}层: 无新链接可处理，爬取结束")
                 break
             
             # 并发爬取当前层
             level_results = self.crawl_urls_concurrent(
                 level_urls, 
                 progress_callback,
-                max_pages_per_level
+                len(level_urls)  # 处理所有当前层的URL
             )
             
             all_results.extend(level_results)
             processed_urls.update(level_urls)
             
-            # 收集下一层的URL
+            # 收集下一层的URL - 🔥 关键修复：收集所有有效链接，不限制数量
             next_urls = []
             for result in level_results:
                 if result['success'] and result['links']:
@@ -661,7 +754,11 @@ if __name__ == "__main__":
             
             if progress_callback:
                 success_count = sum(1 for r in level_results if r['success'])
-                progress_callback(f"第{depth+1}层完成: 成功 {success_count}/{len(level_results)} 页，发现 {len(current_urls)} 个新链接")
+                progress_callback(f"🎯 第{depth}层完成: 成功 {success_count}/{len(level_results)} 页，发现 {len(current_urls)} 个新链接")
+                if depth < max_depth and current_urls:
+                    next_layer_limit = max_pages_per_level ** (depth + 1)
+                    actual_next = min(len(current_urls), next_layer_limit)
+                    progress_callback(f"📊 递归统计: 第{depth+1}层将处理前 {actual_next} 个链接")
         
         return all_results
     

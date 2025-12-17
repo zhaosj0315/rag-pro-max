@@ -6,7 +6,10 @@ import time
 import hashlib
 import re
 import fnmatch
-from typing import List, Optional, Callable
+from typing import List, Optional, Callable, Dict
+
+# 导入智能优化器
+from .crawl_optimizer import CrawlOptimizer
 
 class WebCrawler:
     def __init__(self, output_dir="temp_uploads/web_crawl"):
@@ -16,6 +19,9 @@ class WebCrawler:
         self.visited_urls = set()
         self.failed_urls = set()
         self.retry_counts = {}
+        
+        # 🔥 新增：智能优化器
+        self.optimizer = CrawlOptimizer()
         
         # 创建会话，增强反爬处理
         self.session = requests.Session()
@@ -59,6 +65,57 @@ class WebCrawler:
             'timeout': 15,         # 请求超时
         }
 
+    def get_smart_recommendations(self, url: str) -> Dict:
+        """🔥 新增：获取智能爬取推荐参数"""
+        return self.optimizer.analyze_website(url)
+
+    def crawl_with_smart_params(self, 
+                               start_url: str,
+                               use_smart_params: bool = True,
+                               manual_depth: Optional[int] = None,
+                               manual_pages: Optional[int] = None,
+                               exclude_patterns: List[str] = None,
+                               parser_type: str = "default",
+                               status_callback: Optional[Callable] = None) -> List[str]:
+        """🔥 新增：使用智能参数推荐的爬取方法"""
+        
+        if use_smart_params:
+            # 获取智能推荐
+            recommendations = self.get_smart_recommendations(start_url)
+            
+            if status_callback:
+                status_callback("🧠 智能分析网站...")
+                status_callback(f"📊 网站类型: {recommendations['site_type']}")
+                status_callback(f"📝 描述: {recommendations['description']}")
+                status_callback(f"🎯 推荐深度: {recommendations['recommended_depth']}层")
+                status_callback(f"📄 推荐页数: {recommendations['recommended_pages']}页/层")
+                status_callback(f"📈 预估总页数: {recommendations['estimated_pages']:,}页")
+                status_callback(f"🔍 置信度: {recommendations['confidence']:.1%}")
+            
+            # 使用推荐参数（可被手动参数覆盖）
+            max_depth = manual_depth or recommendations['recommended_depth']
+            max_pages = manual_pages or recommendations['recommended_pages']
+            
+            if status_callback:
+                status_callback(f"⚙️ 最终参数: 深度={max_depth}, 页数={max_pages}")
+        else:
+            # 使用手动参数或默认值
+            max_depth = manual_depth or 2
+            max_pages = manual_pages or 10
+            
+            if status_callback:
+                status_callback(f"🔧 手动参数: 深度={max_depth}, 页数={max_pages}")
+        
+        # 调用原有的爬取方法
+        return self.crawl_advanced(
+            start_url=start_url,
+            max_depth=max_depth,
+            max_pages=max_pages,
+            exclude_patterns=exclude_patterns,
+            parser_type=parser_type,
+            status_callback=status_callback
+        )
+
     def _is_valid_url(self, url):
         parsed = urlparse(url)
         return bool(parsed.netloc) and bool(parsed.scheme)
@@ -83,6 +140,8 @@ class WebCrawler:
                 self.anti_bot_config['min_delay'], 
                 self.anti_bot_config['max_delay']
             )
+            if status_callback and delay > 1.0:
+                status_callback(f"⏱️ 延迟 {delay:.1f}s (反爬保护)")
             time.sleep(delay)
             
             # 随机化User-Agent
@@ -100,6 +159,9 @@ class WebCrawler:
             parsed_url = urlparse(url)
             if parsed_url.netloc:
                 headers['Referer'] = f"{parsed_url.scheme}://{parsed_url.netloc}/"
+            
+            if retry_count > 0 and status_callback:
+                status_callback(f"🔄 重试第 {retry_count} 次: {url}")
             
             response = self.session.get(
                 url, 
@@ -254,12 +316,12 @@ class WebCrawler:
                       parser_type: str = "default",
                       status_callback: Optional[Callable] = None) -> List[str]:
         """
-        高级递归爬取网页
+        高级递归爬取网页 - 修复递归逻辑
         
         Args:
             start_url: 起始URL
             max_depth: 最大深度 (1-5)
-            max_pages: 每层最大页面数量
+            max_pages: 每层最大页面数量 (递归增长: 第1层=max_pages, 第2层=max_pages^2, ...)
             exclude_patterns: 排除链接模式列表（支持通配符）
             parser_type: 页面解析器类型 ("default", "article", "documentation")
             status_callback: 状态回调函数 func(msg)
@@ -286,43 +348,64 @@ class WebCrawler:
         current_level = [start_url]
         saved_files = []
         total_count = 0
+        total_attempted = 0
         
         base_domain = urlparse(start_url).netloc
         
         if status_callback:
-            status_callback(f"开始爬取: {start_url} (最大深度: {max_depth}, 每层最大页数: {max_pages})")
+            status_callback(f"开始递归爬取: {start_url}")
+            status_callback(f"📊 递归参数: 最大深度={max_depth}, 每层页数={max_pages}")
+            for d in range(1, max_depth + 1):
+                expected_pages = max_pages ** d
+                status_callback(f"   第{d}层预计: {expected_pages} 页")
         
         for depth in range(1, max_depth + 1):
             if not current_level:
+                if status_callback:
+                    status_callback(f"⚠️ 第{depth}层: 无链接可处理，爬取结束")
                 break
-                
+            
+            # 🔥 关键修复：每层的页面数量应该是 max_pages^depth
+            current_layer_limit = max_pages ** depth
+            
+            # 限制当前层处理的URL数量
+            current_level = current_level[:current_layer_limit]
+            
             next_level = []
             level_count = 0
-            
-            # 限制当前层的页面数
-            current_level = current_level[:max_pages]
+            level_success = 0
+            level_failed = 0
             
             if status_callback:
-                status_callback(f"📂 第{depth}层开始: 准备处理 {len(current_level)} 个链接")
+                status_callback(f"📂 第{depth}层开始: 处理 {len(current_level)} 个链接 (限制: {current_layer_limit})")
             
-            for url in current_level:
-                if url in self.visited_urls or level_count >= max_pages:
+            for i, url in enumerate(current_level, 1):
+                total_attempted += 1
+                if url in self.visited_urls:
+                    if status_callback:
+                        status_callback(f"⏭️ 跳过已访问: {url}")
                     continue
                 
                 self.visited_urls.add(url)
+                level_count += 1
                 
                 try:
                     if status_callback:
-                        status_callback(f"正在抓取 ({total_count+1}) 第{depth}层 ({level_count+1}/{max_pages}): {url}")
+                        status_callback(f"🔄 正在抓取 ({total_count+1}) 第{depth}层 ({i}/{len(current_level)}): {url}")
                     
                     # 使用智能请求方法
                     response = self._smart_request(url, status_callback)
+                    if status_callback:
+                        status_callback(f"📡 HTTP {response.status_code}: {url}")
+                    
                     response.encoding = response.apparent_encoding
                     
                     soup = BeautifulSoup(response.text, 'html.parser')
                     
                     # 根据解析器类型提取内容
                     content = self._extract_content_by_parser(soup, parser_type)
+                    if status_callback:
+                        status_callback(f"📝 内容提取: {len(content)} 字符 ({parser_type}模式)")
                     
                     title = soup.title.string if soup.title else "No Title"
                     title = self._clean_text(title)
@@ -331,34 +414,49 @@ class WebCrawler:
                     filepath = self._save_content(url, title, content)
                     if filepath:
                         saved_files.append(filepath)
-                        level_count += 1
                         total_count += 1
+                        level_success += 1
                         if status_callback:
                             status_callback(f"✅ 已保存: {title} ({len(content)} 字符)")
+                    else:
+                        level_failed += 1
+                        if status_callback:
+                            status_callback(f"❌ 保存失败: {title}")
                     
                     # 如果还没达到最大深度，提取下一级链接
                     if depth < max_depth:
                         links = self._extract_links(soup, url, exclude_patterns)
+                        # 🔥 关键修复：每个页面提取所有有效链接，不限制数量
+                        # 让下一层的数量限制来控制递归规模
                         next_level.extend(links)
                         
-                        if status_callback and links:
-                            status_callback(f"发现 {len(links)} 个新链接，添加到第{depth+1}层队列")
+                        if status_callback:
+                            if links:
+                                status_callback(f"🔗 发现 {len(links)} 个链接，全部添加到第{depth+1}层队列")
+                            else:
+                                status_callback(f"🔗 未发现有效链接")
                     
                     time.sleep(0.5)  # 礼貌爬取
                     
                 except Exception as e:
+                    level_failed += 1
                     if status_callback:
-                        status_callback(f"抓取失败 {url}: {e}")
+                        status_callback(f"❌ 抓取失败 {url}: {str(e)[:100]}")
                     continue
             
             # 准备下一层
             current_level = list(set(next_level))  # 去重
             
             if status_callback:
-                status_callback(f"🎯 第{depth}层完成: 成功抓取 {level_count} 页，发现 {len(current_level)} 个下级链接")
+                status_callback(f"🎯 第{depth}层完成: 成功 {level_success} 页，失败 {level_failed} 页")
+                if depth < max_depth and current_level:
+                    next_layer_limit = max_pages ** (depth + 1)
+                    actual_next = min(len(current_level), next_layer_limit)
+                    status_callback(f"📊 递归统计: 发现 {len(current_level)} 个下级链接，第{depth+1}层将处理前 {actual_next} 个")
         
         if status_callback:
-            status_callback(f"🎉 爬取完成！总共获取 {len(saved_files)} 个页面 (共{max_depth}层)")
+            status_callback(f"🎉 递归爬取完成！总共获取 {len(saved_files)} 个页面 (共{max_depth}层)")
+            status_callback(f"📈 最终统计: 尝试 {total_attempted} 个URL，成功访问 {len(self.visited_urls)} 个，保存 {len(saved_files)} 个文件")
                 
         return saved_files
 

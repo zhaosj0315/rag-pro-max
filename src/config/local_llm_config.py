@@ -9,7 +9,7 @@ os.environ["DISABLE_OPENAI"] = "true"
 # Ollama配置
 OLLAMA_CONFIG = {
     "base_url": "http://localhost:11434",
-    "model": "qwen2.5:7b",
+    "model": "gpt-oss:20b",
     "timeout": 30
 }
 

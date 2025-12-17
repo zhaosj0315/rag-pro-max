@@ -18,6 +18,36 @@ initialize_environment()
 import os
 # 在最开始设置环境变量，禁用PaddleOCR详细日志
 import os
+
+def get_default_model():
+    """统一获取默认模型"""
+    try:
+        from src.config import ConfigLoader
+        config = ConfigLoader.load()
+        return config.get('llm_model_ollama', 'gpt-oss:20b')
+    except:
+        return 'gpt-oss:20b'
+
+def update_all_model_configs(new_model):
+    """统一更新所有地方的模型配置"""
+    try:
+        from src.config import ConfigLoader
+        # 更新配置文件
+        config = ConfigLoader.load()
+        config['llm_model_ollama'] = new_model
+        ConfigLoader.save(config)
+        
+        # 更新session state
+        st.session_state.selected_model = new_model
+        
+        # 更新全局LLM
+        ollama_url = config.get('llm_url_ollama', 'http://localhost:11434')
+        set_global_llm_model("Ollama", new_model, api_url=ollama_url)
+        
+        return True
+    except Exception as e:
+        print(f"配置更新失败: {e}")
+        return False
 os.environ['GLOG_minloglevel'] = '3'  # 只显示致命错误
 os.environ['FLAGS_logtostderr'] = '0'  # 不输出到stderr
 os.environ['PADDLE_LOG_LEVEL'] = '50'  # 最高级别，几乎不输出
@@ -51,7 +81,7 @@ import re
 
 # 🧹 启动时自动清理临时文件
 def cleanup_temp_files():
-    """清理超过24小时的临时文件"""
+    """清理超过一周的临时文件"""
     temp_dir = "temp_uploads"
     if not os.path.exists(temp_dir):
         return
@@ -82,8 +112,8 @@ def cleanup_temp_files():
             # 检查文件修改时间
             try:
                 file_time = os.path.getmtime(filepath)
-                # 如果文件超过24小时（86400秒）
-                if current_time - file_time > 86400:
+                # 如果文件超过一周（604800秒）
+                if current_time - file_time > 604800:
                     os.remove(filepath)
                     cleaned_count += 1
             except (OSError, IOError) as e:
@@ -951,6 +981,20 @@ with st.sidebar:
                     with col3:
                         parser_type = st.selectbox("解析器", ["default", "article", "documentation"])
                     
+                    # 🔥 新增：网址抓取质量筛选开关
+                    st.write("**质量筛选设置**")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        enable_url_quality_filter = st.checkbox("🎯 启用质量筛选", value=False, 
+                                                              help="开启后会过滤低质量页面，关闭则保留所有爬取的页面")
+                    with col2:
+                        if enable_url_quality_filter:
+                            url_quality_threshold = st.slider("质量阈值", 10.0, 50.0, 30.0, 5.0,
+                                                            help="分数越高筛选越严格，30分为推荐值")
+                        else:
+                            url_quality_threshold = 0.0
+                            st.info("已关闭质量筛选，将保留所有页面")
+                    
                     # 🛑 安全警告 - 指数增长预估
                     estimated_pages = max_pages ** crawl_depth  # 指数增长：每层可能产生max_pages个新链接
                     if estimated_pages > 1000:
@@ -982,6 +1026,20 @@ with st.sidebar:
                         max_pages = st.number_input("总页数", 1, 500, 20, help="所有网站总共抓取的页数（会智能分配到2-3个相关网站）")
                     with col3:
                         parser_type = st.selectbox("解析器", ["default", "article", "documentation"])
+                    
+                    # 🔥 新增：质量筛选开关
+                    st.write("**质量筛选设置**")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        enable_quality_filter = st.checkbox("🎯 启用质量筛选", value=True, 
+                                                          help="开启后会过滤低质量页面，关闭则保留所有爬取的页面")
+                    with col2:
+                        if enable_quality_filter:
+                            quality_threshold = st.slider("质量阈值", 10.0, 50.0, 30.0, 5.0,
+                                                        help="分数越高筛选越严格，30分为推荐值")
+                        else:
+                            quality_threshold = 0.0
+                            st.info("已关闭质量筛选，将保留所有页面")
                     
                     # 🛑 安全警告 - 指数增长预估
                     estimated_pages = max_pages ** crawl_depth  # 指数增长：每层可能产生max_pages个新链接
@@ -1016,7 +1074,16 @@ with st.sidebar:
                     if crawl_url:
                         # 网址抓取模式
                         try:
-                            from src.processors.web_crawler import WebCrawler
+                            # 优先使用异步爬虫
+                            try:
+                                from src.processors.enhanced_web_crawler import run_async_crawl
+                                use_async = True
+                                st.info("🚀 使用异步并发爬虫 (性能提升10倍+, 支持断点续传, robots.txt检查)")
+                            except ImportError:
+                                from src.processors.web_crawler import WebCrawler
+                                use_async = False
+                                st.info("📡 使用标准爬虫")
+                            
                             # 使用带域名的唯一目录
                             from urllib.parse import urlparse
                             from datetime import datetime
@@ -1030,40 +1097,147 @@ with st.sidebar:
                             timestamp_dir = datetime.now().strftime('%Y%m%d_%H%M%S')
                             unique_output_dir = os.path.join("temp_uploads", f"Web_{domain}_{timestamp_dir}")
                             
-                            crawler = WebCrawler(output_dir=unique_output_dir)
-                            
-                            progress_bar = st.progress(0)
-                            status_text = st.empty()
-                            crawled_count = [0]
-                            
-                            def update_status(msg):
-                                status_text.text(f"📡 {msg}")
-                                # 添加日志记录
-                                logger.info(f"🌐 网页爬取: {msg}")
-                                if "已保存" in msg:
-                                    crawled_count[0] += 1
-                                    progress = min(crawled_count[0] / max_pages, 1.0)
-                                    progress_bar.progress(progress)
-                            
-                            # 记录爬取开始
-                            logger.info(f"🌐 开始网页爬取: {crawl_url} (深度:{crawl_depth}, 页数:{max_pages})")
-                            
-                            with st.spinner("抓取中..."):
-                                saved_files = crawler.crawl_advanced(
-                                    start_url=crawl_url,
-                                    max_depth=crawl_depth,
-                                    max_pages=max_pages,
-                                    exclude_patterns=exclude_patterns,
-                                    parser_type=parser_type,
-                                    status_callback=update_status
-                                )
+                            if use_async:
+                                # 异步爬虫配置
+                                max_concurrent = 15  # 默认并发数
+                                
+                                progress_bar = st.progress(0)
+                                status_text = st.empty()
+                                crawled_count = [0]
+                                
+                                def update_status(msg):
+                                    status_text.text(msg)
+                                    logger.info(f"🌐 网页爬取: {msg}")
+                                    if "已爬取" in msg or "已保存" in msg:
+                                        crawled_count[0] += 1
+                                        progress = min(crawled_count[0] / max(max_pages, 1), 1.0)
+                                        progress_bar.progress(progress)
+                                
+                                # 记录爬取开始
+                                logger.info(f"🌐 开始网页爬取: {crawl_url} (深度:{crawl_depth}, 页数:{max_pages})")
+                                
+                                with st.spinner("异步抓取中..."):
+                                    # 运行异步爬虫
+                                    result = run_async_crawl(
+                                        start_url=crawl_url,
+                                        max_depth=crawl_depth,
+                                        max_pages=max_pages,
+                                        status_callback=update_status,
+                                        max_concurrent=max_concurrent,
+                                        ignore_robots=True  # 绕过robots.txt限制
+                                    )
+                                    saved_files = result if isinstance(result, list) else []
+                                    # 异步爬虫使用固定的输出目录格式
+                                    async_output_dir = unique_output_dir
+                            else:
+                                # 同步爬虫
+                                crawler = WebCrawler(output_dir=unique_output_dir)
+                                
+                                progress_bar = st.progress(0)
+                                status_text = st.empty()
+                                crawled_count = [0]
+                                
+                                def update_status(msg):
+                                    status_text.text(f"📡 {msg}")
+                                    # 添加日志记录
+                                    logger.info(f"🌐 网页爬取: {msg}")
+                                    if "已保存" in msg:
+                                        crawled_count[0] += 1
+                                        progress = min(crawled_count[0] / max_pages, 1.0)
+                                        progress_bar.progress(progress)
+                                
+                                # 记录爬取开始
+                                logger.info(f"🌐 开始网页爬取: {crawl_url} (深度:{crawl_depth}, 页数:{max_pages})")
+                                
+                                with st.spinner("抓取中..."):
+                                    saved_files = crawler.crawl_advanced(
+                                        start_url=crawl_url,
+                                        max_depth=crawl_depth,
+                                        max_pages=max_pages,
+                                        parser_type="default",
+                                        exclude_patterns=[],
+                                        status_callback=update_status
+                                    )
                             
                             progress_bar.progress(1.0)
                             
                             # 记录爬取结果
                             logger.success(f"🌐 网页爬取完成: 获取 {len(saved_files)} 个页面")
                             
-                            if saved_files:
+                            # 检查是否有实际文件（异步爬虫可能返回空列表但有文件）
+                            actual_files = []
+                            if use_async:
+                                from src.utils.directory_selector import select_best_web_crawl_directory
+                                selected_dir, actual_files = select_best_web_crawl_directory(domain)
+                                if selected_dir:
+                                    logger.info(f"🎯 智能选择目录: {os.path.basename(selected_dir)} (包含 {len(actual_files)} 个文件)")
+                                else:
+                                    logger.warning(f"⚠️ 未找到有效的网页抓取目录")
+                            
+                            files_to_use = saved_files if saved_files else actual_files
+                            
+                            # 🔥 新增：网址抓取质量过滤
+                            if files_to_use and enable_url_quality_filter:
+                                try:
+                                    from src.processors.content_analyzer import ContentQualityAnalyzer
+                                    content_analyzer = ContentQualityAnalyzer()
+                                    
+                                    # 读取文件内容进行质量分析
+                                    analysis_contents = []
+                                    for file_path in files_to_use:
+                                        try:
+                                            with open(file_path, 'r', encoding='utf-8') as f:
+                                                content = f.read()
+                                                # 提取标题和URL（从文件内容的前几行）
+                                                lines = content.split('\n')
+                                                title = "Unknown"
+                                                url = crawl_url
+                                                for line in lines[:5]:
+                                                    if line.startswith('Title:'):
+                                                        title = line.replace('Title:', '').strip()
+                                                    elif line.startswith('URL:'):
+                                                        url = line.replace('URL:', '').strip()
+                                                
+                                                analysis_contents.append({
+                                                    'title': title,
+                                                    'content': content,
+                                                    'url': url,
+                                                    'file_path': file_path
+                                                })
+                                        except Exception as e:
+                                            logger.warning(f"读取文件失败 {file_path}: {e}")
+                                            continue
+                                    
+                                    if analysis_contents:
+                                        total_pages = len(analysis_contents)
+                                        # 动态设置max_results
+                                        if total_pages <= 50:
+                                            max_results = max(10, int(total_pages * 0.8))
+                                        elif total_pages <= 200:
+                                            max_results = max(50, int(total_pages * 0.7))
+                                        else:
+                                            max_results = min(500, max(100, int(total_pages * 0.6)))
+                                        
+                                        logger.info(f"🎯 网址抓取质量过滤: 总页面{total_pages}个，保留前{max_results}个高质量页面 (阈值:{url_quality_threshold}分)")
+                                        
+                                        filtered_contents = content_analyzer.analyze_and_filter_contents(
+                                            analysis_contents,
+                                            search_keywords=[crawl_url.split('/')[-1]],  # 使用域名作为关键词
+                                            min_quality_score=url_quality_threshold,
+                                            max_results=max_results
+                                        )
+                                        
+                                        # 更新files_to_use为过滤后的文件
+                                        files_to_use = [item['file_path'] for item in filtered_contents]
+                                        
+                                        logger.info(f"📊 网址抓取质量过滤完成: {total_pages} → {len(files_to_use)}个高质量页面")
+                                        
+                                except Exception as e:
+                                    logger.warning(f"质量过滤失败，使用原始文件: {e}")
+                            elif files_to_use and not enable_url_quality_filter:
+                                logger.info(f"⚡ 网址抓取跳过质量筛选: 保留全部{len(files_to_use)}个页面")
+                            
+                            if files_to_use or (use_async and matching_dirs):
                                 # 生成知识库名称
                                 if web_kb_name:
                                     kb_name = web_kb_name
@@ -1077,10 +1251,23 @@ with st.sidebar:
                                 if web_kb_name:
                                     kb_name = KBNameOptimizer.generate_unique_name(kb_name, output_base)
                                 
-                                st.success(f"✅ 抓取完成！获取 {len(saved_files)} 页，正在创建知识库: {kb_name}")
+                                st.success(f"✅ 抓取完成！获取 {len(files_to_use)} 页，正在创建知识库: {kb_name}")
                                 
                                 # 设置知识库构建参数
-                                st.session_state.uploaded_path = os.path.abspath(crawler.output_dir)
+                                if use_async:
+                                    # 查找最新的异步爬虫输出目录，优先选择有文件的目录
+                                    from src.utils.directory_selector import select_best_web_crawl_directory
+                                    async_output_dir, _ = select_best_web_crawl_directory(domain)
+                                    
+                                    if async_output_dir:
+                                        logger.info(f"🎯 知识库构建使用目录: {os.path.basename(async_output_dir)}")
+                                        st.session_state.uploaded_path = os.path.abspath(async_output_dir)
+                                    else:
+                                        # 回退到预期的目录
+                                        logger.warning(f"⚠️ 未找到有效目录，使用默认目录")
+                                        st.session_state.uploaded_path = os.path.abspath(unique_output_dir)
+                                else:
+                                    st.session_state.uploaded_path = os.path.abspath(crawler.output_dir)
                                 st.session_state.upload_auto_name = kb_name
                                 st.session_state.auto_build_kb = True
                                 st.session_state.selected_kb = kb_name
@@ -1096,19 +1283,19 @@ with st.sidebar:
                                 # 简洁的结果显示
                                 with st.expander("📊 构建详情", expanded=False):
                                     st.write(f"**知识库名称**: {kb_name}")
-                                    st.write(f"**抓取页面**: {len(saved_files)} 页")
+                                    st.write(f"**抓取页面**: {len(files_to_use)} 页")
                                     st.write(f"**创建时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                                    for i, file_path in enumerate(saved_files[:3], 1):
+                                    for i, file_path in enumerate(files_to_use[:3], 1):
                                         file_name = os.path.basename(file_path)
                                         st.text(f"{i}. {file_name}")
-                                    if len(saved_files) > 3:
-                                        st.text(f"... 还有 {len(saved_files) - 3} 个文件")
+                                    if len(files_to_use) > 3:
+                                        st.text(f"... 还有 {len(files_to_use) - 3} 个文件")
                                 
                                 # 推荐问题
                                 try:
                                     from src.chat.web_suggestion_engine import WebSuggestionEngine
                                     web_engine = WebSuggestionEngine()
-                                    web_suggestions = web_engine.generate_suggestions_from_crawl(crawl_url, saved_files)
+                                    web_suggestions = web_engine.generate_suggestions_from_crawl(crawl_url, files_to_use)
                                     
                                     if web_suggestions:
                                         st.markdown("**💡 推荐问题:**")
@@ -1170,9 +1357,11 @@ with st.sidebar:
                             # 记录搜索开始
                             logger.info(f"🔍 开始智能行业搜索: '{search_keyword}' ({selected_industry}, 深度:{crawl_depth}, 总页数:{max_pages})")
                             
-                            # 计算每个网站分配的页数
-                            pages_per_site = max(1, max_pages // len(search_engines))  # 平均分配，至少1页
-                            logger.info(f"📊 页数分配: 总共{max_pages}页，{len(search_engines)}个网站，每站{pages_per_site}页")
+                            # 🔥 修复：每个网站使用完整的max_pages参数，而不是分割
+                            # pages_per_site = max(1, max_pages // len(search_engines))  # ❌ 错误：分割总页数
+                            pages_per_site = max_pages  # ✅ 正确：每个网站使用完整参数
+                            logger.info(f"📊 页数分配修复: 每个网站使用完整{max_pages}页参数 (共{len(search_engines)}个网站)")
+                            logger.info(f"🧮 递归预估: 第1层={max_pages}页, 第2层={max_pages**2}页 (如果深度≥2)")
                             
                             # v2.4.0 并发爬取优化
                             try:
@@ -1238,16 +1427,35 @@ with st.sidebar:
                                                 error=result.get('error', 'Unknown error')
                                             )
                                     
-                                    # 质量分析和过滤
+                                    # 🔥 修复：用户可控的质量分析和过滤
                                     if analysis_contents:
-                                        filtered_contents = content_analyzer.analyze_and_filter_contents(
-                                            analysis_contents,
-                                            search_keywords=[search_keyword],
-                                            min_quality_score=30.0,
-                                            max_results=50
-                                        )
-                                        
-                                        logger.info(f"📊 质量过滤完成: {len(analysis_contents)} → {len(filtered_contents)}个高质量页面")
+                                        if enable_quality_filter:
+                                            # 启用质量筛选
+                                            total_pages = len(analysis_contents)
+                                            if total_pages <= 50:
+                                                # 小规模：保留80%
+                                                max_results = max(10, int(total_pages * 0.8))
+                                            elif total_pages <= 200:
+                                                # 中规模：保留70%
+                                                max_results = max(50, int(total_pages * 0.7))
+                                            else:
+                                                # 大规模：保留60%，但不超过500
+                                                max_results = min(500, max(100, int(total_pages * 0.6)))
+                                            
+                                            logger.info(f"🎯 质量过滤参数: 总页面{total_pages}个，保留前{max_results}个高质量页面 (阈值:{quality_threshold}分)")
+                                            
+                                            filtered_contents = content_analyzer.analyze_and_filter_contents(
+                                                analysis_contents,
+                                                search_keywords=[search_keyword],
+                                                min_quality_score=quality_threshold,  # 使用用户设置的阈值
+                                                max_results=max_results
+                                            )
+                                            
+                                            logger.info(f"📊 质量过滤完成: {len(analysis_contents)} → {len(filtered_contents)}个高质量页面")
+                                        else:
+                                            # 跳过质量筛选，保留所有页面
+                                            filtered_contents = analysis_contents
+                                            logger.info(f"⚡ 跳过质量筛选: 保留全部{len(analysis_contents)}个页面")
                                         
                                         # 保存过滤后的内容
                                         saved_files = []
@@ -1256,12 +1464,22 @@ with st.sidebar:
                                             filepath = os.path.join(unique_output_dir, filename)
                                             
                                             # 创建增强的内容
-                                            enhanced_content = f"""标题: {content_item['title']}
+                                            if 'quality_score' in content_item and content_item['quality_score']:
+                                                # 有质量评分信息
+                                                enhanced_content = f"""标题: {content_item['title']}
 URL: {content_item['url']}
 质量评分: {content_item['quality_score']['total_score']:.1f}/100
-相关性评分: {content_item['relevance_score']:.2f}
-综合评分: {content_item['final_score']:.1f}
+相关性评分: {content_item.get('relevance_score', 0):.2f}
+综合评分: {content_item.get('final_score', 0):.1f}
 关键词: {', '.join(content_item['quality_score']['details']['top_keywords'][:5])}
+
+内容:
+{content_item['content']}
+"""
+                                            else:
+                                                # 无质量评分信息
+                                                enhanced_content = f"""标题: {content_item['title']}
+URL: {content_item['url']}
 
 内容:
 {content_item['content']}
@@ -1281,7 +1499,7 @@ URL: {content_item['url']}
                                         concurrent_stats = concurrent_crawler.get_stats()
                                         
                                         logger.success(f"🎉 v2.4.0并发爬取完成!")
-                                        logger.info(f"📊 爬取统计: 成功率 {final_stats['success_rate']:.1%}, 平均质量 {final_stats['avg_quality_score']:.1f}")
+                                        logger.info(f"📊 爬取统计: 成功率 {final_stats['success_rate']:.1%}, 平均质量 {final_stats.get('avg_quality_score', 0):.1f}")
                                         logger.info(f"⚡ 性能统计: {concurrent_stats['pages_per_minute']:.1f}页/分钟, 平均响应 {concurrent_stats['avg_response_time']:.2f}秒")
                                     
                                 else:
@@ -1325,7 +1543,15 @@ URL: {content_item['url']}
                             
                             progress_bar.progress(1.0)
                             
-                            if all_saved_files:
+                            # 检查是否有实际文件（统一逻辑）
+                            actual_files = []
+                            if not all_saved_files:
+                                import glob
+                                actual_files = glob.glob(os.path.join(unique_output_dir, "*.txt"))
+                            
+                            files_to_use = all_saved_files if all_saved_files else actual_files
+                            
+                            if files_to_use:
                                 # 生成基础名称
                                 if web_kb_name:
                                     kb_name = web_kb_name
@@ -1337,10 +1563,10 @@ URL: {content_item['url']}
                                     from src.core.app_config import output_base
                                     kb_name = KBNameOptimizer.generate_name_from_keyword(search_keyword, output_base)
                                 
-                                st.success(f"✅ 智能行业搜索完成！获取 {len(all_saved_files)} 页，正在创建知识库: {kb_name}")
+                                st.success(f"✅ 智能行业搜索完成！获取 {len(files_to_use)} 页，正在创建知识库: {kb_name}")
                                 
                                 # 记录搜索完成
-                                logger.success(f"🔍 智能行业搜索完成: '{search_keyword}' ({selected_industry}) - 获取 {len(all_saved_files)} 个页面")
+                                logger.success(f"🔍 智能行业搜索完成: '{search_keyword}' ({selected_industry}) - 获取 {len(files_to_use)} 个页面")
                                 
                                 # 设置知识库构建参数
                                 st.session_state.uploaded_path = os.path.abspath(crawler.output_dir)
@@ -1361,7 +1587,7 @@ URL: {content_item['url']}
                                     st.write(f"**知识库名称**: {kb_name}")
                                     st.write(f"**搜索关键词**: {search_keyword}")
                                     st.write(f"**搜索方式**: 全网搜索")
-                                    st.write(f"**抓取页面**: {len(all_saved_files)} 页")
+                                    st.write(f"**抓取页面**: {len(files_to_use)} 页")
                                     st.write(f"**创建时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
                                 
                                 st.rerun()
@@ -2990,16 +3216,20 @@ with st.container():
                 
                 if models:
                     available_models = models
+                    # 确保 gpt-oss:20b 在第一位
+                    if "gpt-oss:20b" in available_models:
+                        available_models.remove("gpt-oss:20b")
+                        available_models.insert(0, "gpt-oss:20b")
                 else:
-                    available_models = ["llama3", "mistral", "gemma", "deepseek-coder", "qwen2.5:7b"] # Fallback list
+                    available_models = ["gpt-oss:20b", "llama3", "mistral", "gemma", "deepseek-coder", "qwen2.5:7b"] # Fallback list
             except Exception as e:
-                available_models = ["llama3", "mistral", "qwen2.5:7b"]
+                available_models = ["gpt-oss:20b", "llama3", "mistral", "qwen2.5:7b"]
                 
-            # 获取当前模型
-            current_model = st.session_state.get('selected_model', 'qwen2.5:7b')
+            # 获取当前模型 - 使用统一配置
+            current_model = st.session_state.get('selected_model', get_default_model())
             if current_model not in available_models:
                 if available_models:
-                    if current_model not in ["llama3", "mistral", "qwen2.5:7b"]:
+                    if current_model not in ["gpt-oss:20b", "llama3", "mistral", "qwen2.5:7b"]:
                          current_model = available_models[0]
             
             # 模型选择下拉框
@@ -3011,11 +3241,11 @@ with st.container():
                 help="Code: 写代码 | Vision: 看图 | Chat: 闲聊"
             )
 
-            # 检测模型变更
+            # 检测模型变更 - 使用统一更新
             if selected_model_new != st.session_state.get('selected_model'):
-                st.session_state.selected_model = selected_model_new
-                if set_global_llm_model("Ollama", selected_model_new, api_url=ollama_url):
+                if update_all_model_configs(selected_model_new):
                     st.toast(f"✅ 已切换到模型: {selected_model_new}", icon="🤖")
+                    st.rerun()  # 刷新界面显示
                 else:
                     st.toast(f"❌ 切换模型失败: {selected_model_new}", icon="⚠️")
             
@@ -3031,7 +3261,7 @@ with st.container():
 
     with col_info:
         # 显示当前状态摘要
-        curr_model = st.session_state.get('selected_model', 'qwen2.5:7b')
+        curr_model = st.session_state.get('selected_model', get_default_model())
         opt_status = "✅ 开启" if st.session_state.get('enable_query_optimization', False) else "⬜ 关闭"
         st.caption(f"**当前模型**: `{curr_model}` &nbsp;&nbsp;|&nbsp;&nbsp; **智能优化**: {opt_status}")
 

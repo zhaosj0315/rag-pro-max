@@ -109,7 +109,7 @@ def render_compact_sidebar():
             
             if llm_provider == "Ollama":
                 ollama_url = st.text_input("Ollama URL", "http://localhost:11434", key="ollama_url")
-                ollama_models = ["qwen2.5:7b", "llama3:8b", "gpt-oss:20b"]
+                ollama_models = ["gpt-oss:20b", "qwen2.5:7b", "llama3:8b"]
                 selected_model = st.selectbox("模型", ollama_models, key="ollama_model")
             else:
                 openai_key = st.text_input("OpenAI API Key", type="password", key="openai_key")

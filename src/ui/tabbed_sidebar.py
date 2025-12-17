@@ -145,7 +145,7 @@ class TabbedSidebar:
                 st.selectbox("模型", ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"], key="openai_model")
             elif llm_type == "Ollama":
                 st.text_input("服务地址", value="http://localhost:11434", key="ollama_url")
-                st.text_input("模型名称", placeholder="qwen2.5:7b", key="ollama_model")
+                st.text_input("模型名称", placeholder="gpt-oss:20b", key="ollama_model")
         
         # 嵌入模型配置
         with st.expander("🔤 嵌入模型"):

@@ -121,13 +121,18 @@ def crawl_and_create_kb(url: str = None,
                         status_callback(f"🌐 搜索 {site_name}: {search_url}")
                     
                     try:
+                        # 🔥 修复：每个网站使用完整的max_pages参数，而不是分割
                         files = crawler.crawl_advanced(
                             start_url=search_url,
-                            max_depth=2, # 深度2才能抓取搜索结果
-                            max_pages=max_pages // len(sites),
+                            max_depth=max_depth,
+                            max_pages=max_pages,  # 修复：使用完整参数，不再除以网站数量
                             status_callback=status_callback
                         )
                         crawled_files.extend(files)
+                        
+                        if status_callback:
+                            status_callback(f"✅ {site_name} 搜索完成: 获取 {len(files)} 个页面")
+                            
                     except Exception as e:
                         if status_callback:
                             status_callback(f"❌ {site_name} 搜索失败: {e}")
@@ -278,12 +283,74 @@ def render_enhanced_web_crawl():
                 if st.checkbox(site_name, value=default_checked, key=f"search_site_{site_name}"):
                     selected_sites.append(site_name)
         
-        # 参数设置
+        # 🔥 新增：智能推荐按钮（复用网页爬取逻辑）
+        st.write("**爬取参数设置**")
+        
+        # 智能推荐按钮
+        col_smart, col_manual = st.columns([1, 2])
+        with col_smart:
+            if st.button("🧠 智能推荐参数", help="基于搜索网站类型自动推荐最佳参数"):
+                if selected_sites:
+                    # 使用第一个选中网站进行智能分析
+                    first_site = selected_sites[0]
+                    if first_site in preset_sites:
+                        sample_url = preset_sites[first_site].format(keyword="sample")
+                        
+                        try:
+                            from .crawl_optimizer import CrawlOptimizer
+                            optimizer = CrawlOptimizer()
+                            recommendations = optimizer.analyze_website(sample_url)
+                            
+                            # 存储推荐参数到session_state
+                            st.session_state.smart_search_depth = recommendations['recommended_depth']
+                            st.session_state.smart_search_pages = recommendations['recommended_pages']
+                            st.session_state.smart_search_type = recommendations['site_type']
+                            st.session_state.smart_search_confidence = recommendations['confidence']
+                            
+                            st.success(f"🎯 推荐参数已生成！网站类型: {recommendations['site_type']}")
+                            
+                        except Exception as e:
+                            st.warning(f"智能分析失败，使用默认参数: {e}")
+                            st.session_state.smart_search_depth = 2
+                            st.session_state.smart_search_pages = 20
+                else:
+                    st.warning("请先选择搜索网站")
+        
+        # 参数设置（支持智能推荐覆盖）
         col1, col2 = st.columns(2)
         with col1:
-            search_pages = st.selectbox("总页面数", [10, 20, 30, 50], index=1)
+            # 🔥 修复：使用智能推荐的深度，支持手动覆盖
+            default_depth = getattr(st.session_state, 'smart_search_depth', 2)
+            search_depth = st.selectbox("🏗️ 爬取深度", [1, 2, 3, 4], 
+                                      index=default_depth-1, 
+                                      help="递归爬取的层数")
+            
         with col2:
-            search_kb_name = st.text_input("知识库名", placeholder="留空自动生成")
+            # 🔥 修复：使用智能推荐的页数，支持手动覆盖
+            default_pages = getattr(st.session_state, 'smart_search_pages', 20)
+            search_pages = st.selectbox("📄 每层页数", [5, 10, 20, 30, 50], 
+                                      index=[5, 10, 20, 30, 50].index(default_pages) if default_pages in [5, 10, 20, 30, 50] else 2,
+                                      help="每层最大页面数")
+        
+        # 显示智能推荐信息
+        if hasattr(st.session_state, 'smart_search_type'):
+            st.info(f"🧠 智能推荐: {st.session_state.smart_search_type} 类型网站 "
+                   f"(置信度: {getattr(st.session_state, 'smart_search_confidence', 0.5):.1%})")
+            
+            # 🔥 显示递归逻辑预览
+            total_pages = sum(search_pages ** d for d in range(1, search_depth + 1))
+            st.info(f"📊 递归预估: 深度{search_depth}层，每层{search_pages}页 → "
+                   f"总计约 {total_pages:,} 页")
+            
+            # 显示各层详情
+            layer_details = []
+            for d in range(1, search_depth + 1):
+                layer_pages = search_pages ** d
+                layer_details.append(f"第{d}层: {search_pages}^{d} = {layer_pages:,}页")
+            st.caption(" | ".join(layer_details))
+        
+        # 知识库名称
+        search_kb_name = st.text_input("📚 知识库名", placeholder="留空自动生成")
         
         # 搜索按钮
         if st.button("🔍 搜索并创建知识库", type="primary", disabled=not keyword or not selected_sites):
@@ -296,10 +363,12 @@ def render_enhanced_web_crawl():
                     progress_bar.progress(min(progress_bar._value + 0.2, 0.9))
             
             try:
+                # 🔥 修复：传递正确的递归参数
                 result = crawl_and_create_kb(
                     keyword=keyword,
                     sites=selected_sites,
-                    max_pages=search_pages,
+                    max_depth=search_depth,  # 使用选择的深度
+                    max_pages=search_pages,  # 使用选择的页数
                     kb_name=search_kb_name if search_kb_name else None,
                     status_callback=status_callback
                 )
