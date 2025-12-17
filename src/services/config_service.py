@@ -5,7 +5,7 @@
 
 import os
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from src.common.config import load_config, save_config, get_default_config
 
 class ConfigService:

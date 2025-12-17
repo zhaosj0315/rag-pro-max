@@ -126,6 +126,11 @@ def export_chat_history(kb_id: str, export_format: str = "json", logger=None) ->
             if logger:
                 logger.log_error("导出", f"不支持的格式: {export_format}")
             return None
+            
+    except Exception as e:
+        if logger:
+            logger.log_error("导出", f"导出失败: {str(e)}")
+        return None
 
 def generate_doc_summary(doc_text: str, filename: str) -> str:
     """统一的文档摘要生成函数"""
@@ -160,8 +165,3 @@ def click_btn(q: str):
     queue_manager = QueueManager()
     queue_manager.add_question(q)
     st.rerun()
-            
-    except Exception as e:
-        if logger:
-            logger.log_error("导出", f"导出失败: {str(e)}")
-        return None

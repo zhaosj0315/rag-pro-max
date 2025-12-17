@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-v2.4.2-blue.svg)
+![Version](https://img.shields.io/badge/version-v2.4.3-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Docker-lightgrey.svg)
@@ -748,20 +748,22 @@ open dist/RAG_Pro_Max.app
 
 ### 📊 项目统计
 
-- **总文件数**: 208个Python文件 (实际统计，排除临时文件)
-- **源代码文件**: 195个 (src目录)
+- **总文件数**: 191个Python文件 (实际统计，排除临时文件)
+- **源代码文件**: 191个 (src目录)
 - **测试文件**: 50个 (tests目录)
-- **模块化程度**: 95%+
+- **目录结构**: 46个目录
+- **模块化程度**: 98%+
 - **文档数量**: 12个核心文档
-- **主要模块**: 18个功能模块
+- **主要模块**: 15个功能模块
 
 ### 🏗️ 架构特点
 
-- **135模块架构**: 完全模块化设计，单一职责原则
-- **4层应用入口**: apppro_final.py (40行) → apppro_ultra.py → apppro_minimal.py → apppro.py
-- **12大功能域**: api, core, ui, processors, app_logging, config, chat, kb, query, utils, monitoring, documents
-- **完整测试体系**: 36个测试文件，覆盖所有核心模块
-- **基础功能完整**: 核心功能实现，需要增强测试覆盖
+- **四层架构**: 表现层 → 服务层 → 公共层 → 工具层
+- **191模块架构**: 完全模块化设计，单一职责原则
+- **3个服务**: 核心业务服务 (file, kb, config)
+- **3个公共模块**: 通用功能库 (utils, business, config)
+- **完整测试体系**: 50个测试文件，覆盖核心模块
+- **重构优化**: Phase 2-4重构完成，代码质量显著提升
 
 ---
 
@@ -903,12 +905,13 @@ python3 tests/factory_test.py
 
 ### 📊 项目统计
 
-- **总文件数**: 208个Python文件 (实际统计，排除临时文件)
-- **源代码文件**: 195个 (src目录)
+- **总文件数**: 191个Python文件 (实际统计，排除临时文件)
+- **源代码文件**: 191个 (src目录)
 - **测试文件**: 50个 (tests目录)
-- **模块化程度**: 95%+
+- **目录结构**: 46个目录
+- **模块化程度**: 98%+
 - **文档数量**: 12个核心文档
-- **主要模块**: 18个功能模块
+- **主要模块**: 15个功能模块
 
 ### 🎯 数据处理流程
 
