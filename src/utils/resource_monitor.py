@@ -97,18 +97,4 @@ def should_throttle(cpu, mem, gpu, threshold=90.0):
     return cpu > threshold or mem > threshold or gpu > threshold
 
 
-def format_bytes(bytes_value):
-    """
-    格式化字节数
-    
-    Args:
-        bytes_value: 字节数
-        
-    Returns:
-        str: 格式化后的字符串
-    """
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-        if bytes_value < 1024.0:
-            return f"{bytes_value:.2f} {unit}"
-        bytes_value /= 1024.0
-    return f"{bytes_value:.2f} PB"
+from src.common.utils import format_bytes
