@@ -209,7 +209,7 @@ def auto_switch_model(kb_dim, current_model):
         str: 推荐的模型名称
     """
     model_map = {
-        512: "BAAI/bge-small-zh-v1.5",
+        512: "sentence-transformers/all-MiniLM-L6-v2",
         768: "BAAI/bge-large-zh-v1.5",
         1024: "BAAI/bge-large-zh-v1.5"
     }
@@ -232,7 +232,7 @@ def get_model_dimension(model_name):
         int: 向量维度
     """
     dimension_map = {
-        "BAAI/bge-small-zh-v1.5": 512,
+        "sentence-transformers/all-MiniLM-L6-v2": 512,
         "BAAI/bge-large-zh-v1.5": 1024,
         "BAAI/bge-large-zh-v1.5": 1024,
         "BAAI/bge-m3": 1024,

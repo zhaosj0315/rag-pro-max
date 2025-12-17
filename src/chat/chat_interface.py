@@ -208,7 +208,7 @@ class ChatInterface:
             # 获取配置
             config = ConfigLoader.load()
             embed_provider = config.get('embed_provider', 'HuggingFace (本地/极速)')
-            embed_model = config.get('embed_model_hf', 'BAAI/bge-small-zh-v1.5')
+            embed_model = config.get('embed_model_hf', 'sentence-transformers/all-MiniLM-L6-v2')
             embed_key = config.get('embed_key', '')
             embed_url = config.get('embed_url', '')
             

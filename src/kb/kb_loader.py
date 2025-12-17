@@ -72,7 +72,7 @@ class KnowledgeBaseLoader:
             kb_dim = self.get_kb_embedding_dim(db_path)
             if kb_dim:
                 model_map = {
-                    512: "BAAI/bge-small-zh-v1.5",
+                    512: "sentence-transformers/all-MiniLM-L6-v2",
                     768: "BAAI/bge-base-zh-v1.5", 
                     1024: "BAAI/bge-m3"
                 }

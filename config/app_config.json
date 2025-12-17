@@ -5,5 +5,5 @@
   "max_file_size": 104857600,
   "enable_gpu": true,
   "enable_ocr": true,
-  "embed_model": "sentence-transformers/all-MiniLM-L6-v2"
+  "llm_model_ollama": "gpt-oss:20b"
 }

@@ -236,7 +236,7 @@ def test_vector_database():
         
         # 检查本地缓存是否存在
         cache_dir = "./hf_cache"
-        model_cache = os.path.join(cache_dir, "BAAI--bge-small-zh-v1.5")
+        model_cache = os.path.join(cache_dir, "sentence-transformers--all-MiniLM-L6-v2")
         
         if not os.path.exists(model_cache):
             print_test("嵌入模型加载", "SKIP", "模型未下载（离线模式）")
@@ -246,10 +246,10 @@ def test_vector_database():
         
         # 只在本地缓存存在时测试
         embed_model = HuggingFaceEmbedding(
-            model_name="BAAI/bge-small-zh-v1.5",
+            model_name="sentence-transformers/all-MiniLM-L6-v2",
             cache_folder=cache_dir
         )
-        print_test("嵌入模型加载", "PASS", "BAAI/bge-small-zh-v1.5")
+        print_test("嵌入模型加载", "PASS", "sentence-transformers/all-MiniLM-L6-v2")
         
         # 测试文档向量化
         docs = [Document(text="这是一个测试文档")]
@@ -733,7 +733,7 @@ def run_additional_module_tests():
         defaults = {
             "llm_url_ollama": "http://localhost:11434",
             "llm_model_ollama": "qwen2.5:7b",
-            "embed_model_hf": "BAAI/bge-small-zh-v1.5"
+            "embed_model_hf": "sentence-transformers/all-MiniLM-L6-v2"
         }
         
         # 验证配置函数可调用（不实际执行Streamlit组件）

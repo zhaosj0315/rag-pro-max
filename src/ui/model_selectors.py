@@ -137,7 +137,7 @@ def render_hf_embedding_selector(
     # 默认预设模型
     if preset_models is None:
         preset_models = [
-            "BAAI/bge-small-zh-v1.5",
+            "sentence-transformers/all-MiniLM-L6-v2",
             "BAAI/bge-large-zh-v1.5",
             "BAAI/bge-m3",
             "BAAI/bge-base-zh-v1.5",
@@ -149,7 +149,7 @@ def render_hf_embedding_selector(
     
     if model_descriptions is None:
         model_descriptions = {
-            "BAAI/bge-small-zh-v1.5": "🚀 小型快速版 | 90MB | 适合实时应用、资源受限场景",
+            "sentence-transformers/all-MiniLM-L6-v2": "🚀 小型快速版 | 90MB | 适合实时应用、资源受限场景",
             "BAAI/bge-large-zh-v1.5": "🎯 中文最强版 | 1.3GB | 最高准确度，推荐用于精准检索",
             "BAAI/bge-m3": "🌍 多语言最强 | 2GB | 支持100+语言，跨语言检索最佳",
             "BAAI/bge-base-zh-v1.5": "⚖️ 平衡版本 | 400MB | 速度与准确度的完美平衡",
@@ -183,7 +183,7 @@ def render_hf_embedding_selector(
             help="输入任意 HuggingFace 模型 ID"
         )
         if not embed_model:
-            embed_model = "BAAI/bge-small-zh-v1.5"  # 默认值
+            embed_model = "sentence-transformers/all-MiniLM-L6-v2"  # 默认值
     else:
         embed_model = selected
     

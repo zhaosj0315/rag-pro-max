@@ -12,7 +12,7 @@ class CustomHuggingFaceEmbedding(BaseEmbedding):
     
     def __init__(
         self,
-        model_name: str = "BAAI/bge-small-zh-v1.5",
+        model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
         cache_folder: str = "./hf_cache",
         batch_size: int = 2048,
         device: str = "mps"
@@ -112,7 +112,7 @@ class CustomHuggingFaceEmbedding(BaseEmbedding):
 
 
 def create_custom_embedding(
-    model_name: str = "BAAI/bge-small-zh-v1.5",
+    model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
     cache_folder: str = "./hf_cache",
     batch_size: int = 2048,
     device: str = "mps"

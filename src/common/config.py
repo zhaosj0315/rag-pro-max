@@ -52,7 +52,7 @@ def get_default_config() -> Dict[str, Any]:
         },
         "embedding": {
             "provider": "HuggingFace",
-            "model": "BAAI/bge-small-zh-v1.5",
+            "model": "sentence-transformers/all-MiniLM-L6-v2",
             "device": "auto"
         },
         "rag": {

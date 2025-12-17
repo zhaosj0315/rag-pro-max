@@ -359,7 +359,7 @@ class KBInterface:
         # 合并配置和选项
         process_options = {
             'embed_provider': config.get('embed_provider', 'HuggingFace (本地/极速)'),
-            'embed_model': config.get('embed_model_hf', 'BAAI/bge-small-zh-v1.5'),
+            'embed_model': config.get('embed_model_hf', 'sentence-transformers/all-MiniLM-L6-v2'),
             'embed_key': config.get('embed_key', ''),
             'embed_url': config.get('embed_url', ''),
             'action_mode': 'NEW',

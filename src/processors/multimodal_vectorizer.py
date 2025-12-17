@@ -30,7 +30,7 @@ class MultiModalVectorizer:
     """多模态向量化器"""
     
     def __init__(self, 
-                 text_model_name: str = "BAAI/bge-small-zh-v1.5",
+                 text_model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
                  vision_model_name: str = "openai/clip-vit-base-patch32"):
         
         # 文本嵌入模型

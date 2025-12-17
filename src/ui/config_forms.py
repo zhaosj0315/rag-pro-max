@@ -137,7 +137,7 @@ def render_embedding_config(defaults: dict) -> Tuple[str, str, str, str]:
         
         with col2:
             if embed_provider.startswith("HuggingFace"):
-                saved_model = defaults.get("embed_model_hf", "BAAI/bge-small-zh-v1.5")
+                saved_model = defaults.get("embed_model_hf", "sentence-transformers/all-MiniLM-L6-v2")
                 embed_model = render_hf_embedding_selector(saved_model)
                 embed_url = ""
                 embed_key = ""

@@ -115,12 +115,12 @@ class TestConfigLoader(unittest.TestCase):
         """测试提取 HuggingFace 嵌入配置"""
         config = {
             'embed_provider_idx': 0,
-            'embed_model_hf': 'BAAI/bge-small-zh-v1.5'
+            'embed_model_hf': 'sentence-transformers/all-MiniLM-L6-v2'
         }
         
         embed_config = ConfigLoader.get_embed_config(config)
         self.assertEqual(embed_config['provider'], 'HuggingFace')
-        self.assertEqual(embed_config['model'], 'BAAI/bge-small-zh-v1.5')
+        self.assertEqual(embed_config['model'], 'sentence-transformers/all-MiniLM-L6-v2')
 
 
 class TestConfigValidator(unittest.TestCase):
@@ -155,7 +155,7 @@ class TestConfigValidator(unittest.TestCase):
         """测试验证 HuggingFace 嵌入配置"""
         config = {
             'provider': 'HuggingFace',
-            'model': 'BAAI/bge-small-zh-v1.5'
+            'model': 'sentence-transformers/all-MiniLM-L6-v2'
         }
         valid, error = ConfigValidator.validate_embed_config(config)
         self.assertTrue(valid)

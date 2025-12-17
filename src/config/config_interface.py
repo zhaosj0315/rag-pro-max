@@ -133,7 +133,7 @@ class ConfigInterface:
             embed_model = st.selectbox(
                 "HuggingFace模型",
                 [
-                    "BAAI/bge-small-zh-v1.5",
+                    "sentence-transformers/all-MiniLM-L6-v2",
                     "BAAI/bge-large-zh-v1.5",
                     "sentence-transformers/all-MiniLM-L6-v2"
                 ],
@@ -317,7 +317,7 @@ class ConfigInterface:
         """测试嵌入模型"""
         try:
             embed_provider = config_values.get("embed_provider", "HuggingFace (本地/极速)")
-            embed_model = config_values.get("embed_model", "BAAI/bge-small-zh-v1.5")
+            embed_model = config_values.get("embed_model", "sentence-transformers/all-MiniLM-L6-v2")
             
             with st.spinner("测试嵌入模型..."):
                 from src.utils.model_manager import load_embedding_model
@@ -364,7 +364,7 @@ class ConfigInterface:
                     "llm_model": "gpt-oss:20b",
                     "llm_key": "",
                     "embed_provider": "HuggingFace (本地/极速)",
-                    "embed_model": "BAAI/bge-small-zh-v1.5"
+                    "embed_model": "sentence-transformers/all-MiniLM-L6-v2"
                 }
             
             elif setup_type == "云端服务 (OpenAI)":
@@ -373,7 +373,7 @@ class ConfigInterface:
                     "llm_url": "https://api.openai.com/v1",
                     "llm_model": "gpt-3.5-turbo",
                     "embed_provider": "HuggingFace (本地/极速)",
-                    "embed_model": "BAAI/bge-small-zh-v1.5"
+                    "embed_model": "sentence-transformers/all-MiniLM-L6-v2"
                 }
             
             else:

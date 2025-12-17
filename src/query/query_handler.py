@@ -48,7 +48,7 @@ class QueryHandler:
             if kb_dim:
                 # 根据维度选择合适的模型
                 model_map = {
-                    512: "BAAI/bge-small-zh-v1.5",
+                    512: "sentence-transformers/all-MiniLM-L6-v2",
                     768: "BAAI/bge-base-zh-v1.5", 
                     1024: "BAAI/bge-m3"
                 }

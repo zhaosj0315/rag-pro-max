@@ -1866,7 +1866,7 @@ URL: {content_item['url']}
         llm_model = config_values.get('llm_model', 'qwen2.5:7b')
         llm_key = config_values.get('llm_key', '')
         embed_provider = config_values.get('embed_provider', 'HuggingFace (本地/极速)')
-        embed_model = config_values.get('embed_model', 'BAAI/bge-small-zh-v1.5')
+        embed_model = config_values.get('embed_model', 'sentence-transformers/all-MiniLM-L6-v2')
         embed_url = config_values.get('embed_url', '')
         embed_key = config_values.get('embed_key', '')
 
@@ -3443,7 +3443,7 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             
             # 维度映射
             model_map = {
-                512: "BAAI/bge-small-zh-v1.5",
+                512: "sentence-transformers/all-MiniLM-L6-v2",
                 768: "BAAI/bge-large-zh-v1.5",
                 1024: "BAAI/bge-m3"
             }
@@ -3461,7 +3461,7 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             else:
                 # 维度检测失败时，降级到最小模型（512维）
                 print(f"⚠️ 维度检测失败，降级到最小模型")
-                fallback_model = "BAAI/bge-small-zh-v1.5"
+                fallback_model = "sentence-transformers/all-MiniLM-L6-v2"
                 if embed_model != fallback_model:
                     print(f"🔄 降级切换: {embed_model} → {fallback_model}")
                     embed_model = fallback_model

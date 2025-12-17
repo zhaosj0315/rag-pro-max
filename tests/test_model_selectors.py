@@ -47,7 +47,7 @@ def test_preset_models():
     
     # 验证预设模型格式
     preset_models = [
-        "BAAI/bge-small-zh-v1.5",
+        "sentence-transformers/all-MiniLM-L6-v2",
         "BAAI/bge-large-zh-v1.5",
         "BAAI/bge-m3",
     ]

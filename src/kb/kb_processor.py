@@ -42,7 +42,7 @@ class KBProcessor:
         
         # 设置嵌入模型
         embed_provider = options.get('embed_provider', 'HuggingFace (本地/极速)')
-        embed_model = options.get('embed_model', 'BAAI/bge-small-zh-v1.5')
+        embed_model = options.get('embed_model', 'sentence-transformers/all-MiniLM-L6-v2')
         embed_key = options.get('embed_key', '')
         embed_url = options.get('embed_url', '')
         

@@ -120,7 +120,7 @@ class TestStage16Modules(unittest.TestCase):
                 'llm_model': 'gpt-3.5-turbo',
                 'llm_key': 'test-key',
                 'embed_provider': 'HuggingFace',
-                'embed_model': 'BAAI/bge-small-zh-v1.5',
+                'embed_model': 'sentence-transformers/all-MiniLM-L6-v2',
                 'embed_url': '',
                 'embed_key': ''
             }
@@ -128,7 +128,7 @@ class TestStage16Modules(unittest.TestCase):
             extracted = SidebarConfig.extract_config_values(test_config)
             
             self.assertEqual(extracted['llm_provider'], 'OpenAI')
-            self.assertEqual(extracted['embed_model'], 'BAAI/bge-small-zh-v1.5')
+            self.assertEqual(extracted['embed_model'], 'sentence-transformers/all-MiniLM-L6-v2')
             
             print("✅ 侧边栏配置值提取正常")
         except Exception as e:
