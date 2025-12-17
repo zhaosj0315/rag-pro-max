@@ -11,6 +11,7 @@
 - [性能优化](#性能优化)
 - [故障排除](#故障排除)
 - [高级功能](#高级功能)
+- [维护和开发](#维护和开发)
 
 ---
 
@@ -428,3 +429,47 @@ cp app_config.json backup/
 ---
 
 **最后更新**: 2025-12-17
+
+
+---
+
+## 维护和开发
+
+### Q: 如何检查文档是否与代码同步？
+**A**: 运行文档同步检查脚本：
+```bash
+python scripts/check_documentation_sync.py
+```
+该脚本会检查版本号一致性、API文档完整性、配置文档同步等。
+
+### Q: 推送代码前需要做什么检查？
+**A**: 运行推送前安全检查：
+```bash
+./scripts/pre_push_safety_check.sh
+```
+确保遵守"非必要不推送"原则，防止私有数据推送到远程。
+
+### Q: 哪些文件不应该推送到远程仓库？
+**A**: 以下文件类型不应推送：
+- 用户数据: `vector_db_storage/`, `chat_histories/`
+- 缓存文件: `hf_cache/`, `__pycache__/`
+- 日志文件: `app_logs/`, `*.log`
+- 临时文件: `temp_uploads/`, `exports/`, `crawler_state*.json`
+- 系统文件: `.DS_Store`, `*.pyc`
+
+### Q: 代码更新后需要维护哪些文档？
+**A**: 参考 `DOCUMENTATION_MAINTENANCE_STANDARD.md`：
+- **必须更新**: `version.json`, `CHANGELOG.md`, `README.md`
+- **功能变更时**: `USER_MANUAL.md`, `API.md`, `ARCHITECTURE.md`
+- **配置变更时**: `DEPLOYMENT.md`, `FAQ.md`
+
+### Q: 如何运行出厂测试？
+**A**: 
+```bash
+# 完整测试
+python tests/factory_test.py
+
+# 快速测试
+python tests/factory_test.py --quick
+```
+确保测试通过率 ≥ 85% 才能发布。

@@ -7,11 +7,11 @@
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Docker-lightgrey.svg)
 
-**🔥 开源免费的企业级RAG应用 | 支持本地部署 | 无需联网使用**
+**🔥 开源免费的企业级RAG应用 | 支持本地部署 | 无需联网使用 | 生产就绪**
 
 基于 Streamlit + LlamaIndex 的智能文档问答系统，支持多格式文档上传，提供语义检索和AI问答功能。
 
-**🎯 核心优势**: 本地部署 • 数据安全 • 多模态支持 • GPU加速 • 四层架构
+**🎯 核心优势**: 本地部署 • 数据安全 • 多模态支持 • GPU加速 • 四层架构 • 生产就绪
 
 </div>
 
@@ -219,7 +219,7 @@ model = config.get_default_model()
 # 运行完整测试
 python tests/factory_test.py
 
-# 测试覆盖: 88/96 通过
+# 测试覆盖: 84/96 通过 (87.5%)
 # 测试类别: 环境、配置、模块、文档、向量库等
 ```
 
@@ -287,6 +287,8 @@ register_processor('.custom', CustomProcessor)
 - [❓ 常见问题](FAQ.md)
 - [🤝 贡献指南](CONTRIBUTING.md)
 - [📝 更新日志](CHANGELOG.md)
+- [🔧 维护标准](DOCUMENTATION_MAINTENANCE_STANDARD.md)
+- [🔒 推送规范](NON_ESSENTIAL_PUSH_STANDARD.md)
 
 ---
 
