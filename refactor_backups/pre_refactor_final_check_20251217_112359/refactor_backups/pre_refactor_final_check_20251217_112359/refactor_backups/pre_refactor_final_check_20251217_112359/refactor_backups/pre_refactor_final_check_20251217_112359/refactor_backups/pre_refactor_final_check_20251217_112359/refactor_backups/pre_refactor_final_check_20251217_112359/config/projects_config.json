@@ -1,7 +1,0 @@
-{
-    "书": {
-        "source_path": "/Users/zhaosj/Documents/资料/CASE.pdf",
-        "db_path": "./storage_书",
-        "embed_model": "BAAI/bge-small-zh-v1.5"
-    }
-}
