@@ -849,11 +849,14 @@ with st.sidebar:
                             # 触发重建逻辑...
                     with col_m2:
                         if st.button("🗑️ 删除知识库", type="primary", use_container_width=True):
-                            if kb_manager.delete_kb(current_kb_name):
-                                st.success(f"已删除 {current_kb_name}")
+                            success, message = kb_manager.delete(current_kb_name)
+                            if success:
+                                st.success(message)
                                 st.session_state.current_nav = "➕ 新建知识库..."
                                 time.sleep(1)
                                 st.rerun()
+                            else:
+                                st.error(message)
 
         # 统一的数据源处理逻辑（仅针对 Web 抓取保留在外部，本地文件已在内部处理）
         btn_start = False # Initialize to avoid NameError
