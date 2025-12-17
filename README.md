@@ -290,6 +290,7 @@ register_processor('.custom', CustomProcessor)
 - [🔧 文档维护标准](DOCUMENTATION_MAINTENANCE_STANDARD.md)
 - [🔒 推送规范](NON_ESSENTIAL_PUSH_STANDARD.md)
 - [🧹 开发清理标准](DEVELOPMENT_CLEANUP_STANDARD.md)
+- [⚡ 开发规范标准](DEVELOPMENT_STANDARD.md)
 
 ---
 
