@@ -157,20 +157,4 @@ class KBNameOptimizer:
         return KBNameOptimizer.generate_unique_name(base_name, output_base)
 
 
-def sanitize_filename(filename: str) -> str:
-    """清理文件名，移除非法字符"""
-    if not filename:
-        return ""
-    
-    # 移除或替换非法字符
-    illegal_chars = r'[<>:"/\\|?*]'
-    clean_name = re.sub(illegal_chars, '_', filename)
-    
-    # 移除首尾空格和点
-    clean_name = clean_name.strip(' .')
-    
-    # 限制长度
-    if len(clean_name) > 100:
-        clean_name = clean_name[:100]
-    
-    return clean_name
+from src.common.utils import sanitize_filename

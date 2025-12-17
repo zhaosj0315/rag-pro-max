@@ -7,9 +7,7 @@ from datetime import datetime
 from llama_index.core.schema import Document
 
 
-def sanitize_filename(name: str) -> str:
-    """清理文件名，移除非法字符"""
-    return re.sub(r'[\\/*?:"<>|]', "", name).replace(" ", "_").strip()
+from src.common.utils import sanitize_filename
 
 
 def get_file_size_str(size_bytes: int) -> str:

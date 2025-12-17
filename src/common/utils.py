@@ -8,6 +8,7 @@ import gc
 import psutil
 import torch
 import re
+import time
 from typing import Optional
 
 def cleanup_memory():
@@ -86,8 +87,6 @@ def get_memory_stats() -> dict:
 
 def cleanup_temp_files(temp_dir: str = "temp_uploads", max_age_hours: int = 24) -> int:
     """统一的临时文件清理函数"""
-    import time
-    
     if not os.path.exists(temp_dir):
         return 0
     
@@ -119,3 +118,27 @@ def cleanup_temp_files(temp_dir: str = "temp_uploads", max_age_hours: int = 24) 
         pass
     
     return cleaned_count
+
+def get_file_stats(file_path: str) -> dict:
+    """统一的文件统计函数"""
+    try:
+        stat = os.stat(file_path)
+        return {
+            'size': stat.st_size,
+            'size_formatted': format_bytes(stat.st_size),
+            'modified': stat.st_mtime,
+            'created': stat.st_ctime,
+            'is_file': os.path.isfile(file_path),
+            'is_dir': os.path.isdir(file_path),
+            'exists': True
+        }
+    except (OSError, IOError):
+        return {
+            'size': 0,
+            'size_formatted': '0 B',
+            'modified': 0,
+            'created': 0,
+            'is_file': False,
+            'is_dir': False,
+            'exists': False
+        }
