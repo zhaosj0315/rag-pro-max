@@ -1,0 +1,293 @@
+# ============================================================
+# RAG Pro Max .gitignore - 标准规范版本
+# 原则：只忽略运行时数据、临时文件和用户个人配置
+# ============================================================
+
+# ============================================================
+# Python 标准忽略
+# ============================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ============================================================
+# 虚拟环境
+# ============================================================
+venv/
+ENV/
+env/
+.venv/
+.env
+.env.local
+.env.*.local
+
+# ============================================================
+# IDE 和编辑器
+# ============================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# ============================================================
+# 系统文件
+# ============================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.AppleDouble
+.LSOverride
+
+# ============================================================
+# RAG Pro Max 运行时数据（用户数据，不上传）
+# ============================================================
+
+# 向量数据库存储（用户创建的知识库）
+vector_db_storage/
+!vector_db_storage/.gitkeep
+
+# 聊天历史记录（用户的对话记录）
+chat_histories/
+!chat_histories/.gitkeep
+
+# 临时上传文件（用户上传的文档）
+temp_uploads/
+!temp_uploads/.gitkeep
+
+# HuggingFace 模型缓存（下载的模型文件）
+hf_cache/
+!hf_cache/.gitkeep
+
+# 应用日志（运行时日志）
+app_logs/
+!app_logs/.gitkeep
+
+# 建议历史（推荐问题历史）
+suggestion_history/
+!suggestion_history/.gitkeep
+
+# 导出文件（用户导出的数据）
+exports/
+!exports/.gitkeep
+
+# ============================================================
+# 用户配置文件（本地实例配置，不上传）
+# ============================================================
+# 根目录的用户配置
+/app_config.json
+/rag_config.json
+/projects_config.json
+
+# config目录中的用户配置
+config/user_config.json
+config/local_config.json
+config/users.json
+config/alert_history.json
+config/monitoring_history.json
+config/performance_history.json
+config/scheduler_history.json
+config/scheduler_config.json
+config/alert_config.json
+config/cpu_protection.json
+
+# ============================================================
+# 构建和打包输出
+# ============================================================
+# macOS 打包输出
+dist/
+*.dmg
+*.app
+*.pkg
+
+# Docker 构建
+.dockerignore
+
+# 其他构建输出
+*.deb
+*.rpm
+
+# ============================================================
+# 日志和临时文件
+# ============================================================
+*.log
+*.log.*
+logs/
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# ============================================================
+# 测试和覆盖率
+# ============================================================
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ============================================================
+# Jupyter Notebook
+# ============================================================
+.ipynb_checkpoints
+
+# ============================================================
+# Node.js（如果有前端组件）
+# ============================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ============================================================
+# 开发过程临时文件（不上传）
+# ============================================================
+
+# 项目管理临时文档
+DIRECTORY_STRUCTURE.md
+GIT_PUSH_CHECKLIST.md
+DIRECTORY_MAPPING.md
+PROMOTION.md
+NEXT_STEPS.md
+GITHUB_PUSH_GUIDE.md
+PUSH_QUICK_REFERENCE.md
+GIT_PUSH_CHECKLIST_FINAL.md
+PUSH_CHECKLIST.md
+DEV_RULES.md
+VERSION_ALIGNMENT_SUMMARY.md
+GITHUB_PUSH_CHECKLIST.md
+
+# 备份目录
+archive/
+docs/archive/process_docs_backup_*/
+20251203/
+
+# 原始大文件（超过GitHub限制）
+demo.mp4
+
+# 开发过程中的临时脚本和备份
+*_migrate.py
+*_fix.py
+fix_*.py
+update_*.py
+add_*.py
+*.backup_*
+*.backup
+*.pre-migration
+src/apppro.py.backup*
+
+# 临时修复工具
+fix_missing_crawler_files.py
+
+# ============================================================
+# 测试文件（开发过程临时测试，不上传）
+# ============================================================
+
+# 质量筛选相关测试
+test_quality_filter*.py
+test_web_crawl*.py
+QUALITY_*.md
+WEB_CRAWL_*.md
+
+# 网页抓取修复测试
+test_*fix*.py
+test_*integration*.py
+test_*verification*.py
+*_FIX.md
+*_VERIFICATION.md
+
+# 专家审查和批判性文档
+EXPERT_*.md
+CRITICAL_*.md
+FINAL_*.md
+DEPLOYMENT_*.md
+
+# 其他临时测试文件
+test_temp*.py
+temp_test*.py
+test_*.py
+!tests/test_*.py
+
+# ============================================================
+# 特定功能的临时文件
+# ============================================================
+
+# v2.2.0 标签页迁移过程临时文件
+exact_config_migrate.py
+fix_config_migrate.py
+manual_config_migrate.py
+complete_config_migrate.py
+fix_config_error.py
+fix_config_consistency.py
+fix_variable_error.py
+fix_create_mode.py
+fix_elif_syntax.py
+migrate_monitor_tab.py
+migrate_monitor_fixed.py
+migrate_tools_tab.py
+migrate_tools_fixed.py
+fix_tabs_issue.py
+fix_direct.py
+config_only_fix.py
+simple_fix.py
+exact_config_replace.py
+fix_duplicate_id.py
+fix_variable_ref.py
+fix_button_error.py
+fix_model_name.py
+fix_syntax_error.py
+fix_dict_get_error.py
+fix_embed_button_key.py
+fix_session_state_error.py
+fix_config_expanded.py
+simple_key_fix.py
+remove_main_config.py
+remove_all_main_config.py
+fix_system_tools.py
+fix_id_expander.py
+add_auto_switch.py
+fix_model_selector_keys.py
+update_readme.py
+add_v22_tests.py
+update_main_tests.py
+fix_auto_switch_test.py
+update_gitignore.py
+
+# ============================================================
+# 注意事项
+# ============================================================
+# 1. 保留所有源代码文件（.py）
+# 2. 保留配置模板文件（config/目录中的模板）
+# 3. 保留文档文件（README.md, docs/等）
+# 4. 保留脚本文件（scripts/目录）
+# 5. 保留测试文件（tests/目录）
+# 6. 只忽略运行时生成的数据和用户个人配置
+# ============================================================
