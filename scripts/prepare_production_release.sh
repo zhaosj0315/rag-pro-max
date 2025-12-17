@@ -15,7 +15,7 @@ if [ ! -f "src/apppro.py" ]; then
 fi
 
 # 1. 数据清理
-echo "📁 第一阶段: 清理测试数据..."
+echo "📁 第一阶段: 清理用户数据..."
 echo "  - 清理向量数据库..."
 rm -rf vector_db_storage/*
 echo "" > vector_db_storage/.gitkeep
@@ -31,12 +31,6 @@ echo "  - 清理应用日志..."
 rm -rf app_logs/*
 echo "" > app_logs/.gitkeep
 
-echo "  - 清理缓存目录..."
-if [ -d "hf_cache" ]; then
-    rm -rf hf_cache/*
-    echo "" > hf_cache/.gitkeep
-fi
-
 echo "  - 清理建议历史..."
 if [ -d "suggestion_history" ]; then
     rm -rf suggestion_history/*
@@ -47,6 +41,8 @@ echo "  - 清理导出文件..."
 if [ -d "exports" ]; then
     rm -rf exports/*
 fi
+
+echo "  ⚠️  保留本地缓存 (hf_cache/) - 仅不推送到远程"
 
 # 2. 清理临时和状态文件
 echo "🧹 第二阶段: 清理临时文件..."

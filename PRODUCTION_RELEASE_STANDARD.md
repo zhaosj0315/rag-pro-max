@@ -6,9 +6,9 @@
 
 ## 📋 出厂前强制清单
 
-### 🔥 第一阶段：数据清理 (必须执行)
+### 🔥 第一阶段：用户数据清理 (必须执行)
 
-#### 1. 删除所有测试数据
+#### 1. 删除用户测试数据
 ```bash
 # 清空测试知识库
 rm -rf vector_db_storage/*
@@ -32,6 +32,10 @@ rm -f detected_cycles.csv
 # 删除系统文件
 find . -name ".DS_Store" -delete
 find . -name "Thumbs.db" -delete
+
+# ⚠️ 保留本地缓存 - 仅通过 .gitignore 不推送
+# hf_cache/ - 保留本地模型缓存，加速后续使用
+# 其他本地优化缓存也保留
 ```
 
 #### 2. 重置配置文件
