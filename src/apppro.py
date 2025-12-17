@@ -1166,10 +1166,12 @@ with st.sidebar:
                             
                             # 检查是否有实际文件（异步爬虫可能返回空列表但有文件）
                             actual_files = []
+                            matching_dirs = False
                             if use_async:
                                 from src.utils.directory_selector import select_best_web_crawl_directory
                                 selected_dir, actual_files = select_best_web_crawl_directory(domain)
                                 if selected_dir:
+                                    matching_dirs = True
                                     logger.info(f"🎯 智能选择目录: {os.path.basename(selected_dir)} (包含 {len(actual_files)} 个文件)")
                                 else:
                                     logger.warning(f"⚠️ 未找到有效的网页抓取目录")
