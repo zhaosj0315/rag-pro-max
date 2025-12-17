@@ -1124,7 +1124,8 @@ with st.sidebar:
                                         max_pages=max_pages,
                                         status_callback=update_status,
                                         max_concurrent=max_concurrent,
-                                        ignore_robots=True  # 绕过robots.txt限制
+                                        ignore_robots=True,  # 绕过robots.txt限制
+                                        output_dir=unique_output_dir
                                     )
                                     saved_files = result if isinstance(result, list) else []
                                     # 异步爬虫使用固定的输出目录格式

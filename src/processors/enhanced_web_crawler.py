@@ -23,7 +23,8 @@ class EnhancedWebCrawler:
         status_callback=None,
         use_async: bool = True,
         max_concurrent: int = 10,
-        ignore_robots: bool = False
+        ignore_robots: bool = False,
+        output_dir: str = None
     ):
         """异步爬取入口"""
         
@@ -36,9 +37,14 @@ class EnhancedWebCrawler:
         # 使用新的异步爬虫
         async with AsyncWebCrawler(max_concurrent=max_concurrent, ignore_robots=ignore_robots) as crawler:
             
-            # 创建临时目录
-            timestamp = int(time.time())
-            temp_dir = f"temp_crawl_{timestamp}"
+            # 使用指定的输出目录或创建临时目录
+            if output_dir:
+                import os
+                os.makedirs(output_dir, exist_ok=True)
+                crawl_output_dir = output_dir
+            else:
+                timestamp = int(time.time())
+                crawl_output_dir = f"temp_crawl_{timestamp}"
             
             if status_callback:
                 status_callback(f"🚀 启用异步爬虫 (并发:{max_concurrent})")
@@ -48,11 +54,15 @@ class EnhancedWebCrawler:
                     start_url=start_url,
                     max_depth=max_depth,
                     max_pages_per_level=max_pages,
-                    output_dir=temp_dir,
+                    output_dir=crawl_output_dir,
                     status_callback=status_callback
                 )
                 
-                # 转换为兼容格式 - 移动文件到temp_uploads目录
+                # 如果使用了指定的输出目录，直接返回文件列表
+                if output_dir:
+                    return files
+                
+                # 否则转换为兼容格式 - 移动文件到temp_uploads目录
                 import shutil
                 import os
                 from urllib.parse import urlparse
