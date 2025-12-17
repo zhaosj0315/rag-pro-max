@@ -375,15 +375,31 @@ def test_memory_management():
     print_header("11. 内存管理测试")
     
     try:
-        # 检查 cleanup_memory 函数（可能在 src/utils/memory.py）
+        # 检查 cleanup_memory 函数（现在在公共模块中）
         cleanup_found = False
         check_content = ""
         
-        # 检查 src/utils/memory.py
-        if os.path.exists("src/utils/memory.py"):
+        # 首先检查公共模块
+        if os.path.exists("src/common/utils.py"):
+            with open("src/common/utils.py", 'r', encoding='utf-8') as f:
+                common_content = f.read()
+            if 'def cleanup_memory' in common_content:
+                print_test("cleanup_memory 函数", "PASS", "已定义 (src/common/utils.py)")
+                cleanup_found = True
+                check_content = common_content
+        
+        # 检查 src/utils/memory.py 是否导入了公共函数
+        if not cleanup_found and os.path.exists("src/utils/memory.py"):
             with open("src/utils/memory.py", 'r', encoding='utf-8') as f:
                 utils_content = f.read()
-            if 'def cleanup_memory' in utils_content:
+            if 'from src.common.utils import cleanup_memory' in utils_content:
+                print_test("cleanup_memory 函数", "PASS", "已导入 (src/utils/memory.py)")
+                cleanup_found = True
+                # 读取公共模块内容用于后续检查
+                if os.path.exists("src/common/utils.py"):
+                    with open("src/common/utils.py", 'r', encoding='utf-8') as f:
+                        check_content = f.read()
+            elif 'def cleanup_memory' in utils_content:
                 print_test("cleanup_memory 函数", "PASS", "已定义 (src/utils/memory.py)")
                 cleanup_found = True
                 check_content = utils_content
