@@ -845,7 +845,7 @@ with st.sidebar:
                     with col_m1:
                         if st.button("🔄 重建索引", use_container_width=True, help="完全重新构建该知识库"):
                             action_mode = "NEW" # 强制覆盖
-                            st.session_state.uploaded_path = kb_manager.get_kb_path(current_kb_name)
+                            st.session_state.uploaded_path = os.path.join("vector_db_storage", current_kb_name)
                             # 触发重建逻辑...
                     with col_m2:
                         if st.button("🗑️ 删除知识库", type="primary", use_container_width=True):
@@ -1684,12 +1684,6 @@ URL: {content_item['url']}
 
                     st.success(f"✅ **数据源已就绪**: `{display_name}`")
 
-                    # 三列统计卡片
-                    stat_col1, stat_col2, stat_col3 = st.columns(3)
-                    stat_col1.metric("📄 文件数", f"{cnt}")
-                    stat_col2.metric("💾 总大小", f"{size_mb:.1f}MB" if size_mb > 1 else f"{total_size/1024:.0f}KB")
-                    stat_col3.metric("📂 类型", f"{len(file_types)} 种")
-
                     # 类型分布（只显示前5种）
                     if file_types:
                         st.caption("**文件类型分布**")
@@ -1777,11 +1771,7 @@ URL: {content_item['url']}
                     try:
                         stats = kb_manager.get_stats(current_kb_name)
                         if stats:
-                            st.caption(
-                                f"📅 {stats.get('created_time', '').split(' ')[0]} | "
-                                f"📄 {stats.get('file_count', 0)} 文件 | "
-                                f"💾 {KBManager.format_size(stats.get('size', 0))}"
-                            )
+                            pass  # 移除统计信息显示
                     except Exception:
                         pass
                 

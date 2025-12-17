@@ -66,40 +66,13 @@ class DocumentManager:
     
     def render_statistics_overview(self, kb_name, stats):
         """渲染统计概览"""
-        file_cnt = stats['file_cnt']
-        total_sz = stats['total_sz']
-        total_chunks = stats['total_chunks']
+        # 知识库名称和修改按钮在一行
+        name_col, edit_col = st.columns([4, 1])
+        with name_col:
+            st.markdown(f"### 💬 {kb_name}")
         
-        # 读取知识库模型信息
-        kb_info_file = os.path.join(self.db_path, ".kb_info.json")
-        if os.path.exists(kb_info_file):
-            try:
-                with open(kb_info_file, 'r') as f:
-                    kb_info = json.load(f)
-                    kb_model = kb_info.get('embedding_model', 'Unknown')
-            except:
-                kb_model = self.manifest.get('embed_model', 'Unknown')
-        else:
-            kb_model = self.manifest.get('embed_model', 'Unknown')
-        
-        # 知识库名称作为标题
-        st.markdown(f"### 💬 {kb_name}")
-        
-        # 双行布局：每行两个指标
-        row1_col1, row1_col2 = st.columns(2)
-        with row1_col1:
-            st.metric("📄 文件", file_cnt)
-        with row1_col2:
-            st.metric("💾 大小", f"{total_sz/1024:.1f}MB" if total_sz > 1024 else f"{int(total_sz)}KB")
-            
-        row2_col1, row2_col2 = st.columns(2)
-        with row2_col1:
-            st.metric("📦 片段", total_chunks)
-        with row2_col2:
-            st.metric("🧬 模型", kb_model.split('/')[-1] if '/' in kb_model else kb_model)
-        
-        # 为了兼容性返回最后一列，虽然现在不再是单行布局
-        return row2_col2
+        # 返回编辑按钮列，用于放置修改按钮
+        return edit_col
     
     def render_detailed_statistics(self, stats):
         """渲染详细统计信息"""
