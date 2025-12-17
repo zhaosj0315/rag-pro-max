@@ -2262,11 +2262,9 @@ if not st.session_state.first_time_guide_shown and len(existing_kbs) == 0:
         st.rerun()
 
 def click_btn(q):
-    """点击追问按钮，将问题加入队列（去重）"""
-    from src.queue.queue_manager import QueueManager
-    queue_manager = QueueManager()
-    queue_manager.add_question(q)
-    st.rerun()
+    """点击追问按钮 - 使用公共业务逻辑"""
+    from src.common.business import click_btn as common_click_btn
+    return common_click_btn(q)
 
 # 计算当前的 KB ID (根据侧边栏选择)
 active_kb_name = current_kb_name if not is_create_mode else None

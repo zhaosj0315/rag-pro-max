@@ -151,6 +151,15 @@ def generate_doc_summary(doc_text: str, filename: str) -> str:
         
     except Exception as e:
         return f"总结失败: {str(e)}"
+
+def click_btn(q: str):
+    """点击追问按钮，将问题加入队列（去重）"""
+    from src.queue.queue_manager import QueueManager
+    import streamlit as st
+    
+    queue_manager = QueueManager()
+    queue_manager.add_question(q)
+    st.rerun()
             
     except Exception as e:
         if logger:
