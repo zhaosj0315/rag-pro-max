@@ -1035,7 +1035,7 @@ with st.sidebar:
                     with st.expander("🚫 排除链接 (可选)", expanded=False):
                         exclude_text = st.text_area("每行一个，支持 * 通配符", 
                                                    placeholder="*/admin/*\n*.pdf", 
-                                                   height=68)
+                                                   height=60, max_chars=150)
                         exclude_patterns = [line.strip() for line in exclude_text.split('\n') if line.strip()] if exclude_text else []
                 
                 # 知识库设置
