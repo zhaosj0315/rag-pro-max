@@ -2104,8 +2104,27 @@ def process_knowledge_base_logic(action_mode="NEW"):
     logger.info(f"🔧 设置嵌入模型: {embed_model} (provider: {embed_provider})")
     embed = get_embed(embed_provider, embed_model, embed_key, embed_url)
     if not embed:
-        logger.error(f"❌ 嵌入模型加载失败: {embed_model}")
-        raise ValueError(f"无法加载嵌入模型: {embed_model}")
+        logger.warning(f"⚠️ 嵌入模型加载失败: {embed_model}，尝试离线模式")
+        try:
+            from src.utils.offline_embeddings import get_offline_embeddings
+            offline_embed = get_offline_embeddings("all-MiniLM-L6-v2")
+            if offline_embed.load_model():
+                logger.info("✅ 离线嵌入模型加载成功")
+                # 创建一个简单的包装器
+                class OfflineEmbedWrapper:
+                    def __init__(self, offline_model):
+                        self.offline_model = offline_model
+                    def _get_text_embedding(self, text):
+                        return self.offline_model.encode([text])[0]
+                embed = OfflineEmbedWrapper(offline_embed)
+            else:
+                logger.error(f"❌ 离线模式也失败，无法加载嵌入模型")
+                st.error("❌ 嵌入模型加载失败，请检查网络连接或模型配置")
+                return
+        except Exception as e:
+            logger.error(f"❌ 离线模式异常: {e}")
+            st.error("❌ 嵌入模型加载失败，请检查网络连接或模型配置")
+            return
     
     Settings.embed_model = embed
     try:

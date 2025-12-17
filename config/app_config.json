@@ -4,5 +4,6 @@
   "default_model": "qwen2.5:7b",
   "max_file_size": 104857600,
   "enable_gpu": true,
-  "enable_ocr": true
+  "enable_ocr": true,
+  "embed_model": "sentence-transformers/all-MiniLM-L6-v2"
 }

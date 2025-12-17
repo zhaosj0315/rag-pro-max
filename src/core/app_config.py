@@ -26,7 +26,7 @@ def load_config():
         "llm_model": "gpt-oss:20b",
         "llm_key": "",
         "embed_provider": "HuggingFace (本地/极速)",
-        "embed_model": "BAAI/bge-small-zh-v1.5",
+        "embed_model": "sentence-transformers/all-MiniLM-L6-v2",
         "embed_url": "",
         "embed_key": ""
     }
