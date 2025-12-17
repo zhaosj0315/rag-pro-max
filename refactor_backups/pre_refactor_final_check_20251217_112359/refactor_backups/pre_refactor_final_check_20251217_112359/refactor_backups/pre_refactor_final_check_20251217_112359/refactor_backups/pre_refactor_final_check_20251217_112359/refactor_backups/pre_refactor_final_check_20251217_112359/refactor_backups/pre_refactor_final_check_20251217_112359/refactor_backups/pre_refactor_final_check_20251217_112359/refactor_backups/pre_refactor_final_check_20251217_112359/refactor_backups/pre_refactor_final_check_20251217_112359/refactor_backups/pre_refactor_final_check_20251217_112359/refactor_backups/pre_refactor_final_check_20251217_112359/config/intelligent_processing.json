@@ -1,0 +1,79 @@
+{
+  "workload_analysis": {
+    "file_count": 1208,
+    "avg_file_size_mb": 2.5,
+    "workload_type": "大量中等文件",
+    "strategy": "CPU+内存密集型"
+  },
+  "resource_config": {
+    "max_workers": 10,
+    "chunk_size": 1000,
+    "batch_size": 21,
+    "memory_limit_gb": 25.2,
+    "gpu_batch_size": 0,
+    "io_threads": 6,
+    "priority": "balanced"
+  },
+  "logging_config": {
+    "processing_steps": {
+      "file_scanning": {
+        "enabled": true,
+        "detail_level": "verbose",
+        "show_progress": true,
+        "log_interval": 100
+      },
+      "content_reading": {
+        "enabled": true,
+        "detail_level": "verbose",
+        "show_progress": true,
+        "log_interval": 50,
+        "show_file_sizes": true,
+        "show_processing_time": true
+      },
+      "text_chunking": {
+        "enabled": true,
+        "detail_level": "normal",
+        "show_chunk_stats": true,
+        "log_interval": 100
+      },
+      "vectorization": {
+        "enabled": true,
+        "detail_level": "verbose",
+        "show_gpu_usage": true,
+        "show_batch_stats": true,
+        "log_interval": 10
+      },
+      "index_building": {
+        "enabled": true,
+        "detail_level": "verbose",
+        "show_memory_usage": true,
+        "log_interval": 1
+      }
+    },
+    "resource_monitoring": {
+      "enabled": true,
+      "monitor_interval": 2,
+      "log_cpu_per_core": true,
+      "log_memory_details": true,
+      "log_gpu_details": true,
+      "alert_thresholds": {
+        "cpu_high": 90,
+        "memory_high": 85,
+        "gpu_memory_high": 90
+      }
+    },
+    "performance_metrics": {
+      "enabled": true,
+      "track_processing_speed": true,
+      "track_throughput": true,
+      "estimate_completion_time": true,
+      "log_bottlenecks": true
+    }
+  },
+  "system_resources": {
+    "cpu_count": 14,
+    "memory_gb": 36.0,
+    "gpu_available": false,
+    "disk_type": "SSD"
+  }
+}

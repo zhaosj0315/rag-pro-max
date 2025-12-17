@@ -1,0 +1,47 @@
+[
+  {
+    "timestamp": 1765492194.6353889,
+    "cpu_usage": 21.3,
+    "memory_usage": 62.3,
+    "workers": 8,
+    "pages_processed": 6,
+    "processing_time": 0.44663500785827637,
+    "success_rate": 0.0
+  },
+  {
+    "timestamp": 1765492374.375248,
+    "cpu_usage": 23.3,
+    "memory_usage": 62.2,
+    "workers": 8,
+    "pages_processed": 6,
+    "processing_time": 0.4340221881866455,
+    "success_rate": 1.0
+  },
+  {
+    "timestamp": 1765492529.577395,
+    "cpu_usage": 31.9,
+    "memory_usage": 62.6,
+    "workers": 12,
+    "pages_processed": 6,
+    "processing_time": 0.4512059688568115,
+    "success_rate": 1.0
+  },
+  {
+    "timestamp": 1765492666.696727,
+    "cpu_usage": 0.0,
+    "memory_usage": 63.2,
+    "workers": 8,
+    "pages_processed": 6,
+    "processing_time": 0.4624769687652588,
+    "success_rate": 1.0
+  },
+  {
+    "timestamp": 1765492978.0155818,
+    "cpu_usage": 0.0,
+    "memory_usage": 63.6,
+    "workers": 12,
+    "pages_processed": 6,
+    "processing_time": 0.3995487689971924,
+    "success_rate": 0.0
+  }
+]

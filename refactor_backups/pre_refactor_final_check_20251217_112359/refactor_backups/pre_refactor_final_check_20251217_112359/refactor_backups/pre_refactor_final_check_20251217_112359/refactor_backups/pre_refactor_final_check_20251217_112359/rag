@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# RAG Pro Max v2.3.0 启动器
+cd "$(dirname "$0")"
+
+echo "🚀 RAG Pro Max v2.3.0 - 智能监控版"
+echo "=================================="
+
+# 快速启动
+if [ "$1" = "start" ] || [ "$1" = "" ]; then
+    echo "📊 启动智能监控版..."
+    streamlit run src/apppro.py --server.port 8501
+    
+elif [ "$1" = "test" ]; then
+    echo "🧪 运行功能测试..."
+    python test_v2.3.0_features.py
+    
+elif [ "$1" = "monitor" ]; then
+    echo "📊 查看系统监控..."
+    python -c "
+from src.utils.smart_scheduler import get_smart_scheduler
+from src.utils.alert_system import get_alert_system
+import psutil
+
+scheduler = get_smart_scheduler()
+alert_system = get_alert_system()
+
+print('📊 系统状态:')
+print(f'  CPU: {psutil.cpu_percent()}%')
+print(f'  内存: {psutil.virtual_memory().percent}%')
+
+config = scheduler.get_optimal_workers()
+print(f'📋 推荐配置:')
+print(f'  CPU工作线程: {config[\"cpu_workers\"]}')
+print(f'  IO工作线程: {config[\"io_workers\"]}')
+print(f'  负载等级: {config[\"load_level\"]}')
+"
+
+else
+    echo "用法: rag [start|test|monitor]"
+    echo "  start   - 启动应用 (默认)"
+    echo "  test    - 运行功能测试"  
+    echo "  monitor - 查看系统状态"
+fi

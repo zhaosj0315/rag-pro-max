@@ -1,0 +1,18 @@
+[server]
+runOnSave = false
+fileWatcherType = "none"
+
+[logger]
+level = "error"
+
+[client]
+showErrorDetails = false
+
+[runner]
+magicEnabled = false
+installTracer = false
+
+[browser]
+gatherUsageStats = false
+serverAddress = "localhost"
+serverPort = 8501

@@ -1,0 +1,14 @@
+{
+    "target_path": "/Users/zhaosj/Documents/rag-pro-max/temp_uploads/batch_1765770928",
+    "output_path": "/Users/zhaosj/Documents/rag-pro-max/vector_db_storage",
+    "llm_type_idx": 0,
+    "llm_url_ollama": "http://127.0.0.1:11434",
+    "llm_model_ollama": "gemma3n:latest",
+    "llm_url_openai": "",
+    "llm_key": "",
+    "llm_model_openai": "",
+    "embed_provider_idx": 0,
+    "embed_model_hf": "BAAI/bge-large-zh-v1.5",
+    "embed_url_ollama": "",
+    "embed_model_ollama": ""
+}

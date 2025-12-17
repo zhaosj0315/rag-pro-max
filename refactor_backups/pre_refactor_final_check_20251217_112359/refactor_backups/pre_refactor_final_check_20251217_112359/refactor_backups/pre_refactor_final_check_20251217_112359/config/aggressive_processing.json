@@ -1,0 +1,18 @@
+{
+  "document_processing": {
+    "max_workers": 13,
+    "chunk_size": 1000,
+    "batch_size": 50,
+    "parallel_threshold": 5
+  },
+  "vectorization": {
+    "batch_size": 32,
+    "max_workers": 4,
+    "gpu_memory_fraction": 0.8
+  },
+  "resource_monitoring": {
+    "cpu_threshold": 90,
+    "memory_threshold": 85,
+    "check_interval": 0.5
+  }
+}
