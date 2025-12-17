@@ -11,7 +11,7 @@ import os
 from src.config import ConfigLoader
 from src.ui.config_forms import render_basic_config
 from src.kb import KBManager
-from src.ui.performance_dashboard import render_performance_dashboard
+# from src.ui.performance_dashboard import render_performance_dashboard  # 已删除冗余模块
 
 
 class CompleteSidebar:
@@ -170,7 +170,8 @@ class CompleteSidebar:
         with st.expander("🛠️ 系统工具", expanded=False):
             # 性能监控面板
             if st.button("🚀 性能监控面板"):
-                render_performance_dashboard()
+                # render_performance_dashboard()  # 已删除冗余模块
+                st.info("性能监控功能已迁移到系统监控中")
             
             # 系统监控
             auto_refresh = st.checkbox("🔄 自动刷新 (2秒)", value=False, key="monitor_auto_refresh")

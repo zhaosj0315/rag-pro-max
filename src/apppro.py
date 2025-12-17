@@ -391,7 +391,7 @@ def get_llm(provider, model, key, url, temp):
 from src.file_processor import scan_directory_safe
 
 
-from src.ui.compact_sidebar import render_compact_sidebar
+# from src.ui.compact_sidebar import render_compact_sidebar  # 已删除冗余模块
 # 增强功能模块 (v1.7.4)
 from src.utils.error_handler_enhanced import error_handler
 from src.utils.memory_manager_enhanced import memory_manager
