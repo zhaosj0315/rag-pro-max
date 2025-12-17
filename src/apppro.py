@@ -1422,6 +1422,10 @@ with st.sidebar:
                                         
                                         # 保存过滤后的内容
                                         saved_files = []
+                                        
+                                        # 确保输出目录存在
+                                        os.makedirs(unique_output_dir, exist_ok=True)
+                                        
                                         for i, content_item in enumerate(filtered_contents):
                                             filename = f"quality_content_{i+1:03d}.txt"
                                             filepath = os.path.join(unique_output_dir, filename)
