@@ -171,6 +171,29 @@ class ConfigService:
             'cache_keys': list(self.config_cache.keys())
         }
 
+    def get_default_model(self) -> str:
+        """获取默认模型"""
+        return self.get_config_value('llm_model_ollama', 'gpt-oss:20b')
+    
+    def update_model_config(self, new_model: str) -> bool:
+        """更新模型配置"""
+        try:
+            # 更新配置
+            success = self.set_config_value('llm_model_ollama', new_model)
+            
+            if success:
+                # 更新相关配置
+                ollama_url = self.get_config_value('llm_url_ollama', 'http://localhost:11434')
+                
+                # 这里可以添加更多的配置更新逻辑
+                # 比如通知其他组件配置已更新
+                
+            return success
+            
+        except Exception as e:
+            print(f"配置更新失败: {e}")
+            return False
+
 # 全局配置服务实例
 _config_service = None
 

@@ -21,33 +21,27 @@ import os
 
 def get_default_model():
     """统一获取默认模型"""
-    try:
-        from src.config import ConfigLoader
-        config = ConfigLoader.load()
-        return config.get('llm_model_ollama', 'gpt-oss:20b')
-    except:
-        return 'gpt-oss:20b'
+    from src.services.config_service import get_config_service
+    config_service = get_config_service()
+    return config_service.get_default_model()
 
 def update_all_model_configs(new_model):
     """统一更新所有地方的模型配置"""
-    try:
-        from src.config import ConfigLoader
-        # 更新配置文件
-        config = ConfigLoader.load()
-        config['llm_model_ollama'] = new_model
-        ConfigLoader.save(config)
-        
+    from src.services.config_service import get_config_service
+    config_service = get_config_service()
+    
+    success = config_service.update_model_config(new_model)
+    
+    if success:
         # 更新session state
+        import streamlit as st
         st.session_state.selected_model = new_model
         
         # 更新全局LLM
-        ollama_url = config.get('llm_url_ollama', 'http://localhost:11434')
+        ollama_url = config_service.get_config_value('llm_url_ollama', 'http://localhost:11434')
         set_global_llm_model("Ollama", new_model, api_url=ollama_url)
-        
-        return True
-    except Exception as e:
-        print(f"配置更新失败: {e}")
-        return False
+    
+    return success
 os.environ['GLOG_minloglevel'] = '3'  # 只显示致命错误
 os.environ['FLAGS_logtostderr'] = '0'  # 不输出到stderr
 os.environ['PADDLE_LOG_LEVEL'] = '50'  # 最高级别，几乎不输出
@@ -645,27 +639,9 @@ for d in [HISTORY_DIR, UPLOAD_DIR]:
 defaults = ConfigLoader.load()
 
 def generate_doc_summary(doc_text, filename):
-    """
-    生成单个文档的摘要，使用当前的 LLM 设置。
-    """
-    # 屏蔽多线程警告
-    import warnings
-    import logging
-    warnings.filterwarnings('ignore')
-    logging.getLogger('streamlit').setLevel(logging.ERROR)
-    
-    if not hasattr(Settings, 'llm'): return "总结失败: LLM未初始化"
-    try:
-        llm = Settings.llm
-        summary_prompt = (
-            f"以下是文档 '{filename}' 的一个片段内容，请用一段简短的中文话总结其核心内容 (不超过 80 字)，用于文件清单预览。内容:\n---\n{doc_text[:2000]}..."
-        )
-        response = llm.complete(summary_prompt)
-        return response.text.strip().replace('\n', ' ')\
-                             .replace('总结:', '').replace('总结是：', '').strip()
-        
-    except Exception as e:
-        return f"总结失败: {str(e)}"
+    """生成文档摘要 - 使用公共业务逻辑"""
+    from src.common.business import generate_doc_summary as common_generate_doc_summary
+    return common_generate_doc_summary(doc_text, filename)
 
 with st.sidebar:
     # 横向标签页布局

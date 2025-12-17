@@ -126,6 +126,31 @@ def export_chat_history(kb_id: str, export_format: str = "json", logger=None) ->
             if logger:
                 logger.log_error("导出", f"不支持的格式: {export_format}")
             return None
+
+def generate_doc_summary(doc_text: str, filename: str) -> str:
+    """统一的文档摘要生成函数"""
+    try:
+        # 导入必要的模块
+        import warnings
+        import logging
+        from llama_index.core import Settings
+        
+        warnings.filterwarnings('ignore')
+        logging.getLogger('streamlit').setLevel(logging.ERROR)
+        
+        if not hasattr(Settings, 'llm'): 
+            return "总结失败: LLM未初始化"
+        
+        llm = Settings.llm
+        summary_prompt = (
+            f"以下是文档 '{filename}' 的一个片段内容，请用一段简短的中文话总结其核心内容 (不超过 80 字)，用于文件清单预览。内容:\n---\n{doc_text[:2000]}..."
+        )
+        response = llm.complete(summary_prompt)
+        return response.text.strip().replace('\n', ' ')\
+                             .replace('总结:', '').replace('总结是：', '').strip()
+        
+    except Exception as e:
+        return f"总结失败: {str(e)}"
             
     except Exception as e:
         if logger:
