@@ -99,6 +99,7 @@ def get_file_info(file_path: str, metadata_mgr=None) -> dict:
         
         info = {
             "name": file_name,
+            "file_path": os.path.abspath(file_path),
             "size": size_str,
             "size_bytes": size_bytes,
             "added_at": datetime.now().strftime("%Y-%m-%d %H:%M"),

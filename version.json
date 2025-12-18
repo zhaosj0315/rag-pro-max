@@ -1,19 +1,19 @@
 {
-  "version": "2.4.4",
-  "release_date": "2025-12-17",
-  "codename": "UI交互优化版",
+  "version": "2.4.5",
+  "release_date": "2025-12-18",
+  "codename": "UI交互极致优化版",
   "features": [
-    "Web抓取智能分析UI优化",
-    "知识库管理界面布局重构",
-    "异步爬虫集成增强",
-    "文档列表显示逻辑修复",
-    "知识库详情统计布局优化"
+    "macOS 原生预览 (Quick Look) 功能集成",
+    "侧边栏与管理界面空间极致压缩",
+    "全选复选框局部刷新 (st.fragment) 优化",
+    "文件上传双重触发逻辑修复",
+    "参考来源 Node ID 准确性修复"
   ],
   "architecture": {
     "layers": 4,
     "modules": 191,
     "services": 3,
     "common_modules": 3,
-    "test_coverage": "88/96"
+    "test_coverage": "88/97"
   }
 }

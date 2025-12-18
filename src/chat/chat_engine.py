@@ -137,10 +137,20 @@ class ChatEngine:
                 except:
                     text = str(node)[:150]
                 
+                # 提取 Node ID
+                node_id = 'unknown'
+                if hasattr(node, 'id_'):
+                    node_id = node.id_
+                elif hasattr(node, 'node') and hasattr(node.node, 'id_'):
+                    node_id = node.node.id_
+                elif isinstance(node, dict) and 'node_id' in node:
+                    node_id = node['node_id']
+                
                 node_data.append({
                     'metadata': getattr(node, 'metadata', {}),
                     'score': getattr(node, 'score', 0.0),
-                    'text': text
+                    'text': text,
+                    'node_id': node_id
                 })
             
             # 并行处理节点

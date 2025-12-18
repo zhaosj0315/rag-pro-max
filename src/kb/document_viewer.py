@@ -70,13 +70,35 @@ class DocumentViewer:
                                 continue
                             
                             # 构建完整路径
-                            # 文件通常在 temp_uploads/kb_name/ 目录下
-                            possible_paths = [
-                                os.path.join('temp_uploads', kb_name, file_name),  # 最常见
-                                file_name,  # 绝对路径
-                                os.path.join('temp_uploads', file_name),  # temp_uploads根目录
-                                os.path.join(kb_path, file_name),  # 知识库目录
-                            ]
+                            # 优先级：1. 显式记录的原始路径 2. 知识库目录 3. 各种上传目录
+                            possible_paths = []
+                            
+                            # A. Manifest 记录的原始路径 (最准确，特别是对于“手动输入路径”的情况)
+                            raw_path = f.get('file_path')
+                            if raw_path: 
+                                possible_paths.append(raw_path)
+                                # 同时也尝试在原父目录下查找（防止文件被移动但还在同级目录）
+                                possible_paths.append(os.path.join(os.path.dirname(raw_path), file_name))
+                            
+                            # B. 标准位置
+                            possible_paths.extend([
+                                os.path.join('temp_uploads', kb_name, file_name),
+                                os.path.join(kb_path, file_name),
+                                file_name,
+                            ])
+                            
+                            # C. 添加模糊匹配路径 (batch_*)
+                            import glob
+                            batch_matches = glob.glob(os.path.join("temp_uploads", "batch_*", file_name), recursive=True)
+                            possible_paths.extend(batch_matches)
+                            
+                            # 添加 Web 抓取路径
+                            web_matches = glob.glob(os.path.join("temp_uploads", "Web_*", file_name), recursive=True)
+                            possible_paths.extend(web_matches)
+                            
+                            # 添加知识库深度查找
+                            kb_deep_matches = glob.glob(os.path.join(kb_path, "**", file_name), recursive=True)
+                            possible_paths.extend(kb_deep_matches)
                             
                             file_path = None
                             for path in possible_paths:

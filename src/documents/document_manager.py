@@ -105,17 +105,21 @@ class DocumentManager:
         # 统计摘要
         st.markdown(f"**📊 统计** · {file_cnt} 文件 · {total_chunks} 片段 · 📁 原始 {f'{total_sz/1024:.1f}MB' if total_sz > 1024 else f'{int(total_sz)}KB'} · 💾 向量库 {db_size_mb:.1f}MB ({storage_efficiency}) · 📅 {time_range}")
         
-        # 核心指标
-        metric_col1, metric_col2, metric_col3, metric_col4, metric_col5, metric_col6 = st.columns(6)
+        # 核心指标 - 优化为单行布局 (6列)
+        metric_cols = st.columns(6)
+        
         avg_chunks = total_chunks / file_cnt if file_cnt > 0 else 0
         avg_size = (total_sz / file_cnt) if file_cnt > 0 else 0
         
-        metric_col1.metric("📈 平均片段", f"{avg_chunks:.1f}")
-        metric_col2.metric("📊 平均大小", f"{avg_size/1024:.1f}KB" if avg_size > 1024 else f"{int(avg_size)}KB")
+        with metric_cols[0]:
+            st.metric("📈 平均片段", f"{avg_chunks:.1f}")
+        with metric_cols[1]:
+            st.metric("📊 平均大小", f"{avg_size/1024:.1f}KB" if avg_size > 1024 else f"{int(avg_size)}KB")
         
         # 健康度
         health_icon = "🟢" if success_rate >= 90 else "🟡" if success_rate >= 70 else "🔴"
-        metric_col3.metric("💚 健康度", f"{health_icon} {success_rate:.0f}%")
+        with metric_cols[2]:
+            st.metric("💚 健康度", f"{health_icon} {success_rate:.0f}%")
         
         # 质量分析
         low_quality = len([f for f in self.manifest['files'] if len(f.get('doc_ids', [])) < 2])
@@ -123,13 +127,16 @@ class DocumentManager:
         empty_docs = len([f for f in self.manifest['files'] if len(f.get('doc_ids', [])) == 0])
         
         quality_status = "✅ 优秀" if low_quality == 0 and large_files == 0 and empty_docs == 0 else f"⚠️ {empty_docs}空 {low_quality}低质"
-        metric_col4.metric("🔍 质量", quality_status)
+        with metric_cols[3]:
+            st.metric("🔍 质量", quality_status)
         
         type_count = len(file_types)
-        metric_col5.metric("📂 类型", f"{type_count} 种")
+        with metric_cols[4]:
+            st.metric("📂 类型", f"{type_count} 种")
         
         kb_model = self.manifest.get('embed_model', 'Unknown')
-        metric_col6.metric("🔤 模型", kb_model.split('/')[-1][:12] if '/' in kb_model else kb_model[:12])
+        with metric_cols[5]:
+            st.metric("🔤 模型", kb_model.split('/')[-1][:12] if '/' in kb_model else kb_model[:12])
         
         return {
             'success_rate': success_rate,
@@ -271,10 +278,11 @@ class DocumentManager:
         
         return filtered_files
     
+    @st.fragment
     def render_file_list(self, filtered_files, start_idx, end_idx, page_size):
-        """渲染文件列表"""
-        # 表头
-        cols = st.columns([0.5, 2.5, 1, 0.8, 1, 0.8, 1.2, 0.8])
+        """渲染文件列表 (局部刷新模式)"""
+        # 表头 - 与 _render_file_row 保持一致
+        cols = st.columns([0.5, 2.5, 0.8, 0.6, 0.8, 0.6, 1.2, 1.0])
         
         # 全选复选框
         current_page_files = [f['name'] for f in filtered_files[start_idx:end_idx] 
@@ -320,7 +328,8 @@ class DocumentManager:
     
     def _render_file_row(self, f, orig_idx, display_idx):
         """渲染单个文件行"""
-        cols = st.columns([0.5, 2.5, 1, 0.8, 1, 0.8, 1.2, 0.8])
+        # 调整列比例，为预览按钮腾出空间
+        cols = st.columns([0.5, 2.5, 0.8, 0.6, 0.8, 0.6, 1.2, 1.0])
         
         # 摘要复选框
         if not f.get('summary') and f.get('doc_ids'):
@@ -360,9 +369,66 @@ class DocumentManager:
         
         cols[6].caption(f['added_at'])
         
-        # 删除按钮
-        if cols[7].button("🗑️", key=f"del_{orig_idx}_{display_idx}"):
-            self._delete_file(f)
+        # 操作列 (预览 + 删除)
+        btn_col = cols[7]
+        btn_col1, btn_col2 = btn_col.columns(2)
+        
+        with btn_col1:
+            # 查找文件真实路径
+            file_name = f['name']
+            kb_name = os.path.basename(self.db_path)
+            
+            # 1. 整理可能的路径候选 (按优先级)
+            candidates = []
+            
+            # A. Manifest 记录的原始路径 (最准确)
+            raw_path = f.get('file_path')
+            if raw_path: candidates.append(raw_path)
+            
+            # B. 各种上传目录模糊匹配
+            import glob
+            patterns = [
+                os.path.join("temp_uploads", kb_name, file_name),
+                os.path.join("temp_uploads", "batch_*", file_name),
+                os.path.join("temp_uploads", "Search_*", file_name),
+                os.path.join("temp_uploads", "Web_*", file_name),
+                os.path.join("vector_db_storage", kb_name, file_name),
+                # 递归查找知识库目录下的文件
+                os.path.join("vector_db_storage", kb_name, "**", file_name)
+            ]
+            
+            for pattern in patterns:
+                matches = glob.glob(pattern, recursive=True)
+                if matches:
+                    candidates.extend(matches)
+            
+            # C. 针对“手动输入文件夹路径”的情况，尝试在父目录中查找
+            if raw_path:
+                parent_dir = os.path.dirname(raw_path)
+                if parent_dir and os.path.exists(parent_dir):
+                    candidates.append(os.path.join(parent_dir, file_name))
+            
+            # 2. 验证并转换为绝对路径
+            final_path = None
+            for p in candidates:
+                abs_p = os.path.abspath(p)
+                if os.path.exists(abs_p):
+                    final_path = abs_p
+                    break
+            
+            if btn_col1.button("👁️", key=f"prev_{orig_idx}_{display_idx}", help="macOS 原生预览"):
+                if final_path:
+                    from src.utils.app_utils import open_file_native
+                    open_file_native(final_path)
+                    st.toast(f"🚀 正在调用系统预览: {file_name}")
+                else:
+                    st.error(f"找不到文件: {file_name}")
+                    # 在控制台输出更详细的调试信息
+                    print(f"DEBUG: Preview failed. Checked candidates for {file_name}: {candidates}")
+                    
+        with btn_col2:
+            if btn_col2.button("🗑️", key=f"del_{orig_idx}_{display_idx}", help="删除"):
+                self._delete_file(f)
         
         # 文件摘要展开
         if f.get('summary'):

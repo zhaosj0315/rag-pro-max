@@ -113,82 +113,22 @@ GET /health
 ```json
 {
     "status": "healthy",
-    "version": "2.4.4",
-    "timestamp": "2025-12-17T21:58:12Z"
+    "version": "2.4.5",
+    "timestamp": "2025-12-18T13:58:12Z"
 }
 ```
 
-### 查询接口
-```http
-POST /query
-Content-Type: application/json
-
-{
-    "question": "你的问题",
-    "kb_name": "知识库名称",
-    "stream": false
-}
-```
-
-**响应**:
-```json
-{
-    "answer": "回答内容",
-    "sources": [
-        {
-            "file": "文件名",
-            "page": 1,
-            "content": "相关内容"
-        }
-    ],
-    "suggestions": ["追问1", "追问2", "追问3"]
-}
-```
-
-### 知识库列表
-```http
-GET /knowledge-bases
-```
-
-**响应**:
-```json
-{
-    "knowledge_bases": [
-        {
-            "name": "知识库名称",
-            "file_count": 10,
-            "created_time": "2025-12-17",
-            "size": "50MB"
-        }
-    ]
-}
-```
-
-### 文件上传
-```http
-POST /upload
-Content-Type: multipart/form-data
-
-{
-    "file": <文件>,
-    "kb_name": "知识库名称"
-}
-```
-
-**响应**:
-```json
-{
-    "success": true,
-    "message": "文件上传成功",
-    "file_info": {
-        "name": "文件名",
-        "size": "10MB",
-        "type": "pdf"
-    }
-}
-```
+...
 
 ## 🔧 高级功能
+
+### 系统原生预览
+```python
+from src.utils.app_utils import open_file_native
+
+# 使用系统默认程序或 Quick Look (macOS) 打开预览
+success = open_file_native("/path/to/your/document.pdf")
+```
 
 ### 网页抓取
 ```python
@@ -326,7 +266,7 @@ print(f"知识库列表: {kb_list}")
 
 ## 🔄 版本兼容性
 
-- **当前版本**: v2.4.4
+- **当前版本**: v2.4.5
 - **API版本**: v1
 - **最低Python版本**: 3.8+
 - **向后兼容**: 支持v2.x所有版本

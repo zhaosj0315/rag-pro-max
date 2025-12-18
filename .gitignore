@@ -1,5 +1,5 @@
 # RAG Pro Max - 出厂标准版 .gitignore
-# 版本: v2.4.4
+# 版本: v2.4.5
 # 原则: 非必要不推送 - 本地保留所有数据，远程只推送核心代码
 
 # ===== 运行时数据 (本地保留，远程忽略) =====
@@ -11,12 +11,19 @@ vector_db_storage/*
 chat_histories/*
 !chat_histories/.gitkeep
 
-# 临时上传文件 - 处理中的文件
+# 临时上传与爬取文件 (强制忽略所有变体)
 temp_uploads/
+temp_uploads/*
+batch_*
+Web_*
+Search_*.txt
+Search_*/
+text_*
 
 # 应用日志 - 运行日志
 app_logs/*
 !app_logs/.gitkeep
+*.log
 
 # ===== 测试和临时文件 (不推送) =====
 # 测试导出文件

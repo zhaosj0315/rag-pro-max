@@ -2,16 +2,17 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-v2.4.4-blue.svg)
+![Version](https://img.shields.io/badge/version-v2.4.5-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
-![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Docker-lightgrey.svg)
+![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Docker-lightgrey.svg)
+![Test Coverage](https://img.shields.io/badge/test%20coverage-90.7%25-brightgreen.svg)
 
-**🔥 开源免费的企业级RAG应用 | 支持本地部署 | 无需联网使用 | 生产就绪**
+**🔥 开源免费的企业级RAG应用 | 支持本地部署 | 极致交互体验 | 生产就绪**
 
-基于 Streamlit + LlamaIndex 的智能文档问答系统，支持多格式文档上传，提供语义检索和AI问答功能。
+基于 Streamlit + LlamaIndex 的智能文档问答系统，支持多格式文档上传，提供语义检索、macOS 原生预览和 AI 问答功能。
 
-**🎯 核心优势**: 本地部署 • 数据安全 • 多模态支持 • GPU加速 • 四层架构 • 生产就绪
+**🎯 核心优势**: 极致压缩UI • macOS原生预览 • 数据安全 • 多模态支持 • GPU加速 • 生产就绪
 
 </div>
 
@@ -19,8 +20,14 @@
 
 ## ✨ 核心功能
 
+### 🎨 极致交互 (v2.4.5 新特性)
+- **macOS 原生预览**: 集成系统 Quick Look，直接在文档列表中预览 PDF/图片，无需打开应用
+- **单行统计布局**: 核心指标 1x6 紧凑展示，大幅提升垂直空间利用率
+- **交互防抖技术**: 利用 `st.fragment` 实现文件列表局部刷新，操作无闪烁
+- **布局锁定**: 彻底禁止任何形式的左右滑动晃动，操作体验极其稳固
+
 ### 📄 文档处理
-- **多格式支持**: PDF、TXT、DOCX、MD、XLSX、PPTX、CSV、HTML、JSON、ZIP
+- **多格式支持**: PDF、TXT...
 - **OCR识别**: 扫描版PDF自动OCR，GPU加速，CPU保护机制
 - **批量上传**: 支持文件夹批量导入，智能目录选择
 - **文件验证**: 大小限制100MB，类型安全检查
@@ -59,11 +66,11 @@
 ```
 
 ### 核心模块
-- **apppro.py** - 主应用入口 (5,700+ 行)
+- **apppro.py** - 主应用入口 (3,715 行)
 - **services/** - 文件服务、知识库服务、配置服务
 - **processors/** - 文档处理器、网页爬虫 (23个模块)
 - **ui/** - 用户界面组件 (39个模块)
-- **utils/** - 工具函数库 (59个模块)
+- **utils/** - 工具函数库 (60个模块)
 
 ---
 
@@ -219,7 +226,7 @@ model = config.get_default_model()
 # 运行完整测试
 python tests/factory_test.py
 
-# 测试覆盖: 84/96 通过 (87.5%)
+# 测试覆盖: 88/97 通过 (90.7%)
 # 测试类别: 环境、配置、模块、文档、向量库等
 ```
 
@@ -256,7 +263,7 @@ python tests/factory_test.py
 ### 项目结构
 ```
 src/
-├── apppro.py           # 主应用 (5,700+ 行)
+├── apppro.py           # 主应用 (3,715 行)
 ├── services/           # 业务服务层
 ├── common/             # 公共工具层  
 ├── ui/                 # 界面组件

@@ -5,6 +5,7 @@
 
 import os
 import json
+import time
 import streamlit as st
 from src.app_logging import LogManager
 
@@ -148,6 +149,64 @@ def show_first_time_guide(existing_kbs):
         if st.button("✅ 我知道了，开始使用", use_container_width=True):
             st.session_state.first_time_guide_shown = True
             st.rerun()
+
+
+def open_file_native(file_path):
+    """
+    使用系统默认程序打开文件 (macOS 原生预览)
+    
+    Args:
+        file_path: 文件路径
+    """
+    import platform
+    import subprocess
+    
+    # 获取绝对路径并检查
+    abs_path = os.path.abspath(file_path)
+    if not os.path.exists(abs_path):
+        print(f"DEBUG: Preview failed. File not found at: {abs_path}")
+        logger.error(f"文件不存在，无法打开: {abs_path}")
+        return False
+        
+    try:
+        system = platform.system()
+        if system == "Darwin":  # macOS
+            print(f"DEBUG: Attempting macOS preview for: {abs_path}")
+            # 方案 A: 尝试 Quick Look (qlmanage)
+            try:
+                # 1. 启动预览进程
+                subprocess.Popen(
+                    ["qlmanage", "-p", abs_path], 
+                    stdout=subprocess.DEVNULL, 
+                    stderr=subprocess.DEVNULL
+                )
+                
+                # 2. 强制将预览窗口置于最前端
+                # 给预览窗口一点点启动时间，然后使用 AppleScript 激活它
+                time.sleep(0.3)
+                subprocess.run([
+                    "osascript", "-e", 
+                    'tell application "System Events" to set frontmost of process "qlmanage" to true'
+                ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                
+                return True
+            except Exception as e:
+                print(f"DEBUG: qlmanage failed, falling back to 'open': {e}")
+                # 方案 B: 退而求其次，使用系统默认关联程序打开 (Preview.app 等)
+                subprocess.run(["open", abs_path])
+                return True
+                
+        elif system == "Windows":
+            print(f"DEBUG: Attempting Windows open for: {abs_path}")
+            os.startfile(abs_path)
+        else:  # Linux
+            print(f"DEBUG: Attempting Linux open for: {abs_path}")
+            subprocess.run(["xdg-open", abs_path])
+        return True
+    except Exception as e:
+        print(f"DEBUG: Native preview command exception: {e}")
+        logger.error(f"原生预览打开失败: {e}")
+        return False
 
 
 def handle_kb_switching(active_kb_name, current_kb_id):

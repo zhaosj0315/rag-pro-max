@@ -31,7 +31,7 @@ RAG Pro Max 采用四层架构设计，确保代码的可维护性、可扩展�
 ### 核心应用层
 ```
 src/
-├── apppro.py                    # 🚀 主应用入口 (5,700+ 行)
+├── apppro.py                    # 🚀 主应用入口 (3,715 行)
 │   ├── Streamlit配置
 │   ├── 页面路由
 │   ├── 会话管理
@@ -96,7 +96,7 @@ src/processors/                  # 23个处理器
 
 ### 工具层 (Utils Layer)
 ```
-src/utils/                       # 59个工具模块
+src/utils/                       # 60个工具模块
 ├── model_manager.py             # 模型管理
 ├── ocr_optimizer.py             # OCR优化
 ├── gpu_ocr_accelerator.py       # GPU加速OCR

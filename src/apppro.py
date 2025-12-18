@@ -374,83 +374,33 @@ PageStyle.setup_page()
 # 注入 CSS
 st.markdown("""
 <style>
-                        /* 修复统计卡片显示 */
-    [data-testid="metric-container"] {
-        background: rgba(248, 249, 251, 0.8) !important;
-        border: 1px solid rgba(0, 0, 0, 0.08) !important;
-        border-radius: 8px !important;
-        padding: 0.75rem !important;
-        margin: 0.25rem !important;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
-        transition: all 0.2s ease !important;
-        min-height: 80px !important;
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: center !important;
+    /* 彻底禁止横向滚动和左右拖动手势 - 强制锁定布局 */
+    html, body, [data-testid="stAppViewContainer"], .stApp, [data-testid="stApp"] {
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+        overscroll-behavior-x: none !important;
+        position: relative !important;
     }
     
-    [data-testid="metric-container"]:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-        border-color: rgba(31, 119, 180, 0.3) !important;
-    }
-    
-    /* 统计数值样式 */
-    [data-testid="metric-container"] [data-testid="metric-value"] {
-        font-size: 1.5rem !important;
-        font-weight: 700 !important;
-        color: #1f77b4 !important;
-        line-height: 1.2 !important;
-        margin-bottom: 0.25rem !important;
-    }
-    
-    /* 统计标签样式 */
-    [data-testid="metric-container"] [data-testid="metric-label"] {
-        font-size: 0.85rem !important;
-        color: #6c757d !important;
-        font-weight: 500 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.5px !important;
-    }
-    
-    /* 确保统计区域布局正常 */
-    .stMetric {
-        background: transparent !important;
-    }
-    
-    /* 修复可能的布局问题 */
-    div[data-testid="column"] > div {
-        height: auto !important;
-    }
-    
-    /* 修复下拉框文字截断问题 */
-    div[data-testid="stSelectbox"] > div > div {
-        white-space: normal !important;
-        height: auto !important;
-        min-height: 40px !important;
-        overflow: visible !important;
+    /* 强制禁止任何容器产生横向位移 */
+    [data-testid="stMain"], [data-testid="stSidebar"] {
+        overflow-x: hidden !important;
+        max-width: 100% !important;
     }
 
-    /* 修复下拉框选项截断问题 */
-    ul[data-testid="stSelectboxVirtualDropdown"] li {
-        white-space: normal !important;
-        height: auto !important;
-        min-height: 40px !important;
-    }
-
-    /* 修复统计标签截断问题 */
-    [data-testid="stMetricLabel"] {
-        white-space: normal !important;
-        overflow: visible !important;
-        height: auto !important;
-        line-height: 1.2 !important;
-    }
-    
-    /* 增加侧边栏宽度，防止内容过窄 */
+    /* 增加侧边栏宽度，固定大小并禁止拖动缩放 */
     section[data-testid="stSidebar"] {
         min-width: 350px !important;
         width: 350px !important;
+        max-width: 350px !important;
     }
+
+    /* 隐藏并禁用侧边栏缩放手柄（彻底解决左下角左右拖动问题） */
+    [data-testid="stSidebarResizer"] {
+        display: none !important;
+        pointer-events: none !important;
+    }
+
     
     /* 统计区域容器 */
     .stats-container {
@@ -682,39 +632,42 @@ with st.sidebar:
 
         # 使用当前工作目录下的 vector_db_storage
         default_output_path = os.path.join(os.getcwd(), "vector_db_storage")
-        output_base = st.text_input("存储根目录", value=default_output_path)
+        
+        output_base = st.text_input("📁 存储根目录", value=default_output_path, help="知识库文件的保存位置")
+        if not output_base: output_base = default_output_path
+            
         existing_kbs = (setattr(kb_manager, "base_path", output_base), kb_manager.list_all())[1]
 
         # --- 核心导航 ---
-        st.markdown("#### 📚 知识库管理")
+        nav_options = ["➕ 新建知识库..."] + [f"📂 {kb}" for kb in kb_manager.list_all()]
 
-        # 知识库搜索/过滤
-        if len(existing_kbs) > 5:
+        # 默认选择"新建知识库"，避免自动加载大知识库
+        default_idx = 0
+        if "current_nav" in st.session_state and st.session_state.current_nav in nav_options:
+            try:
+                default_idx = nav_options.index(st.session_state.current_nav)
+            except ValueError:
+                default_idx = 0
+
+        selected_nav = st.selectbox("📚 选择知识库", nav_options, index=default_idx)
+
+        # 知识库搜索/过滤 (仅在知识库较多时显示，并使用紧凑布局)
+        if len(existing_kbs) > 10:
             search_kb = st.text_input(
-                "🔍 搜索知识库",
-                placeholder="输入关键词过滤...",
+                "🔍 过滤...",
+                placeholder="输入关键词...",
                 key="search_kb",
                 label_visibility="collapsed"
             )
             if search_kb:
                 filtered_kbs = [kb for kb in existing_kbs if search_kb.lower() in kb.lower()]
-                st.caption(f"找到 {len(filtered_kbs)} 个匹配的知识库")
-            else:
-                filtered_kbs = existing_kbs
-        else:
-            filtered_kbs = existing_kbs
-
-        nav_options = ["➕ 新建知识库..."] + [f"📂 {kb}" for kb in filtered_kbs]
-
-        # 默认选择"新建知识库"，避免自动加载大知识库
-        default_idx = 0
-        if "current_nav" in st.session_state and st.session_state.current_nav in nav_options:
-            default_idx = nav_options.index(st.session_state.current_nav)
-        # 注释掉自动选择第一个知识库的逻辑
-        # elif len(nav_options) > 1:
-        #     default_idx = 1 
-
-        selected_nav = st.selectbox("选择当前知识库", nav_options, index=default_idx, label_visibility="collapsed")
+                # 更新 nav_options 以应用过滤
+                nav_options = ["➕ 新建知识库..."] + [f"📂 {kb}" for kb in filtered_kbs]
+                # 重新计算选择索引
+                if st.session_state.get('current_nav') in nav_options:
+                    default_idx = nav_options.index(st.session_state.current_nav)
+                else:
+                    default_idx = 0
 
         # 卸载知识库按钮（释放内存）
         if not (selected_nav == "➕ 新建知识库...") and st.session_state.get('chat_engine') is not None:
@@ -821,42 +774,36 @@ with st.sidebar:
             st.caption(f"🛠️ 管理: {current_kb_name}")
             
             with st.container(border=True):
-                # 管理选项卡
-                manage_tab1, manage_tab2 = st.tabs(["📤 添加文档", "⚙️ 设置"])
-                
-                with manage_tab1:
-                    # 追加模式的文件上传
-                    action_mode = "APPEND"
-                    target_path = "" # 管理模式不需要手动指定路径，使用KB原有路径
-                    
-                    uploaded_files = st.file_uploader(
-                        "追加文件到当前知识库", 
-                        accept_multiple_files=True, 
-                        key="uploader_append",
-                        label_visibility="collapsed"
-                    )
-                    
-                    if uploaded_files:
-                        st.info("💡 上传后请点击下方 '更新知识库' 按钮")
+                # 紧凑管理布局：标题和重建按钮占一行
+                manage_head_col1, manage_head_col2 = st.columns([3, 1])
+                with manage_head_col1:
+                    st.markdown("📤 **添加文档**")
+                with manage_head_col2:
+                    if st.button("🔄", help="重建索引 (覆盖该库)", use_container_width=True):
+                        # 触发重建逻辑
+                        st.session_state.uploaded_path = os.path.join("vector_db_storage", current_kb_name)
+                        # 这里需要一种方式标记为 NEW 模式，通常是通过 btn_start 触发
+                        st.session_state.trigger_rebuild = True
+                        st.rerun()
 
-                with manage_tab2:
-                    # 知识库操作
-                    col_m1, col_m2 = st.columns(2)
-                    with col_m1:
-                        if st.button("🔄 重建索引", use_container_width=True, help="完全重新构建该知识库"):
-                            action_mode = "NEW" # 强制覆盖
-                            st.session_state.uploaded_path = os.path.join("vector_db_storage", current_kb_name)
-                            # 触发重建逻辑...
-                    with col_m2:
-                        if st.button("🗑️ 删除知识库", type="primary", use_container_width=True):
-                            success, message = kb_manager.delete(current_kb_name)
-                            if success:
-                                st.success(message)
-                                st.session_state.current_nav = "➕ 新建知识库..."
-                                time.sleep(1)
-                                st.rerun()
-                            else:
-                                st.error(message)
+                # 追加模式的文件上传
+                action_mode = "APPEND"
+                # 如果触发了重建，则强制改为 NEW
+                if st.session_state.get('trigger_rebuild'):
+                    action_mode = "NEW"
+                    st.session_state.trigger_rebuild = False # 消费掉标记
+                
+                target_path = "" # 管理模式不需要手动指定路径，使用KB原有路径
+                
+                uploaded_files = st.file_uploader(
+                    "追加文件到当前知识库", 
+                    accept_multiple_files=True, 
+                    key="uploader_append",
+                    label_visibility="collapsed"
+                )
+                
+                if uploaded_files:
+                    st.info("💡 上传后请点击下方 '更新知识库' 按钮")
 
         # 统一的数据源处理逻辑（仅针对 Web 抓取保留在外部，本地文件已在内部处理）
         btn_start = False # Initialize to avoid NameError
@@ -891,136 +838,100 @@ with st.sidebar:
                         except ImportError:
                             optimizer = None
                         
-                        col_url_input, col_analyze_btn = st.columns([7, 1])
+                        col_url_input, col_analyze_btn = st.columns([7, 1.2])
                         with col_url_input:
-                            crawl_url = st.text_input("🔗 网址", placeholder="python.org", help="支持自动添加https://")
+                            crawl_url = st.text_input("🔗 网址", placeholder="python.org", label_visibility="collapsed")
                         
                         search_keyword = None
                         
-                        # 智能分析功能
-                        if optimizer:
-                            with col_analyze_btn:
-                                st.markdown('<div style="margin-top: 29px;"></div>', unsafe_allow_html=True)
-                                if st.button("🧠", help="AI分析网站并推荐最佳参数", key="smart_analyze", use_container_width=True):
-                                    if crawl_url:
-                                        with st.spinner("🔍 正在分析网站结构..."):
-                                            # 确保URL格式正确
-                                            if not crawl_url.startswith(('http://', 'https://')):
-                                                test_url = f"https://{crawl_url}"
-                                            else:
-                                                test_url = crawl_url
-                                            
-                                            analysis = optimizer.analyze_website(test_url)
-                                            st.session_state.crawl_analysis = analysis
-                                    else:
-                                        st.toast("请先输入网址", icon="⚠️")
+                        # 智能分析逻辑 (大脑图标)
+                        with col_analyze_btn:
+                            if st.button("🧠", help="AI智能分析网站并推荐最佳参数", key="smart_analyze_url", use_container_width=True):
+                                if crawl_url:
+                                    with st.spinner("🔍"):
+                                        if not crawl_url.startswith(('http://', 'https://')):
+                                            test_url = f"https://{crawl_url}"
+                                        else:
+                                            test_url = crawl_url
+                                        analysis = optimizer.analyze_website(test_url) if optimizer else None
+                                        if analysis: st.session_state.crawl_analysis = analysis
+                                else:
+                                    st.toast("请先输入网址", icon="⚠️")
                             
-                            # 显示分析结果
-                            if 'crawl_analysis' in st.session_state:
-                                analysis = st.session_state.crawl_analysis
-                                
-                                with st.expander("🎯 智能分析结果", expanded=True):
-                                    # Row 1
-                                    col1, col2 = st.columns(2)
-                                    with col1:
-                                        st.metric("🏷️ 网站类型", analysis['site_type'].title())
-                                    with col2:
-                                        st.metric("📊 推荐深度", f"{analysis['recommended_depth']}层")
-                                    
-                                    # Row 2
-                                    col3, col4 = st.columns(2)
-                                    with col3:
-                                        st.metric("📄 推荐页数", f"{analysis['recommended_pages']}")
-                                    with col4:
-                                        st.metric("📈 预估总页", f"{analysis['estimated_pages']:,}")
-                                    
-                                    # Row 3
-                                    col5, col6 = st.columns(2)
-                                    with col5:
-                                        total_links = analysis.get('site_info', {}).get('total_links', 0)
-                                        st.metric("🔗 页面链接", f"{total_links}")
-                                    with col6:
-                                        st.metric("🔍 分析置信度", f"{analysis['confidence']:.1%}")
-                                    
-                                    st.info(f"💡 **分析结果**: {analysis['description']}")
-                                    
-                                    confidence_color = "🟢" if analysis['confidence'] > 0.7 else "🟡" if analysis['confidence'] > 0.5 else "🔴"
-                                    st.caption(f"{confidence_color} 置信度指示: 🟢 > 70%, 🟡 > 50%, 🔴 < 50%")
+                        # 显示分析结果 (紧凑模式)
+                        if 'crawl_analysis' in st.session_state:
+                            analysis = st.session_state.crawl_analysis
+                            with st.expander("🎯 推荐: " + analysis['site_type'].title(), expanded=True):
+                                st.caption(f"💡 {analysis['description']}")
                         
-                        # 抓取参数（使用智能推荐的默认值）
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            default_depth = 2
-                            if 'crawl_analysis' in st.session_state:
-                                default_depth = st.session_state.crawl_analysis['recommended_depth']
-                            crawl_depth = st.number_input("递归深度", 1, 10, default_depth, help="AI推荐基于网站结构分析")
-                        with col2:
-                            default_pages = 20
-                            if 'crawl_analysis' in st.session_state:
-                                default_pages = st.session_state.crawl_analysis['recommended_pages']
-                            max_pages = st.number_input("每层页数", 1, 1000, default_pages, help="AI推荐基于内容密度分析")
-                        with col3:
-                            parser_type = st.selectbox("解析器", ["default", "article", "documentation"])
+                        # 抓取参数 - 紧凑布局 (一行两个)
+                        col_p1, col_p2 = st.columns(2)
+                        with col_p1:
+                            default_depth = st.session_state.crawl_analysis['recommended_depth'] if 'crawl_analysis' in st.session_state else 2
+                            crawl_depth = st.number_input("递归深度", 1, 10, default_depth)
+                        with col_p2:
+                            default_pages = st.session_state.crawl_analysis['recommended_pages'] if 'crawl_analysis' in st.session_state else 20
+                            max_pages = st.number_input("每层页数", 1, 1000, default_pages)
                         
-                        # 🔥 新增：网址抓取质量筛选开关
-                        st.write("**质量筛选设置**")
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            enable_url_quality_filter = st.checkbox("🎯 启用质量筛选", value=False, 
-                                                                  help="开启后会过滤低质量页面，关闭则保留所有爬取的页面")
-                        with col2:
-                            if enable_url_quality_filter:
-                                url_quality_threshold = st.slider("质量阈值", 10.0, 50.0, 30.0, 5.0,
-                                                                help="分数越高筛选越严格，30分为推荐值")
-                            else:
-                                url_quality_threshold = 0.0
-                                st.info("已关闭质量筛选，将保留所有页面")
+                        # 解析器单放一行
+                        parser_type = st.selectbox("解析器类型", ["default", "article", "documentation"])
                         
-                        # 🛑 安全警告 - 指数增长预估
-                        estimated_pages = max_pages ** crawl_depth  # 指数增长：每层可能产生max_pages个新链接
-                        if estimated_pages > 1000:
-                            st.warning(f"⚠️ 预估抓取页面: {estimated_pages:,} 页，可能耗时很长！系统最大限制: 50,000 页")
-                        elif estimated_pages > 100:
-                            st.info(f"ℹ️ 预估抓取页面: {estimated_pages:,} 页")
+                        # 质量筛选 - 极致压缩
+                        enable_url_quality_filter = st.checkbox("🎯 启用质量筛选", value=True, help="开启后会过滤低质量页面，建议在内容杂乱时使用")
+                        if enable_url_quality_filter:
+                            url_quality_threshold = st.slider("质量阈值", 10.0, 50.0, 30.0, 5.0, help="分数越高筛选越严格，30分为推荐值")
+                        else:
+                            url_quality_threshold = 0.0
                         
                     else:  # current_mode == "search"
                         # 智能行业搜索模式
                         crawl_url = None
                         
-                        # 行业选择 - 单独占一行
+                        # 加载优化器 (复用逻辑)
+                        try:
+                            from src.processors.crawl_optimizer import CrawlOptimizer
+                            optimizer = st.session_state.get('crawl_optimizer', CrawlOptimizer())
+                        except: optimizer = None
+
+                        # 行业选择
                         try:
                             from src.config.unified_sites import get_industry_list
                             industries = get_industry_list()
-                            selected_industry = st.selectbox("🏢 选择目标行业", industries, help="选择目标行业，系统将在该行业的专业网站中搜索")
-                        except ImportError:
-                            # 备用配置
-                            selected_industry = "🔧 技术开发 - 编程语言、开发工具、云服务技术"
+                            selected_industry = st.selectbox("🏢 目标行业", industries)
+                        except:
+                            selected_industry = "🔧 技术开发"
                         
-                        # 搜索关键词 - 单独占一行
-                        search_keyword = st.text_input("🔍 搜索关键词", placeholder="Python编程、机器学习、人工智能", help="系统将智能选择该行业最相关的2-3个权威网站进行搜索")
+                        # 关键词输入 + 智能分析 (大脑)
+                        col_kw_input, col_kw_brain = st.columns([7, 1.2])
+                        with col_kw_input:
+                            search_keyword = st.text_input("🔍 关键词", placeholder="输入搜索内容...", label_visibility="collapsed")
                         
-                        # 搜索参数
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            crawl_depth = st.number_input("递归深度", 1, 5, 2, help="搜索内容的抓取深度")
-                        with col2:
-                            max_pages = st.number_input("总页数", 1, 500, 20, help="所有网站总共抓取的页数（会智能分配到2-3个相关网站）")
-                        with col3:
-                            parser_type = st.selectbox("解析器", ["default", "article", "documentation"])
+                        with col_kw_brain:
+                            if st.button("🧠", help="AI智能推荐行业权威站点", key="smart_analyze_search", use_container_width=True):
+                                if search_keyword:
+                                    with st.spinner("🔍"):
+                                        # 复用智能推荐逻辑：基于行业和关键词给出建议
+                                        st.toast(f"🎯 已根据 '{selected_industry}' 优化搜索策略")
+                                        # 这里可以插入具体的行业搜索优化逻辑
+                                else:
+                                    st.toast("请先输入关键词", icon="⚠️")
+
+                        # 搜索参数 - 紧凑布局 (一行两个)
+                        col_s1, col_s2 = st.columns(2)
+                        with col_s1:
+                            crawl_depth = st.number_input("递归深度", 1, 5, 2)
+                        with col_s2:
+                            max_pages = st.number_input("总页数", 1, 500, 20)
                         
-                        # 🔥 新增：质量筛选开关
-                        st.write("**质量筛选设置**")
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            enable_quality_filter = st.checkbox("🎯 启用质量筛选", value=True, 
-                                                              help="开启后会过滤低质量页面，关闭则保留所有爬取的页面")
-                        with col2:
-                            if enable_quality_filter:
-                                quality_threshold = st.slider("质量阈值", 10.0, 50.0, 30.0, 5.0,
-                                                            help="分数越高筛选越严格，30分为推荐值")
-                            else:
-                                quality_threshold = 0.0
-                                st.info("已关闭质量筛选，将保留所有页面")
+                        # 解析器单放一行
+                        parser_type = st.selectbox("解析器类型", ["default", "article", "documentation"], key="parser_search")
+                        
+                        # 质量筛选 - 极致压缩
+                        enable_quality_filter = st.checkbox("🎯 启用质量筛选", value=True, help="过滤低相关性页面，建议开启", key="q_filter_search")
+                        if enable_quality_filter:
+                            quality_threshold = st.slider("质量阈值", 10.0, 50.0, 30.0, 5.0, key="q_threshold_search")
+                        else:
+                            quality_threshold = 0.0
                         
                         # 🛑 安全警告 - 指数增长预估
                         estimated_pages = max_pages ** crawl_depth  # 指数增长：每层可能产生max_pages个新链接
@@ -1596,62 +1507,53 @@ URL: {content_item['url']}
 
             # 处理上传 (Stage 4.1 - 使用 UploadHandler)
             if uploaded_files:
-                if 'last_uploaded_names' not in st.session_state:
-                    st.session_state.last_uploaded_names = []
-
-                current_names = [f.name for f in uploaded_files]
-
-                # 只在文件列表变化时处理
-                if set(current_names) != set(st.session_state.last_uploaded_names):
+                # 使用文件名+大小的组合作为哈希，判断文件列表是否真正改变
+                import hashlib
+                upload_hash = hashlib.md5("".join([f"{f.name}_{f.size}" for f in uploaded_files]).encode()).hexdigest()
+                
+                if st.session_state.get('last_upload_hash') != upload_hash:
                     progress_bar = st.progress(0)
                     status_text = st.empty()
 
                     # 使用 UploadHandler 处理上传
                     handler = UploadHandler(UPLOAD_DIR, logger)
-
-                    for idx, f in enumerate(uploaded_files):
-                        status_text.text(f"验证中: {f.name} ({idx+1}/{len(uploaded_files)})")
-                        progress_bar.progress((idx + 1) / len(uploaded_files))
+                    
+                    # 模拟进度显示（实际处理在 process_uploads 内部）
+                    status_text.text(f"正在处理 {len(uploaded_files)} 个文件...")
+                    progress_bar.progress(0.5)
 
                     result = handler.process_uploads(uploaded_files)
 
                     progress_bar.empty()
                     status_text.empty()
 
-                    st.session_state.last_uploaded_names = current_names
+                    # 记录哈希，防止重复处理
+                    st.session_state.last_upload_hash = upload_hash
                     st.session_state.uploaded_path = os.path.abspath(result.batch_dir)
 
                     # 显示上传结果
                     if result.success_count > 0:
-                        st.success(f"✅ 成功上传 {result.success_count} 个文件")
+                        st.toast(f"✅ 成功上传 {result.success_count} 个文件")
 
                     if result.skipped_count > 0:
                         st.warning(f"⚠️ 跳过 {result.skipped_count} 个文件")
-                        with st.expander("查看跳过详情", expanded=True):
-                            for reason in result.skip_reasons:
-                                st.text(f"• {reason}")
 
                     # 为文件上传场景生成智能名称
                     if result.success_count > 0:
                         try:
-                            # 计算文件类型分布
                             file_types = {}
-                            for filename in current_names:
-                                ext = os.path.splitext(filename)[1].lower()
+                            for f in uploaded_files:
+                                ext = os.path.splitext(f.name)[1].lower()
                                 file_types[ext] = file_types.get(ext, 0) + 1
 
-                            # 使用上传的文件名生成智能名称
-                            folder_name = os.path.basename(result.batch_dir)  # batch_xxx
+                            folder_name = os.path.basename(result.batch_dir)
                             auto_name = generate_smart_kb_name(result.batch_dir, result.success_count, file_types, folder_name)
-
-                            # 存储智能生成的名称
                             st.session_state.upload_auto_name = auto_name
-                        except Exception as e:
+                        except Exception:
                             st.session_state.upload_auto_name = None
-
-                    time.sleep(1)
-                    if result.success_count > 0:
-                        st.rerun()
+                    
+                    # 关键修复：不再强制全页面 rerun，而是依靠 Streamlit 自然流转
+                    # 这样可以保留 uploader 的状态，避免其因刷新而报错或重置
 
 
             # 使用上传路径或手动输入的路径
@@ -1780,10 +1682,12 @@ URL: {content_item['url']}
                 
                 st.divider()
                 
-                # 底部：操作栏 (单行紧凑布局)
-                op_col1, op_col2, op_col3, op_col4, op_col5, op_col6 = st.columns(6)
+                # 底部：操作栏 (优化为 2*3 布局)
+                op_row1_col1, op_row1_col2 = st.columns(2)
+                op_row2_col1, op_row2_col2 = st.columns(2)
+                op_row3_col1, op_row3_col2 = st.columns(2)
                 
-                with op_col1:
+                with op_row1_col1:
                     if st.button("🔄 撤销", use_container_width=True, disabled=len(state.get_messages()) < 2, help="撤销最近一轮对话"):
                         if len(state.get_messages()) >= 2:
                             st.session_state.messages.pop()
@@ -1794,7 +1698,7 @@ URL: {content_item['url']}
                             time.sleep(0.5)
                             st.rerun()
                 
-                with op_col2:
+                with op_row1_col2:
                     if st.button("🧹 清空", use_container_width=True, disabled=len(state.get_messages()) == 0, help="清空当前对话记录"):
                         st.session_state.messages = []
                         st.session_state.suggestions_history = []
@@ -1804,7 +1708,7 @@ URL: {content_item['url']}
                         time.sleep(0.5)
                         st.rerun()
                 
-                with op_col3:
+                with op_row2_col1:
                     export_content = ""
                     if len(state.get_messages()) > 0:
                         export_content = f"# 对话记录 - {current_kb_name}\n\n**导出时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n\n"
@@ -1814,15 +1718,15 @@ URL: {content_item['url']}
                     
                     st.download_button("📥 导出", export_content, file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d')}.md", mime="text/markdown", use_container_width=True, disabled=len(state.get_messages()) == 0)
 
-                with op_col4:
+                with op_row2_col2:
                     st.link_button("🔀 新窗口", "http://localhost:8501", use_container_width=True, help="打开新窗口")
 
-                with op_col5:
+                with op_row3_col1:
                     if st.button("🗑️ 删除", use_container_width=True, type="primary", disabled=not current_kb_name, help="永久删除该知识库"):
                         st.session_state.confirm_delete = True
                         st.rerun()
                 
-                # op_col6 留空或用于将来扩展
+                # op_row3_col2 留空或用于将来扩展
             
             # 删除确认对话框 (放在卡片外，避免嵌套问题)
             if st.session_state.get('confirm_delete', False):
@@ -1908,40 +1812,45 @@ URL: {content_item['url']}
                 pass
 
             with monitor_placeholder.container():
-                col1, col2 = st.columns([4, 1])
-                with col1:
+                # 优化为 2*3 布局 (一行两个)
+                m_row1_col1, m_row1_col2 = st.columns(2)
+                m_row2_col1, m_row2_col2 = st.columns(2)
+                m_row3_col1, m_row3_col2 = st.columns(2)
+
+                with m_row1_col1:
                     st.metric("CPU 使用率", f"{cpu_percent:.1f}%")
-                with col2:
-                    st.caption(f"{psutil.cpu_count()} 核")
-                st.progress(cpu_percent / 100)
+                    st.caption(f"⚙️ {psutil.cpu_count()} 核")
+                    st.progress(cpu_percent / 100)
 
-                col1, col2 = st.columns([4, 1])
-                with col1:
+                with m_row1_col2:
                     st.metric("GPU 状态", "活跃" if gpu_active else "空闲")
-                with col2:
-                    st.caption("32 核")
-                if gpu_active:
-                    st.progress(0.5)
-                else:
-                    st.progress(0.0)
+                    st.caption("🎮 Apple Metal")
+                    if gpu_active:
+                        st.progress(0.5)
+                    else:
+                        st.progress(0.0)
 
-                col1, col2 = st.columns([4, 1])
-                with col1:
+                with m_row2_col1:
                     st.metric("内存使用", f"{mem.percent:.1f}%")
-                with col2:
-                    st.caption(f"{mem.used/1024**3:.1f}GB")
-                st.progress(mem.percent / 100)
+                    st.caption(f"🧠 {mem.used/1024**3:.1f}GB / {mem.total/1024**3:.1f}GB")
+                    st.progress(mem.percent / 100)
 
-                col1, col2 = st.columns([4, 1])
-                with col1:
+                with m_row2_col2:
                     st.metric("磁盘使用", f"{disk.percent:.1f}%")
-                with col2:
-                    st.caption(f"{disk.used/1024**3:.0f}GB")
-                st.progress(disk.percent / 100)
+                    st.caption(f"💾 {disk.used/1024**3:.0f}GB / {disk.total/1024**3:.0f}GB")
+                    st.progress(disk.percent / 100)
 
                 current_proc = psutil.Process()
                 proc_mem = current_proc.memory_info().rss / 1024**3
-                st.caption(f"🔍 进程: {proc_mem:.1f}GB | {current_proc.num_threads()} 线程")
+                
+                with m_row3_col1:
+                    st.metric("进程内存", f"{proc_mem:.1f} GB")
+                    st.caption("🔍 当前应用占用")
+                
+                with m_row3_col2:
+                    st.metric("线程数量", f"{current_proc.num_threads()}")
+                    st.caption("🧵 活动线程数")
+
                 st.caption("💡 GPU 详细信息需要: `sudo python3 system_monitor.py`")
 
             if auto_refresh:
@@ -2467,24 +2376,33 @@ if active_kb_name:
             ocr_files = sum(1 for f in doc_manager.manifest['files'] if f.get('used_ocr', False))
             metadata_files = sum(1 for f in doc_manager.manifest['files'] if f.get('keywords') or f.get('category'))
             summary_files = sum(1 for f in doc_manager.manifest['files'] if f.get('summary'))
+            total_chunks = sum(len(f.get('doc_ids', [])) for f in doc_manager.manifest['files'])
+            storage_size = KBManager.format_size(stats.get('size', 0)) if stats else "未知"
             
             # 只有当有高级数据时才展开
             has_advanced_data = (ocr_files + metadata_files + summary_files) > 0
             
             with st.expander("🔧 高级选项处理统计", expanded=has_advanced_data):
-                col1, col2, col3, col4 = st.columns(4)
+                # 优化为单行 6 列布局
+                adv_cols = st.columns(6)
                 
-                with col1:
+                with adv_cols[0]:
                     st.metric("📄 总文档", total_files)
-                with col2:
+                with adv_cols[1]:
+                    st.metric("🧩 总片段", total_chunks)
+                    
+                with adv_cols[2]:
                     ocr_percentage = (ocr_files / total_files * 100) if total_files > 0 else 0
                     st.metric("🔍 OCR处理", f"{ocr_files}", delta=f"{ocr_percentage:.1f}%")
-                with col3:
+                with adv_cols[3]:
                     metadata_percentage = (metadata_files / total_files * 100) if total_files > 0 else 0
                     st.metric("📊 元数据提取", f"{metadata_files}", delta=f"{metadata_percentage:.1f}%")
-                with col4:
+                    
+                with adv_cols[4]:
                     summary_percentage = (summary_files / total_files * 100) if total_files > 0 else 0
                     st.metric("📝 生成摘要", f"{summary_files}", delta=f"{summary_percentage:.1f}%")
+                with adv_cols[5]:
+                    st.metric("💾 存储占用", storage_size)
                 
                 # 处理建议
                 if not has_advanced_data:

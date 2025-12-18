@@ -37,11 +37,13 @@ def process_node_worker(args):
         file_name = metadata.get('file_name', 'Unknown')
         score = node_data.get('score', 0.0)
         text = node_data.get('text', '')
+        node_id = node_data.get('node_id', 'unknown')
         
         return {
-            "file": file_name, 
+            "file_name": file_name, 
             "score": score, 
-            "text": text[:150].replace("\n", " ") + "..."
+            "text": text[:150].replace("\n", " ") + "...",
+            "node_id": node_id
         }
     except:
         return None

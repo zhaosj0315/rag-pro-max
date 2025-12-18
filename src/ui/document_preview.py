@@ -69,16 +69,46 @@ def show_kb_documents(kb_name: str) -> None:
     
     for doc in docs:
         with st.container():
-            # 使用更紧凑的列布局
-            col_name, col_view, col_del = st.columns([5, 0.8, 0.8])
+            # 使用更紧凑的列布局，增加一个预览按钮列
+            col_name, col_view, col_native, col_del = st.columns([5, 0.8, 0.8, 0.8])
             
             # 文档名称和大小
             col_name.write(f"📄 {doc.name} ({doc.size_mb:.2f} MB)")
             
-            # 查看按钮 (图标)
-            if col_view.button("👁️", key=f"view_{doc.name}", help="查看详情", use_container_width=True):
+            # 详情按钮 (图标)
+            if col_view.button("📝", key=f"view_{doc.name}", help="查看详情", use_container_width=True):
                 st.session_state['show_doc_detail'] = doc
                 st.session_state['show_doc_kb'] = kb_name
+            
+            # 原生预览按钮 (图标)
+            if col_native.button("👁️", key=f"native_{doc.name}", help="macOS 原生预览", use_container_width=True):
+                from src.utils.app_utils import open_file_native
+                # 重新验证路径，防止相对路径失效
+                import os
+                import glob
+                
+                # 优先级搜索候选
+                file_name = doc.name
+                candidates = [
+                    doc.file_path,
+                    os.path.join("temp_uploads", kb_name, file_name),
+                    os.path.join("vector_db_storage", kb_name, file_name)
+                ]
+                # 增加模糊匹配
+                candidates.extend(glob.glob(os.path.join("temp_uploads", "batch_*", file_name)))
+                candidates.extend(glob.glob(os.path.join("temp_uploads", "Search_*", file_name)))
+                candidates.extend(glob.glob(os.path.join("temp_uploads", "Web_*", file_name)))
+                
+                final_path = None
+                for p in candidates:
+                    if p and os.path.exists(os.path.abspath(p)):
+                        final_path = os.path.abspath(p)
+                        break
+                
+                if final_path and open_file_native(final_path):
+                    st.toast(f"🚀 正在调用系统预览: {doc.name}")
+                else:
+                    st.error(f"无法定位文件: {doc.name}")
             
             # 删除按钮 (图标)
             if col_del.button("🗑️", key=f"del_{doc.name}", help="删除文档", use_container_width=True):
