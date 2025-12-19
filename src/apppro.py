@@ -1,5 +1,7 @@
 # 初始化环境配置
 # 环境变量设置 - 减少启动警告
+__version__ = "2.4.7"
+
 import os
 os.environ['DISABLE_MODEL_SOURCE_CHECK'] = 'True'
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
@@ -1895,7 +1897,7 @@ URL: {content_item['url']}
     
     with tab_help:
         st.markdown("### 📖 帮助")
-        st.info("RAG Pro Max v2.4.0 - 并发爬取与智能优化版")
+        st.info("RAG Pro Max v2.4.7 - Web爬取与数据处理增强版")
 
 # ==========================================
 # 主功能区域
@@ -2100,6 +2102,7 @@ def process_knowledge_base_logic(action_mode="NEW", use_ocr=False, extract_metad
         persist_dir=persist_dir,
         embed_model=embed,
         embed_model_name=embed_model,
+        use_ocr=use_ocr,  # 传递OCR选项
         extract_metadata=extract_metadata,  # 传递性能选项
         generate_summary=generate_summary,  # 传递摘要选项
         logger=logger
@@ -2385,6 +2388,46 @@ if active_kb_name:
     db_path = os.path.join(output_base, active_kb_name)
     doc_manager = DocumentManager(db_path)
     stats = doc_manager.get_kb_statistics()
+
+    # --- 批量操作处理逻辑 ---
+    if st.session_state.get('trigger_batch_summary'):
+        st.session_state.trigger_batch_summary = False
+        run_summary = True # 触发下方的摘要逻辑
+    else:
+        run_summary = False
+
+    if st.session_state.get('trigger_batch_delete'):
+        st.session_state.trigger_batch_delete = False
+        selected_files = st.session_state.get('selected_for_summary', set())
+        if selected_files:
+            with st.status(f"正在批量删除 {len(selected_files)} 个文件...", expanded=True) as status:
+                try:
+                    from llama_index.core import StorageContext, load_index_from_storage
+                    ctx = StorageContext.from_defaults(persist_dir=db_path)
+                    idx = load_index_from_storage(ctx)
+                    
+                    for fname in selected_files:
+                        file_info = next((f for f in doc_manager.manifest['files'] if f['name'] == fname), None)
+                        if file_info:
+                            for did in file_info.get('doc_ids', []):
+                                try:
+                                    idx.delete_ref_doc(did, delete_from_docstore=True)
+                                except: pass
+                    
+                    idx.storage_context.persist(persist_dir=db_path)
+                    
+                    # 更新 manifest
+                    doc_manager.manifest['files'] = [f for f in doc_manager.manifest['files'] if f['name'] not in selected_files]
+                    with open(ManifestManager.get_path(db_path), 'w', encoding='utf-8') as mf:
+                        json.dump(doc_manager.manifest, mf, indent=4, ensure_ascii=False)
+                    
+                    status.update(label="✅ 批量删除成功", state="complete")
+                    st.session_state.selected_for_summary = set()
+                    st.session_state.chat_engine = None
+                    time.sleep(1)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"批量删除失败: {e}")
     
     # 重命名逻辑和统计显示
     if st.session_state.renaming:
@@ -2549,7 +2592,6 @@ if active_kb_name:
             selected_count = len(st.session_state.selected_for_summary)
             
             # 3. 生成摘要
-            run_summary = False
             with op_col3:
                 # 始终显示按钮，但根据选中数量决定是否禁用
                 button_label = f"✨ 摘要 ({selected_count})" if selected_count > 0 else "✨ 生成摘要"

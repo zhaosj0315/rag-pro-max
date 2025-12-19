@@ -42,6 +42,7 @@ class IndexBuilder:
     
     def __init__(self, kb_name: str, persist_dir: str, 
                  embed_model, embed_model_name: str = "Unknown",
+                 use_ocr: bool = False,
                  extract_metadata: bool = True,
                  generate_summary: bool = False,
                  logger=None):
@@ -49,6 +50,7 @@ class IndexBuilder:
         self.persist_dir = persist_dir
         self.embed_model = embed_model
         self.embed_model_name = embed_model_name
+        self.use_ocr = use_ocr  # OCR选项
         self.extract_metadata = extract_metadata  # 是否提取元数据
         self.generate_summary = generate_summary  # 是否生成摘要
         self.logger = logger
@@ -169,7 +171,7 @@ class IndexBuilder:
     
     def _read_documents(self, source_path, total_files, callback):
         """读取文档"""
-        docs, process_result = scan_directory_safe(source_path)
+        docs, process_result = scan_directory_safe(source_path, use_ocr=self.use_ocr)
         summary = process_result.get_summary()
         
         if summary['success'] == 0:

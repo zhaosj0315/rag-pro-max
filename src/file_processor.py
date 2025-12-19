@@ -91,7 +91,7 @@ def _ocr_page(args):
         return idx, ""
 
 # 将文件加载函数移到模块级别（用于多进程）
-def _load_single_file(file_info):
+def _load_single_file(file_info, use_ocr=True):
     """单个文件加载函数（优化：直接读取文件内容，避免 SimpleDirectoryReader 开销）"""
     # 屏蔽子进程中的警告和日志
     import warnings
@@ -233,14 +233,12 @@ def _load_single_file(file_info):
                 needs_ocr = True
         
         if needs_ocr:
-                # 检查OCR设置：优先检查前台控制，其次检查环境变量
-                import streamlit as st
-                use_ocr_frontend = st.session_state.get('use_ocr', True) if hasattr(st, 'session_state') else True
+                # 检查OCR设置：优先检查传入参数，其次检查环境变量
                 skip_ocr_env = os.environ.get('SKIP_OCR', 'false').lower() == 'true'
                 
                 # 如果前台禁用OCR或环境变量设置跳过，则跳过OCR
-                if not use_ocr_frontend or skip_ocr_env:
-                    source = "前台设置" if not use_ocr_frontend else "环境变量"
+                if not use_ocr or skip_ocr_env:
+                    source = "前台设置" if not use_ocr else "环境变量"
                     print(f"   ⚡ 跳过OCR处理（{source}控制）")
                     return "此PDF为扫描版，已跳过OCR处理。如需OCR识别，请在前台勾选'启用OCR识别'"
                 
@@ -311,8 +309,15 @@ def _load_single_file(file_info):
 
 
 # 批量处理函数（模块级别，用于多进程）
-def _process_batch(batch_files):
+def _process_batch(args):
     """批量处理文件（在独立进程中运行）"""
+    # 解包参数
+    if isinstance(args, tuple) and len(args) == 2:
+        batch_files, use_ocr = args
+    else:
+        batch_files = args
+        use_ocr = True  # 默认值
+        
     # 安全的CPU密集型计算，强制激活CPU核心
     import math
     import os
@@ -324,17 +329,18 @@ def _process_batch(batch_files):
     # 原有的文档处理
     batch_results = []
     for file_info in batch_files:
-        result = _load_single_file(file_info)
+        result = _load_single_file(file_info, use_ocr=use_ocr)
         batch_results.append(result)
     return batch_results
 
 
-def scan_directory_safe(input_dir: str) -> Tuple[List, 'FileProcessResult']:
+def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'FileProcessResult']:
     """
     安全扫描目录，返回成功加载的文档和处理结果（多线程并行）
     
     Args:
         input_dir: 输入目录路径
+        use_ocr: 是否启用OCR识别
     
     Returns:
         (documents, result) - 文档列表和处理结果
@@ -430,8 +436,8 @@ def scan_directory_safe(input_dir: str) -> Tuple[List, 'FileProcessResult']:
         fast_count = 0
         slow_count = 0
         
-        # 将文件列表分批
-        batches = [file_list[i:i + batch_size] for i in range(0, len(file_list), batch_size)]
+        # 将文件列表分批 (打包 use_ocr 参数)
+        batches = [(file_list[i:i + batch_size], use_ocr) for i in range(0, len(file_list), batch_size)]
         print(f"📊 [第 3 步] 总计 {len(file_list)} 个文件，分成 {len(batches)} 批")
         
         start_time = time_module.time()
@@ -501,25 +507,35 @@ def scan_directory_safe(input_dir: str) -> Tuple[List, 'FileProcessResult']:
     
     else:
         # 单核模式（文件少时）
-        for fp, fname, ext in file_list:
+        for file_info in file_list:
+            fp, fname, ext = file_info
             try:
-                size = os.path.getsize(fp)
+                # 统一使用 _load_single_file 处理
+                # 解包返回值: docs, fname, status, info, read_mode
+                result_tuple = _load_single_file(file_info, use_ocr=use_ocr)
                 
-                if ext not in SUPPORTED_FORMATS:
-                    result.add_skipped(fname, f"不支持的格式: {ext}")
-                    continue
-                
-                if size > 100 * 1024 * 1024:
-                    result.add_skipped(fname, "文件过大 (>100MB)")
-                    continue
-                
-                docs = SimpleDirectoryReader(input_files=[fp]).load_data()
-                if docs:
-                    all_docs.extend(docs)
-                    result.add_success(fname, size, len(docs))
+                if result_tuple[0]: # docs is not None
+                    if len(result_tuple) == 5:
+                        docs, _, status, info, _ = result_tuple
+                    else:
+                        docs, _, status, info = result_tuple
+                        
+                    if status == 'success':
+                        all_docs.extend(docs)
+                        size, doc_count = info
+                        result.add_success(fname, size, doc_count)
+                    elif status == 'skipped':
+                        result.add_skipped(fname, info)
+                    else:
+                        result.add_failed(fname, info)
                 else:
-                    result.add_failed(fname, "文件内容为空")
-            
+                    # Handle failure/skip where docs is None
+                    _, fname, status, info, _ = result_tuple
+                    if status == 'skipped':
+                        result.add_skipped(fname, info)
+                    else:
+                        result.add_failed(fname, info)
+
             except Exception as e:
                 result.add_failed(fname, str(e)[:100])
     

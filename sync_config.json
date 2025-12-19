@@ -1,0 +1,192 @@
+{
+  "project_info": {
+    "name": "RAG Pro Max",
+    "version": "2.4.7",
+    "description": "基于 Streamlit + LlamaIndex 的智能文档问答系统",
+    "architecture": "四层架构设计",
+    "main_entry": "src/apppro.py"
+  },
+  "sync_configuration": {
+    "version_files": [
+      "README.md",
+      "CHANGELOG.md",
+      "src/apppro.py",
+      "requirements.txt"
+    ],
+    "core_files": [
+      "src/apppro.py",
+      "src/file_processor.py",
+      "src/rag_engine.py"
+    ],
+    "documentation_files": [
+      "README.md",
+      "DEPLOYMENT.md",
+      "API_DOCUMENTATION.md",
+      "CHANGELOG.md",
+      "INTERFACE_SUMMARY.md",
+      "VERSION_ALIGNMENT_SUMMARY.md"
+    ],
+    "architecture_layers": {
+      "ui": {
+        "name": "表现层 (UI Layer)",
+        "directories": ["src/ui/", "src/app/", "src/auth/"],
+        "description": "Streamlit界面组件"
+      },
+      "service": {
+        "name": "服务层 (Service Layer)",
+        "directories": ["src/services/", "src/processors/", "src/engines/"],
+        "description": "业务逻辑服务"
+      },
+      "common": {
+        "name": "公共层 (Common Layer)",
+        "directories": ["src/common/", "src/utils/", "src/config/"],
+        "description": "通用工具模块"
+      },
+      "tools": {
+        "name": "工具层 (Tools Layer)",
+        "directories": ["src/api/", "src/monitoring/", "src/queue/"],
+        "description": "底层工具函数"
+      }
+    },
+    "exclude_patterns": [
+      "__pycache__",
+      "*.pyc",
+      ".git",
+      "node_modules",
+      "temp_uploads",
+      "vector_db_storage",
+      "chat_histories",
+      "app_logs",
+      ".DS_Store",
+      "*.log"
+    ]
+  },
+  "features": [
+    {
+      "category": "极致交互",
+      "items": [
+        "视图大一统",
+        "macOS 原生预览",
+        "高级选项一键全选",
+        "交互防抖"
+      ]
+    },
+    {
+      "category": "文档处理",
+      "items": [
+        "多格式支持",
+        "OCR识别",
+        "批量上传",
+        "文件验证"
+      ]
+    },
+    {
+      "category": "网页抓取",
+      "items": [
+        "智能抓取",
+        "内容分析",
+        "质量筛选",
+        "安全机制"
+      ]
+    },
+    {
+      "category": "智能检索",
+      "items": [
+        "语义检索",
+        "混合检索",
+        "智能重排序",
+        "引用来源"
+      ]
+    },
+    {
+      "category": "对话系统",
+      "items": [
+        "多轮对话",
+        "流式输出",
+        "追问推荐",
+        "历史管理"
+      ]
+    }
+  ],
+  "technology_stack": {
+    "core_frameworks": [
+      "streamlit>=1.28.0",
+      "llama-index>=0.9.0",
+      "chromadb>=0.4.0",
+      "sentence-transformers>=2.2.0"
+    ],
+    "document_processing": [
+      "PyMuPDF",
+      "python-docx",
+      "openpyxl",
+      "paddleocr"
+    ],
+    "ai_ml": [
+      "torch>=2.0.0",
+      "transformers>=4.30.0",
+      "ollama>=0.1.0"
+    ]
+  },
+  "sync_history": {
+    "last_sync": null,
+    "sync_count": 0,
+    "last_version_update": null,
+    "last_backup": null
+  },
+  "validation_rules": {
+    "required_directories": [
+      "src",
+      "config",
+      "tests"
+    ],
+    "required_files": [
+      "src/apppro.py",
+      "README.md",
+      "requirements.txt",
+      "CHANGELOG.md"
+    ],
+    "version_consistency": true,
+    "architecture_validation": true,
+    "documentation_completeness": true
+  },
+  "backup_settings": {
+    "backup_directory": "backups",
+    "retention_days": 30,
+    "include_patterns": [
+      "src/**",
+      "config/**",
+      "*.md",
+      "requirements.txt"
+    ],
+    "exclude_patterns": [
+      "__pycache__",
+      "*.pyc",
+      "temp_uploads",
+      "vector_db_storage",
+      "chat_histories",
+      "app_logs"
+    ]
+  },
+  "sync_tools": {
+    "master_sync": {
+      "script": "master_sync.py",
+      "description": "完整项目同步主控制器"
+    },
+    "code_sync": {
+      "script": "sync_codebase.py",
+      "description": "代码库结构同步"
+    },
+    "doc_sync": {
+      "script": "sync_documentation.py",
+      "description": "文档逻辑同步"
+    },
+    "version_unify": {
+      "script": "unify_versions.py",
+      "description": "版本号统一工具"
+    },
+    "project_manager": {
+      "script": "manage.sh",
+      "description": "项目管理便捷脚本"
+    }
+  }
+}

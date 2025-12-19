@@ -10,9 +10,9 @@ from datetime import datetime
 from pathlib import Path
 
 # 当前版本信息
-CURRENT_VERSION = "v2.3.0"
-CURRENT_DATE = "2025-12-13"
-RELEASE_NAME = "智能监控版"
+CURRENT_VERSION = "v2.4.7"
+CURRENT_DATE = "2025-12-19"
+RELEASE_NAME = "Web爬取与数据处理增强版"
 
 def update_readme():
     """更新 README.md"""

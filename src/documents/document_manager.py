@@ -55,13 +55,23 @@ class DocumentManager:
                 if newest_date is None or file_date > newest_date:
                     newest_date = file_date
         
+        # 计算向量库实际存储大小
+        db_size = 0
+        if os.path.exists(self.db_path):
+            try:
+                for root, dirs, files_walk in os.walk(self.db_path):
+                    db_size += sum(os.path.getsize(os.path.join(root, f)) for f in files_walk)
+            except Exception:
+                pass
+
         return {
             'file_cnt': file_cnt,
             'total_sz': total_sz,
             'total_chunks': total_chunks,
             'file_types': file_types,
             'oldest_date': oldest_date,
-            'newest_date': newest_date
+            'newest_date': newest_date,
+            'size': db_size
         }
     
     def render_statistics_overview(self, kb_name, stats):
@@ -281,24 +291,22 @@ class DocumentManager:
     @st.fragment
     def render_file_list(self, filtered_files, start_idx, end_idx, page_size):
         """渲染文件列表 (局部刷新模式)"""
-        # 表头 - 与 _render_file_row 保持一致
-        cols = st.columns([0.5, 2.5, 0.8, 0.6, 0.8, 0.6, 1.2, 1.0])
+        # 表头 - 与 _render_file_row 保持一致 [0.4, 0.8, 2.3, 0.8, 0.6, 0.8, 0.6, 1.2, 1.0]
+        cols = st.columns([0.4, 0.8, 2.3, 0.8, 0.6, 0.8, 0.6, 1.2, 1.0])
         
-        # 全选复选框
-        current_page_files = [f['name'] for f in filtered_files[start_idx:end_idx] 
-                             if not f.get('summary') and f.get('doc_ids')]
+        # 1. 全选复选框
+        current_page_files = [f['name'] for f in filtered_files[start_idx:end_idx]]
+        
+        selected_for_summary = st.session_state.get('selected_for_summary', set())
         
         if current_page_files:
-            if 'selected_for_summary' not in st.session_state:
-                st.session_state.selected_for_summary = set()
+            all_selected = all(fname in selected_for_summary for fname in current_page_files)
             
-            all_selected = all(fname in st.session_state.selected_for_summary for fname in current_page_files)
-            
-            def toggle_select_all(files=current_page_files):
+            def toggle_select_all():
                 if st.session_state.get(f"select_all_page_{st.session_state.file_page}"):
-                    st.session_state.selected_for_summary.update(files)
+                    st.session_state.selected_for_summary.update(current_page_files)
                 else:
-                    st.session_state.selected_for_summary.difference_update(files)
+                    st.session_state.selected_for_summary.difference_update(current_page_files)
             
             cols[0].checkbox(
                 "全选",
@@ -309,14 +317,26 @@ class DocumentManager:
             )
         else:
             cols[0].markdown("**✨**")
-        
-        cols[1].markdown("**文件名**")
-        cols[2].markdown("**类型**")
-        cols[3].markdown("**片段**")
-        cols[4].markdown("**大小**")
-        cols[5].markdown("**质量**")
-        cols[6].markdown("**时间**")
-        cols[7].markdown("**操作**")
+            
+        # 2. 批量操作按钮 (紧跟在全选框后面)
+        selected_count = len(selected_for_summary)
+        if selected_count > 0:
+            btn_col = cols[1]
+            b1, b2 = btn_col.columns(2)
+            if b1.button("✨", key="batch_sum_btn", help=f"为选中的 {selected_count} 个文件生成摘要"):
+                st.session_state.trigger_batch_summary = True
+            if b2.button("🗑️", key="batch_del_btn", help=f"批量删除选中的 {selected_count} 个文件"):
+                st.session_state.trigger_batch_delete = True
+        else:
+            cols[1].markdown("**ID**")
+            
+        cols[2].markdown("**文件名**")
+        cols[3].markdown("**类型**")
+        cols[4].markdown("**片段**")
+        cols[5].markdown("**大小**")
+        cols[6].markdown("**质量**")
+        cols[7].markdown("**时间**")
+        cols[8].markdown("**操作**")
         st.divider()
         
         # 渲染文件行
@@ -328,11 +348,11 @@ class DocumentManager:
     
     def _render_file_row(self, f, orig_idx, display_idx):
         """渲染单个文件行"""
-        # 调整列比例，为预览按钮腾出空间
-        cols = st.columns([0.5, 2.5, 0.8, 0.6, 0.8, 0.6, 1.2, 1.0])
+        # 调整列比例，与表头对齐 [0.4, 0.8, 2.3, 0.8, 0.6, 0.8, 0.6, 1.2, 1.0]
+        cols = st.columns([0.4, 0.8, 2.3, 0.8, 0.6, 0.8, 0.6, 1.2, 1.0])
         
-        # 摘要复选框
-        if not f.get('summary') and f.get('doc_ids'):
+        # 复选框 (始终显示)
+        if True:
             if 'selected_for_summary' not in st.session_state:
                 st.session_state.selected_for_summary = set()
             
@@ -345,16 +365,17 @@ class DocumentManager:
                 st.session_state.selected_for_summary.add(f['name'])
             else:
                 st.session_state.selected_for_summary.discard(f['name'])
-        else:
-            cols[0].write("")
+            
+        # ID列
+        cols[1].caption(f"#{orig_idx+1}")
         
         # 文件信息
-        cols[1].caption(f'{f["icon"]} {f["name"]}')
-        cols[2].caption(f['type'])
+        cols[2].caption(f'{f["icon"]} {f["name"]}')
+        cols[3].caption(f['type'])
         
         chunk_count = len(f.get('doc_ids', []))
-        cols[3].caption(str(chunk_count))
-        cols[4].caption(f['size'])
+        cols[4].caption(str(chunk_count))
+        cols[5].caption(f['size'])
         
         # 质量指示器
         if chunk_count == 0:
@@ -365,12 +386,12 @@ class DocumentManager:
             quality_icon = "✅"
         else:
             quality_icon = "🎉"
-        cols[5].caption(quality_icon)
+        cols[6].caption(quality_icon)
         
-        cols[6].caption(f['added_at'])
+        cols[7].caption(f['added_at'])
         
         # 操作列 (预览 + 删除)
-        btn_col = cols[7]
+        btn_col = cols[8]
         btn_col1, btn_col2 = btn_col.columns(2)
         
         with btn_col1:

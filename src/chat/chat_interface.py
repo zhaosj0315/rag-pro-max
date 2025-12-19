@@ -46,7 +46,7 @@ class ChatInterface:
                 col1, col2, col3 = st.columns(3)
                 col1.metric("📄 文档数", stats.get('file_cnt', 0))
                 col2.metric("🧩 片段数", stats.get('total_chunks', 0))
-                col3.metric("💾 大小", f"{stats.get('total_size_mb', 0):.1f}MB")
+                col3.metric("💾 大小", f"{stats.get('size', 0) / (1024 * 1024):.1f}MB")
                 
                 # 文档管理入口
                 with st.expander("📊 知识库详情与管理", expanded=False):
