@@ -1066,12 +1066,25 @@ with st.sidebar:
                             # 检查是否有实际文件（异步爬虫可能返回空列表但有文件）
                             actual_files = []
                             matching_dirs = False
-                            if use_async:
+                            
+                            # 优先检查当前生成的目录
+                            if os.path.exists(unique_output_dir) and os.listdir(unique_output_dir):
+                                import glob
+                                actual_files = glob.glob(os.path.join(unique_output_dir, "*.txt"))
+                                if actual_files:
+                                    matching_dirs = True
+                                    logger.info(f"🎯 使用本次抓取目录: {os.path.basename(unique_output_dir)} (包含 {len(actual_files)} 个文件)")
+                                    # 确保使用当前目录
+                                    async_output_dir = unique_output_dir
+                            
+                            # 如果当前目录为空（异常情况），才尝试智能选择
+                            if not actual_files and use_async:
                                 from src.utils.directory_selector import select_best_web_crawl_directory
                                 selected_dir, actual_files = select_best_web_crawl_directory(domain)
                                 if selected_dir:
                                     matching_dirs = True
-                                    logger.info(f"🎯 智能选择目录: {os.path.basename(selected_dir)} (包含 {len(actual_files)} 个文件)")
+                                    logger.info(f"⚠️ 当前目录为空，智能回退目录: {os.path.basename(selected_dir)} (包含 {len(actual_files)} 个文件)")
+                                    async_output_dir = selected_dir
                                 else:
                                     logger.warning(f"⚠️ 未找到有效的网页抓取目录")
                             
@@ -1156,9 +1169,13 @@ with st.sidebar:
                                 
                                 # 设置知识库构建参数
                                 if use_async:
-                                    # 查找最新的异步爬虫输出目录，优先选择有文件的目录
-                                    from src.utils.directory_selector import select_best_web_crawl_directory
-                                    async_output_dir, _ = select_best_web_crawl_directory(domain)
+                                    # 如果 async_output_dir 已经设置且有效，直接使用 (优先使用本次生成的目录)
+                                    if 'async_output_dir' in locals() and async_output_dir and os.path.exists(async_output_dir):
+                                        pass 
+                                    else:
+                                        # 查找最新的异步爬虫输出目录，优先选择有文件的目录 (仅作为回退)
+                                        from src.utils.directory_selector import select_best_web_crawl_directory
+                                        async_output_dir, _ = select_best_web_crawl_directory(domain)
                                     
                                     if async_output_dir:
                                         logger.info(f"🎯 知识库构建使用目录: {os.path.basename(async_output_dir)}")
@@ -1207,7 +1224,7 @@ with st.sidebar:
                                 except:
                                     pass
                                 
-                                st.rerun()
+                                # st.rerun() # 移除强制刷新，确保高级选项状态保留
                             
                             else:
                                 st.warning("未获取到内容")
@@ -1495,7 +1512,7 @@ URL: {content_item['url']}
                                     st.write(f"**抓取页面**: {len(files_to_use)} 页")
                                     st.write(f"**创建时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
                                 
-                                st.rerun()
+                                # st.rerun() # 移除强制刷新，确保高级选项状态保留
                             
                             else:
                                 st.warning("未搜索到相关内容")
@@ -1996,9 +2013,10 @@ if st.session_state.get('main_mode', 'rag') == 'sql':
 # 5. 核心逻辑 (RAG & Indexing)
 # ==========================================
 
-def process_knowledge_base_logic(action_mode="NEW"):
+def process_knowledge_base_logic(action_mode="NEW", use_ocr=False, extract_metadata=False, generate_summary=False, force_reindex=False):
     """处理知识库逻辑 (Stage 4.2 - 使用 IndexBuilder)"""
     global logger
+    
     persist_dir = os.path.join(output_base, final_kb_name)
     start_time = time.time()
     
@@ -2298,6 +2316,12 @@ if btn_start:
     if 'action_mode' not in locals() and 'action_mode' not in globals():
         action_mode = "NEW" if is_create_mode else "APPEND"
 
+    # 显式获取高级选项状态 (优先从 session_state 获取)
+    current_use_ocr = st.session_state.get('kb_use_ocr', False)
+    current_extract_metadata = st.session_state.get('kb_extract_metadata', False)
+    current_generate_summary = st.session_state.get('kb_generate_summary', False)
+    current_force_reindex = st.session_state.get('kb_force_reindex', False)
+
     config_to_save = {
         "target_path": target_path,
         "output_path": output_base,
@@ -2331,7 +2355,16 @@ if btn_start:
             # 使用优化后的名称
             final_kb_name = optimized_name
             
-            process_knowledge_base_logic(action_mode)
+            # DEBUG: Check parameters
+            print(f"DEBUG: Calling process_knowledge_base_logic with: ocr={current_use_ocr}, meta={current_extract_metadata}, summary={current_generate_summary}")
+
+            process_knowledge_base_logic(
+                action_mode=action_mode,
+                use_ocr=current_use_ocr,
+                extract_metadata=current_extract_metadata,
+                generate_summary=current_generate_summary,
+                force_reindex=current_force_reindex
+            )
             st.session_state.current_nav = f"📂 {final_kb_name}"
             st.session_state.current_kb_id = None 
             

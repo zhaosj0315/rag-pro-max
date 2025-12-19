@@ -231,7 +231,7 @@ RetrievalSystem
 ## 🔧 技术栈详解
 
 ### 前端技术栈
-- **Streamlit** ≥1.28.0 - Web应用框架 (v2.4.6 引入 st.fragment 局部刷新)
+- **Streamlit** ≥1.28.0 - Web应用框架 (v2.4.7 引入 st.fragment 局部刷新)
 - **HTML/CSS/JavaScript** - 自定义组件
 - **Plotly** - 数据可视化
 - **Streamlit-Aggrid** - 表格组件

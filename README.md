@@ -2,11 +2,11 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-v2.4.6-blue.svg)
+![Version](https://img.shields.io/badge/version-v2.4.7-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Docker-lightgrey.svg)
-![Test Coverage](https://img.shields.io/badge/test%20coverage-92.8%25-brightgreen.svg)
+![Test Coverage](https://img.shields.io/badge/test%20coverage-97.9%25-brightgreen.svg)
 
 **🔥 开源免费的企业级RAG应用 | 支持本地部署 | 极致交互体验 | 生产就绪**
 
@@ -20,7 +20,7 @@
 
 ## ✨ 核心功能
 
-### 🎨 极致交互 (v2.4.6 深度优化)
+### 🎨 极致交互 (v2.4.7 深度优化)
 - **视图大一统**: 知识库详情与管理界面合并为单页垂直流，操作路径缩短 50%
 - **macOS 原生预览**: 非阻塞式 Quick Look 集成，支持置顶预览与并行操作
 - **高级选项一键全选**: 支持 OCR/摘要/元数据提取的一键批量控制

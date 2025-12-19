@@ -71,14 +71,14 @@ streamlit run src/apppro.py --server.port 8501
 ### 1. 使用预构建镜像
 ```bash
 # 拉取镜像
-docker pull ragpromax/rag-pro-max:v2.4.5
+docker pull ragpromax/rag-pro-max:v2.4.7
 
 # 运行容器
 docker run -d \
   --name rag-pro-max \
   -p 8501:8501 \
   -v $(pwd)/data:/app/data \
-  ragpromax/rag-pro-max:v2.4.5
+  ragpromax/rag-pro-max:v2.4.7
 ```
 
 ### 2. 本地构建镜像
@@ -315,7 +315,7 @@ spec:
     spec:
       containers:
       - name: rag-pro-max
-        image: ragpromax/rag-pro-max:v2.4.5
+        image: ragpromax/rag-pro-max:v2.4.7
         ports:
         - containerPort: 8501
         env:
@@ -371,7 +371,7 @@ spec:
 version: '3.8'
 services:
   rag-pro-max:
-    image: ragpromax/rag-pro-max:v2.4.5
+    image: ragpromax/rag-pro-max:v2.4.7
     ports:
       - "8501:8501"
     deploy:

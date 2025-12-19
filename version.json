@@ -1,19 +1,19 @@
 {
-  "version": "2.4.6",
+  "version": "2.4.7",
   "release_date": "2025-12-19",
-  "codename": "交互体验深度优化版",
+  "codename": "Web爬取与数据处理增强版",
   "features": [
+    "Web爬取目录选择逻辑修复（优先使用当前抓取目录）",
+    "高级选项（OCR/元数据/摘要）在自动构建流程中的状态保留",
+    "知识库存储空间统计修复（增加向量库磁盘占用计算）",
     "知识库详情与管理视图大一统 (Tabs合并)",
-    "macOS 原生预览非阻塞集成 (Async + AppleScript)",
-    "文档列表局部刷新 (st.fragment) 与行内复选框",
-    "高级选项一键全选功能",
-    "每页5条的小步幅分页器"
+    "macOS 原生预览非阻塞集成 (Async + AppleScript)"
   ],
   "architecture": {
     "layers": 4,
     "modules": 191,
     "services": 3,
     "common_modules": 3,
-    "test_coverage": "90/97"
+    "test_coverage": "95/97"
   }
 }
