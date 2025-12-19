@@ -6,7 +6,7 @@
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Docker-lightgrey.svg)
-![Test Coverage](https://img.shields.io/badge/test%20coverage-97.9%25-brightgreen.svg)
+![Test Coverage](https://img.shields.io/badge/test%20coverage-91.7%25-brightgreen.svg)
 
 **🔥 开源免费的企业级RAG应用 | 支持本地部署 | 极致交互体验 | 生产就绪**
 

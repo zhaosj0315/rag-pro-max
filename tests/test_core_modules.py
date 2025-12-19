@@ -75,8 +75,8 @@ class TestCoreModules(unittest.TestCase):
         # 验证版本格式
         version = get_version()
         self.assertIsInstance(version, str)
-        # 更宽松的版本检查 - 支持v2.4.6
-        self.assertTrue("2.4.6" in version or "v2.4.6" in version)
+        # 更宽松的版本检查 - 支持v2.4.7
+        self.assertTrue("2.4.7" in version or "v2.4.7" in version)
 
 def run_core_module_tests():
     """运行核心模块测试"""
