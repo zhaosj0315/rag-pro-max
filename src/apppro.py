@@ -72,6 +72,7 @@ import time
 import requests
 import ollama
 import re
+import subprocess
 
 # 🧹 启动时自动清理临时文件
 from src.common.utils import cleanup_temp_files
@@ -1625,14 +1626,24 @@ URL: {content_item['url']}
 
             # 高级选项
             with st.expander("🔧 高级选项", expanded=False):
+                # 全选控制
+                def toggle_all():
+                    val = st.session_state.kb_adv_select_all
+                    st.session_state.kb_force_reindex = val
+                    st.session_state.kb_use_ocr = val
+                    st.session_state.kb_extract_metadata = val
+                    st.session_state.kb_generate_summary = val
+
+                st.checkbox("✅ 一键全选", value=False, key="kb_adv_select_all", on_change=toggle_all, help="开启/关闭所有高级选项")
+
                 # 第一行：索引和元数据选项
                 adv_col1, adv_col2 = st.columns(2)
                 with adv_col1:
-                    force_reindex = st.checkbox("🔄 强制重建索引", False, help="删除现有索引，重新构建")
-                    use_ocr = st.checkbox("🔍 启用OCR识别", value=False, help="识别PDF中的图片文字（耗时较长）", key="kb_use_ocr")
+                    force_reindex = st.checkbox("🔄 强制重建索引", value=False, key="kb_force_reindex", help="删除现有索引，重新构建")
+                    use_ocr = st.checkbox("🔍 启用OCR识别", value=False, key="kb_use_ocr", help="识别PDF中的图片文字（耗时较长）")
                 with adv_col2:
-                    extract_metadata = st.checkbox("📊 提取元数据", value=False, help="提取文件分类、关键词等信息")
-                    generate_summary = st.checkbox("📝 生成文档摘要", value=False, help="为每个文档生成AI摘要", key="kb_generate_summary")
+                    extract_metadata = st.checkbox("📊 提取元数据", value=False, key="kb_extract_metadata", help="提取文件分类、关键词等信息")
+                    generate_summary = st.checkbox("📝 生成文档摘要", value=False, key="kb_generate_summary", help="为每个文档生成AI摘要")
                 
                 # 保存到session state
                 st.session_state.use_ocr = use_ocr
@@ -2412,10 +2423,10 @@ if active_kb_name:
             
             st.divider()
             
-            # 文档列表查看
-            tab1, tab2 = st.tabs(["📊 统计信息", "📄 文档列表"])
+            # 文档列表查看与统计
+            # tab1, tab2 = st.tabs(["📊 统计信息", "📄 文档列表"])
             
-            with tab1:
+            if True: # 统计信息
                 # 详细统计信息
                 quality_info = doc_manager.render_detailed_statistics(stats)
                 st.divider()
@@ -2592,9 +2603,8 @@ if active_kb_name:
                 time.sleep(1)
                 st.rerun()  # 立即刷新页面显示摘要
             
-            # 文档列表标签页 (v1.6)
-            with tab2:
-                show_kb_documents(active_kb_name)
+            # 文档列表标签页 (v1.6) - 已移除
+            pass
             
             st.divider()
             
@@ -2614,7 +2624,7 @@ if active_kb_name:
             filter_quality = col5.selectbox("✅", ["✅ 质量", "优秀", "正常", "低质", "空"], label_visibility="collapsed")
             
             sort_by = col6.selectbox("排序", ["时间↓", "时间↑", "大小↓", "大小↑", "名称", "热度↓", "片段↓"], label_visibility="collapsed")
-            page_size = col7.selectbox("页", [10, 20, 50, 100], index=0, label_visibility="collapsed")
+            page_size = col7.selectbox("页", [5, 10, 20, 50], index=0, label_visibility="collapsed")
             
             # 筛选文件
             filtered_files = doc_manager.manifest['files']
@@ -2961,21 +2971,42 @@ if active_kb_name:
                                 st.session_state['show_doc_detail_kb'] = active_kb_name
                         
                         with col_ops:
-                            # 操作区：仅保留删除按钮，节省空间
-                            # 这里的 key 必须唯一
-                            if st.button("🗑️", key=f"del_{i}", help="删除文件"):
-                                with st.status(f"删除中...", expanded=True) as status:
+                            # 预览和删除
+                            op_c1, op_c2 = st.columns([1, 1])
+                            with op_c1:
+                                if st.button("👁️", key=f"prev_{i}", help="原生预览"):
                                     try:
-                                        ctx = StorageContext.from_defaults(persist_dir=db_path)
-                                        idx = load_index_from_storage(ctx)
-                                        for did in f.get('doc_ids', []):
-                                            idx.delete_ref_doc(did, delete_from_docstore=True)
-                                        idx.storage_context.persist(persist_dir=db_path)
-                                        remove_file_from_manifest(db_path, f['name'])
-                                        status.update(label="已删除", state="complete")
-                                        st.session_state.chat_engine = None
-                                        time.sleep(0.5); st.rerun()
-                                    except Exception as e: st.error(str(e))
+                                        # 优先使用记录的完整路径，否则回退到知识库目录
+                                        file_path = f.get('file_path')
+                                        if not file_path or not os.path.exists(file_path):
+                                            file_path = os.path.join(db_path, f['name'])
+                                        
+                                        if os.path.exists(file_path):
+                                            # 异步启动预览，不阻塞主程序
+                                            subprocess.Popen(["qlmanage", "-p", file_path], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                                            # 启动后台脚本强制置顶窗口
+                                            top_script = 'tell application "System Events"\n repeat until (exists process "qlmanage")\n delay 0.1\n end repeat\n set frontmost of process "qlmanage" to true\n end tell'
+                                            subprocess.Popen(['osascript', '-e', top_script])
+                                        else:
+                                            st.warning(f"源文件不存在: {f['name']}")
+                                    except Exception as e:
+                                        st.error(f"预览失败: {e}")
+                            
+                            with op_c2:
+                                # 操作区：仅保留删除按钮
+                                if st.button("🗑️", key=f"del_{i}", help="删除文件"):
+                                    with st.status(f"删除中...", expanded=True) as status:
+                                        try:
+                                            ctx = StorageContext.from_defaults(persist_dir=db_path)
+                                            idx = load_index_from_storage(ctx)
+                                            for did in f.get('doc_ids', []):
+                                                idx.delete_ref_doc(did, delete_from_docstore=True)
+                                            idx.storage_context.persist(persist_dir=db_path)
+                                            remove_file_from_manifest(db_path, f['name'])
+                                            status.update(label="已删除", state="complete")
+                                            st.session_state.chat_engine = None
+                                            time.sleep(0.5); st.rerun()
+                                        except Exception as e: st.error(str(e))
                 
                 # 底部分页（方便翻页）
                 if total_pages > 1:

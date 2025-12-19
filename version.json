@@ -1,19 +1,19 @@
 {
-  "version": "2.4.5",
-  "release_date": "2025-12-18",
-  "codename": "UI交互极致优化版",
+  "version": "2.4.6",
+  "release_date": "2025-12-19",
+  "codename": "交互体验深度优化版",
   "features": [
-    "macOS 原生预览 (Quick Look) 功能集成",
-    "侧边栏与管理界面空间极致压缩",
-    "全选复选框局部刷新 (st.fragment) 优化",
-    "文件上传双重触发逻辑修复",
-    "参考来源 Node ID 准确性修复"
+    "知识库详情与管理视图大一统 (Tabs合并)",
+    "macOS 原生预览非阻塞集成 (Async + AppleScript)",
+    "文档列表局部刷新 (st.fragment) 与行内复选框",
+    "高级选项一键全选功能",
+    "每页5条的小步幅分页器"
   ],
   "architecture": {
     "layers": 4,
     "modules": 191,
     "services": 3,
     "common_modules": 3,
-    "test_coverage": "88/97"
+    "test_coverage": "90/97"
   }
 }
