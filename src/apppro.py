@@ -715,15 +715,6 @@ with st.sidebar:
 
         # --- 功能区 ---
         if is_create_mode:
-            # 新建知识库标题完全一行化
-            new_col1, new_col2, new_col3 = st.columns([0.6, 5.9, 0.5])
-            with new_col1:
-                st.markdown("**新建:**")
-            with new_col2:
-                st.markdown("")  # 占位
-            with new_col3:
-                if st.button("💡", help="智能建议", use_container_width=True, key="smart_suggest"):
-                    st.toast("💡 建议：上传相关文档，系统会自动优化处理")
             
             with st.container(border=True):
                 # 1. 路径选择完全一行化
@@ -734,7 +725,7 @@ with st.sidebar:
                 if st.session_state.get('uploaded_path') and not st.session_state.path_input:
                     st.session_state.path_input = st.session_state.uploaded_path
 
-                path_col1, path_col2, path_col3 = st.columns([0.6, 5.9, 0.5])
+                path_col1, path_col2, path_col3, path_col4 = st.columns([0.6, 5.4, 0.5, 0.5])
                 
                 with path_col1:
                     st.markdown("**路径:**")
@@ -757,6 +748,9 @@ with st.sidebar:
                                 webbrowser.open(file_url)
                                 st.toast("✅ 已打开")
                             except: pass
+                with path_col4:
+                    if st.button("💡", help="智能建议", use_container_width=True, key="smart_suggest"):
+                        st.toast("💡 建议：上传相关文档，系统会自动优化处理")
 
                 if target_path != st.session_state.path_input:
                     st.session_state.path_input = target_path
@@ -1686,43 +1680,36 @@ URL: {content_item['url']}
                     if folder_name.startswith(('batch_', 'Web_', 'Search_')) and auto_name:
                         display_name = auto_name
 
-                    st.success(f"✅ **数据源已就绪**: `{display_name}`")
+                    # --- 将就绪提示和名称输入合并到一行 ---
+                    ready_col1, ready_col2 = st.columns([3, 4])
+                    with ready_col1:
+                        st.success(f"✅ **已就绪**: `{display_name[:20]}...`" if len(display_name) > 20 else f"✅ **已就绪**: `{display_name}`")
+                    
+                    with ready_col2:
+                        if is_create_mode:
+                            final_kb_name = st.text_input(
+                                "知识库名称", 
+                                value=sanitize_filename(auto_name) if auto_name else "", 
+                                placeholder="输入库名",
+                                label_visibility="collapsed",
+                                key="kb_name_inline_input"
+                            )
+                        else:
+                            final_kb_name = current_kb_name
+                            st.info(f"📂 库: {final_kb_name}")
 
-                    # 类型分布（只显示前5种）
+                    # 类型分布（紧凑化）
                     if file_types:
-                        st.caption("**文件类型分布**")
                         sorted_types = sorted(file_types.items(), key=lambda x: x[1], reverse=True)[:5]
-                        type_text = " · ".join([f"{ext.replace('.', '')}: {count}" for ext, count in sorted_types])
-                        if len(file_types) > 5:
-                            type_text += f" · 其他: {sum(c for _, c in sorted(file_types.items(), key=lambda x: x[1], reverse=True)[5:])}"
-                        st.caption(type_text)
+                        type_text = " · ".join([f"{ext.replace('.', '')}:{count}" for ext, count in sorted_types])
+                        st.caption(f"📊 {type_text}")
                 else:
                     st.error("❌ 路径不存在，请检查路径是否正确")
-
-            # final_kb_name 必须在 if/else 中被定义，以确保其在模块作用域内
-            st.write("")
-            if is_create_mode:
-                # 知识库名称一行化布局
-                name_col1, name_col2 = st.columns([1.5, 5.5])
-                with name_col1:
-                    st.markdown("**知识库名称**")
-                with name_col2:
-                    if auto_name:
-                        st.caption(f"💡 建议名称：{auto_name}")
-
-                final_kb_name = st.text_input(
-                    "知识库名称", 
-                    value=sanitize_filename(auto_name) if auto_name else "", 
-                    placeholder="留空自动生成，或输入自定义名称",
-                    label_visibility="collapsed",
-                    help="留空将自动生成有意义的名称"
-                )
-
-                # 如果用户没输入，使用自动生成的名称
-                if not final_kb_name and auto_name:
-                    final_kb_name = sanitize_filename(auto_name)
+                    final_kb_name = current_kb_name if not is_create_mode else ""
             else:
-                final_kb_name = current_kb_name
+                final_kb_name = current_kb_name if not is_create_mode else ""
+
+            st.write("")
 
             # 高级选项
             with st.expander("🔧 高级选项", expanded=False):
