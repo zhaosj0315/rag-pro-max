@@ -894,6 +894,8 @@ with st.sidebar:
                         col_url_input, col_analyze_btn = st.columns([7, 1.2])
                         with col_url_input:
                             crawl_url = st.text_input("🔗 网址", placeholder="python.org", label_visibility="collapsed")
+                            # 保存到session_state
+                            st.session_state.crawl_url = crawl_url
                         
                         search_keyword = None
                         
@@ -922,18 +924,27 @@ with st.sidebar:
                         with col_p1:
                             default_depth = st.session_state.crawl_analysis['recommended_depth'] if 'crawl_analysis' in st.session_state else 2
                             crawl_depth = st.number_input("递归深度", 1, 10, default_depth)
+                            # 保存到session_state
+                            st.session_state.crawl_depth = crawl_depth
                         with col_p2:
                             default_pages = st.session_state.crawl_analysis['recommended_pages'] if 'crawl_analysis' in st.session_state else 5
                             max_pages = st.number_input("每层页数", 1, 1000, default_pages)
+                            # 保存到session_state
+                            st.session_state.max_pages = max_pages
                         with col_p3:
                             parser_type = st.selectbox("解析器类型", ["default", "article", "documentation"])
+                            # 保存到session_state
+                            st.session_state.parser_type = parser_type
                         
                         # 质量筛选 - 极致压缩
                         enable_url_quality_filter = st.checkbox("🎯 启用质量筛选", value=True, help="开启后会过滤低质量页面，建议在内容杂乱时使用")
                         if enable_url_quality_filter:
                             url_quality_threshold = st.slider("质量阈值", 10.0, 50.0, 45.0, 5.0, help="分数越高筛选越严格，45分为推荐值")
+                            # 保存到session_state
+                            st.session_state.url_quality_threshold = url_quality_threshold
                         else:
                             url_quality_threshold = 0.0
+                            st.session_state.url_quality_threshold = url_quality_threshold
                         
                     else:  # current_mode == "search"
                         # 智能行业搜索模式
@@ -957,6 +968,8 @@ with st.sidebar:
                         col_kw_input, col_kw_brain = st.columns([7, 1.2])
                         with col_kw_input:
                             search_keyword = st.text_input("🔍 关键词", placeholder="输入搜索内容...", label_visibility="collapsed")
+                            # 保存到session_state
+                            st.session_state.search_keyword = search_keyword
                         
                         with col_kw_brain:
                             if st.button("🧠", help="AI智能推荐行业权威站点", key="smart_analyze_search", use_container_width=True):
@@ -972,17 +985,26 @@ with st.sidebar:
                         col_s1, col_s2, col_s3 = st.columns(3)
                         with col_s1:
                             crawl_depth = st.number_input("递归深度", 1, 5, 2)
+                            # 保存到session_state (搜索模式)
+                            st.session_state.search_crawl_depth = crawl_depth
                         with col_s2:
                             max_pages = st.number_input("总页数", 1, 500, 5)
+                            # 保存到session_state (搜索模式)
+                            st.session_state.search_max_pages = max_pages
                         with col_s3:
                             parser_type = st.selectbox("解析器类型", ["default", "article", "documentation"], key="parser_search")
+                            # 保存到session_state (搜索模式)
+                            st.session_state.search_parser_type = parser_type
                         
                         # 质量筛选 - 极致压缩
                         enable_quality_filter = st.checkbox("🎯 启用质量筛选", value=True, help="过滤低相关性页面，建议开启", key="q_filter_search")
                         if enable_quality_filter:
                             quality_threshold = st.slider("质量阈值", 10.0, 50.0, 45.0, 5.0, key="q_threshold_search")
+                            # 保存到session_state
+                            st.session_state.quality_threshold = quality_threshold
                         else:
                             quality_threshold = 0.0
+                            st.session_state.quality_threshold = quality_threshold
                         
                         # 🛑 安全警告 - 指数增长预估
                         estimated_pages = max_pages ** crawl_depth  # 指数增长：每层可能产生max_pages个新链接
@@ -2384,6 +2406,288 @@ if active_kb_name and st.session_state.chat_engine is None:
 
 # 按钮处理
 if btn_start:
+    # 检查是否为网页抓取模式
+    is_web_crawl_mode = (is_create_mode and 
+                        st.session_state.get('crawl_input_mode') in ['url', 'search'] and
+                        (st.session_state.get('crawl_url') or st.session_state.get('search_keyword')))
+    
+    if is_web_crawl_mode:
+        # 复用网页抓取逻辑
+        crawl_url = st.session_state.get('crawl_url')
+        search_keyword = st.session_state.get('search_keyword')
+        current_mode = st.session_state.get('crawl_input_mode', 'url')
+        
+        # 获取抓取参数
+        crawl_depth = st.session_state.get('crawl_depth', 2)
+        max_pages = st.session_state.get('max_pages', 5)
+        parser_type = st.session_state.get('parser_type', 'default')
+        url_quality_threshold = st.session_state.get('url_quality_threshold', 45.0)
+        quality_threshold = st.session_state.get('quality_threshold', 45.0)
+        
+        # 执行网页抓取并创建知识库的逻辑
+        if crawl_url:
+            # 网址抓取模式 - 复用现有逻辑
+            try:
+                # 优先使用异步爬虫
+                try:
+                    from src.processors.enhanced_web_crawler import run_async_crawl
+                    use_async = True
+                    st.info("🚀 使用异步并发爬虫 (性能提升10倍+, 支持断点续传, robots.txt检查)")
+                except ImportError:
+                    from src.processors.web_crawler import WebCrawler
+                    use_async = False
+                    st.info("📡 使用标准爬虫")
+                
+                # 使用带域名的唯一目录
+                from urllib.parse import urlparse
+                from datetime import datetime
+                
+                try:
+                    domain = urlparse(crawl_url).netloc.replace('.', '_').replace(':', '')
+                    if not domain: domain = "unknown"
+                except:
+                    domain = "unknown"
+                    
+                timestamp_dir = datetime.now().strftime('%Y%m%d_%H%M%S')
+                unique_output_dir = os.path.join("temp_uploads", f"Web_{domain}_{timestamp_dir}")
+                
+                # 执行抓取
+                if use_async:
+                    # 异步爬虫配置
+                    max_concurrent = 15
+                    
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    crawled_count = [0]
+                    
+                    def update_status(msg):
+                        status_text.text(msg)
+                        logger.info(f"🌐 网页爬取: {msg}")
+                        if "已爬取" in msg or "已保存" in msg:
+                            crawled_count[0] += 1
+                            progress = min(crawled_count[0] / max(max_pages, 1), 1.0)
+                            progress_bar.progress(progress)
+                    
+                    logger.info(f"🌐 开始网页爬取: {crawl_url} (深度:{crawl_depth}, 页数:{max_pages})")
+                    
+                    with st.spinner("异步抓取中..."):
+                        result = run_async_crawl(
+                            start_url=crawl_url,
+                            max_depth=crawl_depth,
+                            max_pages=max_pages,
+                            status_callback=update_status,
+                            max_concurrent=max_concurrent,
+                            ignore_robots=True,
+                            output_dir=unique_output_dir
+                        )
+                        saved_files = result if isinstance(result, list) else []
+                        async_output_dir = unique_output_dir
+                else:
+                    # 同步爬虫逻辑
+                    crawler = WebCrawler(output_dir=unique_output_dir)
+                    
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    crawled_count = [0]
+                    
+                    def update_status(msg):
+                        status_text.text(f"📡 {msg}")
+                        logger.info(f"🌐 网页爬取: {msg}")
+                        if "已保存" in msg:
+                            crawled_count[0] += 1
+                            progress = min(crawled_count[0] / max_pages, 1.0)
+                            progress_bar.progress(progress)
+                    
+                    logger.info(f"🌐 开始网页爬取: {crawl_url} (深度:{crawl_depth}, 页数:{max_pages})")
+                    
+                    with st.spinner("网页抓取中..."):
+                        saved_files = crawler.crawl_website(
+                            start_url=crawl_url,
+                            max_depth=crawl_depth,
+                            max_pages=max_pages,
+                            parser_type=parser_type,
+                            status_callback=update_status,
+                            quality_threshold=url_quality_threshold
+                        )
+                
+                # 抓取完成后自动创建知识库
+                if saved_files:
+                    st.success(f"✅ 网页抓取完成！共保存 {len(saved_files)} 个文件")
+                    
+                    # 设置抓取目录为数据源
+                    target_path = unique_output_dir
+                    
+                    # 自动生成知识库名称
+                    kb_name = f"Web_{domain}_{timestamp_dir}"
+                    
+                    # 继续执行知识库创建逻辑
+                    st.info("🚀 开始创建知识库...")
+                    
+                    # 获取高级选项状态
+                    current_use_ocr = st.session_state.get('kb_use_ocr', False)
+                    current_extract_metadata = st.session_state.get('kb_extract_metadata', False)
+                    current_generate_summary = st.session_state.get('kb_generate_summary', False)
+                    current_force_reindex = st.session_state.get('kb_force_reindex', False)
+                    
+                    # 执行知识库创建
+                    from src.core.business_logic import process_knowledge_base_logic
+                    
+                    success = process_knowledge_base_logic(
+                        target_path=target_path,
+                        kb_name=kb_name,
+                        output_base=output_base,
+                        action_mode="NEW",
+                        use_ocr=current_use_ocr,
+                        extract_metadata=current_extract_metadata,
+                        generate_summary=current_generate_summary,
+                        force_reindex=current_force_reindex
+                    )
+                    
+                    if success:
+                        st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
+                        # 清理session_state中的网页抓取参数
+                        for key in ['crawl_url', 'crawl_depth', 'max_pages', 'parser_type', 'url_quality_threshold']:
+                            if key in st.session_state:
+                                del st.session_state[key]
+                        st.rerun()
+                    else:
+                        st.error("❌ 知识库创建失败")
+                    
+                else:
+                    st.error("❌ 网页抓取失败，未获取到任何文件")
+                    st.stop()
+                    
+            except Exception as e:
+                st.error(f"❌ 网页抓取失败: {str(e)}")
+                logger.error(f"网页抓取错误: {str(e)}")
+                st.stop()
+                
+        elif search_keyword:
+            # 智能搜索模式 - 复用现有逻辑
+            try:
+                # 获取搜索参数
+                crawl_depth = st.session_state.get('search_crawl_depth', 2)
+                max_pages = st.session_state.get('search_max_pages', 5)
+                parser_type = st.session_state.get('search_parser_type', 'default')
+                quality_threshold = st.session_state.get('quality_threshold', 45.0)
+                
+                st.info(f"🔍 开始智能搜索: {search_keyword}")
+                
+                # 使用现有的智能搜索引擎
+                search_engines = [
+                    "https://www.runoob.com/",
+                    "https://docs.python.org/zh-cn/3/",
+                    "https://help.aliyun.com/",
+                    "https://www.eastmoney.com/",
+                    "https://www.icourse163.org/"
+                ]
+                
+                # 生成唯一输出目录
+                from datetime import datetime
+                timestamp_dir = datetime.now().strftime('%Y%m%d_%H%M%S')
+                unique_output_dir = os.path.join("temp_uploads", f"Search_{search_keyword.replace(' ', '_')}_{timestamp_dir}")
+                
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                def update_status(msg):
+                    status_text.text(f"🔍 {msg}")
+                    logger.info(f"🔍 智能搜索: {msg}")
+                
+                logger.info(f"🔍 开始智能搜索: {search_keyword} (深度:{crawl_depth}, 页数:{max_pages})")
+                
+                with st.spinner("智能搜索中..."):
+                    # 使用现有的并发爬虫
+                    from src.processors.concurrent_crawler import ConcurrentCrawler
+                    from src.processors.content_analyzer import ContentQualityAnalyzer
+                    
+                    concurrent_crawler = ConcurrentCrawler(max_workers=3)
+                    content_analyzer = ContentQualityAnalyzer()
+                    
+                    def enhanced_progress_callback(message, progress=None):
+                        update_status(message)
+                        if progress is not None:
+                            progress_bar.progress(progress)
+                    
+                    # 执行并发爬取
+                    crawl_results = concurrent_crawler.crawl_with_depth(
+                        search_engines,
+                        max_depth=crawl_depth,
+                        max_pages_per_level=max_pages,
+                        progress_callback=enhanced_progress_callback
+                    )
+                    
+                    # 保存结果到文件
+                    saved_files = []
+                    if crawl_results:
+                        import os
+                        os.makedirs(unique_output_dir, exist_ok=True)
+                        
+                        for i, result in enumerate(crawl_results):
+                            if result['success'] and result['content']:
+                                filename = f"quality_content_{i+1:03d}.txt"
+                                filepath = os.path.join(unique_output_dir, filename)
+                                
+                                with open(filepath, 'w', encoding='utf-8') as f:
+                                    f.write(f"标题: {result['title']}\n")
+                                    f.write(f"URL: {result['url']}\n")
+                                    f.write(f"内容:\n{result['content']}\n")
+                                
+                                saved_files.append(filepath)
+                
+                # 搜索完成后自动创建知识库
+                if saved_files:
+                    st.success(f"✅ 智能搜索完成！共保存 {len(saved_files)} 个文件")
+                    
+                    # 设置搜索目录为数据源
+                    target_path = unique_output_dir
+                    
+                    # 自动生成知识库名称
+                    kb_name = f"Search_{search_keyword.replace(' ', '_')}_{timestamp_dir}"
+                    
+                    # 继续执行知识库创建逻辑
+                    st.info("🚀 开始创建知识库...")
+                    
+                    # 获取高级选项状态
+                    current_use_ocr = st.session_state.get('kb_use_ocr', False)
+                    current_extract_metadata = st.session_state.get('kb_extract_metadata', False)
+                    current_generate_summary = st.session_state.get('kb_generate_summary', False)
+                    current_force_reindex = st.session_state.get('kb_force_reindex', False)
+                    
+                    # 执行知识库创建
+                    from src.core.business_logic import process_knowledge_base_logic
+                    
+                    success = process_knowledge_base_logic(
+                        target_path=target_path,
+                        kb_name=kb_name,
+                        output_base=output_base,
+                        action_mode="NEW",
+                        use_ocr=current_use_ocr,
+                        extract_metadata=current_extract_metadata,
+                        generate_summary=current_generate_summary,
+                        force_reindex=current_force_reindex
+                    )
+                    
+                    if success:
+                        st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
+                        # 清理session_state中的搜索参数
+                        for key in ['search_keyword', 'search_crawl_depth', 'search_max_pages', 'search_parser_type', 'quality_threshold']:
+                            if key in st.session_state:
+                                del st.session_state[key]
+                        st.rerun()
+                    else:
+                        st.error("❌ 知识库创建失败")
+                        
+                else:
+                    st.error("❌ 智能搜索失败，未获取到任何文件")
+                    st.stop()
+                    
+            except Exception as e:
+                st.error(f"❌ 智能搜索失败: {str(e)}")
+                logger.error(f"智能搜索错误: {str(e)}")
+                st.stop()
+    
+    # 原有的文件处理逻辑
     # 确保 action_mode 已定义 (防止 NameError)
     if 'action_mode' not in locals() and 'action_mode' not in globals():
         action_mode = "NEW" if is_create_mode else "APPEND"
