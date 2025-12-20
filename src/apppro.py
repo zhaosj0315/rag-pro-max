@@ -807,14 +807,13 @@ with st.sidebar:
                             else:
                                 st.warning("内容不能为空")
         else:
-            # 管理模式
-            st.caption(f"🛠️ 管理: {current_kb_name}")
-            
-            # 紧凑管理布局：标题和重建按钮占一行
-            manage_head_col1, manage_head_col2 = st.columns([3, 1])
-            with manage_head_col1:
+            # 管理模式 - 使用一行化布局
+            manage_title_col1, manage_title_col2, manage_title_col3 = st.columns([2, 2, 1])
+            with manage_title_col1:
+                st.caption(f"🛠️ 管理: {current_kb_name}")
+            with manage_title_col2:
                 st.markdown("📤 **添加文档**")
-            with manage_head_col2:
+            with manage_title_col3:
                 if st.button("🔄", help="重建索引 (覆盖该库)", use_container_width=True):
                     # 触发重建逻辑
                     st.session_state.uploaded_path = os.path.join("vector_db_storage", current_kb_name)
@@ -838,11 +837,16 @@ with st.sidebar:
                 label_visibility="collapsed"
             )
             
+            # 添加更新知识库按钮
             if uploaded_files:
                 st.info("💡 上传后请点击下方 '更新知识库' 按钮")
+                if st.button("🔄 更新知识库", type="primary", use_container_width=True, key="update_kb_btn"):
+                    btn_start = True  # 触发处理逻辑
+                    action_mode = "APPEND"
 
         # 统一的数据源处理逻辑（仅针对 Web 抓取保留在外部，本地文件已在内部处理）
         btn_start = False # Initialize to avoid NameError
+        
         if is_create_mode:
             with src_tab_web:
                 with st.container(border=True):
