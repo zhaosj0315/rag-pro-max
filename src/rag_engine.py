@@ -135,21 +135,6 @@ class RAGEngine:
         
         return self.index
     
-    def get_retriever(self, similarity_top_k: int = 5):
-        """
-        获取检索器
-        
-        Args:
-            similarity_top_k: 返回的相似文档数量
-            
-        Returns:
-            检索器对象
-        """
-        if not self.index:
-            raise ValueError("索引未加载，请先创建或加载索引")
-        
-        return self.index.as_retriever(similarity_top_k=similarity_top_k)
-    
     def get_query_engine(
         self, 
         similarity_top_k: int = 5,
@@ -169,35 +154,6 @@ class RAGEngine:
             raise ValueError("索引未加载，请先创建或加载索引")
         
         return self.index.as_query_engine(
-            similarity_top_k=similarity_top_k,
-            streaming=streaming
-        )
-    
-    def get_chat_engine(
-        self,
-        chat_mode: str = "condense_plus_context",
-        memory=None,
-        similarity_top_k: int = 5,
-        streaming: bool = True
-    ):
-        """
-        获取对话引擎
-        
-        Args:
-            chat_mode: 对话模式
-            memory: 对话记忆
-            similarity_top_k: 返回的相似文档数量
-            streaming: 是否启用流式输出
-            
-        Returns:
-            对话引擎对象
-        """
-        if not self.index:
-            raise ValueError("索引未加载，请先创建或加载索引")
-        
-        return self.index.as_chat_engine(
-            chat_mode=chat_mode,
-            memory=memory,
             similarity_top_k=similarity_top_k,
             streaming=streaming
         )
