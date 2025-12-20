@@ -2549,29 +2549,30 @@ if btn_start:
                     current_generate_summary = st.session_state.get('kb_generate_summary', False)
                     current_force_reindex = st.session_state.get('kb_force_reindex', False)
                     
-                    # 执行知识库创建
-                    from src.core.business_logic import process_knowledge_base_logic
+                    # 执行知识库创建 - 使用现有的kb_interface方法
+                    from src.kb.kb_interface import KBInterface
                     
-                    success = process_knowledge_base_logic(
-                        target_path=target_path,
-                        kb_name=kb_name,
-                        output_base=output_base,
-                        action_mode="NEW",
-                        use_ocr=current_use_ocr,
-                        extract_metadata=current_extract_metadata,
-                        generate_summary=current_generate_summary,
-                        force_reindex=current_force_reindex
-                    )
+                    kb_interface = KBInterface()
                     
-                    if success:
+                    # 构建选项字典
+                    options = {
+                        'use_ocr': current_use_ocr,
+                        'extract_metadata': current_extract_metadata,
+                        'generate_summary': current_generate_summary,
+                        'force_reindex': current_force_reindex
+                    }
+                    
+                    try:
+                        kb_interface.create_knowledge_base(target_path, kb_name, options)
                         st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
                         # 清理session_state中的网页抓取参数
                         for key in ['crawl_url', 'crawl_depth', 'max_pages', 'parser_type', 'url_quality_threshold']:
                             if key in st.session_state:
                                 del st.session_state[key]
                         st.rerun()
-                    else:
-                        st.error("❌ 知识库创建失败")
+                    except Exception as e:
+                        st.error(f"❌ 知识库创建失败: {str(e)}")
+                        logger.error(f"知识库创建错误: {str(e)}")
                     
                 else:
                     st.error("❌ 网页抓取失败，未获取到任何文件")
@@ -2677,29 +2678,30 @@ if btn_start:
                     current_generate_summary = st.session_state.get('kb_generate_summary', False)
                     current_force_reindex = st.session_state.get('kb_force_reindex', False)
                     
-                    # 执行知识库创建
-                    from src.core.business_logic import process_knowledge_base_logic
+                    # 执行知识库创建 - 使用现有的kb_interface方法
+                    from src.kb.kb_interface import KBInterface
                     
-                    success = process_knowledge_base_logic(
-                        target_path=target_path,
-                        kb_name=kb_name,
-                        output_base=output_base,
-                        action_mode="NEW",
-                        use_ocr=current_use_ocr,
-                        extract_metadata=current_extract_metadata,
-                        generate_summary=current_generate_summary,
-                        force_reindex=current_force_reindex
-                    )
+                    kb_interface = KBInterface()
                     
-                    if success:
+                    # 构建选项字典
+                    options = {
+                        'use_ocr': current_use_ocr,
+                        'extract_metadata': current_extract_metadata,
+                        'generate_summary': current_generate_summary,
+                        'force_reindex': current_force_reindex
+                    }
+                    
+                    try:
+                        kb_interface.create_knowledge_base(target_path, kb_name, options)
                         st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
                         # 清理session_state中的搜索参数
                         for key in ['search_keyword', 'search_crawl_depth', 'search_max_pages', 'search_parser_type', 'quality_threshold']:
                             if key in st.session_state:
                                 del st.session_state[key]
                         st.rerun()
-                    else:
-                        st.error("❌ 知识库创建失败")
+                    except Exception as e:
+                        st.error(f"❌ 知识库创建失败: {str(e)}")
+                        logger.error(f"知识库创建错误: {str(e)}")
                         
                 else:
                     st.error("❌ 智能搜索失败，未获取到任何文件")
