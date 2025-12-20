@@ -810,24 +810,23 @@ with st.sidebar:
             # 管理模式
             st.caption(f"🛠️ 管理: {current_kb_name}")
             
-            with st.container(border=True):
-                # 紧凑管理布局：标题和重建按钮占一行
-                manage_head_col1, manage_head_col2 = st.columns([3, 1])
-                with manage_head_col1:
-                    st.markdown("📤 **添加文档**")
-                with manage_head_col2:
-                    if st.button("🔄", help="重建索引 (覆盖该库)", use_container_width=True):
-                        # 触发重建逻辑
-                        st.session_state.uploaded_path = os.path.join("vector_db_storage", current_kb_name)
-                        # 这里需要一种方式标记为 NEW 模式，通常是通过 btn_start 触发
-                        st.session_state.trigger_rebuild = True
-                        st.rerun()
+            # 紧凑管理布局：标题和重建按钮占一行
+            manage_head_col1, manage_head_col2 = st.columns([3, 1])
+            with manage_head_col1:
+                st.markdown("📤 **添加文档**")
+            with manage_head_col2:
+                if st.button("🔄", help="重建索引 (覆盖该库)", use_container_width=True):
+                    # 触发重建逻辑
+                    st.session_state.uploaded_path = os.path.join("vector_db_storage", current_kb_name)
+                    # 这里需要一种方式标记为 NEW 模式，通常是通过 btn_start 触发
+                    st.session_state.trigger_rebuild = True
+                    st.rerun()
 
-                # 追加模式的文件上传
-                action_mode = "APPEND"
-                # 如果触发了重建，则强制改为 NEW
-                if st.session_state.get('trigger_rebuild'):
-                    action_mode = "NEW"
+            # 追加模式的文件上传
+            action_mode = "APPEND"
+            # 如果触发了重建，则强制改为 NEW
+            if st.session_state.get('trigger_rebuild'):
+                action_mode = "NEW"
                     st.session_state.trigger_rebuild = False # 消费掉标记
                 
                 target_path = "" # 管理模式不需要手动指定路径，使用KB原有路径
@@ -901,17 +900,16 @@ with st.sidebar:
                             with st.expander("🎯 推荐: " + analysis['site_type'].title(), expanded=True):
                                 st.caption(f"💡 {analysis['description']}")
                         
-                        # 抓取参数 - 紧凑布局 (一行两个)
-                        col_p1, col_p2 = st.columns(2)
+                        # 抓取参数 - 一行三列布局
+                        col_p1, col_p2, col_p3 = st.columns(3)
                         with col_p1:
                             default_depth = st.session_state.crawl_analysis['recommended_depth'] if 'crawl_analysis' in st.session_state else 2
                             crawl_depth = st.number_input("递归深度", 1, 10, default_depth)
                         with col_p2:
                             default_pages = st.session_state.crawl_analysis['recommended_pages'] if 'crawl_analysis' in st.session_state else 20
                             max_pages = st.number_input("每层页数", 1, 1000, default_pages)
-                        
-                        # 解析器单放一行
-                        parser_type = st.selectbox("解析器类型", ["default", "article", "documentation"])
+                        with col_p3:
+                            parser_type = st.selectbox("解析器类型", ["default", "article", "documentation"])
                         
                         # 质量筛选 - 极致压缩
                         enable_url_quality_filter = st.checkbox("🎯 启用质量筛选", value=True, help="开启后会过滤低质量页面，建议在内容杂乱时使用")
@@ -953,15 +951,14 @@ with st.sidebar:
                                 else:
                                     st.toast("请先输入关键词", icon="⚠️")
 
-                        # 搜索参数 - 紧凑布局 (一行两个)
-                        col_s1, col_s2 = st.columns(2)
+                        # 搜索参数 - 一行三列布局
+                        col_s1, col_s2, col_s3 = st.columns(3)
                         with col_s1:
                             crawl_depth = st.number_input("递归深度", 1, 5, 2)
                         with col_s2:
                             max_pages = st.number_input("总页数", 1, 500, 20)
-                        
-                        # 解析器单放一行
-                        parser_type = st.selectbox("解析器类型", ["default", "article", "documentation"], key="parser_search")
+                        with col_s3:
+                            parser_type = st.selectbox("解析器类型", ["default", "article", "documentation"], key="parser_search")
                         
                         # 质量筛选 - 极致压缩
                         enable_quality_filter = st.checkbox("🎯 启用质量筛选", value=True, help="过滤低相关性页面，建议开启", key="q_filter_search")
