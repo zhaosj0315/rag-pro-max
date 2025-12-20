@@ -391,6 +391,25 @@ st.markdown("""
         max-width: 100% !important;
     }
 
+    /* 极致压缩侧边栏间距 */
+    section[data-testid="stSidebar"] .stSelectbox > div {
+        margin-bottom: 1px !important;
+    }
+    
+    section[data-testid="stSidebar"] .stTextInput > div {
+        margin-bottom: 1px !important;
+    }
+    
+    section[data-testid="stSidebar"] .stCaption {
+        margin-bottom: 1px !important;
+        margin-top: 1px !important;
+    }
+    
+    section[data-testid="stSidebar"] .stContainer {
+        margin-bottom: 1px !important;
+        margin-top: 1px !important;
+    }
+
     /* 增加侧边栏宽度，固定大小并禁止拖动缩放 */
     section[data-testid="stSidebar"] {
         min-width: 850px !important;
@@ -652,7 +671,7 @@ with st.sidebar:
             except ValueError:
                 default_idx = 0
 
-        selected_nav = st.selectbox("📚 选择知识库", nav_options, index=default_idx)
+        selected_nav = st.selectbox("选择:", nav_options, index=default_idx)
 
         # 知识库搜索/过滤已按用户要求移除
 
@@ -676,7 +695,7 @@ with st.sidebar:
 
         # --- 功能区 ---
         if is_create_mode:
-            st.caption("🛠️ 创建新知识库")
+            st.caption("新建:")
             
             with st.container(border=True):
                 # 1. 路径选择（仅在创建模式显示）
@@ -691,7 +710,7 @@ with st.sidebar:
                 
                 with path_col1:
                     target_path = st.text_input(
-                        "目标路径 (可选)", 
+                        "存储:", 
                         value=st.session_state.path_input,
                         placeholder="📁 若为空则自动生成",
                         key="path_input_display",

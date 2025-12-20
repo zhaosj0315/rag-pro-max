@@ -52,7 +52,7 @@ class PageStyle:
         }
         
         section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
-            gap: 0.75rem !important;
+            gap: 1px !important;
         }
         
         /* 舒适的元素间距 */
