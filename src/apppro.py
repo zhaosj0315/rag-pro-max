@@ -1658,11 +1658,13 @@ URL: {content_item['url']}
             # final_kb_name 必须在 if/else 中被定义，以确保其在模块作用域内
             st.write("")
             if is_create_mode:
-                st.markdown("**知识库名称**")
-
-                # 显示智能建议
-                if auto_name:
-                    st.caption(f"💡 建议名称：{auto_name}")
+                # 知识库名称一行化布局
+                name_col1, name_col2 = st.columns([1.5, 5.5])
+                with name_col1:
+                    st.markdown("**知识库名称**")
+                with name_col2:
+                    if auto_name:
+                        st.caption(f"💡 建议名称：{auto_name}")
 
                 final_kb_name = st.text_input(
                     "知识库名称", 
