@@ -127,13 +127,19 @@ class KBInterface:
             
             # 高级选项
             with st.expander("🔧 高级选项", expanded=False):
+                # 一键全选控制 - 统一逻辑
+                select_all = st.checkbox("✅ 一键全选", value=False, key="kb_adv_select_all_kb", help="开启/关闭所有高级选项")
+                
+                # 根据一键全选状态设置默认值
+                default_val = select_all
+
                 col1, col2 = st.columns(2)
                 with col1:
-                    force_reindex = st.checkbox("🔄 强制重建索引", False)
-                    use_ocr = st.checkbox("🔍 启用OCR识别", False)
+                    force_reindex = st.checkbox("🔄 强制重建索引", default_val, key="kb_force_reindex_kb")
+                    use_ocr = st.checkbox("🔍 启用OCR识别", default_val, key="kb_use_ocr_kb")
                 with col2:
-                    extract_metadata = st.checkbox("📊 提取元数据", False)
-                    generate_summary = st.checkbox("📝 生成文档摘要", False)
+                    extract_metadata = st.checkbox("📊 提取元数据", default_val, key="kb_extract_metadata_kb")
+                    generate_summary = st.checkbox("📝 生成文档摘要", default_val, key="kb_generate_summary_kb")
             
             # 创建按钮
             if st.button("🚀 立即创建", type="primary", use_container_width=True):
