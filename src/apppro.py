@@ -844,19 +844,25 @@ with st.sidebar:
                     btn_start = True  # 触发处理逻辑
                     action_mode = "APPEND"
                     # 自动收起侧边栏
-                    st.markdown("""
+                    st.components.v1.html("""
                     <script>
-                    setTimeout(function() {
-                        const sidebar = parent.document.querySelector('[data-testid="stSidebar"]');
-                        const collapseBtn = parent.document.querySelector('[data-testid="collapsedControl"]');
-                        if (sidebar && sidebar.style.width !== '0px') {
-                            if (collapseBtn) {
-                                collapseBtn.click();
-                            }
+                    function collapseSidebar() {
+                        const collapseBtn = window.parent.document.querySelector('[data-testid="collapsedControl"]');
+                        if (collapseBtn) {
+                            collapseBtn.click();
+                            return;
                         }
-                    }, 100);
+                        
+                        const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+                        if (sidebar) {
+                            sidebar.style.width = '0px';
+                            sidebar.style.minWidth = '0px';
+                            sidebar.style.maxWidth = '0px';
+                        }
+                    }
+                    setTimeout(collapseSidebar, 200);
                     </script>
-                    """, unsafe_allow_html=True)
+                    """, height=0)
 
         # 统一的数据源处理逻辑（仅针对 Web 抓取保留在外部，本地文件已在内部处理）
         btn_start = False # Initialize to avoid NameError
@@ -1738,20 +1744,39 @@ URL: {content_item['url']}
             
             # 自动收起侧边栏的JavaScript
             if btn_start:
-                st.markdown("""
+                st.components.v1.html("""
                 <script>
-                // 自动收起侧边栏
-                setTimeout(function() {
-                    const sidebar = parent.document.querySelector('[data-testid="stSidebar"]');
-                    const collapseBtn = parent.document.querySelector('[data-testid="collapsedControl"]');
-                    if (sidebar && sidebar.style.width !== '0px') {
-                        if (collapseBtn) {
-                            collapseBtn.click();
-                        }
+                function collapseSidebar() {
+                    // 方法1: 查找收起按钮
+                    const collapseBtn = window.parent.document.querySelector('[data-testid="collapsedControl"]');
+                    if (collapseBtn) {
+                        collapseBtn.click();
+                        return;
                     }
-                }, 100);
+                    
+                    // 方法2: 查找侧边栏并直接设置样式
+                    const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+                    if (sidebar) {
+                        sidebar.style.width = '0px';
+                        sidebar.style.minWidth = '0px';
+                        sidebar.style.maxWidth = '0px';
+                    }
+                    
+                    // 方法3: 触发键盘快捷键 Ctrl+Shift+[
+                    const event = new KeyboardEvent('keydown', {
+                        key: '[',
+                        code: 'BracketLeft',
+                        ctrlKey: true,
+                        shiftKey: true,
+                        bubbles: true
+                    });
+                    window.parent.document.dispatchEvent(event);
+                }
+                
+                // 延迟执行，确保DOM加载完成
+                setTimeout(collapseSidebar, 200);
                 </script>
-                """, unsafe_allow_html=True)
+                """, height=0)
             
             # 检查是否需要自动构建知识库（网页抓取触发）
             if st.session_state.get('auto_build_kb', False):
