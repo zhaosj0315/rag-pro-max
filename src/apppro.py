@@ -655,7 +655,7 @@ with st.sidebar:
         # 存储根目录完全一行化
         storage_col1, storage_col2, storage_col3 = st.columns([0.6, 5.9, 0.5])
         with storage_col1:
-            st.markdown("**存储:**")
+            st.markdown("**路径:**")
         with storage_col2:
             default_output_path = os.path.join(os.getcwd(), "vector_db_storage")
             output_base = st.text_input("", value=default_output_path, help="知识库文件的保存位置", label_visibility="collapsed")
@@ -737,7 +737,7 @@ with st.sidebar:
                 path_col1, path_col2, path_col3 = st.columns([0.6, 5.9, 0.5])
                 
                 with path_col1:
-                    st.markdown("**存储:**")
+                    st.markdown("**路径:**")
                 with path_col2:
                     target_path = st.text_input(
                         "", 
@@ -847,10 +847,12 @@ with st.sidebar:
                     st.markdown("""
                     <style>
                     [data-testid="stSidebar"] {
-                        width: 0px !important;
-                        min-width: 0px !important;
-                        max-width: 0px !important;
-                        transform: translateX(-100%) !important;
+                        width: 2.5rem !important;
+                        min-width: 2.5rem !important;
+                        max-width: 2.5rem !important;
+                    }
+                    [data-testid="stSidebar"] > div {
+                        overflow: hidden !important;
                     }
                     </style>
                     """, unsafe_allow_html=True)
@@ -1739,12 +1741,14 @@ URL: {content_item['url']}
                 st.markdown("""
                 <style>
                 [data-testid="stSidebar"] {
-                    width: 0px !important;
-                    min-width: 0px !important;
-                    max-width: 0px !important;
-                    transform: translateX(-100%) !important;
+                    width: 2.5rem !important;
+                    min-width: 2.5rem !important;
+                    max-width: 2.5rem !important;
                 }
-                [data-testid="stSidebarNav"] {
+                [data-testid="stSidebar"] > div {
+                    overflow: hidden !important;
+                }
+                [data-testid="stSidebar"] .css-1d391kg {
                     display: none !important;
                 }
                 </style>
