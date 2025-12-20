@@ -1454,7 +1454,16 @@ with st.sidebar:
                                         os.makedirs(unique_output_dir, exist_ok=True)
                                         
                                         for i, content_item in enumerate(filtered_contents):
-                                            filename = f"quality_content_{i+1:03d}.txt"
+                                            # 使用网页标题作为文件名，如果没有标题则使用默认名称
+                                            title = content_item.get('title', '').strip()
+                                            if title:
+                                                # 清理标题，移除不合法的文件名字符
+                                                safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
+                                                safe_title = safe_title.replace(' ', '_')[:50]  # 限制长度
+                                                filename = f"{safe_title}_{i+1:03d}.txt"
+                                            else:
+                                                filename = f"quality_content_{i+1:03d}.txt"
+                                            
                                             filepath = os.path.join(unique_output_dir, filename)
                                             
                                             # 创建增强的内容
@@ -2645,7 +2654,16 @@ if btn_start:
                         
                         for i, result in enumerate(crawl_results):
                             if result['success'] and result['content']:
-                                filename = f"quality_content_{i+1:03d}.txt"
+                                # 使用网页标题作为文件名，如果没有标题则使用默认名称
+                                title = result.get('title', '').strip()
+                                if title:
+                                    # 清理标题，移除不合法的文件名字符
+                                    safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
+                                    safe_title = safe_title.replace(' ', '_')[:50]  # 限制长度
+                                    filename = f"{safe_title}_{i+1:03d}.txt"
+                                else:
+                                    filename = f"quality_content_{i+1:03d}.txt"
+                                
                                 filepath = os.path.join(unique_output_dir, filename)
                                 
                                 with open(filepath, 'w', encoding='utf-8') as f:

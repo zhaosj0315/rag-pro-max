@@ -396,7 +396,15 @@ class AsyncWebCrawler:
                 level_success += 1
                 
                 # 保存文件
-                filename = f"page_{len(saved_files)+1}_{int(time.time())}.txt"
+                title = result.get('title', '').strip()
+                if title:
+                    # 清理标题，移除不合法的文件名字符
+                    safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
+                    safe_title = safe_title.replace(' ', '_')[:50]  # 限制长度
+                    filename = f"{safe_title}_{len(saved_files)+1:03d}.txt"
+                else:
+                    filename = f"page_{len(saved_files)+1}_{int(time.time())}.txt"
+                
                 filepath = output_path / filename
                 
                 async with aiofiles.open(filepath, 'w', encoding='utf-8') as f:
