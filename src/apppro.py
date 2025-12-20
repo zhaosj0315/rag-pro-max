@@ -827,19 +827,19 @@ with st.sidebar:
             # 如果触发了重建，则强制改为 NEW
             if st.session_state.get('trigger_rebuild'):
                 action_mode = "NEW"
-                    st.session_state.trigger_rebuild = False # 消费掉标记
-                
-                target_path = "" # 管理模式不需要手动指定路径，使用KB原有路径
-                
-                uploaded_files = st.file_uploader(
-                    "追加文件到当前知识库", 
-                    accept_multiple_files=True, 
-                    key="uploader_append",
-                    label_visibility="collapsed"
-                )
-                
-                if uploaded_files:
-                    st.info("💡 上传后请点击下方 '更新知识库' 按钮")
+                st.session_state.trigger_rebuild = False # 消费掉标记
+            
+            target_path = "" # 管理模式不需要手动指定路径，使用KB原有路径
+            
+            uploaded_files = st.file_uploader(
+                "追加文件到当前知识库", 
+                accept_multiple_files=True, 
+                key="uploader_append",
+                label_visibility="collapsed"
+            )
+            
+            if uploaded_files:
+                st.info("💡 上传后请点击下方 '更新知识库' 按钮")
 
         # 统一的数据源处理逻辑（仅针对 Web 抓取保留在外部，本地文件已在内部处理）
         btn_start = False # Initialize to avoid NameError
