@@ -654,23 +654,7 @@ with st.sidebar:
 
         selected_nav = st.selectbox("📚 选择知识库", nav_options, index=default_idx)
 
-        # 知识库搜索/过滤 (仅在知识库较多时显示，并使用紧凑布局)
-        if len(existing_kbs) > 10:
-            search_kb = st.text_input(
-                "🔍 过滤...",
-                placeholder="输入关键词...",
-                key="search_kb",
-                label_visibility="collapsed"
-            )
-            if search_kb:
-                filtered_kbs = [kb for kb in existing_kbs if search_kb.lower() in kb.lower()]
-                # 更新 nav_options 以应用过滤
-                nav_options = ["➕ 新建知识库..."] + [f"📂 {kb}" for kb in filtered_kbs]
-                # 重新计算选择索引
-                if st.session_state.get('current_nav') in nav_options:
-                    default_idx = nav_options.index(st.session_state.current_nav)
-                else:
-                    default_idx = 0
+        # 知识库搜索/过滤已按用户要求移除
 
         # 卸载知识库按钮（释放内存）
         if not (selected_nav == "➕ 新建知识库...") and st.session_state.get('chat_engine') is not None:
@@ -3780,10 +3764,10 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                 st.divider()
                 st.markdown("##### 🚀 追问推荐")
                 for idx, q in enumerate(st.session_state.suggestions_history):
-                    if st.button(f"👉 {q}", key=f"sug_btn_{int(time.time())}_{idx}", use_container_width=True):
+                    if st.button(f"👉 {q}", key=f"sug_btn_stable_{idx}", use_container_width=True):
                         click_btn(q)
                 
-                if st.button("✨ 继续推荐 3 个追问", key=f"gen_more_{int(time.time())}", type="secondary", use_container_width=True):
+                if st.button("✨ 继续推荐 3 个追问", key="gen_more_stable", type="secondary", use_container_width=True):
                     with st.spinner("⏳ 正在生成新问题..."):
                         all_history_questions = [m['content'] for m in st.session_state.messages if m['role'] == 'user']
                         all_history_questions.extend(st.session_state.suggestions_history)
