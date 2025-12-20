@@ -16,38 +16,38 @@ class CrawlOptimizer:
         # 网站类型配置 - 调整为更现实的参数
         self.site_configs = {
             "documentation": {
-                "depth": 3,
-                "pages_per_level": 20,  # 降低每层页数
+                "depth": 2,
+                "pages_per_level": 5,  # 降低每层页数
                 "description": "技术文档网站，内容层次深",
                 "examples": ["docs.python.org", "developer.mozilla.org"]
             },
             "news": {
                 "depth": 2,
-                "pages_per_level": 30,  # 降低每层页数
+                "pages_per_level": 5,  # 降低每层页数
                 "description": "新闻网站，文章数量多",
                 "examples": ["36kr.com", "techcrunch.com"]
             },
             "ecommerce": {
                 "depth": 2,
-                "pages_per_level": 50,  # 降低每层页数
+                "pages_per_level": 5,  # 降低每层页数
                 "description": "电商网站，商品页面丰富",
                 "examples": ["jd.com", "taobao.com"]
             },
             "blog": {
                 "depth": 2,
-                "pages_per_level": 25,  # 降低每层页数
+                "pages_per_level": 5,  # 降低每层页数
                 "description": "博客网站，文章分类清晰",
                 "examples": ["medium.com", "dev.to"]
             },
             "forum": {
-                "depth": 3,
-                "pages_per_level": 25,  # 降低每层页数
+                "depth": 2,
+                "pages_per_level": 5,  # 降低每层页数
                 "description": "论坛网站，讨论层次深",
                 "examples": ["stackoverflow.com", "reddit.com"]
             },
             "corporate": {
                 "depth": 2,
-                "pages_per_level": 15,  # 大幅降低企业官网预估
+                "pages_per_level": 5,  # 大幅降低企业官网预估
                 "description": "企业官网，结构相对简单",
                 "examples": ["apple.com", "microsoft.com"]
             },

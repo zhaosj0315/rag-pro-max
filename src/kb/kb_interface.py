@@ -269,7 +269,7 @@ class KBInterface:
         with col1:
             crawl_depth = st.number_input("递归深度", 1, 10, 2)
         with col2:
-            max_pages = st.number_input("每层页数", 1, 1000, 20)
+            max_pages = st.number_input("每层页数", 1, 1000, 5)
         with col3:
             parser_type = st.selectbox("解析器", ["default", "article", "documentation"])
         
@@ -285,7 +285,7 @@ class KBInterface:
         with col1:
             crawl_depth = st.number_input("递归深度", 1, 5, 2)
         with col2:
-            max_pages = st.number_input("每层页数", 1, 500, 20)
+            max_pages = st.number_input("每层页数", 1, 500, 5)
         with col3:
             parser_type = st.selectbox("解析器", ["default", "article", "documentation"])
         

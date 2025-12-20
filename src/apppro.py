@@ -923,7 +923,7 @@ with st.sidebar:
                             default_depth = st.session_state.crawl_analysis['recommended_depth'] if 'crawl_analysis' in st.session_state else 2
                             crawl_depth = st.number_input("递归深度", 1, 10, default_depth)
                         with col_p2:
-                            default_pages = st.session_state.crawl_analysis['recommended_pages'] if 'crawl_analysis' in st.session_state else 20
+                            default_pages = st.session_state.crawl_analysis['recommended_pages'] if 'crawl_analysis' in st.session_state else 5
                             max_pages = st.number_input("每层页数", 1, 1000, default_pages)
                         with col_p3:
                             parser_type = st.selectbox("解析器类型", ["default", "article", "documentation"])
@@ -931,7 +931,7 @@ with st.sidebar:
                         # 质量筛选 - 极致压缩
                         enable_url_quality_filter = st.checkbox("🎯 启用质量筛选", value=True, help="开启后会过滤低质量页面，建议在内容杂乱时使用")
                         if enable_url_quality_filter:
-                            url_quality_threshold = st.slider("质量阈值", 10.0, 50.0, 30.0, 5.0, help="分数越高筛选越严格，30分为推荐值")
+                            url_quality_threshold = st.slider("质量阈值", 10.0, 50.0, 45.0, 5.0, help="分数越高筛选越严格，45分为推荐值")
                         else:
                             url_quality_threshold = 0.0
                         
@@ -973,14 +973,14 @@ with st.sidebar:
                         with col_s1:
                             crawl_depth = st.number_input("递归深度", 1, 5, 2)
                         with col_s2:
-                            max_pages = st.number_input("总页数", 1, 500, 20)
+                            max_pages = st.number_input("总页数", 1, 500, 5)
                         with col_s3:
                             parser_type = st.selectbox("解析器类型", ["default", "article", "documentation"], key="parser_search")
                         
                         # 质量筛选 - 极致压缩
                         enable_quality_filter = st.checkbox("🎯 启用质量筛选", value=True, help="过滤低相关性页面，建议开启", key="q_filter_search")
                         if enable_quality_filter:
-                            quality_threshold = st.slider("质量阈值", 10.0, 50.0, 30.0, 5.0, key="q_threshold_search")
+                            quality_threshold = st.slider("质量阈值", 10.0, 50.0, 45.0, 5.0, key="q_threshold_search")
                         else:
                             quality_threshold = 0.0
                         

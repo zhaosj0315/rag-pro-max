@@ -327,9 +327,9 @@ def render_enhanced_web_crawl():
             
         with col2:
             # 🔥 修复：使用智能推荐的页数，支持手动覆盖
-            default_pages = getattr(st.session_state, 'smart_search_pages', 20)
+            default_pages = getattr(st.session_state, 'smart_search_pages', 5)
             search_pages = st.selectbox("📄 每层页数", [5, 10, 20, 30, 50], 
-                                      index=[5, 10, 20, 30, 50].index(default_pages) if default_pages in [5, 10, 20, 30, 50] else 2,
+                                      index=[5, 10, 20, 30, 50].index(default_pages) if default_pages in [5, 10, 20, 30, 50] else 0,
                                       help="每层最大页面数")
         
         # 显示智能推荐信息
