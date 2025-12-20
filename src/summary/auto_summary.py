@@ -30,8 +30,14 @@ class AutoSummaryGenerator:
             
             with st.status("✨ 正在分析文档生成摘要...", expanded=True):
                 try:
-                    # 使用知识库的模型
-                    current_model = getattr(Settings.embed_model, '_model_name', 'Unknown')
+                    # 使用知识库的模型 - 修复模型名称获取
+                    if hasattr(Settings.embed_model, 'model_name'):
+                        current_model = Settings.embed_model.model_name
+                    elif hasattr(Settings.embed_model, '_model_name'):
+                        current_model = Settings.embed_model._model_name
+                    else:
+                        current_model = 'sentence-transformers/all-MiniLM-L6-v2'  # 默认模型
+                    
                     logger.info(f"💬 摘要生成使用模型: {current_model}")
                     
                     prompt = "请用一段话简要总结此知识库的核心内容。然后，提出3个用户可能最关心的问题，每行一个，不要序号。"
