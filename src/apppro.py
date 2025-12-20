@@ -637,25 +637,30 @@ with st.sidebar:
     
     with tab_main:
 
-        # 知识库控制台标题与一键配置一行化
-        console_col1, console_col2 = st.columns([6, 1])
+        # 知识库控制台标题与一键配置完全一行化
+        st.markdown("---")
+        console_col1, console_col2, console_col3 = st.columns([4, 1, 0.5])
         with console_col1:
-            st.markdown("### 💠 知识库控制台")
+            st.markdown("**💠 知识库控制台**")
         with console_col2:
-            if st.button("⚡", help="一键配置默认设置", use_container_width=True, key="quick_config_icon"):
+            if st.button("⚡ 一键配置", use_container_width=True, key="quick_config_inline"):
                 ConfigLoader.quick_setup()
                 st.success("✅ 已使用默认配置！")
                 time.sleep(1)
                 st.rerun()
+        with console_col3:
+            st.markdown("❓", help="可手动配置，适合高级用户")
         
         if "model_list" not in st.session_state: st.session_state.model_list = []
 
-        # 存储根目录一行化
-        storage_col1, storage_col2 = st.columns([6, 1])
+        # 存储根目录完全一行化
+        storage_col1, storage_col2, storage_col3 = st.columns([1, 4, 1])
         with storage_col1:
-            default_output_path = os.path.join(os.getcwd(), "vector_db_storage")
-            output_base = st.text_input("存储:", value=default_output_path, help="知识库文件的保存位置", label_visibility="visible")
+            st.markdown("**存储:**")
         with storage_col2:
+            default_output_path = os.path.join(os.getcwd(), "vector_db_storage")
+            output_base = st.text_input("", value=default_output_path, help="知识库文件的保存位置", label_visibility="collapsed")
+        with storage_col3:
             if st.button("📂", help="打开存储目录", use_container_width=True, key="open_storage_dir"):
                 if output_base and os.path.exists(output_base):
                     import webbrowser, urllib.parse
@@ -679,11 +684,13 @@ with st.sidebar:
             except ValueError:
                 default_idx = 0
 
-        # 知识库选择一行化
-        select_col1, select_col2 = st.columns([6, 1])
+        # 知识库选择完全一行化
+        select_col1, select_col2, select_col3 = st.columns([1, 4, 1])
         with select_col1:
-            selected_nav = st.selectbox("选择:", nav_options, index=default_idx)
+            st.markdown("**选择:**")
         with select_col2:
+            selected_nav = st.selectbox("", nav_options, index=default_idx, label_visibility="collapsed")
+        with select_col3:
             if st.button("🔄", help="刷新知识库列表", use_container_width=True, key="refresh_kb_list"):
                 st.rerun()
 
@@ -709,16 +716,18 @@ with st.sidebar:
 
         # --- 功能区 ---
         if is_create_mode:
-            # 新建知识库标题一行化
-            new_col1, new_col2 = st.columns([6, 1])
+            # 新建知识库标题完全一行化
+            new_col1, new_col2, new_col3 = st.columns([1, 4, 1])
             with new_col1:
-                st.caption("新建:")
+                st.markdown("**新建:**")
             with new_col2:
+                st.markdown("")  # 占位
+            with new_col3:
                 if st.button("💡", help="智能建议", use_container_width=True, key="smart_suggest"):
                     st.toast("💡 建议：上传相关文档，系统会自动优化处理")
             
             with st.container(border=True):
-                # 1. 路径选择（仅在创建模式显示）
+                # 1. 路径选择完全一行化
                 if "path_val" not in st.session_state: 
                     st.session_state.path_val = os.path.abspath(defaults.get("target_path", ""))
                 if 'path_input' not in st.session_state:
@@ -726,17 +735,20 @@ with st.sidebar:
                 if st.session_state.get('uploaded_path') and not st.session_state.path_input:
                     st.session_state.path_input = st.session_state.uploaded_path
 
-                path_col1, path_col2 = st.columns([5, 1])
+                path_col1, path_col2, path_col3 = st.columns([1, 4, 1])
                 
                 with path_col1:
+                    st.markdown("**存储:**")
+                with path_col2:
                     target_path = st.text_input(
-                        "存储:", 
+                        "", 
                         value=st.session_state.path_input,
                         placeholder="📁 若为空则自动生成",
                         key="path_input_display",
-                        help="手动指定文件夹路径，或下方上传自动生成"
+                        help="手动指定文件夹路径，或下方上传自动生成",
+                        label_visibility="collapsed"
                     )
-                with path_col2:
+                with path_col3:
                     if st.button("📂", help="在Finder中打开", use_container_width=True):
                         if target_path and os.path.exists(target_path):
                             import webbrowser
