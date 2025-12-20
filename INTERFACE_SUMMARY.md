@@ -58,9 +58,7 @@
 - core/main_controller.py
 - core/optimization_manager.py
 - core/state_manager.py
-- core/v21_integration.py
 - core/v23_integration.py
-- core/v2_integration.py
 - core/version.py
 
 ### document/
@@ -96,10 +94,8 @@
 ### processors/
 - processors/__init__.py
 - processors/async_web_crawler.py
-- processors/batch_ocr_processor.py
 - processors/concurrent_crawler.py
 - processors/content_analyzer.py
-- processors/crawl_monitor.py
 - processors/crawl_optimizer.py
 - processors/crawl_stats_manager.py
 - processors/document_parser.py
@@ -109,11 +105,9 @@
 - processors/multimodal_processor.py
 - processors/multimodal_vectorizer.py
 - processors/summary_generator.py
-- processors/table_parser.py
 - processors/upload_handler.py
 - processors/web_crawler.py
 - processors/web_to_kb_processor.py
-- processors/web_to_kb_simple.py
 
 ### query/
 - query/query_handler.py
@@ -133,7 +127,6 @@
 - metadata_manager.py
 - rag_engine.py
 - system_monitor.py
-- web_crawl_integration_patch.py
 
 ### services/
 - services/__init__.py
@@ -150,7 +143,6 @@
 - ui/batch_upload_ui.py
 - ui/complete_sidebar.py
 - ui/config_forms.py
-- ui/controls_patch.py
 - ui/crawl_progress.py
 - ui/display_components.py
 - ui/document_preview.py
@@ -200,7 +192,6 @@
 - utils/concurrency_monitor.py
 - utils/cpu_monitor.py
 - utils/cpu_throttle.py
-- utils/crawl_url_tracker.py
 - utils/directory_selector.py
 - utils/document_processor.py
 - utils/dynamic_batch.py
@@ -210,8 +201,6 @@
 - utils/error_handler.py
 - utils/error_handler_enhanced.py
 - utils/export_manager.py
-- utils/force_batch_ocr_trigger.py
-- utils/force_ocr_patch.py
 - utils/friendly_error_handler.py
 - utils/gpu_ocr_accelerator.py
 - utils/gpu_optimizer.py
@@ -225,7 +214,6 @@
 - utils/memory_optimizer.py
 - utils/model_manager.py
 - utils/model_utils.py
-- utils/ocr_hotfix.py
 - utils/ocr_optimizer.py
 - utils/offline_embeddings.py
 - utils/offline_query_engine.py

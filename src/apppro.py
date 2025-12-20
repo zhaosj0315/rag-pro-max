@@ -1680,12 +1680,29 @@ URL: {content_item['url']}
                     if folder_name.startswith(('batch_', 'Web_', 'Search_')) and auto_name:
                         display_name = auto_name
 
-                    # --- 将就绪提示和名称输入合并到一行 ---
-                    ready_col1, ready_col2 = st.columns([2, 5])
-                    with ready_col1:
-                        st.markdown('<div style="margin-top: 5px; color: #28a745;">✅ **已就绪**</div>', unsafe_allow_html=True)
+                    # --- 极简一行化：状态徽章 + 名称输入 ---
+                    # 避免在左侧重复显示长文件名，只显示状态，名称在输入框中显示
+                    status_col, input_col = st.columns([1.2, 4])
                     
-                    with ready_col2:
+                    with status_col:
+                        # 垂直居中的状态徽章
+                        st.markdown(
+                            """<div style='
+                                background: #f0fdf4; 
+                                color: #15803d; 
+                                padding: 6px 8px; 
+                                border-radius: 6px; 
+                                border: 1px solid #bbf7d0;
+                                text-align: center; 
+                                font-size: 0.85rem; 
+                                font-weight: 500;
+                                white-space: nowrap;
+                                margin-top: 1px;
+                            '>✅ 源就绪</div>""", 
+                            unsafe_allow_html=True
+                        )
+                    
+                    with input_col:
                         if is_create_mode:
                             final_kb_name = st.text_input(
                                 "知识库名称", 
@@ -1696,15 +1713,13 @@ URL: {content_item['url']}
                             )
                         else:
                             final_kb_name = current_kb_name
-                            # 显示知识库名称，截断过长的名称
-                            display_kb_name = final_kb_name[:30] + "..." if len(final_kb_name) > 30 else final_kb_name
-                            st.markdown(f'<div style="margin-top: 5px; padding: 8px; background-color: #e7f3ff; border-radius: 4px; color: #0066cc;">📂 {display_kb_name}</div>', unsafe_allow_html=True)
+                            st.markdown(f"<div style='padding-top: 6px;'><b>{final_kb_name}</b></div>", unsafe_allow_html=True)
 
                     # 类型分布（紧凑化）
                     if file_types:
                         sorted_types = sorted(file_types.items(), key=lambda x: x[1], reverse=True)[:5]
                         type_text = " · ".join([f"{ext.replace('.', '')}:{count}" for ext, count in sorted_types])
-                        st.caption(f"📊 {type_text}")
+                        st.caption(f"📊 {type_text} · 源: {display_name}")
                 else:
                     st.error("❌ 路径不存在，请检查路径是否正确")
                     final_kb_name = current_kb_name if not is_create_mode else ""
