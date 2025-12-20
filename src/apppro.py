@@ -636,26 +636,34 @@ with st.sidebar:
     tab_main, tab_config, tab_monitor, tab_tools, tab_help = st.tabs(["🏠 主页", "⚙️ 配置", "📊 监控", "🔧 工具", "❓ 帮助"])
     
     with tab_main:
-        # P0改进1: 快速开始模式
-        col1, col2 = st.columns([9, 1])
-        with col1:
-            if st.button("⚡ 一键配置", type="primary", use_container_width=True, help="自动配置默认设置，1分钟开始使用"):
-                # 使用新的配置加载器快速配置 (Stage 8)
-                ConfigLoader.quick_setup()
-                st.success("✅ 已使用默认配置！\n\n💡 下一步：创建知识库 → 上传文档 → 开始对话")
-                time.sleep(2)
-                st.rerun()
-        with col2:
-            st.markdown("❓", help="可手动配置，适合高级用户")
 
-        st.markdown("---")
-        st.markdown("### 💠 知识库控制台")
+        # 知识库控制台标题与一键配置一行化
+        console_col1, console_col2 = st.columns([6, 1])
+        with console_col1:
+            st.markdown("### 💠 知识库控制台")
+        with console_col2:
+            if st.button("⚡", help="一键配置默认设置", use_container_width=True, key="quick_config_icon"):
+                ConfigLoader.quick_setup()
+                st.success("✅ 已使用默认配置！")
+                time.sleep(1)
+                st.rerun()
+        
         if "model_list" not in st.session_state: st.session_state.model_list = []
 
-        # 使用当前工作目录下的 vector_db_storage
-        default_output_path = os.path.join(os.getcwd(), "vector_db_storage")
-        
-        output_base = st.text_input("📁 存储根目录", value=default_output_path, help="知识库文件的保存位置")
+        # 存储根目录一行化
+        storage_col1, storage_col2 = st.columns([6, 1])
+        with storage_col1:
+            default_output_path = os.path.join(os.getcwd(), "vector_db_storage")
+            output_base = st.text_input("存储:", value=default_output_path, help="知识库文件的保存位置", label_visibility="visible")
+        with storage_col2:
+            if st.button("📂", help="打开存储目录", use_container_width=True, key="open_storage_dir"):
+                if output_base and os.path.exists(output_base):
+                    import webbrowser, urllib.parse
+                    try:
+                        file_url = 'file://' + urllib.parse.quote(os.path.abspath(output_base))
+                        webbrowser.open(file_url)
+                        st.toast("✅ 已打开")
+                    except: pass
         if not output_base: output_base = default_output_path
             
         existing_kbs = (setattr(kb_manager, "base_path", output_base), kb_manager.list_all())[1]
@@ -671,7 +679,13 @@ with st.sidebar:
             except ValueError:
                 default_idx = 0
 
-        selected_nav = st.selectbox("选择:", nav_options, index=default_idx)
+        # 知识库选择一行化
+        select_col1, select_col2 = st.columns([6, 1])
+        with select_col1:
+            selected_nav = st.selectbox("选择:", nav_options, index=default_idx)
+        with select_col2:
+            if st.button("🔄", help="刷新知识库列表", use_container_width=True, key="refresh_kb_list"):
+                st.rerun()
 
         # 知识库搜索/过滤已按用户要求移除
 
@@ -695,7 +709,13 @@ with st.sidebar:
 
         # --- 功能区 ---
         if is_create_mode:
-            st.caption("新建:")
+            # 新建知识库标题一行化
+            new_col1, new_col2 = st.columns([6, 1])
+            with new_col1:
+                st.caption("新建:")
+            with new_col2:
+                if st.button("💡", help="智能建议", use_container_width=True, key="smart_suggest"):
+                    st.toast("💡 建议：上传相关文档，系统会自动优化处理")
             
             with st.container(border=True):
                 # 1. 路径选择（仅在创建模式显示）
