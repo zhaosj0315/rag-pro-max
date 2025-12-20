@@ -2412,19 +2412,25 @@ if btn_start:
     print(f"DEBUG: crawl_url = {st.session_state.get('crawl_url')}")
     print(f"DEBUG: search_keyword = {st.session_state.get('search_keyword')}")
     
-    # 检查是否为网页抓取模式
-    is_web_crawl_mode = (is_create_mode and 
-                        st.session_state.get('crawl_input_mode') in ['url', 'search'] and
-                        (st.session_state.get('crawl_url') or st.session_state.get('search_keyword')))
+    # 检查是否为网页抓取模式 - 自动检测模式
+    crawl_url = st.session_state.get('crawl_url', '').strip()
+    search_keyword = st.session_state.get('search_keyword', '').strip()
     
+    # 自动判断模式：有网址就是网址模式，有关键词就是搜索模式
+    auto_detected_mode = None
+    if crawl_url:
+        auto_detected_mode = 'url'
+    elif search_keyword:
+        auto_detected_mode = 'search'
+    
+    is_web_crawl_mode = (is_create_mode and auto_detected_mode is not None)
+    
+    print(f"DEBUG: auto_detected_mode = {auto_detected_mode}")
     print(f"DEBUG: is_web_crawl_mode = {is_web_crawl_mode}")
     
     if is_web_crawl_mode:
         print("DEBUG: 进入网页抓取模式")
-        # 复用网页抓取逻辑
-        crawl_url = st.session_state.get('crawl_url')
-        search_keyword = st.session_state.get('search_keyword')
-        current_mode = st.session_state.get('crawl_input_mode', 'url')
+        current_mode = auto_detected_mode
         
         print(f"DEBUG: current_mode = {current_mode}")
         print(f"DEBUG: crawl_url = {crawl_url}")
@@ -2438,7 +2444,7 @@ if btn_start:
         quality_threshold = st.session_state.get('quality_threshold', 45.0)
         
         # 执行网页抓取并创建知识库的逻辑
-        if crawl_url:
+        if current_mode == 'url' and crawl_url:
             print(f"DEBUG: 开始网址抓取模式，URL = {crawl_url}")
             # 网址抓取模式 - 复用现有逻辑
             try:
@@ -2578,7 +2584,7 @@ if btn_start:
                 logger.error(f"网页抓取错误: {str(e)}")
                 st.stop()
                 
-        elif search_keyword:
+        elif current_mode == 'search' and search_keyword:
             print(f"DEBUG: 开始智能搜索模式，关键词 = {search_keyword}")
             # 智能搜索模式 - 复用现有逻辑
             try:
