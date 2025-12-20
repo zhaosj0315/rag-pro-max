@@ -393,9 +393,9 @@ st.markdown("""
 
     /* 增加侧边栏宽度，固定大小并禁止拖动缩放 */
     section[data-testid="stSidebar"] {
-        min-width: 350px !important;
-        width: 350px !important;
-        max-width: 350px !important;
+        min-width: 850px !important;
+        width: 850px !important;
+        max-width: 850px !important;
     }
 
     /* 隐藏并禁用侧边栏缩放手柄（彻底解决左下角左右拖动问题） */

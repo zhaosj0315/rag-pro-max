@@ -68,8 +68,8 @@ class AppInitializer:
         
         /* 侧边栏优化 */
         section[data-testid="stSidebar"] {
-            min-width: 350px !important;
-            width: 350px !important;
+            min-width: 850px !important;
+            width: 850px !important;
         }
         
         /* 紧凑布局 */

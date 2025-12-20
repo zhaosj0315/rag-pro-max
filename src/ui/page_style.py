@@ -43,8 +43,8 @@ class PageStyle:
         
         /* 舒适的侧边栏 */
         section[data-testid="stSidebar"] {
-            width: 350px !important;
-            min-width: 350px !important;
+            width: 850px !important;
+            min-width: 850px !important;
         }
         
         section[data-testid="stSidebar"] > div {
