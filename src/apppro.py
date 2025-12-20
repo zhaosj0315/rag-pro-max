@@ -841,28 +841,19 @@ with st.sidebar:
             if uploaded_files:
                 st.info("💡 上传后请点击下方 '更新知识库' 按钮")
                 if st.button("🔄 更新知识库", type="primary", use_container_width=True, key="update_kb_btn"):
-                    btn_start = True  # 触发处理逻辑
+                    btn_start = True
                     action_mode = "APPEND"
-                    # 自动收起侧边栏
-                    st.components.v1.html("""
-                    <script>
-                    function collapseSidebar() {
-                        const collapseBtn = window.parent.document.querySelector('[data-testid="collapsedControl"]');
-                        if (collapseBtn) {
-                            collapseBtn.click();
-                            return;
-                        }
-                        
-                        const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
-                        if (sidebar) {
-                            sidebar.style.width = '0px';
-                            sidebar.style.minWidth = '0px';
-                            sidebar.style.maxWidth = '0px';
-                        }
+                    st.session_state.sidebar_state = "collapsed"
+                    st.markdown("""
+                    <style>
+                    [data-testid="stSidebar"] {
+                        width: 0px !important;
+                        min-width: 0px !important;
+                        max-width: 0px !important;
+                        transform: translateX(-100%) !important;
                     }
-                    setTimeout(collapseSidebar, 200);
-                    </script>
-                    """, height=0)
+                    </style>
+                    """, unsafe_allow_html=True)
 
         # 统一的数据源处理逻辑（仅针对 Web 抓取保留在外部，本地文件已在内部处理）
         btn_start = False # Initialize to avoid NameError
@@ -1742,41 +1733,22 @@ URL: {content_item['url']}
             btn_label = "🚀 立即创建" if is_create_mode else ("➕ 执行追加" if action_mode=="APPEND" else "🔄 执行覆盖")
             btn_start = st.button(btn_label, type="primary", use_container_width=True)
             
-            # 自动收起侧边栏的JavaScript
+            # 自动收起侧边栏
             if btn_start:
-                st.components.v1.html("""
-                <script>
-                function collapseSidebar() {
-                    // 方法1: 查找收起按钮
-                    const collapseBtn = window.parent.document.querySelector('[data-testid="collapsedControl"]');
-                    if (collapseBtn) {
-                        collapseBtn.click();
-                        return;
-                    }
-                    
-                    // 方法2: 查找侧边栏并直接设置样式
-                    const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
-                    if (sidebar) {
-                        sidebar.style.width = '0px';
-                        sidebar.style.minWidth = '0px';
-                        sidebar.style.maxWidth = '0px';
-                    }
-                    
-                    // 方法3: 触发键盘快捷键 Ctrl+Shift+[
-                    const event = new KeyboardEvent('keydown', {
-                        key: '[',
-                        code: 'BracketLeft',
-                        ctrlKey: true,
-                        shiftKey: true,
-                        bubbles: true
-                    });
-                    window.parent.document.dispatchEvent(event);
+                st.session_state.sidebar_state = "collapsed"
+                st.markdown("""
+                <style>
+                [data-testid="stSidebar"] {
+                    width: 0px !important;
+                    min-width: 0px !important;
+                    max-width: 0px !important;
+                    transform: translateX(-100%) !important;
                 }
-                
-                // 延迟执行，确保DOM加载完成
-                setTimeout(collapseSidebar, 200);
-                </script>
-                """, height=0)
+                [data-testid="stSidebarNav"] {
+                    display: none !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
             
             # 检查是否需要自动构建知识库（网页抓取触发）
             if st.session_state.get('auto_build_kb', False):
