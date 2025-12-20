@@ -2406,16 +2406,29 @@ if active_kb_name and st.session_state.chat_engine is None:
 
 # 按钮处理
 if btn_start:
+    print(f"DEBUG: btn_start triggered")
+    print(f"DEBUG: is_create_mode = {is_create_mode}")
+    print(f"DEBUG: crawl_input_mode = {st.session_state.get('crawl_input_mode')}")
+    print(f"DEBUG: crawl_url = {st.session_state.get('crawl_url')}")
+    print(f"DEBUG: search_keyword = {st.session_state.get('search_keyword')}")
+    
     # 检查是否为网页抓取模式
     is_web_crawl_mode = (is_create_mode and 
                         st.session_state.get('crawl_input_mode') in ['url', 'search'] and
                         (st.session_state.get('crawl_url') or st.session_state.get('search_keyword')))
     
+    print(f"DEBUG: is_web_crawl_mode = {is_web_crawl_mode}")
+    
     if is_web_crawl_mode:
+        print("DEBUG: 进入网页抓取模式")
         # 复用网页抓取逻辑
         crawl_url = st.session_state.get('crawl_url')
         search_keyword = st.session_state.get('search_keyword')
         current_mode = st.session_state.get('crawl_input_mode', 'url')
+        
+        print(f"DEBUG: current_mode = {current_mode}")
+        print(f"DEBUG: crawl_url = {crawl_url}")
+        print(f"DEBUG: search_keyword = {search_keyword}")
         
         # 获取抓取参数
         crawl_depth = st.session_state.get('crawl_depth', 2)
@@ -2426,6 +2439,7 @@ if btn_start:
         
         # 执行网页抓取并创建知识库的逻辑
         if crawl_url:
+            print(f"DEBUG: 开始网址抓取模式，URL = {crawl_url}")
             # 网址抓取模式 - 复用现有逻辑
             try:
                 # 优先使用异步爬虫
@@ -2565,6 +2579,7 @@ if btn_start:
                 st.stop()
                 
         elif search_keyword:
+            print(f"DEBUG: 开始智能搜索模式，关键词 = {search_keyword}")
             # 智能搜索模式 - 复用现有逻辑
             try:
                 # 获取搜索参数
@@ -2691,6 +2706,7 @@ if btn_start:
                 logger.error(f"智能搜索错误: {str(e)}")
                 st.stop()
     
+    print("DEBUG: 跳过网页抓取模式，进入原有文件处理逻辑")
     # 原有的文件处理逻辑
     # 确保 action_mode 已定义 (防止 NameError)
     if 'action_mode' not in locals() and 'action_mode' not in globals():
