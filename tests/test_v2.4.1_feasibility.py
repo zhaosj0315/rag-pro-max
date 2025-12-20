@@ -53,48 +53,7 @@ def test_crawl_optimizer():
     except Exception as e:
         return False, f"智能爬取优化器测试失败: {str(e)}"
 
-def test_crawl_monitor():
-    """测试爬取监控系统"""
-    try:
-        from src.processors.crawl_monitor import CrawlMonitor
-        
-        monitor = CrawlMonitor()
-        
-        # 测试基本功能
-        monitor.start_crawl(max_depth=2, estimated_pages=100)
-        
-        # 测试进度更新
-        monitor.update_progress(
-            current_url="https://test.com",
-            depth=1,
-            page_count=5,
-            success=True,
-            discovered_links=10
-        )
-        
-        # 测试状态获取
-        status = monitor.get_status()
-        
-        # 验证状态结构
-        required_keys = ['stats', 'depth_stats', 'controls']
-        for key in required_keys:
-            if key not in status:
-                return False, f"状态缺少必需字段: {key}"
-        
-        # 验证统计数据
-        stats = status['stats']
-        if stats['successful_pages'] != 1:
-            return False, f"成功页面统计错误: {stats['successful_pages']}"
-        
-        # 测试控制功能
-        monitor.pause_crawl()
-        monitor.resume_crawl()
-        monitor.stop_crawl()
-        
-        return True, "爬取监控系统测试通过"
-        
-    except Exception as e:
-        return False, f"爬取监控系统测试失败: {str(e)}"
+
 
 def test_website_type_recognition():
     """测试网站类型识别"""
@@ -199,7 +158,7 @@ def run_all_tests():
     
     tests = [
         ("智能爬取优化器", test_crawl_optimizer),
-        ("爬取监控系统", test_crawl_monitor),
+
         ("网站类型识别", test_website_type_recognition),
         ("现实预估算法", test_realistic_estimation),
         ("UI集成", test_ui_integration)

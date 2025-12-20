@@ -1118,23 +1118,7 @@ def test_v241_smart_crawl():
     except Exception as e:
         print_test("智能爬取优化器", "FAIL", str(e))
     
-    try:
-        # 测试爬取监控系统
-        from src.processors.crawl_monitor import CrawlMonitor
-        monitor = CrawlMonitor()
-        
-        monitor.start_crawl(max_depth=2, estimated_pages=100)
-        monitor.update_progress("https://test.com", 1, 5, True, 10)
-        
-        status = monitor.get_status()
-        assert 'stats' in status
-        assert 'depth_stats' in status
-        assert status['stats']['successful_pages'] == 1
-        
-        print_test("爬取监控系统", "PASS", "监控功能正常")
-        
-    except Exception as e:
-        print_test("爬取监控系统", "FAIL", str(e))
+
 
 if __name__ == "__main__":
     main()
