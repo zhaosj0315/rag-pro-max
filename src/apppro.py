@@ -654,7 +654,7 @@ with st.sidebar:
         if "model_list" not in st.session_state: st.session_state.model_list = []
 
         # 存储根目录完全一行化
-        storage_col1, storage_col2, storage_col3 = st.columns([1, 4, 1])
+        storage_col1, storage_col2, storage_col3 = st.columns([1.2, 5.3, 0.5])
         with storage_col1:
             st.markdown("**存储:**")
         with storage_col2:
@@ -685,7 +685,7 @@ with st.sidebar:
                 default_idx = 0
 
         # 知识库选择完全一行化
-        select_col1, select_col2, select_col3 = st.columns([1, 4, 1])
+        select_col1, select_col2, select_col3 = st.columns([1.2, 5.3, 0.5])
         with select_col1:
             st.markdown("**选择:**")
         with select_col2:
@@ -717,7 +717,7 @@ with st.sidebar:
         # --- 功能区 ---
         if is_create_mode:
             # 新建知识库标题完全一行化
-            new_col1, new_col2, new_col3 = st.columns([1, 4, 1])
+            new_col1, new_col2, new_col3 = st.columns([1.2, 5.3, 0.5])
             with new_col1:
                 st.markdown("**新建:**")
             with new_col2:
@@ -735,7 +735,7 @@ with st.sidebar:
                 if st.session_state.get('uploaded_path') and not st.session_state.path_input:
                     st.session_state.path_input = st.session_state.uploaded_path
 
-                path_col1, path_col2, path_col3 = st.columns([1, 4, 1])
+                path_col1, path_col2, path_col3 = st.columns([1.2, 5.3, 0.5])
                 
                 with path_col1:
                     st.markdown("**存储:**")
