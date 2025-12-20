@@ -1681,9 +1681,9 @@ URL: {content_item['url']}
                         display_name = auto_name
 
                     # --- 将就绪提示和名称输入合并到一行 ---
-                    ready_col1, ready_col2 = st.columns([3, 4])
+                    ready_col1, ready_col2 = st.columns([2, 5])
                     with ready_col1:
-                        st.success(f"✅ **已就绪**: `{display_name[:20]}...`" if len(display_name) > 20 else f"✅ **已就绪**: `{display_name}`")
+                        st.markdown('<div style="margin-top: 5px; color: #28a745;">✅ **已就绪**</div>', unsafe_allow_html=True)
                     
                     with ready_col2:
                         if is_create_mode:
@@ -1696,7 +1696,9 @@ URL: {content_item['url']}
                             )
                         else:
                             final_kb_name = current_kb_name
-                            st.info(f"📂 库: {final_kb_name}")
+                            # 显示知识库名称，截断过长的名称
+                            display_kb_name = final_kb_name[:30] + "..." if len(final_kb_name) > 30 else final_kb_name
+                            st.markdown(f'<div style="margin-top: 5px; padding: 8px; background-color: #e7f3ff; border-radius: 4px; color: #0066cc;">📂 {display_kb_name}</div>', unsafe_allow_html=True)
 
                     # 类型分布（紧凑化）
                     if file_types:
