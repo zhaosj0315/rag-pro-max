@@ -843,6 +843,20 @@ with st.sidebar:
                 if st.button("🔄 更新知识库", type="primary", use_container_width=True, key="update_kb_btn"):
                     btn_start = True  # 触发处理逻辑
                     action_mode = "APPEND"
+                    # 自动收起侧边栏
+                    st.markdown("""
+                    <script>
+                    setTimeout(function() {
+                        const sidebar = parent.document.querySelector('[data-testid="stSidebar"]');
+                        const collapseBtn = parent.document.querySelector('[data-testid="collapsedControl"]');
+                        if (sidebar && sidebar.style.width !== '0px') {
+                            if (collapseBtn) {
+                                collapseBtn.click();
+                            }
+                        }
+                    }, 100);
+                    </script>
+                    """, unsafe_allow_html=True)
 
         # 统一的数据源处理逻辑（仅针对 Web 抓取保留在外部，本地文件已在内部处理）
         btn_start = False # Initialize to avoid NameError
@@ -1721,6 +1735,23 @@ URL: {content_item['url']}
 
             btn_label = "🚀 立即创建" if is_create_mode else ("➕ 执行追加" if action_mode=="APPEND" else "🔄 执行覆盖")
             btn_start = st.button(btn_label, type="primary", use_container_width=True)
+            
+            # 自动收起侧边栏的JavaScript
+            if btn_start:
+                st.markdown("""
+                <script>
+                // 自动收起侧边栏
+                setTimeout(function() {
+                    const sidebar = parent.document.querySelector('[data-testid="stSidebar"]');
+                    const collapseBtn = parent.document.querySelector('[data-testid="collapsedControl"]');
+                    if (sidebar && sidebar.style.width !== '0px') {
+                        if (collapseBtn) {
+                            collapseBtn.click();
+                        }
+                    }
+                }, 100);
+                </script>
+                """, unsafe_allow_html=True)
             
             # 检查是否需要自动构建知识库（网页抓取触发）
             if st.session_state.get('auto_build_kb', False):
