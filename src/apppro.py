@@ -2555,7 +2555,9 @@ if btn_start:
                     
                 else:
                     st.error("❌ 网页抓取失败，未获取到任何文件")
-                    st.stop()
+                
+                # 网页抓取模式处理完成，直接返回，不执行后续的文件处理逻辑
+                st.stop()
                     
             except Exception as e:
                 st.error(f"❌ 网页抓取失败: {str(e)}")
@@ -2680,7 +2682,9 @@ if btn_start:
                         
                 else:
                     st.error("❌ 智能搜索失败，未获取到任何文件")
-                    st.stop()
+                
+                # 智能搜索模式处理完成，直接返回，不执行后续的文件处理逻辑
+                st.stop()
                     
             except Exception as e:
                 st.error(f"❌ 智能搜索失败: {str(e)}")
