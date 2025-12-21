@@ -371,6 +371,6 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
         print(f"🔍 result为空或无questions，返回fallback")
         return get_smart_fallback(context_text, query_engine)
     
-        print(f"🔍 函数最终返回: {result['questions']}")
-        return result["questions"]
+    print(f"🔍 函数最终返回: {result['questions']}")
+    return result["questions"]
     

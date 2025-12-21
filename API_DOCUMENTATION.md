@@ -7,7 +7,7 @@ RAG Pro Max 提供了一套完整的 RESTful API 接口，支持知识库查询�
 **服务器信息：**
 - **默认端口**: 8502 (由 `start_v2.sh` 启动)
 - **OpenAPI 文档**: `http://localhost:8502/docs`
-- **版本**: v2.0.0
+- **版本**: v2.4.7
 
 ---
 

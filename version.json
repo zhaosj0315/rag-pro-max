@@ -11,7 +11,7 @@
   ],
   "architecture": {
     "layers": 4,
-    "modules": 191,
+    "modules": 108,
     "services": 3,
     "common_modules": 3,
     "test_coverage": "89/97"
