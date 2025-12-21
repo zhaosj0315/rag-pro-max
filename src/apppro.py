@@ -4110,6 +4110,7 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     
                     # 整体处理完成反馈
                     st.toast("✅ 回答生成完毕", icon="🎉")
+                    st.rerun()
                 
                 except Exception as e: 
                     print(f"❌ 查询出错: {e}\n")
@@ -4123,70 +4124,4 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     cleanup_memory()
                     logger.info("🧹 错误处理完成，内存已清理")
                     st.session_state.is_processing = False
-            
-            # spinner结束后显示所有内容
-            # 显示统计信息
-            if 'total_time' in locals() and 'token_count' in locals():
-                stats_simple = f"⏱️ {total_time:.1f}秒 | 📝 约 {token_count} 字符"
-                st.caption(stats_simple)
-                
-                # 详细信息 (折叠)
-                with st.expander("📊 详细统计", expanded=False):
-                    st.caption(f"🚀 速度: {tokens_per_sec:.1f} tokens/s")
-                    if 'prompt_tokens' in locals() and prompt_tokens:
-                        st.caption(f"📥 输入: {prompt_tokens} | 📤 输出: {completion_tokens}")
-                
-                # 显示参考来源
-                if 'srcs' in locals() and srcs:
-                    from src.ui.message_renderer import render_source_references
-                    render_source_references(srcs, expanded=False)
-            
-            # 自动处理队列中的下一个问题
-            if st.session_state.question_queue:
-                logger.info(f"📝 队列中还有 {len(st.session_state.question_queue)} 个问题，自动处理下一个")
-                st.rerun()  # 触发重新运行，处理下一个问题
-            
-            # 在 chat_message 块外显示推荐问题按钮
-            if st.session_state.suggestions_history:
-                st.divider()
-                st.markdown("##### 🚀 追问推荐")
-                for idx, q in enumerate(st.session_state.suggestions_history):
-                    if st.button(f"👉 {q}", key=f"sug_btn_stable_{idx}", use_container_width=True):
-                        click_btn(q)
-                
-                if st.button("✨ 继续推荐 3 个追问", key="gen_more_stable", type="secondary", use_container_width=True):
-                    with st.spinner("⏳ 正在生成新问题..."):
-                        all_history_questions = [m['content'] for m in st.session_state.messages if m['role'] == 'user']
-                        all_history_questions.extend(st.session_state.suggestions_history)
-                        all_history_questions.extend(st.session_state.question_queue)
-                        
-                        # 获取最后一条回答作为上下文
-                        last_answer = ""
-                        for msg in reversed(st.session_state.messages):
-                            if msg['role'] == 'assistant':
-                                last_answer = msg['content']
-                                break
-                        
-                        # 获取LLM模型
-                        llm_model = None
-                        if st.session_state.get('chat_engine'):
-                            chat_engine = st.session_state.chat_engine
-                            if hasattr(chat_engine, '_llm'):
-                                llm_model = chat_engine._llm
-                            elif hasattr(chat_engine, 'llm'):
-                                llm_model = chat_engine.llm
-                        
-                        new_sugs = generate_follow_up_questions(
-                            context_text=last_answer, 
-                            num_questions=3,
-                            existing_questions=all_history_questions,
-                            query_engine=st.session_state.chat_engine if st.session_state.get('chat_engine') else None,
-                            llm_model=llm_model
-                        )
-                        
-                        if new_sugs:
-                            # 替换而不是累积：始终只保持最新的3个问题
-                            st.session_state.suggestions_history = new_sugs[:3]
-                            st.rerun()
-                        else:
-                            st.warning("未能生成更多追问，请尝试输入新问题。")
+                    st.rerun()
