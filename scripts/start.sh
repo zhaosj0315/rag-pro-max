@@ -77,7 +77,7 @@ STREAMLIT_PID=$!
 
 # 如果v2.0可用，启动API服务
 if [ "$V2_AVAILABLE" = true ]; then
-    echo "🔌 启动 API 服务 (端口 8000)..."
+    echo "🔌 启动 API 服务 (端口 8502)..."
     python3 src/api/fastapi_server.py &
     API_PID=$!
     
@@ -86,7 +86,7 @@ if [ "$V2_AVAILABLE" = true ]; then
     echo ""
     echo "📱 访问地址:"
     echo "   主应用: http://localhost:8501"
-    echo "   API文档: http://localhost:8000/docs"
+    echo "   API文档: http://localhost:8502/docs"
     echo ""
     echo "🆕 v2.0 新功能:"
     echo "   • 增量更新 - 智能检测文件变化"

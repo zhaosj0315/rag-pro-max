@@ -328,28 +328,6 @@ spec:
           limits:
             memory: "4Gi"
             cpu: "2000m"
-## 🔧 维护和监控
-
-### 文档同步检查
-```bash
-# 检查文档是否与代码同步
-python scripts/check_documentation_sync.py
-```
-
-### 推送前安全检查
-```bash
-# 确保遵守非必要不推送原则
-./scripts/pre_push_safety_check.sh
-```
-
-### 出厂测试验证
-```bash
-# 运行完整出厂测试
-python tests/factory_test.py
-
-# 快速测试
-python tests/factory_test.py --quick
-```
 
 ---
 apiVersion: v1
@@ -545,3 +523,27 @@ export CHROMA_SERVER_HOST=0.0.0.0
 export CHROMA_SERVER_HTTP_PORT=8000
 chroma run --host 0.0.0.0 --port 8000
 ```
+
+## 🔧 维护和监控
+
+### 文档同步检查
+```bash
+# 检查文档是否与代码同步
+python scripts/check_documentation_sync.py
+```
+
+### 推送前安全检查
+```bash
+# 确保遵守非必要不推送原则
+./scripts/pre_push_safety_check.sh
+```
+
+### 出厂测试验证
+```bash
+# 运行完整出厂测试
+python tests/factory_test.py
+
+# 快速测试
+python tests/factory_test.py --quick
+```
+

@@ -295,11 +295,11 @@ async def get_multimodal_formats():
         logger.log_error("获取多模态格式失败", str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
-def start_api_server(host: str = "0.0.0.0", port: int = 8000):
+def start_api_server(host: str = "0.0.0.0", port: int = 8502):
     """启动API服务器"""
     logger.info(f"🚀 启动FastAPI服务器: http://{host}:{port}")
     logger.info("📋 v2.0 新功能: 增量更新、多模态支持")
     uvicorn.run(app, host=host, port=port)
 
 if __name__ == "__main__":
-    start_api_server()
+    start_api_server(port=8502)

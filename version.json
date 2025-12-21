@@ -1,19 +1,18 @@
 {
   "version": "2.4.7",
-  "release_date": "2025-12-19",
-  "codename": "Web爬取与数据处理增强版",
+  "release_date": "2025-12-21",
+  "codename": "深度清理与体验修复版",
   "features": [
-    "Web爬取目录选择逻辑修复（优先使用当前抓取目录）",
-    "高级选项（OCR/元数据/摘要）在自动构建流程中的状态保留",
-    "知识库存储空间统计修复（增加向量库磁盘占用计算）",
-    "知识库详情与管理视图大一统 (Tabs合并)",
-    "macOS 原生预览非阻塞集成 (Async + AppleScript)"
+    "深度代码清理 (移除 15+ 废弃模块)",
+    "UI 交互修复 (追问建议显示)",
+    "API 架构统一 (移除 v1.8 legacy)",
+    "测试体系同步 (86/86 通过)"
   ],
   "architecture": {
     "layers": 4,
-    "modules": 108,
+    "modules": 96,
     "services": 3,
     "common_modules": 3,
-    "test_coverage": "89/97"
+    "test_coverage": "86/95"
   }
 }

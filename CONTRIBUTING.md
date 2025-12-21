@@ -98,7 +98,7 @@ P0/P1/P2/P3
 2. **创建分支**: `git checkout -b feature/AmazingFeature`
 3. **编写代码**: 遵循代码规范
 4. **运行测试**: `./scripts/test.sh`
-5. **提交更改**: `git commit -m 'Add some AmazingFeature'`
+5. **提交更改**: `git commit -m 'feat: add amazing feature'`
 6. **推送分支**: `git push origin feature/AmazingFeature`
 7. **创建 Pull Request**
 
