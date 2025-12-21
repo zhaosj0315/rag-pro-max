@@ -198,10 +198,8 @@
 - utils/enhanced_cache.py
 - utils/enhanced_logger.py
 - utils/enhanced_ocr_optimizer.py
-- utils/error_handler.py
 - utils/error_handler_enhanced.py
 - utils/export_manager.py
-- utils/friendly_error_handler.py
 - utils/gpu_ocr_accelerator.py
 - utils/gpu_optimizer.py
 - utils/kb_name_optimizer.py
@@ -209,7 +207,6 @@
 - utils/llm_manager.py
 - utils/log_analyzer.py
 - utils/memory.py
-- utils/memory_leak_detector.py
 - utils/memory_manager_enhanced.py
 - utils/memory_optimizer.py
 - utils/model_manager.py
@@ -227,7 +224,6 @@
 - utils/resource_monitor.py
 - utils/safe_parallel_tasks.py
 - utils/search_engine.py
-- utils/simple_terminal_logger.py
 - utils/smart_scheduler.py
 - utils/task_scheduler.py
 - utils/terminal_progress.py
