@@ -71,7 +71,6 @@ src/ui/                          # 39个界面组件
 ├── page_style.py                # 页面样式
 ├── kb_management_ui.py          # 知识库管理界面
 ├── web_to_kb_interface.py       # 网页抓取界面
-├── batch_upload_ui.py           # 批量上传界面
 ├── search_ui.py                 # 搜索界面
 ├── chat_interface.py            # 聊天界面
 ├── progress_monitor.py          # 进度监控
@@ -89,7 +88,6 @@ src/processors/                  # 23个处理器
 ├── crawl_stats_manager.py       # 爬虫统计
 ├── index_builder.py             # 索引构建
 ├── multimodal_processor.py      # 多模态处理
-├── table_parser.py              # 表格解析
 ├── upload_handler.py            # 上传处理
 └── ...                          # 其他处理器
 ```
