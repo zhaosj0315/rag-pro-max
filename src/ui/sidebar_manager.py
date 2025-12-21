@@ -15,8 +15,8 @@ class SidebarManager:
     def render(self):
         """渲染完整的侧边栏"""
         # 横向标签页布局
-        tab_main, tab_config, tab_monitor, tab_tools, tab_help = st.tabs([
-            "🏠 主页", "⚙️ 配置", "📊 监控", "🔧 工具", "❓ 帮助"
+        tab_main, tab_config, tab_monitor, tab_help = st.tabs([
+            "🏠 主页", "⚙️ 配置", "📊 监控", "❓ 帮助"
         ])
         
         with tab_main:
@@ -27,9 +27,6 @@ class SidebarManager:
         
         with tab_monitor:
             self.render_monitor_tab()
-        
-        with tab_tools:
-            self.render_tools_tab()
         
         with tab_help:
             self.render_help_tab()
@@ -102,26 +99,6 @@ class SidebarManager:
         with st.expander("🔍 进程监控", expanded=False):
             monitor_ui.render_process_monitor()
     
-    def render_tools_tab(self):
-        """渲染工具标签"""
-        st.markdown("### 🔧 工具箱")
-        
-        # 系统监控
-        with st.expander("🛠️ 系统工具", expanded=True):
-            self.render_system_monitor()
-        
-        # 快速上传
-        st.markdown("---")
-        st.markdown("#### ⬆️ 快速上传")
-        uploaded_file = st.file_uploader(
-            "选择文件", 
-            type=['pdf', 'txt', 'docx', 'md'], 
-            key="tools_uploader"
-        )
-        if uploaded_file:
-            st.success(f"✅ 已选择: {uploaded_file.name}")
-            st.info("💡 请到主页完成处理")
-    
     def render_help_tab(self):
         """渲染帮助标签"""
         st.markdown("### 📖 帮助")
@@ -140,28 +117,3 @@ class SidebarManager:
         ConfigLoader.quick_setup()
         st.success("✅ 已使用默认配置！")
         st.info("💡 下一步：创建知识库 → 上传文档 → 开始对话")
-    
-    def render_system_monitor(self):
-        """渲染系统监控"""
-        import psutil
-        
-        # 获取系统信息
-        cpu_percent = psutil.cpu_percent(interval=0.1)
-        mem = psutil.virtual_memory()
-        
-        # 显示监控信息
-        col1, col2 = st.columns([4, 1])
-        with col1:
-            st.metric("CPU 使用率", f"{cpu_percent:.1f}%")
-        with col2:
-            st.caption(f"{psutil.cpu_count()} 核")
-        
-        st.progress(cpu_percent / 100)
-        
-        col1, col2 = st.columns([4, 1])
-        with col1:
-            st.metric("内存使用", f"{mem.percent:.1f}%")
-        with col2:
-            st.caption(f"{mem.used/1024**3:.1f}GB")
-        
-        st.progress(mem.percent / 100)

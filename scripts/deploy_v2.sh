@@ -150,7 +150,7 @@ STREAMLIT_PID=$!
 
 # 启动扩展API
 echo "🔌 启动扩展API服务 (端口 8502)..."
-python3 -m uvicorn src.api.extended_api:extended_app --host 0.0.0.0 --port 8502 &
+python3 -m uvicorn src.api.fastapi_server:app --host 0.0.0.0 --port 8502 &
 API_PID=$!
 
 echo "✅ RAG Pro Max v2.0 启动完成！"
