@@ -289,7 +289,7 @@ class IndexBuilder:
         # 立即生成摘要（并行处理）
         try:
             # 导入摘要生成函数
-            from src.utils.app_utils import generate_doc_summary
+            from src.common.business import generate_doc_summary
             from concurrent.futures import ThreadPoolExecutor, as_completed
             import threading
             

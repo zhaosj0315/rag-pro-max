@@ -19,7 +19,7 @@ class MainApp:
         AppInitializer.initialize_app()
         
         # 初始化会话状态
-        from src.utils.kb_utils import initialize_session_state
+        from src.utils.app_utils import initialize_session_state
         initialize_session_state()
         
         # 初始化各个管理器

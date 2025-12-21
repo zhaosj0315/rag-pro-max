@@ -71,28 +71,3 @@ def generate_smart_kb_name(target_path, cnt, file_types, folder_name):
         return f"{suggested_name}_{int(time.time())}"
 
 
-def initialize_session_state():
-    """初始化会话状态"""
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-    
-    if "first_time_guide_shown" not in st.session_state:
-        st.session_state.first_time_guide_shown = False
-    
-    if "current_kb_id" not in st.session_state:
-        st.session_state.current_kb_id = None
-    
-    if "chat_engine" not in st.session_state:
-        st.session_state.chat_engine = None
-    
-    if "is_processing" not in st.session_state:
-        st.session_state.is_processing = False
-    
-    if "stop_generation" not in st.session_state:
-        st.session_state.stop_generation = False
-
-
-def handle_kb_switching():
-    """处理知识库切换逻辑"""
-    # 这个函数的逻辑已经移到 MainApp.run() 中
-    pass

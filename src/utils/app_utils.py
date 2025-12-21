@@ -46,38 +46,6 @@ def get_kb_embedding_dim(db_path):
     return None
 
 
-def generate_doc_summary(doc_text, filename):
-    """生成文档摘要"""
-    try:
-        from llama_index.core import Settings
-        
-        if not Settings.llm:
-            return "摘要生成失败：LLM 未配置"
-        
-        # 限制文本长度
-        if len(doc_text) > 2000:
-            doc_text = doc_text[:2000] + "..."
-        
-        prompt = f"""请为以下文档生成一个简洁的摘要（50-100字）：
-
-文档名称：{filename}
-文档内容：
-{doc_text}
-
-摘要："""
-        
-        response = Settings.llm.complete(prompt)
-        summary = response.text.strip()
-        
-        # 清理摘要
-        if summary.startswith("摘要："):
-            summary = summary[3:].strip()
-        
-        return summary[:200]  # 限制摘要长度
-        
-    except Exception as e:
-        logger.error(f"摘要生成失败: {e}")
-        return f"总结失败: {str(e)}"
 
 
 def remove_file_from_manifest(db_path, filename):
