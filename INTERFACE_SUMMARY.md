@@ -44,9 +44,7 @@
 - config/config_interface.py
 - config/config_loader.py
 - config/config_validator.py
-- config/industry_sites.py
 - config/manifest_manager.py
-- config/top20_sites.py
 - config/unified_sites.py
 
 ### core/
@@ -140,14 +138,7 @@
 ### ui/
 - ui/__init__.py
 - ui/advanced_config.py
-- ui/batch_upload_ui.py
-- ui/complete_sidebar.py
-- ui/config_forms.py
-- ui/crawl_progress.py
-- ui/display_components.py
-- ui/document_preview.py
 - ui/enhanced_controls.py
-- ui/export_ui.py
 - ui/horizontal_tabs_sidebar.py
 - ui/kb_advanced_options.py
 - ui/kb_management_ui.py
@@ -155,7 +146,6 @@
 - ui/main_interface.py
 - ui/main_kb_interface.py
 - ui/message_renderer.py
-- ui/mobile_responsive.py
 - ui/model_selectors.py
 - ui/monitoring_dashboard.py
 - ui/page_style.py
@@ -163,7 +153,6 @@
 - ui/performance_monitor.py
 - ui/progress_monitor.py
 - ui/progress_tracker.py
-- ui/quick_preview.py
 - ui/responsive_layout.py
 - ui/search_ui.py
 - ui/sidebar_config.py
