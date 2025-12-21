@@ -41,4 +41,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8501/_stcore/health || exit 1
 
 # 启动命令
-CMD ["streamlit", "run", "apppro.py", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "src/apppro.py", "--server.address=0.0.0.0"]
