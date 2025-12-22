@@ -29,17 +29,15 @@ class ConfigInterface:
         return config_values
     
     def render_basic_config(self, defaults: dict):
-        """渲染基础配置"""
-        from src.ui.config_forms import render_basic_config
-        return render_basic_config(defaults)
+        """渲染基础配置 - 使用统一组件"""
+        from src.ui.unified_config_components import render_basic_config
+        return render_basic_config(defaults, "config_interface")
     
     def render_advanced_config(self):
-        """渲染高级配置"""
-        try:
-            from src.ui.sidebar_config import SidebarConfig
-            SidebarConfig._render_advanced_config()
-        except ImportError:
-            st.info("高级配置模块未找到")
+        """渲染高级配置 - 使用统一组件"""
+        from src.ui.unified_config_components import unified_config_renderer
+        config_data = unified_config_renderer.load_config("advanced")
+        return unified_config_renderer.render_advanced_config(config_data, "config_interface")
     
     def render_model_config(self):
         """渲染模型配置"""

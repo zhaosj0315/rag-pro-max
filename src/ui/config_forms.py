@@ -2,6 +2,7 @@
 配置表单组件
 Stage 3.2.2 - 中风险重构
 提取自 apppro.py
+使用统一配置组件
 """
 
 import os
@@ -12,6 +13,7 @@ from .model_selectors import (
     render_openai_model_selector,
     render_hf_embedding_selector
 )
+from .unified_config_components import render_basic_config, render_embedding_config
 
 
 def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
