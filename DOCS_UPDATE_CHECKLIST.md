@@ -14,7 +14,7 @@
 cat version.json
 
 # 记录关键信息:
-# - version: 版本号 (如 v2.4.7)
+# - version: 版本号 (如 v2.4.8)
 # - test_coverage: 测试覆盖率 (如 95/97)
 # - features: 新功能列表
 # - codename: 版本代号

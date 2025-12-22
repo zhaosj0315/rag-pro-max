@@ -1,18 +1,31 @@
 {
-  "version": "2.4.7",
-  "release_date": "2025-12-21",
-  "codename": "深度清理与体验修复版",
+  "version": "2.4.8",
+  "release_date": "2025-12-22",
+  "codename": "统一推荐系统版",
   "features": [
-    "深度代码清理 (移除 15+ 废弃模块)",
-    "UI 交互修复 (追问建议显示)",
-    "API 架构统一 (移除 v1.8 legacy)",
-    "测试体系同步 (86/86 通过)"
+    "统一推荐问题系统 (消除重复建设)",
+    "智能行业网站配置 (可自定义)",
+    "推荐问题质量验证 (基于知识库)",
+    "完全统一的生成逻辑 (聊天/文件/网页)"
   ],
   "architecture": {
     "layers": 4,
-    "modules": 96,
-    "services": 3,
+    "modules": 152,
+    "services": 4,
     "common_modules": 3,
-    "test_coverage": "86/95"
+    "test_coverage": "88/95"
+  },
+  "improvements": {
+    "removed_duplicates": [
+      "WebSuggestionEngine",
+      "SuggestionEngine", 
+      "SuggestionPanel"
+    ],
+    "unified_system": "UnifiedSuggestionEngine",
+    "new_features": [
+      "可配置行业网站管理",
+      "智能推荐问题验证",
+      "统一的推荐生成逻辑"
+    ]
   }
 }

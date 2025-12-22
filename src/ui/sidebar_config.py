@@ -9,6 +9,7 @@ import psutil
 import subprocess
 from src.config import ConfigLoader
 from src.ui.config_forms import render_basic_config
+from src.ui.industry_config_interface import IndustryConfigInterface
 
 
 class SidebarConfig:
@@ -24,6 +25,9 @@ class SidebarConfig:
             # 高级功能
             advanced_config = SidebarConfig._render_advanced_config()
             
+            # 行业网站配置
+            SidebarConfig._render_industry_config()
+            
             # 性能监控
             perf_monitor.render_panel()
             
@@ -31,6 +35,22 @@ class SidebarConfig:
             SidebarConfig._render_system_tools()
             
             return config_values, advanced_config
+    
+    @staticmethod
+    def _render_industry_config():
+        """渲染行业网站配置"""
+        st.markdown("---")
+        st.markdown("### 🔧 网站配置")
+        
+        if st.button("🌐 配置行业网站", use_container_width=True):
+            st.session_state.show_industry_config = True
+        
+        # 快速预览
+        try:
+            interface = IndustryConfigInterface()
+            interface.render_quick_config()
+        except Exception as e:
+            st.caption(f"配置预览加载失败: {str(e)[:50]}...")
     
     @staticmethod
     def _render_quick_start(defaults):

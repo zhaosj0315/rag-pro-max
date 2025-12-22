@@ -59,7 +59,7 @@ ls config/ && grep -r "config" DEPLOYMENT.md README.md
 ### 批量更新版本号
 ```bash
 # 更新所有文档中的版本号
-sed -i '' 's/v2\.4\.3/v2.4.7/g' README.md CHANGELOG.md
+sed -i '' 's/v2\.4\.3/v2.4.8/g' README.md CHANGELOG.md
 ```
 
 ### 检查文档完整性

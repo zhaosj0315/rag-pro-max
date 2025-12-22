@@ -19,37 +19,68 @@ class WebToKBProcessor:
         self.kb_manager = KBManager()
         self.index_builder = IndexBuilder()
         
-        # 预设知名网站
+        # 预设知名网站 - 按类别分组
         self.preset_sites = {
+            # 百科类网站
             "维基百科": {
                 "base_url": "https://zh.wikipedia.org/wiki/",
                 "search_url": "https://zh.wikipedia.org/wiki/Special:Search?search={keyword}",
-                "description": "中文维基百科 - 全球最大的中文百科全书"
+                "description": "中文维基百科 - 全球最大的中文百科全书",
+                "category": "百科"
             },
             "百度百科": {
                 "base_url": "https://baike.baidu.com/item/",
                 "search_url": "https://baike.baidu.com/search?word={keyword}",
-                "description": "百度百科 - 中文百科知识平台"
+                "description": "百度百科 - 中文百科知识平台",
+                "category": "百科"
             },
+            
+            # 医学专业网站
+            "丁香园": {
+                "base_url": "https://www.dxy.com/",
+                "search_url": "https://www.dxy.com/search?q={keyword}",
+                "description": "丁香园 - 专业医学知识平台",
+                "category": "医学"
+            },
+            "好大夫在线": {
+                "base_url": "https://www.haodf.com/",
+                "search_url": "https://www.haodf.com/search?kw={keyword}",
+                "description": "好大夫在线 - 医疗健康咨询平台",
+                "category": "医学"
+            },
+            "春雨医生": {
+                "base_url": "https://www.chunyuyisheng.com/",
+                "search_url": "https://www.chunyuyisheng.com/search?q={keyword}",
+                "description": "春雨医生 - 在线医疗健康服务",
+                "category": "医学"
+            },
+            
+            # 问答类网站
             "知乎": {
                 "base_url": "https://www.zhihu.com/",
                 "search_url": "https://www.zhihu.com/search?type=content&q={keyword}",
-                "description": "知乎 - 中文问答社区"
+                "description": "知乎 - 中文问答社区",
+                "category": "问答"
             },
+            
+            # 技术类网站
             "CSDN": {
                 "base_url": "https://blog.csdn.net/",
                 "search_url": "https://so.csdn.net/so/search?q={keyword}",
-                "description": "CSDN - 技术博客平台"
+                "description": "CSDN - 技术博客平台 ⚠️ 仅适用于技术类搜索",
+                "category": "技术"
             },
             "GitHub": {
                 "base_url": "https://github.com/",
                 "search_url": "https://github.com/search?q={keyword}&type=repositories",
-                "description": "GitHub - 代码托管平台"
+                "description": "GitHub - 代码托管平台 ⚠️ 仅适用于技术类搜索",
+                "category": "技术"
             },
             "Stack Overflow": {
                 "base_url": "https://stackoverflow.com/",
                 "search_url": "https://stackoverflow.com/search?q={keyword}",
-                "description": "Stack Overflow - 程序员问答社区"
+                "description": "Stack Overflow - 程序员问答社区 ⚠️ 仅适用于技术类搜索",
+                "category": "技术"
             }
         }
     
@@ -279,6 +310,37 @@ class WebToKBProcessor:
     def get_preset_sites(self) -> Dict:
         """获取预设网站列表"""
         return self.preset_sites
+    
+    def recommend_sites_for_keyword(self, keyword: str) -> List[str]:
+        """根据关键词智能推荐合适的网站"""
+        from src.services.configurable_industry_service import get_configurable_industry_service
+        
+        # 使用新的可配置推荐系统
+        service = get_configurable_industry_service()
+        return service.recommend_sites_for_keyword(keyword)
+    
+    def generate_suggestions_for_crawl(self, kb_name: str, crawl_url: str, saved_files: List[str]) -> List[str]:
+        """为网页抓取生成推荐问题"""
+        from src.chat.unified_suggestion_engine import get_unified_suggestion_engine
+        
+        # 读取抓取内容作为上下文
+        context = ""
+        for file_path in saved_files[:3]:  # 只读取前3个文件
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    context += content[:1000] + "\n"  # 每个文件取前1000字符
+            except:
+                continue
+        
+        # 使用统一推荐引擎
+        engine = get_unified_suggestion_engine(kb_name)
+        return engine.generate_suggestions(
+            context=context,
+            source_type='web_crawl',
+            metadata={'url': crawl_url, 'files': saved_files},
+            num_questions=4
+        )
     
     def add_preset_site(self, name: str, base_url: str, search_url: str, description: str):
         """添加预设网站"""

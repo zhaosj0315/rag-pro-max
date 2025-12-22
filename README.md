@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-v2.4.7-blue.svg)
+![Version](https://img.shields.io/badge/version-v2.4.8-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Docker-lightgrey.svg)
@@ -20,7 +20,10 @@
 
 ## ✨ 核心功能
 
-### 🎨 极致交互 (v2.4.7 深度优化)
+### 🎨 极致交互 (v2.4.8 统一推荐系统版)
+- **统一推荐系统**: 消除重复建设，聊天/文件/网页使用统一推荐引擎
+- **智能行业配置**: 可自定义每个行业的网站列表，支持动态推荐
+- **推荐质量验证**: 基于知识库内容验证推荐问题的可答性
 - **视图大一统**: 知识库详情与管理界面合并为单页垂直流，操作路径缩短 50%
 - **macOS 原生预览**: 非阻塞式 Quick Look 集成，支持置顶预览与并行操作
 - **高级选项一键全选**: 支持 OCR/摘要/元数据提取的一键批量控制
@@ -47,7 +50,7 @@
 ### 💬 对话系统
 - **多轮对话**: 保持上下文的连续对话
 - **流式输出**: 实时生成回答，支持中断
-- **追问推荐**: 智能生成相关问题
+- **统一推荐**: 智能生成相关问题，支持聊天/文件/网页场景
 - **历史管理**: 对话记录自动保存
 
 ---

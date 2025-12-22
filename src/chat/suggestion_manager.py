@@ -1,16 +1,15 @@
 """
-追问建议管理器
-Stage 7.2 - 追问推荐逻辑
+追问建议管理器 - 统一推荐引擎适配器
+Stage 7.2 - 追问推荐逻辑 (已迁移到统一推荐引擎)
 """
 
 from typing import List, Optional, Any
 import streamlit as st
-
-from src.chat_utils_improved import generate_follow_up_questions_safe as generate_follow_up_questions
+from src.chat.unified_suggestion_engine import get_unified_suggestion_engine
 
 
 class SuggestionManager:
-    """追问建议管理器"""
+    """追问建议管理器 - 统一推荐引擎的适配器"""
     
     @staticmethod
     def get_suggestions_history() -> List[str]:
@@ -38,10 +37,11 @@ class SuggestionManager:
         messages: List[dict],
         question_queue: List[str],
         query_engine: Optional[Any] = None,
-        num_questions: int = 3
+        num_questions: int = 3,
+        kb_name: str = None
     ) -> List[str]:
         """
-        生成初始追问建议
+        生成初始追问建议 - 使用统一推荐引擎
         
         Args:
             context_text: 上下文文本（回答内容）
@@ -49,30 +49,21 @@ class SuggestionManager:
             question_queue: 问题队列
             query_engine: 查询引擎（可选）
             num_questions: 生成问题数量
+            kb_name: 知识库名称
         
         Returns:
             追问建议列表
         """
-        # 排除已有的问题
-        existing_questions = [m['content'] for m in messages if m['role'] == 'user']
-        existing_questions.extend(question_queue)
-        existing_questions.extend(SuggestionManager.get_suggestions_history())
-        
-        # 生成新问题
-        new_sugs = generate_follow_up_questions(
-            context_text,
-            num_questions=num_questions,
-            existing_questions=existing_questions,
-            query_engine=query_engine
+        # 使用统一推荐引擎
+        engine = get_unified_suggestion_engine(kb_name)
+        suggestions = engine.generate_suggestions(
+            context=context_text,
+            source_type='chat',
+            query_engine=query_engine,
+            num_questions=num_questions
         )
         
-        # 去重检查
-        if new_sugs:
-            # 再次检查是否与现有问题重复
-            unique_sugs = [s for s in new_sugs if s not in existing_questions]
-            return unique_sugs
-        
-        return []
+        return suggestions
     
     @staticmethod
     def generate_more_suggestions(
@@ -80,10 +71,11 @@ class SuggestionManager:
         messages: List[dict],
         question_queue: List[str],
         query_engine: Optional[Any] = None,
-        num_questions: int = 3
+        num_questions: int = 3,
+        kb_name: str = None
     ) -> List[str]:
         """
-        生成更多追问建议（用于"继续推荐"按钮）
+        生成更多追问建议 - 使用统一推荐引擎
         
         Args:
             context_text: 上下文文本
@@ -91,21 +83,18 @@ class SuggestionManager:
             question_queue: 问题队列
             query_engine: 查询引擎（可选）
             num_questions: 生成问题数量
+            kb_name: 知识库名称
         
         Returns:
             新的追问建议列表
         """
-        # 排除所有已有问题（包括历史、队列、已生成的追问）
-        all_history_questions = [m['content'] for m in messages if m['role'] == 'user']
-        all_history_questions.extend(SuggestionManager.get_suggestions_history())
-        all_history_questions.extend(question_queue)
-        
-        # 生成新问题
-        new_sugs = generate_follow_up_questions(
-            context_text=context_text,
-            num_questions=num_questions,
-            existing_questions=all_history_questions,
-            query_engine=query_engine
+        # 使用统一推荐引擎
+        engine = get_unified_suggestion_engine(kb_name)
+        suggestions = engine.generate_suggestions(
+            context=context_text,
+            source_type='chat',
+            query_engine=query_engine,
+            num_questions=num_questions
         )
         
-        return new_sugs if new_sugs else []
+        return suggestions

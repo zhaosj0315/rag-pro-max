@@ -111,6 +111,7 @@ from src.app_logging import LogManager
 logger = LogManager()
 # terminal_logger 已被 logger 替代
 from src.chat_utils_improved import generate_follow_up_questions_safe as generate_follow_up_questions
+from src.chat.unified_suggestion_engine import get_unified_suggestion_engine
 
 # 引入元数据管理
 from src.metadata_manager import MetadataManager
@@ -136,7 +137,8 @@ from src.utils.document_processor import (
 from src.config import ConfigLoader, ManifestManager
 
 # 引入聊天管理
-from src.chat import HistoryManager, SuggestionManager
+from src.chat.unified_suggestion_engine import get_unified_suggestion_engine
+from src.chat import HistoryManager
 
 # 引入 UI 模块
 from src.ui.page_style import PageStyle
@@ -312,7 +314,7 @@ from src.utils.parallel_executor import ParallelExecutor
 from src.utils.safe_parallel_tasks import safe_process_node_worker as process_node_worker, extract_metadata_task
 
 # 引入聊天模块 (Stage 7)
-from src.chat import ChatEngine, SuggestionManager
+from src.chat import ChatEngine
 
 # 引入配置模块 (Stage 8)
 from src.config import ConfigLoader, ConfigValidator
@@ -623,6 +625,19 @@ with st.sidebar:
 
         # --- 核心导航 ---
         nav_options = ["➕ 新建知识库..."] + [f"📂 {kb}" for kb in kb_manager.list_all()]
+
+        # 检查是否要显示配置页面
+        if st.session_state.get('show_industry_config'):
+            from src.ui.industry_config_interface import render_industry_config_interface
+            
+            # 返回按钮
+            if st.button("← 返回主页"):
+                st.session_state.show_industry_config = False
+                st.rerun()
+            
+            # 渲染配置界面
+            render_industry_config_interface()
+            st.stop()  # 停止执行后续代码
 
         # 默认选择"新建知识库"，避免自动加载大知识库
         default_idx = 0
@@ -1224,11 +1239,15 @@ with st.sidebar:
                                     if len(files_to_use) > 3:
                                         st.text(f"... 还有 {len(files_to_use) - 3} 个文件")
                                 
-                                # 推荐问题
+                                # 推荐问题 - 使用统一推荐引擎
                                 try:
-                                    from src.chat.web_suggestion_engine import WebSuggestionEngine
-                                    web_engine = WebSuggestionEngine()
-                                    web_suggestions = web_engine.generate_suggestions_from_crawl(crawl_url, files_to_use)
+                                    engine = get_unified_suggestion_engine(kb_name)
+                                    web_suggestions = engine.generate_suggestions(
+                                        context="网页抓取完成",
+                                        source_type='web_crawl',
+                                        metadata={'url': crawl_url, 'files': files_to_use},
+                                        num_questions=3
+                                    )
                                     
                                     if web_suggestions:
                                         st.markdown("**💡 推荐问题:**")
@@ -1276,16 +1295,27 @@ with st.sidebar:
                             try:
                                 from src.config.unified_sites import get_industry_sites
                                 search_engines, site_names = get_industry_sites(selected_industry)
+                                logger.info(f"✅ 成功加载行业配置: {selected_industry} - {len(search_engines)}个网站")
                             except ImportError:
-                                # 备用配置
-                                search_engines = [
-                                    "https://www.runoob.com/",
-                                    "https://docs.python.org/zh-cn/3/",
-                                    "https://help.aliyun.com/",
-                                    "https://www.eastmoney.com/",
-                                    "https://www.icourse163.org/"
-                                ]
-                                site_names = ["菜鸟教程", "Python文档", "阿里云", "东方财富", "中国大学MOOC"]
+                                # 备用配置 - 根据行业选择
+                                if "医疗健康" in selected_industry or "医疗" in selected_industry:
+                                    search_engines = [
+                                        "https://zh.wikipedia.org/",
+                                        "https://baike.baidu.com/",
+                                        "https://www.39.net/",
+                                        "https://www.xywy.com/",
+                                        "https://www.familydoctor.com.cn/"
+                                    ]
+                                    site_names = ["维基百科", "百度百科", "39健康网", "寻医问药网", "家庭医生在线"]
+                                else:
+                                    # 默认使用百科类网站
+                                    search_engines = [
+                                        "https://zh.wikipedia.org/",
+                                        "https://baike.baidu.com/",
+                                        "https://www.zhihu.com/"
+                                    ]
+                                    site_names = ["维基百科", "百度百科", "知乎"]
+                                logger.warning(f"⚠️ 使用备用配置: {selected_industry} - {len(search_engines)}个网站")
                             
                             # 记录搜索开始
                             logger.info(f"🔍 开始智能行业搜索: '{search_keyword}' ({selected_industry}, 深度:{crawl_depth}, 总页数:{max_pages})")
@@ -2552,14 +2582,53 @@ if btn_start:
                 
                 st.info(f"🔍 开始智能搜索: {search_keyword}")
                 
-                # 使用现有的智能搜索引擎
-                search_engines = [
-                    "https://www.runoob.com/",
-                    "https://docs.python.org/zh-cn/3/",
-                    "https://help.aliyun.com/",
-                    "https://www.eastmoney.com/",
-                    "https://www.icourse163.org/"
-                ]
+                # 根据关键词智能选择搜索引擎
+                def get_smart_search_engines(keyword):
+                    """根据关键词智能选择搜索引擎"""
+                    keyword_lower = keyword.lower()
+                    
+                    # 医学关键词
+                    medical_keywords = [
+                        'cancer', 'disease', 'medicine', 'health', 'treatment', 'diagnosis',
+                        '癌症', '疾病', '医学', '健康', '治疗', '诊断', '药物', '症状', '病理',
+                        '卵巢癌', '肺癌', '胃癌', '肝癌', '乳腺癌', '医院', '医生', '手术'
+                    ]
+                    
+                    # 技术关键词
+                    tech_keywords = [
+                        'python', 'java', 'javascript', 'programming', 'coding', 'algorithm',
+                        '编程', '代码', '算法', '开发', '软件', '技术'
+                    ]
+                    
+                    is_medical = any(med_word in keyword_lower for med_word in medical_keywords)
+                    is_tech = any(tech_word in keyword_lower for tech_word in tech_keywords)
+                    
+                    if is_medical:
+                        return [
+                            "https://zh.wikipedia.org/",
+                            "https://baike.baidu.com/",
+                            "https://www.39.net/",
+                            "https://www.xywy.com/",
+                            "https://www.familydoctor.com.cn/"
+                        ]
+                    elif is_tech:
+                        return [
+                            "https://www.runoob.com/",
+                            "https://docs.python.org/zh-cn/3/",
+                            "https://help.aliyun.com/",
+                            "https://zh.wikipedia.org/",
+                            "https://www.zhihu.com/"
+                        ]
+                    else:
+                        return [
+                            "https://zh.wikipedia.org/",
+                            "https://baike.baidu.com/",
+                            "https://www.zhihu.com/",
+                            "https://www.icourse163.org/",
+                            "https://www.eastmoney.com/"
+                        ]
+                
+                search_engines = get_smart_search_engines(search_keyword)
                 
                 # 生成唯一输出目录
                 from datetime import datetime
@@ -3480,14 +3549,8 @@ if active_kb_name and st.session_state.chat_engine and not st.session_state.mess
         summary_placeholder = st.empty()
         with st.status("✨ 正在分析文档生成摘要...", expanded=True) as status:
             try:
-                # 使用知识库的模型（已在挂载时设置，无需重复设置）- 修复模型名称获取
-                if hasattr(Settings.embed_model, 'model_name'):
-                    current_model = Settings.embed_model.model_name
-                elif hasattr(Settings.embed_model, '_model_name'):
-                    current_model = Settings.embed_model._model_name
-                else:
-                    current_model = 'sentence-transformers/all-MiniLM-L6-v2'  # 默认模型
-                
+                # 使用当前选择的 LLM 模型名称
+                current_model = st.session_state.get('selected_model', 'Ollama')
                 logger.info(f"💬 摘要生成使用模型: {current_model}")
                 
                 prompt = "请用一段话简要总结此知识库的核心内容。然后，提出3个用户可能最关心的问题，每行一个，不要序号。"
@@ -3558,7 +3621,17 @@ for msg_idx, msg in enumerate(state.get_messages()):
     
     # 在最后一条 assistant 消息之后显示动态追问推荐（在 chat_message 容器外）
     is_last_message = msg_idx == len(state.get_messages()) - 1
-    if is_last_message and msg["role"] == "assistant" and active_kb_name and st.session_state.chat_engine:
+    
+    # 调试信息
+    debug_info = {
+        'is_last_message': is_last_message,
+        'role': msg.get("role"),
+        'active_kb_name': bool(active_kb_name),
+        'chat_engine': bool(st.session_state.get('chat_engine')),
+        'suggestions_count': len(st.session_state.get('suggestions_history', []))
+    }
+    
+    if is_last_message and msg["role"] == "assistant":
         import hashlib
         msg_hash = hashlib.md5(msg['content'][:100].encode()).hexdigest()[:8]
         
@@ -3566,11 +3639,32 @@ for msg_idx, msg in enumerate(state.get_messages()):
         
         @st.fragment
         def suggestions_fragment():
-            if st.session_state.suggestions_history:
+            # 显示调试信息（直接显示，不折叠）
+            suggestions_count = len(st.session_state.get('suggestions_history', []))
+            st.caption(f"🔍 调试: 推荐问题数量 = {suggestions_count}")
+            
+            if suggestions_count > 0:
                 st.markdown("##### 🚀 追问推荐")
                 for idx, q in enumerate(st.session_state.suggestions_history):
                     if st.button(f"👉 {q}", key=f"dyn_sug_{msg_hash}_{idx}", use_container_width=True):
                         click_btn(q)
+            else:
+                # 如果没有推荐问题，显示提示
+                st.info("💡 回答完成后会自动生成推荐问题")
+                
+                # 手动生成推荐问题按钮
+                if st.button("🔄 手动生成推荐问题", key=f"manual_gen_{msg_hash}"):
+                    with st.spinner("生成中..."):
+                        engine = get_unified_suggestion_engine(active_kb_name)
+                        manual_sugs = engine.generate_suggestions(
+                            context=msg['content'],
+                            source_type='chat',
+                            query_engine=None,  # 不验证知识库，直接生成
+                            num_questions=3
+                        )
+                        if manual_sugs:
+                            st.session_state.suggestions_history = manual_sugs
+                            st.rerun(scope="fragment")
             
             if st.button("✨ 继续推荐 3 个追问 (无限追问)", key=f"gen_more_{msg_hash}", type="secondary", use_container_width=True):
                 with st.spinner("⏳ 正在生成新问题..."):
@@ -3588,12 +3682,13 @@ for msg_idx, msg in enumerate(state.get_messages()):
                         elif hasattr(chat_engine, 'llm'):
                             llm_model = chat_engine.llm
                     
-                    new_sugs = generate_follow_up_questions(
-                        context_text=msg['content'], 
-                        num_questions=3,
-                        existing_questions=all_history_questions,
+                    # 使用统一推荐引擎
+                    engine = get_unified_suggestion_engine(active_kb_name)
+                    new_sugs = engine.generate_suggestions(
+                        context=msg['content'],
+                        source_type='chat',
                         query_engine=st.session_state.chat_engine if st.session_state.get('chat_engine') else None,
-                        llm_model=llm_model
+                        num_questions=3
                     )
                     
                     if new_sugs:
@@ -3953,8 +4048,13 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         if embed:
                             Settings.embed_model = embed
                         
+                        # 检查 chat_engine 状态
+                        if not st.session_state.get('chat_engine'):
+                            raise Exception("聊天引擎未初始化，请先选择知识库")
+                        
                         # GPU加速检索 - 批量处理
                         retrieval_start = time.time()
+                        logger.info(f"🔍 开始查询: {final_prompt[:100]}...")
                         response = st.session_state.chat_engine.stream_chat(final_prompt)
                         retrieval_time = time.time() - retrieval_start
                         
@@ -4087,17 +4187,32 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         elif hasattr(chat_engine, 'llm'):
                             llm_model = chat_engine.llm
                     
-                    initial_sugs = generate_follow_up_questions(
-                        full_text, 
-                        num_questions=3,
-                        existing_questions=existing_questions,
+                    # 使用统一推荐引擎
+                    engine = get_unified_suggestion_engine(current_kb_name)
+                    initial_sugs = engine.generate_suggestions(
+                        context=full_text,
+                        source_type='chat',
                         query_engine=st.session_state.chat_engine if st.session_state.get('chat_engine') else None,
-                        llm_model=llm_model
+                        num_questions=3
                     )
+                    
+                    logger.info(f"🔧 推荐引擎返回 {len(initial_sugs)} 个问题")
                     
                     if initial_sugs:
                         st.session_state.suggestions_history = initial_sugs[:3]
                         logger.info(f"✨ 生成 {len(initial_sugs)} 个推荐问题")
+                        for i, q in enumerate(initial_sugs[:3], 1):
+                            logger.info(f"   {i}. {q}")
+                    else:
+                        logger.warning("⚠️ 推荐引擎未返回任何问题")
+                        # 提供默认推荐问题，避免完全没有推荐
+                        default_suggestions = [
+                            "能否提供更多详细信息？",
+                            "有哪些相关的内容？", 
+                            "如何进一步了解这个话题？"
+                        ]
+                        st.session_state.suggestions_history = default_suggestions
+                        logger.info("🔄 使用默认推荐问题")
                     
                     # 延迟保存：确认所有步骤都成功后再保存
                     if active_kb_name: HistoryManager.save(active_kb_name, state.get_messages())
@@ -4113,8 +4228,17 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     st.rerun()
                 
                 except Exception as e: 
-                    print(f"❌ 查询出错: {e}\n")
-                    st.error(f"出错: {e}")
+                    error_msg = str(e)
+                    print(f"❌ 查询出错: {error_msg}\n")
+                    logger.error(f"查询处理失败: {error_msg}")
+                    
+                    # 显示详细错误信息
+                    if "聊天引擎未初始化" in error_msg:
+                        st.error("❌ 聊天引擎未初始化，请先选择知识库")
+                    elif "stream_chat" in error_msg:
+                        st.error("❌ 查询处理失败，请检查知识库状态")
+                    else:
+                        st.error(f"❌ 查询出错: {error_msg}")
                     
                     # 发生错误，回滚最后一条消息（如果是 assistant 生成的）
                     if st.session_state.messages and st.session_state.messages[-1]['role'] == 'assistant':

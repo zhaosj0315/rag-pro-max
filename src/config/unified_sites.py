@@ -1,7 +1,10 @@
 """
 统一网站配置管理
 整合所有行业的高质量网站配置
+支持用户自定义配置
 """
+
+from src.services.configurable_industry_service import get_configurable_industry_service
 
 # 统一的行业网站配置
 UNIFIED_INDUSTRY_SITES = {
@@ -28,9 +31,16 @@ UNIFIED_INDUSTRY_SITES = {
         "name": "🏥 医疗健康",
         "description": "医疗资讯、健康科普、医学知识",
         "sites": [
+            {"name": "维基百科", "url": "https://zh.wikipedia.org/", "difficulty": 1},
+            {"name": "百度百科", "url": "https://baike.baidu.com/", "difficulty": 1},
             {"name": "丁香园", "url": "https://www.dxy.com/", "difficulty": 3},
             {"name": "好大夫在线", "url": "https://www.haodf.com/", "difficulty": 3},
-            {"name": "春雨医生", "url": "https://www.chunyuyisheng.com/", "difficulty": 3}
+            {"name": "春雨医生", "url": "https://www.chunyuyisheng.com/", "difficulty": 3},
+            {"name": "知乎医学", "url": "https://www.zhihu.com/topic/19551137", "difficulty": 2},
+            {"name": "39健康网", "url": "https://www.39.net/", "difficulty": 2},
+            {"name": "寻医问药网", "url": "https://www.xywy.com/", "difficulty": 2},
+            {"name": "家庭医生在线", "url": "https://www.familydoctor.com.cn/", "difficulty": 2},
+            {"name": "有来医生", "url": "https://www.youlai.cn/", "difficulty": 2}
         ]
     },
     
@@ -139,18 +149,43 @@ UNIFIED_INDUSTRY_SITES = {
 
 def get_industry_list():
     """获取所有行业的显示列表"""
+    # 优先使用用户自定义配置
+    service = get_configurable_industry_service()
+    custom_industries = service.get_all_industries()
+    
+    if custom_industries:
+        return custom_industries
+    
+    # 回退到默认配置
     return [f"{config['name']} - {config['description']}" 
             for config in UNIFIED_INDUSTRY_SITES.values()]
 
 def get_industry_sites(industry_display_name):
     """根据显示名称获取行业网站"""
+    # 优先使用用户自定义配置
+    service = get_configurable_industry_service()
+    
+    # 检查是否为自定义行业
+    if industry_display_name in service.get_all_industries():
+        return service.get_sites_for_crawling(industry_display_name)
+    
+    # 原有逻辑保持不变
+    if "医疗健康" in industry_display_name or "医疗" in industry_display_name:
+        healthcare_sites = UNIFIED_INDUSTRY_SITES['healthcare']['sites']
+        return [site['url'] for site in healthcare_sites], [site['name'] for site in healthcare_sites]
+    
+    # 其他行业匹配
     for key, config in UNIFIED_INDUSTRY_SITES.items():
         if config['name'] in industry_display_name:
             return [site['url'] for site in config['sites']], [site['name'] for site in config['sites']]
     
-    # 默认返回技术开发
-    programming_sites = UNIFIED_INDUSTRY_SITES['programming']['sites']
-    return [site['url'] for site in programming_sites], [site['name'] for site in programming_sites]
+    # 默认返回百科类网站，而不是技术类
+    default_sites = [
+        {"name": "维基百科", "url": "https://zh.wikipedia.org/"},
+        {"name": "百度百科", "url": "https://baike.baidu.com/"},
+        {"name": "知乎", "url": "https://www.zhihu.com/"}
+    ]
+    return [site['url'] for site in default_sites], [site['name'] for site in default_sites]
 
 def get_easy_sites(industry_key, max_difficulty=2):
     """获取指定行业中容易爬取的网站"""

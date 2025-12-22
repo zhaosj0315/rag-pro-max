@@ -1,0 +1,36 @@
+{
+  "custom_industries": {
+    "🔧 技术开发": {
+      "name": "🔧 技术开发",
+      "description": "编程语言、开发工具、云服务技术",
+      "keywords": ["python", "java", "javascript", "编程", "开发", "代码", "算法"],
+      "sites": [
+        {"name": "GitHub", "url": "https://github.com", "priority": 1, "difficulty": 2},
+        {"name": "Stack Overflow", "url": "https://stackoverflow.com", "priority": 2, "difficulty": 2},
+        {"name": "MDN文档", "url": "https://developer.mozilla.org/zh-CN/", "priority": 3, "difficulty": 2},
+        {"name": "菜鸟教程", "url": "https://www.runoob.com/", "priority": 4, "difficulty": 1}
+      ]
+    },
+    "🏥 医疗健康": {
+      "name": "🏥 医疗健康", 
+      "description": "医疗资讯、健康科普、医学知识",
+      "keywords": ["医疗", "健康", "疾病", "治疗", "癌症", "医学", "药物"],
+      "sites": [
+        {"name": "丁香园", "url": "https://www.dxy.com/", "priority": 1, "difficulty": 3},
+        {"name": "好大夫在线", "url": "https://www.haodf.com/", "priority": 2, "difficulty": 3},
+        {"name": "维基百科", "url": "https://zh.wikipedia.org/", "priority": 3, "difficulty": 1},
+        {"name": "百度百科", "url": "https://baike.baidu.com/", "priority": 4, "difficulty": 1}
+      ]
+    },
+    "💰 金融财经": {
+      "name": "💰 金融财经",
+      "description": "股票投资、财经资讯、金融政策", 
+      "keywords": ["股票", "投资", "财经", "金融", "基金", "理财"],
+      "sites": [
+        {"name": "东方财富网", "url": "https://www.eastmoney.com/", "priority": 1, "difficulty": 2},
+        {"name": "雪球", "url": "https://xueqiu.com/", "priority": 2, "difficulty": 3},
+        {"name": "金融界", "url": "https://www.jrj.com/", "priority": 3, "difficulty": 2}
+      ]
+    }
+  }
+}
