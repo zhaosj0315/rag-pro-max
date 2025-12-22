@@ -1,31 +1,43 @@
 {
-  "version": "2.4.8",
-  "release_date": "2025-12-22",
-  "codename": "统一推荐系统版",
+  "version": "2.4.9",
+  "release_date": "2025-12-23",
+  "codename": "UI组件统一版",
   "features": [
     "统一推荐问题系统 (消除重复建设)",
     "智能行业网站配置 (可自定义)",
     "推荐问题质量验证 (基于知识库)",
-    "完全统一的生成逻辑 (聊天/文件/网页)"
+    "完全统一的生成逻辑 (聊天/文件/网页)",
+    "UI组件统一化 (第一步: 对话框组件)"
   ],
   "architecture": {
     "layers": 4,
-    "modules": 152,
+    "modules": 153,
     "services": 4,
     "common_modules": 3,
+    "ui_components": 1,
     "test_coverage": "88/95"
   },
   "improvements": {
     "removed_duplicates": [
       "WebSuggestionEngine",
       "SuggestionEngine", 
-      "SuggestionPanel"
+      "SuggestionPanel",
+      "show_document_detail_dialog (重复函数)"
     ],
     "unified_system": "UnifiedSuggestionEngine",
+    "unified_ui": "unified_dialogs.py",
     "new_features": [
       "可配置行业网站管理",
       "智能推荐问题验证",
-      "统一的推荐生成逻辑"
+      "统一的推荐生成逻辑",
+      "统一UI对话框组件"
     ]
+  },
+  "optimization_plan": {
+    "current_step": "第一步UI统一",
+    "completed": ["show_document_detail_dialog"],
+    "next_targets": ["render_chat_controls_2x2", "render_config_tab"],
+    "total_duplicates_found": 23,
+    "expected_code_reduction": "8000-12000 lines"
   }
 }
