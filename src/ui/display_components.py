@@ -182,27 +182,9 @@ def render_kb_info_card(kb_name: str, doc_count: int, total_chunks: int) -> None
 
 
 def render_system_stats(cpu: float, memory: float, gpu: float = 0) -> None:
-    """
-    渲染系统资源统计
-    
-    Args:
-        cpu: CPU 使用率 (0-100)
-        memory: 内存使用率 (0-100)
-        gpu: GPU 使用率 (0-100)
-    """
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric("CPU", f"{cpu:.1f}%", delta=None)
-    
-    with col2:
-        st.metric("内存", f"{memory:.1f}%", delta=None)
-    
-    with col3:
-        if gpu > 0:
-            st.metric("GPU", f"{gpu:.1f}%", delta=None)
-        else:
-            st.metric("GPU", "未使用", delta=None)
+    """渲染系统资源统计 - 使用统一组件"""
+    from .unified_display_components import render_system_stats as unified_render_system_stats
+    unified_render_system_stats(show_detailed=True)
 
 
 def render_error_message(error: str, details: Optional[str] = None) -> None:
