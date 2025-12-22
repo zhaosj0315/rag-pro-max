@@ -17,13 +17,6 @@ def get_main_controller():
 try:
     from .state_manager import StateManager, state
 except ImportError:
-    # 多进程环境中的fallback
-    class StateManager:
-        def __init__(self):
-            self._state = {}
-        def get(self, key, default=None):
-            return self._state.get(key, default)
-        def set(self, key, value):
-            self._state[key] = value
-    
+    # 使用统一状态管理器
+    from .state_manager import StateManager
     state = StateManager()

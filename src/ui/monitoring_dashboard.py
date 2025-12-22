@@ -166,7 +166,5 @@ def render_monitoring_dashboard():
 
 
 def render_sidebar_widget():
-
-    """渲染侧边栏组件 (v23集成接口)"""
-
+    """渲染侧边栏组件 - 统一接口"""
     monitoring_dashboard.render_sidebar_widget()
