@@ -347,7 +347,9 @@ class TabbedSidebar:
         ]
     
     def _save_config(self):
-        """保存配置"""
+        """保存配置 - 使用统一服务"""
+        from src.services.unified_config_service import save_config
+        
         config = {
             "llm_type": st.session_state.get("llm_type"),
             "temperature": st.session_state.get("temperature"),
@@ -355,9 +357,7 @@ class TabbedSidebar:
             # 添加其他配置项
         }
         
-        # 保存到文件
-        with open("config/ui_config.json", "w") as f:
-            json.dump(config, f, indent=2)
+        save_config(config, "ui_config")
 
 # 使用示例
 def create_tabbed_sidebar():
