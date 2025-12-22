@@ -61,6 +61,9 @@ def render_kb_advanced_options():
 
 
 def render_chat_controls_2x2(state, current_kb_name=None):
+    """渲染聊天控制组件 - 使用统一组件"""
+    from src.ui.enhanced_controls import EnhancedControls
+    return EnhancedControls.render_chat_controls_2x2(state, current_kb_name)
     """渲染2×2布局的聊天控制"""
     st.write("**💬 聊天控制**")
     
