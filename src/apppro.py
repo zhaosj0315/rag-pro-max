@@ -3910,10 +3910,13 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
         selected_kbs = st.session_state.get('selected_kbs', [])
         st.session_state.is_processing = True
         logger.info("✅ 多知识库模式开始处理")
+        logger.info(f"📋 选中知识库: {selected_kbs}")
+        logger.info(f"❓ 用户问题: {final_prompt}")
         
         # 使用多知识库查询引擎
         from src.query.multi_kb_query_engine import MultiKBQueryEngine
         multi_engine = MultiKBQueryEngine(output_base)
+        logger.info("🔧 多知识库查询引擎已初始化")
         
         # 添加用户消息
         st.session_state.messages.append({"role": "user", "content": final_prompt})
@@ -3928,19 +3931,23 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             
             try:
                 # 执行多知识库查询
+                logger.info("🚀 开始执行多知识库联合查询...")
                 response = multi_engine.query(final_prompt, selected_kbs, embed_provider, embed_model, embed_key, embed_url)
                 response_placeholder.write(response)
                 
                 # 添加助手消息
                 st.session_state.messages.append({"role": "assistant", "content": response})
+                logger.success("✅ 多知识库查询完成，回答已添加到对话历史")
                 
             except Exception as e:
                 error_msg = f"查询失败: {str(e)}"
+                logger.error(f"❌ 多知识库查询异常: {str(e)}")
                 response_placeholder.error(error_msg)
                 st.session_state.messages.append({"role": "assistant", "content": error_msg})
             
             finally:
                 st.session_state.is_processing = False
+                logger.info("🔄 处理状态已重置")
                 st.rerun()
                 
     elif st.session_state.chat_engine:
