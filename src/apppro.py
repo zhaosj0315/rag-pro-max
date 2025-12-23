@@ -572,7 +572,7 @@ with st.sidebar:
         existing_kbs = (setattr(kb_manager, "base_path", output_base), kb_manager.list_all())[1]
 
         # --- 核心导航 ---
-        nav_options = ["➕ 新建知识库..."] + [f"📂 {kb}" for kb in kb_manager.list_all()]
+        nav_options = ["➕ 新建知识库...", "🔍 多知识库问答"] + [f"📂 {kb}" for kb in kb_manager.list_all()]
 
         # 检查是否要显示配置页面
         if st.session_state.get('show_industry_config'):
@@ -622,11 +622,16 @@ with st.sidebar:
         st.session_state.current_nav = selected_nav
 
         is_create_mode = (selected_nav == "➕ 新建知识库...")
-        current_kb_name = selected_nav.replace("📂 ", "") if not is_create_mode else None
-
+        is_multi_kb_mode = (selected_nav == "🔍 多知识库问答")
+        current_kb_name = selected_nav.replace("📂 ", "") if not is_create_mode and not is_multi_kb_mode else None
 
         # --- 功能区 ---
-        if is_create_mode:
+        if is_multi_kb_mode:
+            # 多知识库问答模式
+            from src.query.multi_kb_query_engine import render_multi_kb_query
+            render_multi_kb_query()
+            
+        elif is_create_mode:
             
             with st.container(border=True):
                 # 1. 路径选择完全一行化
