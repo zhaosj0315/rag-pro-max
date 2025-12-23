@@ -572,7 +572,7 @@ with st.sidebar:
         existing_kbs = (setattr(kb_manager, "base_path", output_base), kb_manager.list_all())[1]
 
         # --- 核心导航 ---
-        nav_options = ["➕ 新建知识库...", "🔍 多知识库问答"] + [f"📂 {kb}" for kb in kb_manager.list_all()]
+        nav_options = ["➕ 新建知识库..."] + [f"📂 {kb}" for kb in kb_manager.list_all()]
 
         # 检查是否要显示配置页面
         if st.session_state.get('show_industry_config'):
@@ -595,14 +595,59 @@ with st.sidebar:
             except ValueError:
                 default_idx = 0
 
-        # 知识库选择完全一行化
+        # 知识库选择 - 支持多选
         select_col1, select_col2, select_col3 = st.columns([0.6, 5.9, 0.5])
         with select_col1:
             st.markdown("**选择:**")
         with select_col2:
-            selected_nav = st.selectbox("", nav_options, index=default_idx, label_visibility="collapsed")
+            # 检查是否启用多选模式
+            if st.session_state.get('multi_kb_mode', False):
+                # 多选模式
+                available_kbs = [kb for kb in kb_manager.list_all()]
+                if available_kbs:
+                    selected_kbs = []
+                    
+                    # 全选/取消全选
+                    col_all, col_list = st.columns([1, 4])
+                    with col_all:
+                        select_all = st.checkbox("全选", key="select_all_main")
+                    
+                    # 知识库复选框列表
+                    with col_list:
+                        for kb in available_kbs:
+                            if select_all:
+                                is_selected = st.checkbox(f"📂 {kb}", value=True, key=f"kb_check_{kb}")
+                            else:
+                                is_selected = st.checkbox(f"📂 {kb}", key=f"kb_check_{kb}")
+                            
+                            if is_selected:
+                                selected_kbs.append(kb)
+                    
+                    # 保存选中的知识库
+                    st.session_state.selected_kbs = selected_kbs
+                    
+                    if selected_kbs:
+                        st.info(f"✅ 已选择 {len(selected_kbs)} 个知识库: {', '.join(selected_kbs)}")
+                        selected_nav = f"多选: {len(selected_kbs)}个知识库"
+                    else:
+                        st.warning("请至少选择一个知识库")
+                        selected_nav = "➕ 新建知识库..."
+                else:
+                    st.warning("暂无可用知识库")
+                    selected_nav = "➕ 新建知识库..."
+            else:
+                # 单选模式（原来的方式）
+                selected_nav = st.selectbox("", nav_options, index=default_idx, label_visibility="collapsed")
+        
         with select_col3:
-            if st.button("🔄", help="刷新知识库列表", use_container_width=True, key="refresh_kb_list"):
+            # 切换多选/单选模式
+            if st.button("📋" if not st.session_state.get('multi_kb_mode', False) else "📄", 
+                        help="切换到多选模式" if not st.session_state.get('multi_kb_mode', False) else "切换到单选模式", 
+                        use_container_width=True, key="toggle_multi_mode"):
+                st.session_state.multi_kb_mode = not st.session_state.get('multi_kb_mode', False)
+                # 清理相关状态
+                if 'selected_kbs' in st.session_state:
+                    del st.session_state.selected_kbs
                 st.rerun()
 
         # 知识库搜索/过滤已按用户要求移除
@@ -622,14 +667,14 @@ with st.sidebar:
         st.session_state.current_nav = selected_nav
 
         is_create_mode = (selected_nav == "➕ 新建知识库...")
-        is_multi_kb_mode = (selected_nav == "🔍 多知识库问答")
+        is_multi_kb_mode = st.session_state.get('multi_kb_mode', False) and st.session_state.get('selected_kbs', [])
         current_kb_name = selected_nav.replace("📂 ", "") if not is_create_mode and not is_multi_kb_mode else None
 
         # --- 功能区 ---
         if is_multi_kb_mode:
-            # 多知识库问答模式
-            from src.query.multi_kb_query_engine import render_multi_kb_query
-            render_multi_kb_query()
+            # 多知识库模式 - 在原界面显示
+            selected_kbs = st.session_state.get('selected_kbs', [])
+            st.success(f"🔍 多知识库模式：已选择 {len(selected_kbs)} 个知识库")
             
         elif is_create_mode:
             
@@ -3910,7 +3955,98 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             st.session_state._last_checked_kb = active_kb_name
         
         logger.separator("知识库查询")
-        logger.start_operation("查询", f"知识库: {active_kb_name}")
+        
+        # 检查是否为多知识库模式
+        if st.session_state.get('multi_kb_mode', False) and st.session_state.get('selected_kbs', []):
+            # 多知识库查询模式
+            selected_kbs = st.session_state.get('selected_kbs', [])
+            logger.start_operation("多知识库查询", f"知识库: {', '.join(selected_kbs)}")
+            
+            # 导入多知识库查询引擎
+            from src.query.multi_kb_query_engine import query_single_kb_worker
+            from concurrent.futures import ProcessPoolExecutor, as_completed
+            import multiprocessing as mp
+            
+            # 执行多知识库查询
+            start_time = time.time()
+            results = {}
+            max_workers = min(mp.cpu_count(), len(selected_kbs), 3)
+            
+            try:
+                with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                    future_to_kb = {
+                        executor.submit(query_single_kb_worker, kb_name, final_prompt, 3): kb_name 
+                        for kb_name in selected_kbs
+                    }
+                    
+                    for future in as_completed(future_to_kb, timeout=60):
+                        kb_name = future_to_kb[future]
+                        try:
+                            result = future.result(timeout=30)
+                            results[kb_name] = result
+                        except Exception as e:
+                            results[kb_name] = {
+                                "kb_name": kb_name,
+                                "success": False,
+                                "error": f"查询失败: {str(e)}",
+                                "results": []
+                            }
+            except Exception as e:
+                logger.error(f"多进程查询失败: {e}")
+                # 回退到单线程
+                for kb_name in selected_kbs:
+                    try:
+                        result = query_single_kb_worker(kb_name, final_prompt, 3)
+                        results[kb_name] = result
+                    except Exception as kb_error:
+                        results[kb_name] = {
+                            "kb_name": kb_name,
+                            "success": False,
+                            "error": f"查询失败: {str(kb_error)}",
+                            "results": []
+                        }
+            
+            # 生成整合答案
+            successful_results = [r for r in results.values() if r["success"]]
+            total_time = time.time() - start_time
+            
+            if successful_results:
+                # 构建整合答案
+                integrated_answer = f"**基于 {len(successful_results)} 个知识库的查询结果：**\n\n"
+                
+                for i, result in enumerate(successful_results, 1):
+                    kb_name = result["kb_name"]
+                    answer = result.get("answer", "无答案")
+                    integrated_answer += f"### 📚 知识库 {i}: {kb_name}\n{answer}\n\n"
+                
+                integrated_answer += f"---\n**查询统计**: {len(successful_results)}/{len(selected_kbs)} 个知识库响应成功，耗时 {total_time:.2f} 秒"
+                
+                # 显示结果
+                with st.chat_message("assistant", avatar="🤖"):
+                    st.markdown(integrated_answer)
+                    
+                    # 详细结果
+                    with st.expander("📋 详细结果"):
+                        for kb_name, result in results.items():
+                            if result["success"] and result["results"]:
+                                st.write(f"**📚 {kb_name}**")
+                                for i, doc in enumerate(result["results"][:2], 1):
+                                    st.write(f"📄 {doc['source']} (相关度: {doc['score']:.3f})")
+                                    st.caption(doc['content'][:200] + "...")
+                
+                # 添加到消息历史
+                st.session_state.messages.append({"role": "user", "content": final_prompt})
+                st.session_state.messages.append({"role": "assistant", "content": integrated_answer})
+                
+            else:
+                st.error("❌ 所有知识库查询都失败了")
+            
+            st.session_state.is_processing = False
+            st.rerun()
+            
+        else:
+            # 单知识库查询模式（原逻辑）
+            logger.start_operation("查询", f"知识库: {active_kb_name}")
         
         # 查询改写 (v1.6) - 在处理引用内容之前
         # 只有在用户启用查询优化时才进行
