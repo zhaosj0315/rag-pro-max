@@ -2587,7 +2587,13 @@ if btn_start:
                     }
                     
                     try:
+                        logger.log("网页抓取", "info", f"🚀 开始创建知识库: {kb_name}")
+                        logger.log("网页抓取", "info", f"📁 目标路径: {target_path}")
+                        logger.log("网页抓取", "info", f"⚙️ 选项: {options}")
+                        
                         kb_interface.create_knowledge_base(target_path, kb_name, options)
+                        
+                        logger.log("网页抓取", "success", f"✅ 知识库创建成功: {kb_name}")
                         st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
                         
                         # 跳转到新创建的知识库
@@ -2599,16 +2605,21 @@ if btn_start:
                         for key in ['crawl_url', 'crawl_depth', 'max_pages', 'parser_type', 'url_quality_threshold']:
                             if key in st.session_state:
                                 del st.session_state[key]
+                        
+                        logger.log("网页抓取", "info", f"🔄 网页抓取模式: 执行页面刷新")
                         st.rerun()
+                        # 注意：st.rerun() 后不需要 st.stop()，因为页面会重新加载
+                        
                     except Exception as e:
+                        logger.log("网页抓取", "error", f"❌ 知识库创建异常: {str(e)}")
+                        logger.log("网页抓取", "error", f"🔍 异常类型: {type(e).__name__}")
                         st.error(f"❌ 知识库创建失败: {str(e)}")
                         logger.error(f"知识库创建错误: {str(e)}")
                     
                 else:
                     st.error("❌ 网页抓取失败，未获取到任何文件")
-                
-                # 网页抓取模式处理完成，直接返回，不执行后续的文件处理逻辑
-                st.stop()
+                    # 只有失败时才停止执行
+                    st.stop()
                     
             except Exception as e:
                 st.error(f"❌ 网页抓取失败: {str(e)}")
@@ -2789,9 +2800,8 @@ if btn_start:
                         
                 else:
                     st.error("❌ 智能搜索失败，未获取到任何文件")
-                
-                # 智能搜索模式处理完成，直接返回，不执行后续的文件处理逻辑
-                st.stop()
+                    # 只有失败时才停止执行
+                    st.stop()
                     
             except Exception as e:
                 st.error(f"❌ 智能搜索失败: {str(e)}")
