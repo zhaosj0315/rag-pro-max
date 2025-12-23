@@ -2212,8 +2212,9 @@ def process_knowledge_base_logic(action_mode="NEW", use_ocr=False, extract_metad
     else:
         logger.log("知识库跳转", "warning", f"⚠️ 新知识库不在列表中，强制添加: {final_kb_name}")
     
-    # 设置跳转参数
-    st.session_state.current_nav = f"📂 {final_kb_name}"
+    # 设置跳转参数 - 使用正确的格式匹配侧边栏选项
+    correct_nav_format = f"☐ 📂 {final_kb_name}"
+    st.session_state.current_nav = correct_nav_format
     st.session_state.current_kb_id = final_kb_name
     st.session_state.chat_engine = None  # 重置聊天引擎，触发重新加载
     
@@ -2568,7 +2569,7 @@ if btn_start:
                         st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
                         
                         # 跳转到新创建的知识库
-                        st.session_state.current_nav = f"📂 {kb_name}"
+                        st.session_state.current_nav = f"☐ 📂 {kb_name}"
                         st.session_state.current_kb_id = kb_name
                         st.session_state.chat_engine = None  # 重置聊天引擎，触发重新加载
                         
@@ -2751,7 +2752,7 @@ if btn_start:
                         st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
                         
                         # 跳转到新创建的知识库
-                        st.session_state.current_nav = f"📂 {kb_name}"
+                        st.session_state.current_nav = f"☐ 📂 {kb_name}"
                         st.session_state.current_kb_id = kb_name
                         st.session_state.chat_engine = None  # 重置聊天引擎，触发重新加载
                         
