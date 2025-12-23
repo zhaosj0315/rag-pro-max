@@ -4086,14 +4086,8 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
         if active_kb_name:  # 只有在单知识库模式下才检测维度
             db_path = os.path.join(output_base, active_kb_name)
             
-            # 检查是否需要重新检测（知识库切换或首次）
-            last_checked_kb = st.session_state.get('_last_checked_kb')
-            if last_checked_kb != active_kb_name:
-                kb_dim = get_kb_embedding_dim(db_path)
-            
-            # 为历史知识库自动保存信息
-            kb_name = os.path.basename(db_path)
-            kb_manager.save_info(kb_name, embed_model, 0)
+            # 始终检测维度，确保模型匹配
+            kb_dim = get_kb_embedding_dim(db_path)
             
             # 维度映射
             model_map = {
@@ -4113,19 +4107,9 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         Settings.embed_model = embed
                         print(f"✅ 模型已切换")
             else:
-                # 维度检测失败时，降级到最小模型（512维）
-                print(f"⚠️ 维度检测失败，降级到最小模型")
-                fallback_model = "sentence-transformers/all-MiniLM-L6-v2"
-                if embed_model != fallback_model:
-                    print(f"🔄 降级切换: {embed_model} → {fallback_model}")
-                    embed_model = fallback_model
-                    embed = get_embed(embed_provider, embed_model, embed_key, embed_url)
-                    if embed:
-                        Settings.embed_model = embed
-                        print(f"✅ 已降级到最小模型")
-            
-            # 标记已检测
-            st.session_state._last_checked_kb = active_kb_name
+                # 维度检测失败时，不强制切换，但记录日志
+                if not kb_dim:
+                    print(f"⚠️ 无法检测知识库维度，保持当前模型: {embed_model}")
         
         logger.separator("知识库查询")
         
