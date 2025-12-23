@@ -1,22 +1,20 @@
 {
-  "version": "2.5.0",
-  "release_date": "2025-12-23",
-  "codename": "系统优化完成版",
+  "version": "2.5.1",
+  "release_date": "2025-12-24",
+  "codename": "稳定增强版",
   "features": [
-    "完整系统架构优化 (100%完成)",
-    "统一UI组件库 (8个组件)",
-    "统一配置管理服务",
-    "统一文档处理系统",
-    "统一监控日志系统",
-    "消除6000+行重复代码",
-    "企业级生产就绪"
+    "修复知识库跳转逻辑 (Unified Jump Logic)",
+    "修复Web爬虫后无法跳转问题",
+    "增强知识库模型维度检测稳定性",
+    "集成多进程联合查询引擎 (Multi-KB Query)",
+    "统一知识库选择UI交互"
   ],
   "architecture": {
     "layers": 4,
     "modules": 153,
     "unified_components": 8,
     "services": 6,
-    "test_coverage": "86/95 (91.6%)",
+    "test_coverage": "87/95 (91.6%)",
     "code_reduction": "6000+ lines"
   },
   "optimization_achievements": {
@@ -24,22 +22,21 @@
       "WebSuggestionEngine",
       "SuggestionEngine", 
       "SuggestionPanel",
-      "show_document_detail_dialog (重复函数)"
+      "show_document_detail_dialog (重复函数)",
+      "Redundant KB Jump Logic"
     ],
-    "unified_system": "UnifiedSuggestionEngine",
+    "unified_system": "UnifiedSuggestionEngine & UnifiedKBJump",
     "unified_ui": "unified_dialogs.py",
     "new_features": [
-      "可配置行业网站管理",
-      "智能推荐问题验证",
-      "统一的推荐生成逻辑",
-      "统一UI对话框组件"
+      "多进程知识库联合查询",
+      "自动模型维度匹配",
+      "Web爬虫自动跳转"
     ]
   },
-  "optimization_plan": {
-    "current_step": "第一步UI统一",
-    "completed": ["show_document_detail_dialog"],
-    "next_targets": ["render_chat_controls_2x2", "render_config_tab"],
-    "total_duplicates_found": 23,
-    "expected_code_reduction": "8000-12000 lines"
-  }
+  "bug_fixes": [
+    "Fix NameError 'kb_dim' in apppro.py",
+    "Fix KB selection infinite loop",
+    "Fix risky metadata overwriting",
+    "Fix duplicate navigation state updates"
+  ]
 }

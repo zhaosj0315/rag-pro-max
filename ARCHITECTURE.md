@@ -31,7 +31,7 @@ RAG Pro Max 采用四层架构设计，确保代码的可维护性、可扩展�
 ### 核心应用层
 ```
 src/
-├── apppro.py                    # 🚀 主应用入口 (3,715 行)
+├── apppro.py                    # 🚀 主应用入口 (4,500+ 行)
 │   ├── Streamlit配置
 │   ├── 页面路由
 │   ├── 会话管理
@@ -90,6 +90,15 @@ src/processors/                  # 23个处理器
 ├── multimodal_processor.py      # 多模态处理
 ├── upload_handler.py            # 上传处理
 └── ...                          # 其他处理器
+```
+
+### 查询引擎层 (Query Layer)
+```
+src/query/                       # 查询处理引擎
+├── multi_kb_query_engine.py     # 多知识库联合查询引擎 (多进程优化)
+├── query_handler.py             # 核心查询处理器
+├── query_processor.py           # 查询预处理
+└── query_rewriter.py            # 查询重写优化
 ```
 
 ### 工具层 (Utils Layer)

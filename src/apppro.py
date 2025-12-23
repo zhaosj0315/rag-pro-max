@@ -1,6 +1,6 @@
 # 初始化环境配置
 # 环境变量设置 - 减少启动警告
-__version__ = "2.4.7"
+__version__ = "2.5.1"
 
 import os
 os.environ['DISABLE_MODEL_SOURCE_CHECK'] = 'True'
