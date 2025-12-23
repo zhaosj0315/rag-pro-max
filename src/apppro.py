@@ -2469,7 +2469,8 @@ if btn_start:
         
         # 执行网页抓取并创建知识库的逻辑
         if current_mode == 'url' and crawl_url:
-            print(f"DEBUG: 开始网址抓取模式，URL = {crawl_url}")
+            print(f"DEBUG: ✅ 进入网址抓取分支，URL = {crawl_url}")
+            logger.log("网页抓取", "start", f"🌐 开始网址抓取模式: {crawl_url}")
             # 网址抓取模式 - 复用现有逻辑
             try:
                 # 优先使用异步爬虫
@@ -2629,7 +2630,8 @@ if btn_start:
                 st.stop()
                 
         elif current_mode == 'search' and search_keyword:
-            print(f"DEBUG: 开始智能搜索模式，关键词 = {search_keyword}")
+            print(f"DEBUG: ✅ 进入智能搜索分支，关键词 = {search_keyword}")
+            logger.log("智能搜索", "start", f"🔍 开始智能搜索模式: {search_keyword}")
             # 智能搜索模式 - 复用现有逻辑
             try:
                 # 获取搜索参数
@@ -2814,6 +2816,10 @@ if btn_start:
                 st.error(f"❌ 智能搜索失败: {str(e)}")
                 logger.error(f"智能搜索错误: {str(e)}")
                 st.stop()
+        else:
+            print(f"DEBUG: ❌ 未匹配任何网页抓取分支")
+            print(f"DEBUG: current_mode = '{current_mode}', crawl_url = '{crawl_url}', search_keyword = '{search_keyword}'")
+            logger.log("网页抓取", "warning", f"⚠️ 未匹配网页抓取条件: mode={current_mode}, url={bool(crawl_url)}, keyword={bool(search_keyword)}")
     
     print("DEBUG: 跳过网页抓取模式，进入原有文件处理逻辑")
     
