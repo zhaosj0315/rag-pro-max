@@ -74,10 +74,10 @@ class MultiKBQueryEngine:
             storage_context = StorageContext.from_defaults(persist_dir=db_path)
             index = load_index_from_storage(storage_context)
             
-            # 创建查询引擎
+            # 创建查询引擎 - 优化参数提高答案质量
             query_engine = index.as_query_engine(
-                similarity_top_k=3,
-                response_mode="compact"
+                similarity_top_k=5,
+                response_mode="tree_summarize"
             )
             
             # 执行查询
@@ -92,8 +92,15 @@ class MultiKBQueryEngine:
         if not results:
             return "❌ 所有知识库查询均失败"
         
-        # 过滤有效结果
-        valid_results = [r for r in results if not r['content'].startswith('查询')]
+        # 过滤有效结果 - 排除过于简短或无关的回答
+        valid_results = []
+        for r in results:
+            content = r['content'].strip()
+            # 过滤掉明显的错误、过短或无关回答
+            if (not content.startswith('查询') and 
+                len(content) > 10 and 
+                not content.lower() in ['好的', '收到', '测试成功', '没有相关信息']):
+                valid_results.append(r)
         
         if not valid_results:
             # 所有查询都失败，返回错误信息
