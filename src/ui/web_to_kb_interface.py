@@ -87,21 +87,75 @@ class WebToKBInterface:
         # 关键词输入
         keyword = st.text_input(
             "🔍 搜索关键词",
-            placeholder="例如：人工智能、Python编程、机器学习",
+            placeholder="例如：卵巢癌、Python编程、机器学习",
             help="输入要搜索的关键词，系统会在选定网站中搜索相关内容"
         )
         
-        # 网站选择
+        # 智能推荐
+        if keyword:
+            recommended_sites = self.processor.recommend_sites_for_keyword(keyword)
+            st.info(f"💡 根据关键词 '{keyword}' 智能推荐网站: {', '.join(recommended_sites)}")
+        else:
+            recommended_sites = ["维基百科", "百度百科"]
+        
+        # 网站选择 - 按类别分组
         preset_sites = self.processor.get_preset_sites()
         st.write("📍 选择搜索网站：")
         
+        # 按类别分组
+        categories = {}
+        for site_name, site_info in preset_sites.items():
+            category = site_info.get("category", "其他")
+            if category not in categories:
+                categories[category] = []
+            categories[category].append((site_name, site_info))
+        
         selected_sites = []
-        cols = st.columns(3)
-        for i, (site_name, site_info) in enumerate(preset_sites.items()):
-            with cols[i % 3]:
-                if st.checkbox(site_name, value=(site_name in ["维基百科", "百度百科"]), key=f"site_{site_name}"):
+        
+        # 百科类网站（默认推荐）
+        if "百科" in categories:
+            st.write("**📚 百科类网站（推荐用于一般搜索）：**")
+            cols = st.columns(2)
+            for i, (site_name, site_info) in enumerate(categories["百科"]):
+                with cols[i % 2]:
+                    # 根据智能推荐决定默认选中状态
+                    default_checked = site_name in recommended_sites
+                    if st.checkbox(site_name, value=default_checked, key=f"site_{site_name}"):
+                        selected_sites.append(site_name)
+                    st.caption(site_info["description"])
+        
+        # 医学专业网站
+        if "医学" in categories:
+            st.write("**🏥 医学专业网站（推荐用于医疗健康搜索）：**")
+            st.info("💡 专业医学网站提供权威的医疗健康信息")
+            cols = st.columns(3)
+            for i, (site_name, site_info) in enumerate(categories["医学"]):
+                with cols[i % 3]:
+                    default_checked = site_name in recommended_sites
+                    if st.checkbox(site_name, value=default_checked, key=f"site_{site_name}"):
+                        selected_sites.append(site_name)
+                    st.caption(site_info["description"])
+        
+        # 问答类网站
+        if "问答" in categories:
+            st.write("**💬 问答类网站：**")
+            for site_name, site_info in categories["问答"]:
+                default_checked = site_name in recommended_sites
+                if st.checkbox(site_name, value=default_checked, key=f"site_{site_name}"):
                     selected_sites.append(site_name)
                 st.caption(site_info["description"])
+        
+        # 技术类网站（特别标注）
+        if "技术" in categories:
+            st.write("**⚙️ 技术类网站（仅适用于编程/技术相关搜索）：**")
+            st.warning("⚠️ 注意：技术类网站仅适用于编程、开发、技术相关的关键词搜索，对于医学、历史、文学等其他领域可能返回不相关结果。")
+            cols = st.columns(3)
+            for i, (site_name, site_info) in enumerate(categories["技术"]):
+                with cols[i % 3]:
+                    default_checked = site_name in recommended_sites
+                    if st.checkbox(site_name, value=default_checked, key=f"site_{site_name}"):
+                        selected_sites.append(site_name)
+                    st.caption(site_info["description"])
         
         # 抓取参数
         col1, col2 = st.columns(2)
