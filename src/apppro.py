@@ -2193,10 +2193,19 @@ def process_knowledge_base_logic(action_mode="NEW", use_ocr=False, extract_metad
     logger.info(f"📊 统计: {result.file_count} 个文件, {result.doc_count} 个文档片段")
     logger.info(f"⏱️  耗时: {duration:.1f} 秒")
     
-    logger.log("SUCCESS", f"知识库处理完成: {final_kb_name}, 文档数: {result.doc_count
-    }", stage="知识库处理")
+    logger.log("SUCCESS", f"知识库处理完成: {final_kb_name}, 文档数: {result.doc_count}", stage="知识库处理")
     
     status_container.update(label=f"✅ 知识库 '{final_kb_name}' 处理完成", state="complete", expanded=True)
+    
+    # 跳转到新创建的知识库
+    st.session_state.current_nav = f"📂 {final_kb_name}"
+    st.session_state.current_kb_id = final_kb_name
+    st.session_state.chat_engine = None  # 重置聊天引擎，触发重新加载
+    
+    # 显示成功消息并自动跳转
+    st.success(f"🎉 知识库 '{final_kb_name}' 创建成功！正在跳转...")
+    time.sleep(1)  # 短暂延迟让用户看到成功消息
+    st.rerun()
     
     # 资源清理
     resource_guard.throttler.cleanup_memory()
@@ -2535,6 +2544,12 @@ if btn_start:
                     try:
                         kb_interface.create_knowledge_base(target_path, kb_name, options)
                         st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
+                        
+                        # 跳转到新创建的知识库
+                        st.session_state.current_nav = f"📂 {kb_name}"
+                        st.session_state.current_kb_id = kb_name
+                        st.session_state.chat_engine = None  # 重置聊天引擎，触发重新加载
+                        
                         # 清理session_state中的网页抓取参数
                         for key in ['crawl_url', 'crawl_depth', 'max_pages', 'parser_type', 'url_quality_threshold']:
                             if key in st.session_state:
@@ -2712,6 +2727,12 @@ if btn_start:
                     try:
                         kb_interface.create_knowledge_base(target_path, kb_name, options)
                         st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
+                        
+                        # 跳转到新创建的知识库
+                        st.session_state.current_nav = f"📂 {kb_name}"
+                        st.session_state.current_kb_id = kb_name
+                        st.session_state.chat_engine = None  # 重置聊天引擎，触发重新加载
+                        
                         # 清理session_state中的搜索参数
                         for key in ['search_keyword', 'search_crawl_depth', 'search_max_pages', 'search_parser_type', 'quality_threshold']:
                             if key in st.session_state:
