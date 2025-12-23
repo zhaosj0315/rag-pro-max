@@ -572,7 +572,19 @@ with st.sidebar:
         existing_kbs = (setattr(kb_manager, "base_path", output_base), kb_manager.list_all())[1]
 
         # --- 核心导航 ---
-        nav_options = ["➕ 新建知识库..."] + [f"📂 {kb}" for kb in kb_manager.list_all()]
+        base_kbs = kb_manager.list_all()
+        
+        # 为每个知识库创建带复选框的选项
+        nav_options = ["➕ 新建知识库..."]
+        for kb in base_kbs:
+            # 检查是否被选中
+            is_selected = st.session_state.get(f"kb_check_{kb}", False)
+            checkbox_symbol = "☑️" if is_selected else "☐"
+            nav_options.append(f"{checkbox_symbol} 📂 {kb}")
+        
+        # 保存选中的知识库列表
+        selected_kbs = [kb for kb in base_kbs if st.session_state.get(f"kb_check_{kb}", False)]
+        st.session_state.selected_kbs = selected_kbs
 
         # 检查是否要显示配置页面
         if st.session_state.get('show_industry_config'):
@@ -601,6 +613,16 @@ with st.sidebar:
             st.markdown("**选择:**")
         with select_col2:
             selected_nav = st.selectbox("", nav_options, index=default_idx, label_visibility="collapsed")
+            
+            # 处理复选框点击逻辑
+            if selected_nav.startswith("☐") or selected_nav.startswith("☑️"):
+                # 提取知识库名称
+                kb_name = selected_nav.split("📂 ")[1] if "📂 " in selected_nav else ""
+                if kb_name:
+                    # 切换复选框状态
+                    current_state = st.session_state.get(f"kb_check_{kb_name}", False)
+                    st.session_state[f"kb_check_{kb_name}"] = not current_state
+                    st.rerun()
         with select_col3:
             if st.button("🔄", help="刷新知识库列表", use_container_width=True, key="refresh_kb_list"):
                 st.rerun()
@@ -622,7 +644,16 @@ with st.sidebar:
         st.session_state.current_nav = selected_nav
 
         is_create_mode = (selected_nav == "➕ 新建知识库...")
-        current_kb_name = selected_nav.replace("📂 ", "") if not is_create_mode else None
+        
+        # 根据选中的知识库确定当前模式
+        selected_kbs = st.session_state.get('selected_kbs', [])
+        if len(selected_kbs) == 1:
+            current_kb_name = selected_kbs[0]
+        elif len(selected_kbs) > 1:
+            current_kb_name = None  # 多知识库模式
+            st.info(f"🔍 已选择 {len(selected_kbs)} 个知识库: {', '.join(selected_kbs)}")
+        else:
+            current_kb_name = selected_nav.replace("📂 ", "").replace("☐ ", "").replace("☑️ ", "") if not is_create_mode else None
 
 
         # --- 功能区 ---
@@ -2303,7 +2334,13 @@ if not st.session_state.first_time_guide_shown and len(existing_kbs) == 0:
 from src.common.business import click_btn
 
 # 计算当前的 KB ID (根据侧边栏选择)
-active_kb_name = current_kb_name if not is_create_mode else None
+selected_kbs = st.session_state.get('selected_kbs', [])
+if len(selected_kbs) == 1:
+    active_kb_name = selected_kbs[0]
+elif len(selected_kbs) > 1:
+    active_kb_name = "multi_kb_mode"  # 多知识库模式标识
+else:
+    active_kb_name = current_kb_name if not is_create_mode else None
 
 # 自动加载逻辑
 if active_kb_name and active_kb_name != st.session_state.current_kb_id:
@@ -2318,8 +2355,8 @@ if active_kb_name and active_kb_name != st.session_state.current_kb_id:
         st.warning("⚠️ 正在处理问题，请等待完成后再切换知识库")
         st.session_state.current_nav = f"📂 {st.session_state.current_kb_id}"
 
-# 知识库加载逻辑
-if active_kb_name and st.session_state.chat_engine is None:
+# 知识库加载逻辑 - 跳过多知识库模式的单一加载
+if active_kb_name and st.session_state.chat_engine is None and active_kb_name != "multi_kb_mode":
     from src.kb.kb_loader import KnowledgeBaseLoader
     
     kb_loader = KnowledgeBaseLoader(output_base)
