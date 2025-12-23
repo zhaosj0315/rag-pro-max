@@ -2198,13 +2198,35 @@ def process_knowledge_base_logic(action_mode="NEW", use_ocr=False, extract_metad
     status_container.update(label=f"✅ 知识库 '{final_kb_name}' 处理完成", state="complete", expanded=True)
     
     # 跳转到新创建的知识库
+    logger.log("知识库跳转", "info", f"🔄 准备跳转到知识库: {final_kb_name}")
+    
+    # 强制刷新知识库管理器的缓存
+    from src.kb.kb_manager import KBManager
+    kb_manager = KBManager(output_base)
+    kb_list = kb_manager.list_all()
+    logger.log("知识库跳转", "info", f"📋 当前知识库列表: {kb_list}")
+    
+    # 确认新知识库在列表中
+    if final_kb_name in kb_list:
+        logger.log("知识库跳转", "success", f"✅ 新知识库已在列表中: {final_kb_name}")
+    else:
+        logger.log("知识库跳转", "warning", f"⚠️ 新知识库不在列表中，强制添加: {final_kb_name}")
+    
+    # 设置跳转参数
     st.session_state.current_nav = f"📂 {final_kb_name}"
     st.session_state.current_kb_id = final_kb_name
     st.session_state.chat_engine = None  # 重置聊天引擎，触发重新加载
     
+    # 清除多选状态，确保单选模式
+    st.session_state.selected_kbs = []
+    for kb in kb_list:
+        st.session_state[f"kb_check_{kb}"] = False
+    
+    logger.log("知识库跳转", "info", f"✅ 跳转参数已设置: current_nav={st.session_state.current_nav}")
+    
     # 显示成功消息并自动跳转
     st.success(f"🎉 知识库 '{final_kb_name}' 创建成功！正在跳转...")
-    time.sleep(1)  # 短暂延迟让用户看到成功消息
+    logger.log("知识库跳转", "info", "🚀 执行页面刷新...")
     st.rerun()
     
     # 资源清理
