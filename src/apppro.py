@@ -3912,12 +3912,13 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
         
         # 强制检测知识库维度并切换模型（静默处理，不显示加载）
         # 优化：只在首次或切换知识库时检测，避免每次问答都重复
-        db_path = os.path.join(output_base, active_kb_name)
-        
-        # 检查是否需要重新检测（知识库切换或首次）
-        last_checked_kb = st.session_state.get('_last_checked_kb')
-        if last_checked_kb != active_kb_name:
-            kb_dim = get_kb_embedding_dim(db_path)
+        if active_kb_name:  # 只有在单知识库模式下才检测维度
+            db_path = os.path.join(output_base, active_kb_name)
+            
+            # 检查是否需要重新检测（知识库切换或首次）
+            last_checked_kb = st.session_state.get('_last_checked_kb')
+            if last_checked_kb != active_kb_name:
+                kb_dim = get_kb_embedding_dim(db_path)
             
             # 为历史知识库自动保存信息
             kb_name = os.path.basename(db_path)
