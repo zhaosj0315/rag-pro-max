@@ -80,18 +80,26 @@ def get_config_value(key: str, default: Any = None, config: Optional[Dict] = Non
         return unified_get_config_value("app_config", key, default)
 
 def set_config_value(key: str, value: Any, config: Optional[Dict] = None) -> Dict[str, Any]:
-    """设置配置值（支持点号分隔的嵌套键）"""
-    if config is None:
-        config = load_config()
+    """设置配置值 - 使用统一服务"""
+    from src.services.unified_config_service import set_config_value as unified_set_config_value
     
-    keys = key.split('.')
-    current = config
-    
-    # 导航到目标位置
-    for k in keys[:-1]:
-        if k not in current:
-            current[k] = {}
-        current = current[k]
+    if config is not None:
+        # 如果提供了配置字典，直接设置
+        keys = key.split('.')
+        current = config
+        
+        # 创建嵌套结构
+        for k in keys[:-1]:
+            if k not in current:
+                current[k] = {}
+            current = current[k]
+        
+        current[keys[-1]] = value
+        return config
+    else:
+        # 否则保存到默认配置文件
+        unified_set_config_value("app_config", key, value)
+        return load_config()
     
     # 设置值
     current[keys[-1]] = value
