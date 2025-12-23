@@ -614,7 +614,7 @@ with st.sidebar:
             if default_idx > 0 and nav_options[default_idx] != st.session_state.current_nav:
                 st.session_state.current_nav = nav_options[default_idx]
 
-        # 知识库选择完全一行化
+        # 知识库选择 - 直接复选框模式
         select_col1, select_col2, select_col3 = st.columns([0.6, 5.9, 0.5])
         with select_col1:
             st.markdown("**选择:**")
@@ -637,6 +637,30 @@ with st.sidebar:
                     st.rerun()
         with select_col3:
             if st.button("🔄", help="刷新知识库列表", use_container_width=True, key="refresh_kb_list"):
+                st.rerun()
+
+        # 启动系统按钮（当选择了知识库时显示）
+        if len(st.session_state.get('selected_kbs', [])) > 0:
+            if st.button("🚀 启动系统", type="primary", use_container_width=True, key="start_system"):
+                # 初始化聊天引擎
+                if len(st.session_state.get('selected_kbs', [])) == 1:
+                    # 单知识库模式
+                    kb_name = st.session_state.selected_kbs[0]
+                    try:
+                        from src.rag_engine import create_rag_engine
+                        rag_engine = create_rag_engine(kb_name)
+                        if rag_engine:
+                            st.session_state.chat_engine = rag_engine.get_query_engine()
+                            st.session_state.current_kb_id = kb_name
+                            st.success(f"✅ 知识库 '{kb_name}' 已启动")
+                        else:
+                            st.error(f"❌ 无法启动知识库 '{kb_name}'")
+                    except Exception as e:
+                        st.error(f"❌ 启动失败: {str(e)}")
+                else:
+                    # 多知识库模式
+                    st.session_state.chat_engine = "multi_kb_mode"  # 标记为多知识库模式
+                    st.success(f"✅ 多知识库模式已启动，共 {len(st.session_state.selected_kbs)} 个知识库")
                 st.rerun()
 
         # 知识库搜索/过滤已按用户要求移除
@@ -667,8 +691,7 @@ with st.sidebar:
         else:
             current_kb_name = selected_nav.replace("📂 ", "").replace("☐ ", "").replace("☑️ ", "") if not is_create_mode else None
 
-
-        # --- 功能区 ---
+        # --- 功能区 ---        
         if is_create_mode:
             
             with st.container(border=True):
@@ -4060,12 +4083,13 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
         
         # 强制检测知识库维度并切换模型（静默处理，不显示加载）
         # 优化：只在首次或切换知识库时检测，避免每次问答都重复
-        db_path = os.path.join(output_base, active_kb_name)
-        
-        # 检查是否需要重新检测（知识库切换或首次）
-        last_checked_kb = st.session_state.get('_last_checked_kb')
-        if last_checked_kb != active_kb_name:
-            kb_dim = get_kb_embedding_dim(db_path)
+        if active_kb_name:  # 只有在单知识库模式下才检测维度
+            db_path = os.path.join(output_base, active_kb_name)
+            
+            # 检查是否需要重新检测（知识库切换或首次）
+            last_checked_kb = st.session_state.get('_last_checked_kb')
+            if last_checked_kb != active_kb_name:
+                kb_dim = get_kb_embedding_dim(db_path)
             
             # 为历史知识库自动保存信息
             kb_name = os.path.basename(db_path)
@@ -4104,7 +4128,98 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             st.session_state._last_checked_kb = active_kb_name
         
         logger.separator("知识库查询")
-        logger.start_operation("查询", f"知识库: {active_kb_name}")
+        
+        # 检查是否为多知识库模式
+        if len(st.session_state.get('selected_kbs', [])) > 1:
+            # 多知识库查询模式
+            selected_kbs = st.session_state.get('selected_kbs', [])
+            logger.start_operation("多知识库查询", f"知识库: {', '.join(selected_kbs)}")
+            
+            # 导入多知识库查询引擎
+            from src.query.multi_kb_query_engine import query_single_kb_worker
+            from concurrent.futures import ProcessPoolExecutor, as_completed
+            import multiprocessing as mp
+            
+            # 执行多知识库查询
+            start_time = time.time()
+            results = {}
+            max_workers = min(mp.cpu_count(), len(selected_kbs), 3)
+            
+            try:
+                with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                    future_to_kb = {
+                        executor.submit(query_single_kb_worker, kb_name, final_prompt, 3): kb_name 
+                        for kb_name in selected_kbs
+                    }
+                    
+                    for future in as_completed(future_to_kb, timeout=60):
+                        kb_name = future_to_kb[future]
+                        try:
+                            result = future.result(timeout=30)
+                            results[kb_name] = result
+                        except Exception as e:
+                            results[kb_name] = {
+                                "kb_name": kb_name,
+                                "success": False,
+                                "error": f"查询失败: {str(e)}",
+                                "results": []
+                            }
+            except Exception as e:
+                logger.error(f"多进程查询失败: {e}")
+                # 回退到单线程
+                for kb_name in selected_kbs:
+                    try:
+                        result = query_single_kb_worker(kb_name, final_prompt, 3)
+                        results[kb_name] = result
+                    except Exception as kb_error:
+                        results[kb_name] = {
+                            "kb_name": kb_name,
+                            "success": False,
+                            "error": f"查询失败: {str(kb_error)}",
+                            "results": []
+                        }
+            
+            # 生成整合答案
+            successful_results = [r for r in results.values() if r["success"]]
+            total_time = time.time() - start_time
+            
+            if successful_results:
+                # 构建整合答案
+                integrated_answer = f"**基于 {len(successful_results)} 个知识库的查询结果：**\n\n"
+                
+                for i, result in enumerate(successful_results, 1):
+                    kb_name = result["kb_name"]
+                    answer = result.get("answer", "无答案")
+                    integrated_answer += f"### 📚 知识库 {i}: {kb_name}\n{answer}\n\n"
+                
+                integrated_answer += f"---\n**查询统计**: {len(successful_results)}/{len(selected_kbs)} 个知识库响应成功，耗时 {total_time:.2f} 秒"
+                
+                # 显示结果
+                with st.chat_message("assistant", avatar="🤖"):
+                    st.markdown(integrated_answer)
+                    
+                    # 详细结果
+                    with st.expander("📋 详细结果"):
+                        for kb_name, result in results.items():
+                            if result["success"] and result["results"]:
+                                st.write(f"**📚 {kb_name}**")
+                                for i, doc in enumerate(result["results"][:2], 1):
+                                    st.write(f"📄 {doc['source']} (相关度: {doc['score']:.3f})")
+                                    st.caption(doc['content'][:200] + "...")
+                
+                # 添加到消息历史
+                st.session_state.messages.append({"role": "user", "content": final_prompt})
+                st.session_state.messages.append({"role": "assistant", "content": integrated_answer})
+                
+            else:
+                st.error("❌ 所有知识库查询都失败了")
+            
+            st.session_state.is_processing = False
+            st.rerun()
+            
+        else:
+            # 单知识库查询模式（原逻辑）
+            logger.start_operation("查询", f"知识库: {active_kb_name}")
         
         # 查询改写 (v1.6) - 在处理引用内容之前
         # 只有在用户启用查询优化时才进行
