@@ -8,49 +8,15 @@ from src.kb.document_viewer import DocumentViewer, DocumentInfo
 
 
 def show_upload_preview(uploaded_file) -> None:
-    """显示上传文件的预览对话框"""
-    if not uploaded_file:
-        return
-    
-    show_file_preview_dialog(uploaded_file)
-
+    """显示上传预览 - 使用统一组件"""
+    from src.processors.unified_document_processor import show_file_preview
+    show_file_preview(uploaded_file)
 
 @st.dialog("📄 文件预览")
 def show_file_preview_dialog(uploaded_file):
-    """显示文件预览对话框"""
-    st.subheader(uploaded_file.name)
-    
-    try:
-        # 保存临时文件
-        import tempfile
-        import os
-        
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as tmp:
-            tmp.write(uploaded_file.getvalue())
-            tmp_path = tmp.name
-        
-        viewer = DocumentViewer()
-        preview = viewer.preview_file(tmp_path, max_chars=2000)
-        
-        # 文件信息
-        col1, col2 = st.columns(2)
-        col1.metric("📊 文件大小", f"{uploaded_file.size / 1024:.1f} KB")
-        col2.metric("📂 文件类型", uploaded_file.type or "未知")
-        
-        st.divider()
-        
-        # 内容预览
-        st.text_area("内容预览", preview, height=400, disabled=True)
-        
-        # 清理临时文件
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-        
-        if st.button("关闭", type="primary"):
-            st.rerun()
-            
-    except Exception as e:
-        st.error(f"预览失败: {e}")
+    """显示文件预览对话框 - 使用统一组件"""
+    from src.processors.unified_document_processor import show_file_preview
+    show_file_preview(uploaded_file)
 
 
 def show_kb_documents(kb_name: str) -> None:
