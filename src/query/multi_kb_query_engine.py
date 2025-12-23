@@ -39,15 +39,11 @@ class MultiKBQueryEngine:
             logger.log("多知识库查询", "error", "❌ 多知识库查询: 未选择任何知识库")
             return "❌ 未选择任何知识库"
         
-        logger.log("多知识库查询", "start", f"🔍 开始多知识库联合查询: {len(kb_names)} 个知识库")
-        logger.log("多知识库查询", "info", f"📋 知识库列表: {', '.join(kb_names)}")
-        logger.log("多知识库查询", "info", f"❓ 查询问题: {question[:100]}{'...' if len(question) > 100 else ''}")
+        logger.log("多知识库查询", "start", f"🔍 联合查询开始: {len(kb_names)} 个知识库")
         
         # 并行查询所有知识库
         results = []
         with ThreadPoolExecutor(max_workers=min(len(kb_names), 4)) as executor:
-            logger.log("多知识库查询", "info", f"⚡ 启动并行查询，最大并发数: {min(len(kb_names), 4)}")
-            
             future_to_kb = {
                 executor.submit(self._query_single_kb, question, kb_name, 
                               embed_provider, embed_model, embed_key, embed_url): kb_name
@@ -61,87 +57,66 @@ class MultiKBQueryEngine:
                 try:
                     result = future.result()
                     if result and result.strip():
-                        logger.log("多知识库查询", "success", f"✅ [{completed_count}/{len(kb_names)}] {kb_name}: 查询成功")
                         results.append({
                             'kb_name': kb_name,
                             'content': result
                         })
                     else:
-                        logger.log("多知识库查询", "warning", f"⚠️ [{completed_count}/{len(kb_names)}] {kb_name}: 返回空结果")
+                        logger.log("多知识库查询", "warning", f"⚠️ {kb_name}: 返回空结果")
                 except Exception as e:
-                    logger.log("多知识库查询", "error", f"❌ [{completed_count}/{len(kb_names)}] {kb_name}: 查询失败 - {str(e)}")
+                    logger.log("多知识库查询", "error", f"❌ {kb_name}: {str(e)}")
                     results.append({
                         'kb_name': kb_name,
                         'content': f"查询失败: {str(e)}"
                     })
         
         # 整合答案
-        logger.log("多知识库查询", "info", "🔄 开始整合查询结果...")
         integrated_result = self._integrate_results(question, results)
-        logger.log("多知识库查询", "complete", "✅ 多知识库联合查询完成")
+        logger.log("多知识库查询", "complete", f"✅ 联合查询完成: {len([r for r in results if not r['content'].startswith('查询')])} 个有效结果")
         return integrated_result
     
     def _query_single_kb(self, question: str, kb_name: str, embed_provider: str,
                         embed_model: str, embed_key: str, embed_url: str) -> str:
         """查询单个知识库"""
         try:
-            logger.log("单知识库查询", "start", f"🔍 开始查询知识库: {kb_name}")
-            
             db_path = os.path.join(self.output_base, kb_name)
             if not os.path.exists(db_path):
-                logger.log("单知识库查询", "error", f"❌ 知识库路径不存在: {db_path}")
                 return f"知识库 {kb_name} 不存在"
             
-            # 加载知识库
-            logger.log("单知识库查询", "loading", f"📂 加载知识库索引: {kb_name}")
+            # 加载知识库和创建查询引擎
             storage_context = StorageContext.from_defaults(persist_dir=db_path)
             index = load_index_from_storage(storage_context)
-            
-            # 创建查询引擎 - 优化参数提高答案质量
-            logger.log("单知识库查询", "info", f"⚙️ 创建查询引擎: {kb_name}")
             query_engine = index.as_query_engine(
                 similarity_top_k=5,
                 response_mode="tree_summarize"
             )
             
             # 执行查询
-            logger.log("单知识库查询", "processing", f"🚀 执行查询: {kb_name}")
             response = query_engine.query(question)
-            result = str(response)
-            
-            logger.log("单知识库查询", "complete", f"📝 查询结果长度: {len(result)} 字符")
-            return result
+            return str(response)
             
         except Exception as e:
-            logger.log("单知识库查询", "error", f"❌ 查询知识库 {kb_name} 异常: {str(e)}")
             return f"查询知识库 {kb_name} 时出错: {str(e)}"
     
     def _integrate_results(self, question: str, results: List[dict]) -> str:
         """整合多个知识库的查询结果"""
         if not results:
-            logger.log("结果整合", "error", "❌ 所有知识库查询均失败")
             return "❌ 所有知识库查询均失败"
         
-        # 过滤有效结果 - 排除过于简短或无关的回答
+        # 过滤有效结果
         valid_results = []
         for r in results:
             content = r['content'].strip()
-            # 过滤掉明显的错误、过短或无关回答
             if (not content.startswith('查询') and 
                 len(content) > 10 and 
                 not content.lower() in ['好的', '收到', '测试成功', '没有相关信息']):
                 valid_results.append(r)
         
-        logger.log("结果整合", "info", f"📊 结果统计: 总计 {len(results)} 个，有效 {len(valid_results)} 个")
-        
         if not valid_results:
-            # 所有查询都失败，返回错误信息
-            logger.log("结果整合", "warning", "⚠️ 没有有效的查询结果")
             error_summary = "\n".join([f"• {r['kb_name']}: {r['content']}" for r in results])
             return f"❌ 查询失败:\n{error_summary}"
         
         # 构建整合答案
-        logger.log("结果整合", "processing", "🔧 构建整合答案...")
         answer_parts = []
         answer_parts.append(f"🔍 **基于 {len(valid_results)} 个知识库的联合查询结果:**\n")
         
@@ -151,7 +126,6 @@ class MultiKBQueryEngine:
             
             # 简化知识库名称显示
             display_name = kb_name.replace('_20251223_', ' ').replace('_', ' ')
-            logger.log("结果整合", "info", f"📚 整合来源 {i}: {display_name} ({len(content)} 字符)")
             
             answer_parts.append(f"**📚 来源 {i}: {display_name}**")
             answer_parts.append(content)
@@ -160,11 +134,8 @@ class MultiKBQueryEngine:
         # 如果有失败的查询，在末尾提及
         failed_results = [r for r in results if r['content'].startswith('查询')]
         if failed_results:
-            logger.log("结果整合", "warning", f"⚠️ {len(failed_results)} 个知识库查询失败")
             answer_parts.append("⚠️ **部分知识库查询失败:**")
             for r in failed_results:
                 answer_parts.append(f"• {r['kb_name']}: {r['content']}")
         
-        final_answer = "\n".join(answer_parts)
-        logger.log("结果整合", "complete", f"✅ 答案整合完成，总长度: {len(final_answer)} 字符")
-        return final_answer
+        return "\n".join(answer_parts)

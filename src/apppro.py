@@ -3929,26 +3929,29 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
         with st.chat_message("assistant"):
             response_placeholder = st.empty()
             
-            try:
-                # 执行多知识库查询
-                logger.info("🚀 开始执行多知识库联合查询...")
-                response = multi_engine.query(final_prompt, selected_kbs, embed_provider, embed_model, embed_key, embed_url)
-                response_placeholder.write(response)
-                
-                # 添加助手消息
-                st.session_state.messages.append({"role": "assistant", "content": response})
-                logger.success("✅ 多知识库查询完成，回答已添加到对话历史")
-                
-            except Exception as e:
-                error_msg = f"查询失败: {str(e)}"
-                logger.error(f"❌ 多知识库查询异常: {str(e)}")
-                response_placeholder.error(error_msg)
-                st.session_state.messages.append({"role": "assistant", "content": error_msg})
+            # 显示加载动画
+            with st.spinner("🔍 正在从多个知识库中检索信息..."):
+                try:
+                    # 执行多知识库查询
+                    response = multi_engine.query(final_prompt, selected_kbs, embed_provider, embed_model, embed_key, embed_url)
+                    
+                except Exception as e:
+                    error_msg = f"查询失败: {str(e)}"
+                    logger.log("多知识库查询", "error", f"❌ 多知识库查询异常: {str(e)}")
+                    response_placeholder.error(error_msg)
+                    st.session_state.messages.append({"role": "assistant", "content": error_msg})
+                    st.session_state.is_processing = False
+                    st.rerun()
             
-            finally:
-                st.session_state.is_processing = False
-                logger.info("🔄 处理状态已重置")
-                st.rerun()
+            # 显示查询结果
+            response_placeholder.write(response)
+            
+            # 添加助手消息
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            logger.log("多知识库查询", "complete", "✅ 多知识库查询完成")
+            
+            st.session_state.is_processing = False
+            st.rerun()
                 
     elif st.session_state.chat_engine:
         # 不清空 suggestions_history，保留追问按钮
