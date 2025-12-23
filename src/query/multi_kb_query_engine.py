@@ -1,20 +1,83 @@
 #!/usr/bin/env python3
 """
-多知识库联合问答系统
-支持同时查询多个知识库并整合结果
+多知识库联合问答系统 - 多进程优化版
+支持同时查询多个知识库并整合结果，使用多进程避免GIL限制
 """
 
 import streamlit as st
 from typing import List, Dict, Any, Optional, Tuple
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import time
+import multiprocessing as mp
 from pathlib import Path
+import os
+
+def query_single_kb_worker(kb_name: str, query: str, top_k: int = 3) -> Dict[str, Any]:
+    """
+    单个知识库查询工作函数 - 用于多进程
+    必须是顶级函数才能被pickle序列化
+    """
+    try:
+        # 在子进程中导入，避免序列化问题
+        import sys
+        import os
+        
+        # 添加项目路径
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        
+        from src.rag_engine import create_rag_engine
+        
+        # 创建查询引擎
+        rag_engine = create_rag_engine(kb_name)
+        if not rag_engine:
+            return {
+                "kb_name": kb_name,
+                "success": False,
+                "error": "无法创建查询引擎",
+                "results": []
+            }
+        
+        # 执行查询
+        query_engine = rag_engine.get_query_engine()
+        response = query_engine.query(query)
+        
+        # 提取源文档信息
+        source_nodes = getattr(response, 'source_nodes', [])
+        results = []
+        
+        for node in source_nodes[:top_k]:
+            results.append({
+                "content": node.text[:500] + "..." if len(node.text) > 500 else node.text,
+                "score": getattr(node, 'score', 0.0),
+                "metadata": getattr(node, 'metadata', {}),
+                "source": getattr(node.metadata, 'file_name', 'Unknown') if hasattr(node, 'metadata') else 'Unknown'
+            })
+        
+        return {
+            "kb_name": kb_name,
+            "success": True,
+            "answer": str(response),
+            "results": results,
+            "query_time": time.time()
+        }
+        
+    except Exception as e:
+        return {
+            "kb_name": kb_name,
+            "success": False,
+            "error": str(e),
+            "results": []
+        }
 
 class MultiKBQueryEngine:
-    """多知识库联合查询引擎"""
+    """多知识库联合查询引擎 - 多进程优化版"""
     
     def __init__(self):
         self.base_path = "vector_db_storage"
+        # 获取CPU核心数，但限制最大进程数
+        self.max_workers = min(mp.cpu_count(), 4)
     
     def get_available_kbs(self) -> List[str]:
         """获取可用的知识库列表"""
@@ -34,13 +97,78 @@ class MultiKBQueryEngine:
         except Exception:
             return []
     
-    def query_single_kb(self, kb_name: str, query: str, top_k: int = 3) -> Dict[str, Any]:
-        """查询单个知识库"""
+    def query_multiple_kbs(self, kb_names: List[str], query: str, 
+                          top_k_per_kb: int = 3, max_workers: Optional[int] = None) -> Dict[str, Any]:
+        """并行查询多个知识库 - 使用多进程"""
+        if not kb_names:
+            return {"success": False, "error": "未选择知识库"}
+        
+        start_time = time.time()
+        results = {}
+        
+        # 确定进程数
+        if max_workers is None:
+            max_workers = min(self.max_workers, len(kb_names))
+        else:
+            max_workers = min(max_workers, len(kb_names), self.max_workers)
+        
         try:
-            # 导入RAG引擎
+            # 使用多进程池
+            with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                # 提交查询任务
+                future_to_kb = {
+                    executor.submit(query_single_kb_worker, kb_name, query, top_k_per_kb): kb_name 
+                    for kb_name in kb_names
+                }
+                
+                # 收集结果
+                for future in as_completed(future_to_kb, timeout=60):  # 总超时60秒
+                    kb_name = future_to_kb[future]
+                    try:
+                        result = future.result(timeout=30)  # 单个任务30秒超时
+                        results[kb_name] = result
+                    except Exception as e:
+                        results[kb_name] = {
+                            "kb_name": kb_name,
+                            "success": False,
+                            "error": f"查询超时或失败: {str(e)}",
+                            "results": []
+                        }
+        
+        except Exception as e:
+            # 如果多进程失败，回退到单线程模式
+            st.warning("⚠️ 多进程查询失败，回退到单线程模式")
+            for kb_name in kb_names:
+                try:
+                    result = self._query_single_kb_fallback(kb_name, query, top_k_per_kb)
+                    results[kb_name] = result
+                except Exception as kb_error:
+                    results[kb_name] = {
+                        "kb_name": kb_name,
+                        "success": False,
+                        "error": f"查询失败: {str(kb_error)}",
+                        "results": []
+                    }
+        
+        # 整合结果
+        total_time = time.time() - start_time
+        successful_queries = [r for r in results.values() if r["success"]]
+        
+        return {
+            "success": len(successful_queries) > 0,
+            "query": query,
+            "kb_count": len(kb_names),
+            "successful_count": len(successful_queries),
+            "total_time": total_time,
+            "results": results,
+            "used_multiprocessing": True
+        }
+    
+    def _query_single_kb_fallback(self, kb_name: str, query: str, top_k: int = 3) -> Dict[str, Any]:
+        """单线程回退查询方法"""
+        try:
             from src.rag_engine import create_rag_engine
             
-            # 创建查询引擎
             rag_engine = create_rag_engine(kb_name)
             if not rag_engine:
                 return {
@@ -50,11 +178,9 @@ class MultiKBQueryEngine:
                     "results": []
                 }
             
-            # 执行查询
             query_engine = rag_engine.get_query_engine()
             response = query_engine.query(query)
             
-            # 提取源文档信息
             source_nodes = getattr(response, 'source_nodes', [])
             results = []
             
@@ -82,50 +208,6 @@ class MultiKBQueryEngine:
                 "results": []
             }
     
-    def query_multiple_kbs(self, kb_names: List[str], query: str, 
-                          top_k_per_kb: int = 3, max_workers: int = 3) -> Dict[str, Any]:
-        """并行查询多个知识库"""
-        if not kb_names:
-            return {"success": False, "error": "未选择知识库"}
-        
-        start_time = time.time()
-        results = {}
-        
-        # 并行查询
-        with ThreadPoolExecutor(max_workers=min(max_workers, len(kb_names))) as executor:
-            # 提交查询任务
-            future_to_kb = {
-                executor.submit(self.query_single_kb, kb_name, query, top_k_per_kb): kb_name 
-                for kb_name in kb_names
-            }
-            
-            # 收集结果
-            for future in as_completed(future_to_kb):
-                kb_name = future_to_kb[future]
-                try:
-                    result = future.result(timeout=30)  # 30秒超时
-                    results[kb_name] = result
-                except Exception as e:
-                    results[kb_name] = {
-                        "kb_name": kb_name,
-                        "success": False,
-                        "error": f"查询超时或失败: {str(e)}",
-                        "results": []
-                    }
-        
-        # 整合结果
-        total_time = time.time() - start_time
-        successful_queries = [r for r in results.values() if r["success"]]
-        
-        return {
-            "success": len(successful_queries) > 0,
-            "query": query,
-            "kb_count": len(kb_names),
-            "successful_count": len(successful_queries),
-            "total_time": total_time,
-            "results": results
-        }
-    
     def generate_integrated_answer(self, multi_kb_results: Dict[str, Any]) -> str:
         """生成整合答案"""
         if not multi_kb_results["success"]:
@@ -150,6 +232,10 @@ class MultiKBQueryEngine:
         integrated_answer += f"---\n"
         integrated_answer += f"**查询统计**: {multi_kb_results['successful_count']}/{multi_kb_results['kb_count']} 个知识库响应成功，"
         integrated_answer += f"耗时 {multi_kb_results['total_time']:.2f} 秒"
+        
+        # 添加性能信息
+        if multi_kb_results.get("used_multiprocessing"):
+            integrated_answer += f"，使用多进程加速"
         
         return integrated_answer
 
@@ -211,11 +297,12 @@ class MultiKBInterface:
             
             with col2:
                 max_workers = st.slider(
-                    "并发查询数",
+                    "并发进程数",
                     min_value=1,
-                    max_value=5,
-                    value=3,
-                    key="max_workers"
+                    max_value=min(mp.cpu_count(), 4),
+                    value=min(mp.cpu_count(), 3),
+                    key="max_workers",
+                    help=f"当前系统有 {mp.cpu_count()} 个CPU核心"
                 )
         
         return {
@@ -256,7 +343,10 @@ class MultiKBInterface:
     def render_interface(self):
         """渲染完整界面"""
         st.title("🔍 多知识库联合问答")
-        st.markdown("同时查询多个知识库，获得更全面的答案")
+        st.markdown("同时查询多个知识库，获得更全面的答案（多进程加速）")
+        
+        # 性能提示
+        st.info(f"💡 系统检测到 {mp.cpu_count()} 个CPU核心，将使用多进程并行查询以获得最佳性能")
         
         # 知识库选择
         selected_kbs = self.render_kb_selector()
@@ -279,7 +369,7 @@ class MultiKBInterface:
         # 查询按钮
         if st.button("🔍 开始查询", type="primary", disabled=not query.strip()):
             if query.strip():
-                with st.spinner(f"正在查询 {len(selected_kbs)} 个知识库..."):
+                with st.spinner(f"正在使用 {query_options['max_workers']} 个进程并行查询 {len(selected_kbs)} 个知识库..."):
                     # 执行查询
                     results = self.query_engine.query_multiple_kbs(
                         selected_kbs,
