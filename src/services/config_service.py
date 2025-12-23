@@ -130,23 +130,25 @@ class ConfigService:
             return []
     
     def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """验证配置的有效性"""
-        errors = []
-        warnings = []
+        """验证配置 - 使用统一服务"""
+        from src.services.unified_config_service import unified_config_service
         
-        # 检查必需的配置项
-        required_keys = ['llm', 'embedding', 'rag', 'system']
-        for key in required_keys:
-            if key not in config:
-                errors.append(f"缺少必需的配置项: {key}")
+        # 基本配置验证规则
+        schema = {
+            'llm': dict,
+            'embedding': dict,
+            'rag': dict,
+            'system': dict
+        }
         
-        # 检查LLM配置
-        if 'llm' in config:
-            llm_config = config['llm']
-            if 'model' not in llm_config:
-                errors.append("LLM配置缺少model字段")
-            if 'api_key' not in llm_config and llm_config.get('provider') == 'OpenAI':
-                warnings.append("OpenAI配置缺少API密钥")
+        is_valid = unified_config_service.validate_config(config, schema)
+        
+        return {
+            'valid': is_valid,
+            'errors': [] if is_valid else ['配置验证失败'],
+            'warnings': [],
+            'config': config
+        }
         
         # 检查嵌入模型配置
         if 'embedding' in config:
