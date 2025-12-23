@@ -234,6 +234,12 @@ def get_progress_tracker() -> ProgressTracker:
     return _progress_tracker
 
 def render_progress_panel():
-    """渲染进度面板的入口函数"""
-    tracker = get_progress_tracker()
-    tracker.render_progress_panel()
+    """渲染进度面板 - 使用统一组件"""
+    from src.ui.unified_display_components import render_progress_panel as unified_render_progress_panel
+    
+    # 获取当前任务状态
+    tasks = []
+    if hasattr(st.session_state, 'current_tasks'):
+        tasks = st.session_state.current_tasks
+    
+    return unified_render_progress_panel(tasks, "📊 任务进度")
