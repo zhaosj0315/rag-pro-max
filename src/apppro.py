@@ -2073,6 +2073,36 @@ if st.session_state.get('main_mode', 'rag') == 'sql':
 # 5. 核心逻辑 (RAG & Indexing)
 # ==========================================
 
+def jump_to_knowledge_base(kb_name: str, output_base: str):
+    """统一的知识库跳转逻辑"""
+    logger.log("知识库跳转", "info", f"🔄 准备跳转到知识库: {kb_name}")
+    
+    # 强制刷新知识库管理器的缓存
+    from src.kb.kb_manager import KBManager
+    kb_manager = KBManager(output_base)
+    kb_list = kb_manager.list_all()
+    logger.log("知识库跳转", "info", f"📋 当前知识库列表: {kb_list}")
+    
+    # 确认新知识库在列表中
+    if kb_name in kb_list:
+        logger.log("知识库跳转", "success", f"✅ 新知识库已在列表中: {kb_name}")
+    else:
+        logger.log("知识库跳转", "warning", f"⚠️ 新知识库不在列表中: {kb_name}")
+    
+    # 设置跳转参数
+    st.session_state.current_nav = f"☐ 📂 {kb_name}"
+    st.session_state.current_kb_id = kb_name
+    st.session_state.chat_engine = None  # 重置聊天引擎，触发重新加载
+    
+    # 清除多选状态，确保单选模式
+    st.session_state.selected_kbs = []
+    for kb in kb_list:
+        st.session_state[f"kb_check_{kb}"] = False
+    
+    logger.log("知识库跳转", "info", f"✅ 跳转参数已设置: current_nav={st.session_state.current_nav}")
+    logger.log("知识库跳转", "info", "🚀 执行页面刷新...")
+
+
 def process_knowledge_base_logic(action_mode="NEW", use_ocr=False, extract_metadata=False, generate_summary=False, force_reindex=False):
     """处理知识库逻辑 (Stage 4.2 - 使用 IndexBuilder)"""
     global logger
@@ -2198,36 +2228,10 @@ def process_knowledge_base_logic(action_mode="NEW", use_ocr=False, extract_metad
     status_container.update(label=f"✅ 知识库 '{final_kb_name}' 处理完成", state="complete", expanded=True)
     
     # 跳转到新创建的知识库
-    logger.log("知识库跳转", "info", f"🔄 准备跳转到知识库: {final_kb_name}")
-    
-    # 强制刷新知识库管理器的缓存
-    from src.kb.kb_manager import KBManager
-    kb_manager = KBManager(output_base)
-    kb_list = kb_manager.list_all()
-    logger.log("知识库跳转", "info", f"📋 当前知识库列表: {kb_list}")
-    
-    # 确认新知识库在列表中
-    if final_kb_name in kb_list:
-        logger.log("知识库跳转", "success", f"✅ 新知识库已在列表中: {final_kb_name}")
-    else:
-        logger.log("知识库跳转", "warning", f"⚠️ 新知识库不在列表中，强制添加: {final_kb_name}")
-    
-    # 设置跳转参数 - 使用正确的格式匹配侧边栏选项
-    correct_nav_format = f"☐ 📂 {final_kb_name}"
-    st.session_state.current_nav = correct_nav_format
-    st.session_state.current_kb_id = final_kb_name
-    st.session_state.chat_engine = None  # 重置聊天引擎，触发重新加载
-    
-    # 清除多选状态，确保单选模式
-    st.session_state.selected_kbs = []
-    for kb in kb_list:
-        st.session_state[f"kb_check_{kb}"] = False
-    
-    logger.log("知识库跳转", "info", f"✅ 跳转参数已设置: current_nav={st.session_state.current_nav}")
+    jump_to_knowledge_base(final_kb_name, output_base)
     
     # 显示成功消息并自动跳转
     st.success(f"🎉 知识库 '{final_kb_name}' 创建成功！正在跳转...")
-    logger.log("知识库跳转", "info", "🚀 执行页面刷新...")
     st.rerun()
     
     # 资源清理
@@ -2568,33 +2572,8 @@ if btn_start:
                         kb_interface.create_knowledge_base(target_path, kb_name, options)
                         st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
                         
-                        # 跳转到新创建的知识库 - 网页抓取模式完整跳转逻辑
-                        logger.log("知识库跳转", "info", f"🔄 准备跳转到知识库: {kb_name}")
-                        
-                        # 强制刷新知识库管理器的缓存
-                        from src.kb.kb_manager import KBManager
-                        kb_manager_refresh = KBManager(output_base)
-                        kb_list = kb_manager_refresh.list_all()
-                        logger.log("知识库跳转", "info", f"📋 当前知识库列表: {kb_list}")
-                        
-                        # 确认新知识库在列表中
-                        if kb_name in kb_list:
-                            logger.log("知识库跳转", "success", f"✅ 新知识库已在列表中: {kb_name}")
-                        else:
-                            logger.log("知识库跳转", "warning", f"⚠️ 新知识库不在列表中: {kb_name}")
-                        
-                        # 设置跳转参数
-                        st.session_state.current_nav = f"☐ 📂 {kb_name}"
-                        st.session_state.current_kb_id = kb_name
-                        st.session_state.chat_engine = None  # 重置聊天引擎，触发重新加载
-                        
-                        # 清除多选状态，确保单选模式
-                        st.session_state.selected_kbs = []
-                        for kb in kb_list:
-                            st.session_state[f"kb_check_{kb}"] = False
-                        
-                        logger.log("知识库跳转", "info", f"✅ 跳转参数已设置: current_nav={st.session_state.current_nav}")
-                        logger.log("知识库跳转", "info", "🚀 执行页面刷新...")
+                        # 跳转到新创建的知识库
+                        jump_to_knowledge_base(kb_name, output_base)
                         
                         # 清理session_state中的网页抓取参数
                         for key in ['crawl_url', 'crawl_depth', 'max_pages', 'parser_type', 'url_quality_threshold']:
@@ -2774,33 +2753,8 @@ if btn_start:
                         kb_interface.create_knowledge_base(target_path, kb_name, options)
                         st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
                         
-                        # 跳转到新创建的知识库 - 智能搜索模式完整跳转逻辑
-                        logger.log("知识库跳转", "info", f"🔄 准备跳转到知识库: {kb_name}")
-                        
-                        # 强制刷新知识库管理器的缓存
-                        from src.kb.kb_manager import KBManager
-                        kb_manager_refresh = KBManager(output_base)
-                        kb_list = kb_manager_refresh.list_all()
-                        logger.log("知识库跳转", "info", f"📋 当前知识库列表: {kb_list}")
-                        
-                        # 确认新知识库在列表中
-                        if kb_name in kb_list:
-                            logger.log("知识库跳转", "success", f"✅ 新知识库已在列表中: {kb_name}")
-                        else:
-                            logger.log("知识库跳转", "warning", f"⚠️ 新知识库不在列表中: {kb_name}")
-                        
-                        # 设置跳转参数
-                        st.session_state.current_nav = f"☐ 📂 {kb_name}"
-                        st.session_state.current_kb_id = kb_name
-                        st.session_state.chat_engine = None  # 重置聊天引擎，触发重新加载
-                        
-                        # 清除多选状态，确保单选模式
-                        st.session_state.selected_kbs = []
-                        for kb in kb_list:
-                            st.session_state[f"kb_check_{kb}"] = False
-                        
-                        logger.log("知识库跳转", "info", f"✅ 跳转参数已设置: current_nav={st.session_state.current_nav}")
-                        logger.log("知识库跳转", "info", "🚀 执行页面刷新...")
+                        # 跳转到新创建的知识库
+                        jump_to_knowledge_base(kb_name, output_base)
                         
                         # 清理session_state中的搜索参数
                         for key in ['search_keyword', 'search_crawl_depth', 'search_max_pages', 'search_parser_type', 'quality_threshold']:
