@@ -62,19 +62,22 @@ def get_default_config() -> Dict[str, Any]:
     }
 
 def get_config_value(key: str, default: Any = None, config: Optional[Dict] = None) -> Any:
-    """获取配置值（支持点号分隔的嵌套键）"""
-    if config is None:
-        config = load_config()
+    """获取配置值 - 使用统一服务"""
+    from src.services.unified_config_service import get_config_value as unified_get_config_value
     
-    keys = key.split('.')
-    value = config
-    
-    try:
-        for k in keys:
-            value = value[k]
-        return value
-    except (KeyError, TypeError):
-        return default
+    if config is not None:
+        # 如果提供了配置字典，直接从中获取
+        keys = key.split('.')
+        value = config
+        try:
+            for k in keys:
+                value = value[k]
+            return value
+        except (KeyError, TypeError):
+            return default
+    else:
+        # 否则从默认配置文件获取
+        return unified_get_config_value("app_config", key, default)
 
 def set_config_value(key: str, value: Any, config: Optional[Dict] = None) -> Dict[str, Any]:
     """设置配置值（支持点号分隔的嵌套键）"""
