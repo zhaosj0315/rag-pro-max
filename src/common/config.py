@@ -11,33 +11,26 @@ DEFAULT_CONFIG_DIR = "config"
 DEFAULT_CONFIG_FILE = "app_config.json"
 
 def load_config(config_file: Optional[str] = None) -> Dict[str, Any]:
-    """统一的配置加载函数"""
-    if config_file is None:
-        config_file = os.path.join(DEFAULT_CONFIG_DIR, DEFAULT_CONFIG_FILE)
+    """统一的配置加载函数 - 使用统一服务"""
+    from src.services.unified_config_service import load_config as unified_load_config
     
-    try:
-        if os.path.exists(config_file):
-            with open(config_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        else:
-            # 返回默认配置
-            return get_default_config()
-    except Exception:
-        return get_default_config()
+    if config_file is None:
+        config_name = "app_config"
+    else:
+        config_name = Path(config_file).stem
+    
+    return unified_load_config(config_name, get_default_config())
 
 def save_config(config: Dict[str, Any], config_file: Optional[str] = None) -> bool:
-    """统一的配置保存函数"""
-    if config_file is None:
-        config_file = os.path.join(DEFAULT_CONFIG_DIR, DEFAULT_CONFIG_FILE)
+    """统一的配置保存函数 - 使用统一服务"""
+    from src.services.unified_config_service import save_config as unified_save_config
     
-    try:
-        # 确保配置目录存在
-        os.makedirs(os.path.dirname(config_file), exist_ok=True)
-        
-        with open(config_file, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=2, ensure_ascii=False)
-        return True
-    except Exception:
+    if config_file is None:
+        config_name = "app_config"
+    else:
+        config_name = Path(config_file).stem
+    
+    return unified_save_config(config, config_name)
         return False
 
 def get_default_config() -> Dict[str, Any]:

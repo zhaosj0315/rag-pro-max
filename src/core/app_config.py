@@ -13,7 +13,9 @@ CONFIG_FILE = "rag_config.json"
 output_base = "vector_db_storage"
 
 def load_config():
-    """加载配置文件"""
+    """加载配置文件 - 使用统一服务"""
+    from src.services.unified_config_service import load_config as unified_load_config
+    
     defaults = {
         "chunk_size": 500,
         "chunk_overlap": 50,
@@ -31,24 +33,12 @@ def load_config():
         "embed_key": ""
     }
     
-    try:
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                saved_config = json.load(f)
-                defaults.update(saved_config)
-    except Exception as e:
-        logger.error(f"配置加载失败: {e}")
-    
-    return defaults
+    return unified_load_config("rag_config", defaults)
 
 def save_config(config):
-    """保存配置文件"""
-    try:
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=4, ensure_ascii=False)
-        logger.info("配置已保存")
-    except Exception as e:
-        logger.error(f"配置保存失败: {e}")
+    """保存配置文件 - 使用统一服务"""
+    from src.services.unified_config_service import save_config as unified_save_config
+    return unified_save_config(config, "rag_config")
 
 def get_existing_kbs(output_base):
     """获取现有知识库列表"""
