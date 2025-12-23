@@ -2606,9 +2606,11 @@ if btn_start:
                             if key in st.session_state:
                                 del st.session_state[key]
                         
+                        # 设置标记，防止重复执行文件处理逻辑
+                        st.session_state.web_crawl_completed = True
+                        
                         logger.log("网页抓取", "info", f"🔄 网页抓取模式: 执行页面刷新")
                         st.rerun()
-                        # 注意：st.rerun() 后不需要 st.stop()，因为页面会重新加载
                         
                     except Exception as e:
                         logger.log("网页抓取", "error", f"❌ 知识库创建异常: {str(e)}")
@@ -2793,7 +2795,12 @@ if btn_start:
                         for key in ['search_keyword', 'search_crawl_depth', 'search_max_pages', 'search_parser_type', 'quality_threshold']:
                             if key in st.session_state:
                                 del st.session_state[key]
+                        
+                        # 设置标记，防止重复执行文件处理逻辑
+                        st.session_state.smart_search_completed = True
+                        
                         st.rerun()
+                        
                     except Exception as e:
                         st.error(f"❌ 知识库创建失败: {str(e)}")
                         logger.error(f"知识库创建错误: {str(e)}")
@@ -2809,6 +2816,15 @@ if btn_start:
                 st.stop()
     
     print("DEBUG: 跳过网页抓取模式，进入原有文件处理逻辑")
+    
+    # 检查是否已经完成了网页抓取或智能搜索，避免重复处理
+    if st.session_state.get('web_crawl_completed') or st.session_state.get('smart_search_completed'):
+        logger.log("文件处理", "info", "🔄 检测到网页抓取/智能搜索已完成，跳过文件处理逻辑")
+        # 清理标记
+        st.session_state.pop('web_crawl_completed', None)
+        st.session_state.pop('smart_search_completed', None)
+        st.stop()
+    
     # 原有的文件处理逻辑
     # 确保 action_mode 已定义 (防止 NameError)
     if 'action_mode' not in locals() and 'action_mode' not in globals():
