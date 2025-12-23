@@ -595,59 +595,65 @@ with st.sidebar:
             except ValueError:
                 default_idx = 0
 
-        # 知识库选择 - 支持多选
+        # 知识库选择 - 直接复选框模式
         select_col1, select_col2, select_col3 = st.columns([0.6, 5.9, 0.5])
         with select_col1:
             st.markdown("**选择:**")
         with select_col2:
-            # 检查是否启用多选模式
-            if st.session_state.get('multi_kb_mode', False):
-                # 多选模式
-                available_kbs = [kb for kb in kb_manager.list_all()]
-                if available_kbs:
-                    selected_kbs = []
-                    
-                    # 全选/取消全选
-                    col_all, col_list = st.columns([1, 4])
-                    with col_all:
-                        select_all = st.checkbox("全选", key="select_all_main")
-                    
-                    # 知识库复选框列表
-                    with col_list:
-                        for kb in available_kbs:
-                            if select_all:
-                                is_selected = st.checkbox(f"📂 {kb}", value=True, key=f"kb_check_{kb}")
-                            else:
-                                is_selected = st.checkbox(f"📂 {kb}", key=f"kb_check_{kb}")
-                            
-                            if is_selected:
-                                selected_kbs.append(kb)
-                    
-                    # 保存选中的知识库
-                    st.session_state.selected_kbs = selected_kbs
-                    
-                    if selected_kbs:
-                        st.info(f"✅ 已选择 {len(selected_kbs)} 个知识库: {', '.join(selected_kbs)}")
-                        selected_nav = f"多选: {len(selected_kbs)}个知识库"
-                    else:
-                        st.warning("请至少选择一个知识库")
-                        selected_nav = "➕ 新建知识库..."
-                else:
-                    st.warning("暂无可用知识库")
+            available_kbs = kb_manager.list_all()
+            selected_kbs = []
+            
+            if available_kbs:
+                # 显示所有知识库的复选框
+                for kb in available_kbs:
+                    is_selected = st.checkbox(f"📂 {kb}", key=f"kb_select_{kb}")
+                    if is_selected:
+                        selected_kbs.append(kb)
+                
+                # 保存选中的知识库
+                st.session_state.selected_kbs = selected_kbs
+                
+                # 根据选择数量确定模式
+                if len(selected_kbs) == 0:
                     selected_nav = "➕ 新建知识库..."
+                    st.info("请选择至少一个知识库")
+                elif len(selected_kbs) == 1:
+                    selected_nav = f"📂 {selected_kbs[0]}"
+                    current_kb_name = selected_kbs[0]
+                else:
+                    selected_nav = f"多选: {len(selected_kbs)}个知识库"
+                    st.success(f"🔍 多知识库模式：已选择 {len(selected_kbs)} 个知识库")
             else:
-                # 单选模式（原来的方式）
-                selected_nav = st.selectbox("", nav_options, index=default_idx, label_visibility="collapsed")
+                # 没有知识库时显示新建选项
+                selected_nav = "➕ 新建知识库..."
+                st.warning("暂无可用知识库，请先创建")
         
         with select_col3:
-            # 切换多选/单选模式
-            if st.button("📋" if not st.session_state.get('multi_kb_mode', False) else "📄", 
-                        help="切换到多选模式" if not st.session_state.get('multi_kb_mode', False) else "切换到单选模式", 
-                        use_container_width=True, key="toggle_multi_mode"):
-                st.session_state.multi_kb_mode = not st.session_state.get('multi_kb_mode', False)
-                # 清理相关状态
-                if 'selected_kbs' in st.session_state:
-                    del st.session_state.selected_kbs
+            if st.button("🔄", help="刷新知识库列表", use_container_width=True, key="refresh_kb_list"):
+                st.rerun()
+
+        # 启动系统按钮（当选择了知识库时显示）
+        if len(st.session_state.get('selected_kbs', [])) > 0:
+            if st.button("🚀 启动系统", type="primary", use_container_width=True, key="start_system"):
+                # 初始化聊天引擎
+                if len(st.session_state.get('selected_kbs', [])) == 1:
+                    # 单知识库模式
+                    kb_name = st.session_state.selected_kbs[0]
+                    try:
+                        from src.rag_engine import create_rag_engine
+                        rag_engine = create_rag_engine(kb_name)
+                        if rag_engine:
+                            st.session_state.chat_engine = rag_engine.get_query_engine()
+                            st.session_state.current_kb_id = kb_name
+                            st.success(f"✅ 知识库 '{kb_name}' 已启动")
+                        else:
+                            st.error(f"❌ 无法启动知识库 '{kb_name}'")
+                    except Exception as e:
+                        st.error(f"❌ 启动失败: {str(e)}")
+                else:
+                    # 多知识库模式
+                    st.session_state.chat_engine = "multi_kb_mode"  # 标记为多知识库模式
+                    st.success(f"✅ 多知识库模式已启动，共 {len(st.session_state.selected_kbs)} 个知识库")
                 st.rerun()
 
         # 知识库搜索/过滤已按用户要求移除
@@ -667,16 +673,11 @@ with st.sidebar:
         st.session_state.current_nav = selected_nav
 
         is_create_mode = (selected_nav == "➕ 新建知识库...")
-        is_multi_kb_mode = st.session_state.get('multi_kb_mode', False) and st.session_state.get('selected_kbs', [])
+        is_multi_kb_mode = len(st.session_state.get('selected_kbs', [])) > 1
         current_kb_name = selected_nav.replace("📂 ", "") if not is_create_mode and not is_multi_kb_mode else None
 
-        # --- 功能区 ---
-        if is_multi_kb_mode:
-            # 多知识库模式 - 在原界面显示
-            selected_kbs = st.session_state.get('selected_kbs', [])
-            st.success(f"🔍 多知识库模式：已选择 {len(selected_kbs)} 个知识库")
-            
-        elif is_create_mode:
+        # --- 功能区 ---        
+        if is_create_mode:
             
             with st.container(border=True):
                 # 1. 路径选择完全一行化
@@ -3957,7 +3958,7 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
         logger.separator("知识库查询")
         
         # 检查是否为多知识库模式
-        if st.session_state.get('multi_kb_mode', False) and st.session_state.get('selected_kbs', []):
+        if len(st.session_state.get('selected_kbs', [])) > 1:
             # 多知识库查询模式
             selected_kbs = st.session_state.get('selected_kbs', [])
             logger.start_operation("多知识库查询", f"知识库: {', '.join(selected_kbs)}")
