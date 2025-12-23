@@ -2801,7 +2801,14 @@ if btn_start:
             st.error(f"执行失败: {e}")
 
 # --- 主视图渲染 ---
-if active_kb_name:
+if active_kb_name == "multi_kb_mode":
+    # 多知识库模式 - 显示简洁的联合查询界面
+    selected_kbs = st.session_state.get('selected_kbs', [])
+    st.markdown(f"### 🔍 多知识库联合查询")
+    st.info(f"已选择 {len(selected_kbs)} 个知识库: {', '.join(selected_kbs)}")
+    st.markdown("💡 **使用说明**: 直接在下方输入问题，系统将自动从所有选中的知识库中检索相关信息并提供答案。")
+    
+elif active_kb_name:
     from src.documents.document_manager import DocumentManager
     
     db_path = os.path.join(output_base, active_kb_name)
@@ -3838,7 +3845,14 @@ else:
     
     # 如果有新输入，加入队列
     if user_input:
-        if not st.session_state.chat_engine:
+        if active_kb_name == "multi_kb_mode":
+            # 多知识库模式 - 直接处理查询
+            selected_kbs = st.session_state.get('selected_kbs', [])
+            if not selected_kbs:
+                st.error("请先选择知识库")
+            else:
+                st.session_state.question_queue.append(user_input)
+        elif not st.session_state.chat_engine:
             st.error("请先点击左侧【🚀 执行处理】启动系统")
         else:
             st.session_state.question_queue.append(user_input)
@@ -3891,7 +3905,45 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
     final_prompt = st.session_state.question_queue.pop(0)
     logger.info(f"🚀 开始处理队列问题: {final_prompt[:50]}...")
     
-    if st.session_state.chat_engine:
+    if active_kb_name == "multi_kb_mode":
+        # 多知识库模式处理
+        selected_kbs = st.session_state.get('selected_kbs', [])
+        st.session_state.is_processing = True
+        logger.info("✅ 多知识库模式开始处理")
+        
+        # 使用多知识库查询引擎
+        from src.query.multi_kb_query_engine import MultiKBQueryEngine
+        multi_engine = MultiKBQueryEngine(output_base)
+        
+        # 添加用户消息
+        st.session_state.messages.append({"role": "user", "content": final_prompt})
+        
+        # 显示用户消息
+        with st.chat_message("user"):
+            st.write(final_prompt)
+        
+        # 显示助手回复
+        with st.chat_message("assistant"):
+            response_placeholder = st.empty()
+            
+            try:
+                # 执行多知识库查询
+                response = multi_engine.query(final_prompt, selected_kbs, embed_provider, embed_model, embed_key, embed_url)
+                response_placeholder.write(response)
+                
+                # 添加助手消息
+                st.session_state.messages.append({"role": "assistant", "content": response})
+                
+            except Exception as e:
+                error_msg = f"查询失败: {str(e)}"
+                response_placeholder.error(error_msg)
+                st.session_state.messages.append({"role": "assistant", "content": error_msg})
+            
+            finally:
+                st.session_state.is_processing = False
+                st.rerun()
+                
+    elif st.session_state.chat_engine:
         # 不清空 suggestions_history，保留追问按钮
         st.session_state.is_processing = True  # 标记正在处理
         logger.info("✅ 设置处理状态为 True")
