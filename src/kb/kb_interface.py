@@ -51,8 +51,18 @@ class KBInterface:
         nav_options = ["➕ 新建知识库..."] + [f"📂 {kb}" for kb in filtered_kbs]
         
         default_idx = 0
-        if "current_nav" in st.session_state and st.session_state.current_nav in nav_options:
-            default_idx = nav_options.index(st.session_state.current_nav)
+        if "current_nav" in st.session_state:
+            # 强化匹配逻辑：兼容带/不带复选框图标的情况
+            current_nav_clean = st.session_state.current_nav.replace("☑️ ", "").replace("☐ ", "")
+            for i, opt in enumerate(nav_options):
+                opt_clean = opt.replace("☑️ ", "").replace("☐ ", "")
+                if opt_clean == current_nav_clean:
+                    default_idx = i
+                    break
+                    
+            # 兜底：如果清理后匹配到了，更新 session_state 确保符合当前界面的格式
+            if default_idx > 0 and nav_options[default_idx] != st.session_state.current_nav:
+                st.session_state.current_nav = nav_options[default_idx]
         
         selected_nav = st.selectbox(
             "选择当前知识库", 

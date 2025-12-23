@@ -601,11 +601,18 @@ with st.sidebar:
 
         # 默认选择"新建知识库"，避免自动加载大知识库
         default_idx = 0
-        if "current_nav" in st.session_state and st.session_state.current_nav in nav_options:
-            try:
-                default_idx = nav_options.index(st.session_state.current_nav)
-            except ValueError:
-                default_idx = 0
+        if "current_nav" in st.session_state:
+            # 强化匹配逻辑：兼容带/不带复选框图标的情况
+            current_nav_clean = st.session_state.current_nav.replace("☑️ ", "").replace("☐ ", "")
+            for i, opt in enumerate(nav_options):
+                opt_clean = opt.replace("☑️ ", "").replace("☐ ", "")
+                if opt_clean == current_nav_clean:
+                    default_idx = i
+                    break
+            
+            # 兜底：如果清理后匹配到了，更新 session_state 确保图标正确
+            if default_idx > 0 and nav_options[default_idx] != st.session_state.current_nav:
+                st.session_state.current_nav = nav_options[default_idx]
 
         # 知识库选择完全一行化
         select_col1, select_col2, select_col3 = st.columns([0.6, 5.9, 0.5])
@@ -614,14 +621,19 @@ with st.sidebar:
         with select_col2:
             selected_nav = st.selectbox("", nav_options, index=default_idx, label_visibility="collapsed")
             
-            # 处理复选框点击逻辑
-            if selected_nav.startswith("☐") or selected_nav.startswith("☑️"):
+            # 处理复选框点击逻辑 - 只有当用户手动更改选择时才触发
+            if selected_nav != st.session_state.get('current_nav') and (selected_nav.startswith("☐") or selected_nav.startswith("☑️")):
                 # 提取知识库名称
                 kb_name = selected_nav.split("📂 ")[1] if "📂 " in selected_nav else ""
                 if kb_name:
                     # 切换复选框状态
                     current_state = st.session_state.get(f"kb_check_{kb_name}", False)
-                    st.session_state[f"kb_check_{kb_name}"] = not current_state
+                    new_state = not current_state
+                    st.session_state[f"kb_check_{kb_name}"] = new_state
+                    
+                    # 关键修复：立即更新 current_nav 字符串，确保下次 rerun 时 index 匹配正确
+                    new_symbol = "☑️" if new_state else "☐"
+                    st.session_state.current_nav = f"{new_symbol} 📂 {kb_name}"
                     st.rerun()
         with select_col3:
             if st.button("🔄", help="刷新知识库列表", use_container_width=True, key="refresh_kb_list"):
@@ -2098,14 +2110,6 @@ def jump_to_knowledge_base(kb_name: str, output_base: str):
     old_nav = st.session_state.get('current_nav', 'None')
     old_kb_id = st.session_state.get('current_kb_id', 'None')
     
-    st.session_state.current_nav = f"☐ 📂 {kb_name}"
-    st.session_state.current_kb_id = kb_name
-    st.session_state.chat_engine = None  # 重置聊天引擎，触发重新加载
-    
-    logger.log("知识库跳转", "info", f"📝 导航状态变更: {old_nav} → {st.session_state.current_nav}")
-    logger.log("知识库跳转", "info", f"📝 知识库ID变更: {old_kb_id} → {st.session_state.current_kb_id}")
-    logger.log("知识库跳转", "info", f"🔄 聊天引擎已重置")
-    
     # 清除多选状态，确保单选模式
     logger.log("知识库跳转", "info", f"🧹 清除多选状态")
     st.session_state.selected_kbs = []
@@ -2114,6 +2118,12 @@ def jump_to_knowledge_base(kb_name: str, output_base: str):
         if st.session_state.get(f"kb_check_{kb}", False):
             cleared_count += 1
         st.session_state[f"kb_check_{kb}"] = False
+    
+    # 核心修复：在清理完所有状态后，再设置目标知识库的选中状态
+    st.session_state[f"kb_check_{kb_name}"] = True
+    st.session_state.current_nav = f"☑️ 📂 {kb_name}"
+    st.session_state.current_kb_id = kb_name
+    st.session_state.chat_engine = None  # 重置聊天引擎，触发重新加载
     
     logger.log("知识库跳转", "info", f"🧹 已清除 {cleared_count} 个复选框状态")
     logger.log("知识库跳转", "info", f"✅ 跳转参数已设置: current_nav={st.session_state.current_nav}")
@@ -2255,13 +2265,6 @@ def process_knowledge_base_logic(action_mode="NEW", use_ocr=False, extract_metad
     # 资源清理
     resource_guard.throttler.cleanup_memory()
     logger.info("🧹 资源已清理")
-    
-    # 自动跳转到新建的知识库
-    st.session_state.current_nav = f"📂 {final_kb_name}"
-    st.success(f"🎉 知识库 '{final_kb_name}' 构建完成！已自动切换到该知识库")
-    
-    time.sleep(1.5)
-    st.rerun()  # 刷新页面，显示新知识库
     
     return result.doc_count
 
@@ -2885,8 +2888,7 @@ if btn_start:
                 generate_summary=current_generate_summary,
                 force_reindex=current_force_reindex
             )
-            st.session_state.current_nav = f"📂 {final_kb_name}"
-            st.session_state.current_kb_id = None 
+            # st.session_state.current_nav 等跳转逻辑已移至 process_knowledge_base_logic 内部的 jump_to_knowledge_base
             
             if action_mode == "NEW" or action_mode == "APPEND":
                 st.session_state.messages = []

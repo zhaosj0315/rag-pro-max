@@ -257,7 +257,11 @@ def get_knowledge_base_list():
     
     for kb_dir in vector_db_dir.iterdir():
         if kb_dir.is_dir():
+            # 同时检查带点和不带点的 info 文件
             kb_info_file = kb_dir / "kb_info.json"
+            if not kb_info_file.exists():
+                kb_info_file = kb_dir / ".kb_info.json"
+                
             if kb_info_file.exists():
                 try:
                     import json
