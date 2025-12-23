@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from llama_index.core import StorageContext, load_index_from_storage
 
 # 导入日志系统
-from src.common.logger import logger
+from src.logger import logger
 
 
 class MultiKBQueryEngine:
