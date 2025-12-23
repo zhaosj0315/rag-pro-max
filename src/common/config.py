@@ -31,7 +31,6 @@ def save_config(config: Dict[str, Any], config_file: Optional[str] = None) -> bo
         config_name = Path(config_file).stem
     
     return unified_save_config(config, config_name)
-        return False
 
 def get_default_config() -> Dict[str, Any]:
     """获取默认配置"""
