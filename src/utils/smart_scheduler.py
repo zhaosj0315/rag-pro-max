@@ -28,12 +28,12 @@ class SmartScheduler:
         
         # 默认配置
         self.default_config = {
-            'cpu_thresholds': {'low': 30, 'medium': 60, 'high': 80},
-            'memory_thresholds': {'low': 40, 'medium': 70, 'high': 85},
+            'cpu_thresholds': {'low': 40, 'medium': 75, 'high': 92},
+            'memory_thresholds': {'low': 40, 'medium': 75, 'high': 90},
             'worker_configs': {
-                'low_load': {'cpu_workers': 8, 'io_workers': 4},
-                'medium_load': {'cpu_workers': 4, 'io_workers': 2},
-                'high_load': {'cpu_workers': 2, 'io_workers': 1}
+                'low_load': {'cpu_workers': 10, 'io_workers': 5},
+                'medium_load': {'cpu_workers': 6, 'io_workers': 3},
+                'high_load': {'cpu_workers': 4, 'io_workers': 2}
             },
             'adaptive_enabled': True,
             'learning_enabled': True

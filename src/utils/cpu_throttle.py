@@ -78,10 +78,10 @@ class CPUThrottle:
         try:
             cpu_percent = psutil.cpu_percent(interval=0.1)
             
-            if cpu_percent > 85:
-                # CPU 使用率过高，减少线程数
+            if cpu_percent > 92:
+                # CPU 使用率极高，显著减少线程数
                 return max(1, default_workers // 4)
-            elif cpu_percent > 70:
+            elif cpu_percent > 85:
                 # CPU 使用率较高，适度减少
                 return max(2, default_workers // 2)
             else:
