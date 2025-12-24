@@ -4025,10 +4025,11 @@ elif queue_len > 0:
 
 # 从队列中取出问题处理
 if not st.session_state.get('is_processing', False) and st.session_state.question_queue:
-    final_prompt = st.session_state.question_queue.pop(0)
-    logger.info(f"🚀 开始处理队列问题: {final_prompt[:50]}...")
-    
-    if active_kb_name == "multi_kb_mode":
+    try:
+        final_prompt = st.session_state.question_queue.pop(0)
+        logger.info(f"🚀 开始处理队列问题: {final_prompt[:50]}...")
+        
+        if active_kb_name == "multi_kb_mode":
         # 多知识库模式处理
         selected_kbs = st.session_state.get('selected_kbs', [])
         st.session_state.is_processing = True
@@ -4231,6 +4232,8 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                                 logger.info(f"📝 用户选择使用原问题: {final_prompt}")
                                 st.rerun()
                         
+                        # 核心修复：停止前释放处理锁，但标记当前问题，避免丢失或重入
+                        st.session_state.is_processing = False
                         st.stop()  # 等待用户选择
         
         
@@ -4440,7 +4443,8 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         context=full_text,
                         source_type='chat',
                         query_engine=st.session_state.chat_engine if st.session_state.get('chat_engine') else None,
-                        num_questions=3
+                        num_questions=3,
+                        existing_history=existing_questions
                     )
                     
                     logger.info(f"🔧 推荐引擎返回 {len(initial_sugs)} 个问题")
@@ -4496,3 +4500,14 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     logger.info("🧹 错误处理完成，内存已清理")
                     st.session_state.is_processing = False
                     st.rerun()
+    except Exception as e:
+        # 排除 Streamlit 内部的 Rerun 和 Stop 异常
+        exc_type = type(e).__name__
+        if exc_type not in ['RerunException', 'StopException']:
+            logger.error(f"❌ 队列处理发生致命错误: {str(e)}")
+            st.error(f"⚠️ 系统处理出错: {str(e)}")
+            st.session_state.is_processing = False
+            st.rerun()
+        else:
+            # 重新抛出 Streamlit 异常以确保正常流转
+            raise e

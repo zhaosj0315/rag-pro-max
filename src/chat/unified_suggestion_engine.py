@@ -42,7 +42,8 @@ class UnifiedSuggestionEngine:
                            source_type: str = 'chat',  # 'file_upload' | 'web_crawl' | 'chat'
                            query_engine = None,
                            metadata: Dict = None,
-                           num_questions: int = 3) -> List[str]:
+                           num_questions: int = 3,
+                           existing_history: List[str] = None) -> List[str]:
         """
         统一的推荐问题生成入口
         
@@ -52,6 +53,7 @@ class UnifiedSuggestionEngine:
             query_engine: 查询引擎，用于验证问题可答性
             metadata: 元数据（URL、文件信息等）
             num_questions: 生成问题数量
+            existing_history: 已存在的历史问题列表（用于过滤）
         """
         suggestions = []
         
@@ -73,7 +75,7 @@ class UnifiedSuggestionEngine:
             suggestions.extend(kb_questions)
         
         # 4. 去重、过滤历史、验证可答性
-        final_suggestions = self._filter_and_validate(suggestions, query_engine)
+        final_suggestions = self._filter_and_validate(suggestions, query_engine, existing_history)
         
         # 5. 更新历史
         self.history.extend(final_suggestions)
@@ -252,17 +254,26 @@ class UnifiedSuggestionEngine:
         except:
             return False
     
-    def _filter_and_validate(self, suggestions: List[str], query_engine) -> List[str]:
+    def _filter_and_validate(self, suggestions: List[str], query_engine, existing_history: List[str] = None) -> List[str]:
         """过滤和验证问题"""
         # 去重
         unique_suggestions = list(dict.fromkeys(suggestions))
         
-        # 过滤历史问题（只过滤最近5个，避免过度过滤）
+        # 过滤历史问题（内部历史）
         filtered = [q for q in unique_suggestions if q not in self.history[-5:]]
+        
+        # 过滤外部传入的已有历史问题（用户已问过的问题）
+        if existing_history:
+            filtered = [q for q in filtered if q not in existing_history]
         
         # 如果没有过滤后的问题，返回原始问题（避免完全没有推荐）
         if not filtered and unique_suggestions:
-            filtered = unique_suggestions[:3]
+            # 即使回退，也尽量避免重复
+            if existing_history:
+                fallback = [q for q in unique_suggestions if q not in existing_history]
+                filtered = fallback[:3] if fallback else unique_suggestions[:3]
+            else:
+                filtered = unique_suggestions[:3]
         
         # 确保至少有3个问题
         if len(filtered) < 3 and len(unique_suggestions) >= 3:
