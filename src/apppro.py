@@ -3989,6 +3989,17 @@ if st.session_state.prompt_trigger:
 # 显示队列状态
 queue_len = len(st.session_state.question_queue)
 if st.session_state.get('is_processing'):
+    # 核心安全机制：检测处理时长
+    process_start = st.session_state.get('process_start_time', time.time())
+    elapsed = time.time() - process_start
+    if elapsed > 180: # 3 minutes
+        st.warning(f"⚠️ 处理已持续 {elapsed:.0f}s，可能发生死锁或引擎响应过慢。")
+        if st.button("🚨 强制重置系统状态", type="primary"):
+            st.session_state.is_processing = False
+            st.session_state.question_queue = []
+            st.toast("✅ 系统已强制重置")
+            st.rerun()
+
     if queue_len > 0:
         # 显示队列中的问题
         with st.expander(f"⏳ 正在处理问题，队列中还有 {queue_len} 个问题等待...", expanded=True):
@@ -4025,11 +4036,12 @@ elif queue_len > 0:
 
 # 从队列中取出问题处理
 if not st.session_state.get('is_processing', False) and st.session_state.question_queue:
-    try:
-        final_prompt = st.session_state.question_queue.pop(0)
-        logger.info(f"🚀 开始处理队列问题: {final_prompt[:50]}...")
-        
-        if active_kb_name == "multi_kb_mode":
+    # 记录开始时间用于死锁检测
+    st.session_state.process_start_time = time.time()
+    final_prompt = st.session_state.question_queue.pop(0)
+    logger.info(f"🚀 开始处理队列问题: {final_prompt[:50]}...")
+    
+    if active_kb_name == "multi_kb_mode":
         # 多知识库模式处理
         selected_kbs = st.session_state.get('selected_kbs', [])
         st.session_state.is_processing = True
@@ -4500,14 +4512,3 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     logger.info("🧹 错误处理完成，内存已清理")
                     st.session_state.is_processing = False
                     st.rerun()
-    except Exception as e:
-        # 排除 Streamlit 内部的 Rerun 和 Stop 异常
-        exc_type = type(e).__name__
-        if exc_type not in ['RerunException', 'StopException']:
-            logger.error(f"❌ 队列处理发生致命错误: {str(e)}")
-            st.error(f"⚠️ 系统处理出错: {str(e)}")
-            st.session_state.is_processing = False
-            st.rerun()
-        else:
-            # 重新抛出 Streamlit 异常以确保正常流转
-            raise e
