@@ -254,38 +254,61 @@ class UnifiedSuggestionEngine:
         except:
             return False
     
+    def _normalize(self, text: str) -> str:
+        """归一化文本：去除标点、空白，转小写"""
+        if not text: return ""
+        text = text.lower().strip()
+        # 只保留中英文和数字
+        text = re.sub(r'[^\w\u4e00-\u9fa5]', '', text)
+        return text
+
     def _filter_and_validate(self, suggestions: List[str], query_engine, existing_history: List[str] = None) -> List[str]:
         """过滤和验证问题"""
-        # 去重
-        unique_suggestions = list(dict.fromkeys(suggestions))
+        # 去重 (保留顺序)
+        seen = set()
+        unique_suggestions = []
+        for s in suggestions:
+            norm = self._normalize(s)
+            if norm and norm not in seen:
+                seen.add(norm)
+                unique_suggestions.append(s)
         
-        # 过滤历史问题（内部历史）
-        filtered = [q for q in unique_suggestions if q not in self.history[-5:]]
+        # 准备归一化的历史记录
+        normalized_history = set()
+        if self.history:
+            normalized_history.update(self._normalize(h) for h in self.history[-10:]) # 增加内部历史回溯深度
         
-        # 过滤外部传入的已有历史问题（用户已问过的问题）
         if existing_history:
-            filtered = [q for q in filtered if q not in existing_history]
+            normalized_history.update(self._normalize(h) for h in existing_history)
+            
+        # 过滤历史问题
+        filtered = [q for q in unique_suggestions if self._normalize(q) not in normalized_history]
         
-        # 如果没有过滤后的问题，返回原始问题（避免完全没有推荐）
+        # 如果没有过滤后的问题，返回原始问题（但排除绝对重复的）
         if not filtered and unique_suggestions:
-            # 即使回退，也尽量避免重复
             if existing_history:
-                fallback = [q for q in unique_suggestions if q not in existing_history]
-                filtered = fallback[:3] if fallback else unique_suggestions[:3]
+                # 尽量找一个差异最大的
+                filtered = unique_suggestions[:3]
             else:
                 filtered = unique_suggestions[:3]
         
         # 确保至少有3个问题
         if len(filtered) < 3 and len(unique_suggestions) >= 3:
-            # 补充一些原始问题
             for q in unique_suggestions:
-                if q not in filtered and len(filtered) < 3:
-                    filtered.append(q)
+                if q not in filtered and self._normalize(q) not in normalized_history:
+                     filtered.append(q)
+                if len(filtered) >= 3: break
+            
+            # 如果还是不够，被迫使用一些重复的（但尽量避免）
+            if len(filtered) < 3:
+                remaining = [q for q in unique_suggestions if q not in filtered]
+                filtered.extend(remaining[:3-len(filtered)])
         
         # 如果有查询引擎，验证可答性（但保留至少2个问题）
         if query_engine and filtered:
             validated = []
             for question in filtered:
+                # 验证前也检查一下是否完全重复
                 if self._can_answer_from_kb(question, query_engine):
                     validated.append(question)
             

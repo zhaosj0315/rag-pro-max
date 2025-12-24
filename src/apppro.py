@@ -3717,8 +3717,9 @@ for msg_idx, msg in enumerate(state.get_messages()):
             render_message_stats(msg["stats"])
         
         # 渲染引用源 - 使用新组件 (Stage 3.1)
-        if "sources" in msg:
-            render_source_references(msg["sources"], expanded=True)
+                            # 引用来源（新版卡片式）
+                            if "sources" in msg and msg["sources"]:
+                                render_source_references(msg["sources"], expanded=False)
         
         # 引用按钮 (P2 恢复功能)
         if role == "assistant":
