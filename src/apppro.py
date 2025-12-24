@@ -4258,6 +4258,7 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
         recent_queries = [m['content'] for m in st.session_state.messages[-6:] if m['role'] == 'user']
         if final_prompt in recent_queries:
             st.info("💡 您刚才已经问过相同的问题，可以查看上面的回答或尝试换个角度提问")
+            st.session_state.is_processing = False
             st.stop()
         
         st.session_state.messages.append({"role": "user", "content": final_prompt})
