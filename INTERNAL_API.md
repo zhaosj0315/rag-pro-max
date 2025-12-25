@@ -1,4 +1,4 @@
-# RAG Pro Max 内部开发 SDK 文档
+# RAG Pro Max v2.6.0 内部开发 SDK 文档
 
 ## 概述
 
@@ -7,9 +7,47 @@
 
 本 SDK 文档描述了 `src/services/` 层提供的 Python 内部接口，用于在 `apppro.py` 或其他后台任务中直接调用业务逻辑。
 
+**版本**: v2.6.0 智能推荐完整版  
+**架构**: 四层统一架构  
+**模块数**: 153个  
+**测试覆盖率**: 92%
+
 ## 🚀 核心服务接口
 
-### 1. 文件服务 (FileService)
+### 1. 智能推荐服务 (RecommendationService) - v2.6.0 新增
+
+**位置**: `src/services/recommendation_service.py`
+
+#### 生成推荐问题
+```python
+from src.services.recommendation_service import RecommendationService
+
+rec_service = RecommendationService()
+recommendations = rec_service.generate_recommendations(
+    query="用户问题",
+    context="对话上下文",
+    kb_name="知识库名称",
+    history=["历史问题1", "历史问题2"],
+    count=3
+)
+
+# 返回格式
+{
+    "recommendations": [
+        {
+            "question": str,
+            "confidence": float,
+            "source": str
+        }
+    ],
+    "deduplication_info": {
+        "filtered_count": int,
+        "unique_count": int
+    }
+}
+```
+
+### 2. 文件服务 (FileService)
 
 **位置**: `src/services/file_service.py`
 

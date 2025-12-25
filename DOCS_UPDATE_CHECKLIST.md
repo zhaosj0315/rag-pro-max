@@ -14,7 +14,7 @@
 cat version.json
 
 # 记录关键信息:
-# - version: 版本号 (如 v2.4.8)
+# - version: 版本号 (如 v2.6.0)
 # - test_coverage: 测试覆盖率 (如 95/97)
 # - features: 新功能列表
 # - codename: 版本代号
@@ -45,7 +45,7 @@ git status --ignored
 ```bash
 # 获取新版本号
 NEW_VERSION=$(cat version.json | grep '"version"' | cut -d'"' -f4)
-OLD_VERSION="2.4.6"  # 替换为实际的旧版本号
+OLD_VERSION="2.5.1"  # 替换为实际的旧版本号
 
 # 批量替换版本号
 for file in *.md; do

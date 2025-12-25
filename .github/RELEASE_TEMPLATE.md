@@ -1,4 +1,4 @@
-# RAG Pro Max v2.3.1 🚀
+# RAG Pro Max v2.6.0 🚀
 
 ## 🎉 重大功能更新
 
