@@ -47,14 +47,6 @@ class UnifiedSuggestionEngine:
                            existing_history: List[str] = None) -> List[str]:
         """
         统一的推荐问题生成入口
-        
-        Args:
-            context: 上下文内容（回答内容或文档内容）
-            source_type: 来源类型
-            query_engine: 查询引擎，用于验证问题可答性
-            metadata: 元数据（URL、文件信息等）
-            num_questions: 生成问题数量
-            existing_history: 已存在的历史问题列表（用于过滤）
         """
         suggestions = []
         
@@ -64,12 +56,12 @@ class UnifiedSuggestionEngine:
             
         # 2. 核心：基于知识库和上下文生成问题
         if query_engine:
-            # 2.1 尝试使用 LLM 生成高质量追问 (New & Powerful)
-            # 这解决了"没有新内容"的问题，因为LLM总能基于上下文想出新问题
-            llm_questions = self._generate_llm_based_questions(context)
+            # 2.1 尝试使用 LLM 生成高质量追问 (优先)
+            llm = self._get_llm(query_engine)
+            llm_questions = self._generate_llm_based_questions(context, llm)
             suggestions.extend(llm_questions)
 
-            # 2.2 补充：基于实体提取的传统方法 (作为保底)
+            # 2.2 补充：基于实体提取的传统方法
             kb_questions = self._generate_kb_aware_questions(context, query_engine)
             suggestions.extend(kb_questions)
         
@@ -79,22 +71,47 @@ class UnifiedSuggestionEngine:
         elif source_type == 'file_upload':
             suggestions.extend(self._generate_file_questions(context, metadata))
         else:  # chat
-            # 如果有查询引擎，不生成通用的填充问题，只生成基于内容的特定问题
+            # 如果没有查询引擎，不生成通用的填充问题，只生成基于内容的特定问题
             suggestions.extend(self._generate_chat_questions(context, allow_generic=not query_engine))
         
-        # 4. 去重、过滤历史、验证可答性
+        # 4. 安全兜底：如果还是没生成任何问题，提供一些基于上下文的简单追问
+        if not suggestions and context:
+            if '评审' in context or '通过' in context:
+                suggestions.append("评审结果的详细记录在哪里？")
+                suggestions.append("还有哪些项目参加了评审？")
+            else:
+                suggestions.append("能否详细解释一下相关内容？")
+        
+        # 5. 去重、过滤历史、验证可答性
         final_suggestions = self._filter_and_validate(suggestions, query_engine, existing_history)
         
-        # 5. 更新历史
+        # 6. 更新历史
         self.history.extend(final_suggestions)
         self._save_config()
         
         return final_suggestions[:num_questions]
 
-    def _generate_llm_based_questions(self, context: str) -> List[str]:
-        """使用 LLM 基于上下文生成推荐问题 (无限生成的核心)"""
+    def _get_llm(self, query_engine=None):
+        """尝试从多种来源获取 LLM 实例"""
+        # 1. 检查全局 Settings
+        if hasattr(Settings, 'llm') and Settings.llm:
+            return Settings.llm
+        
+        # 2. 检查 query_engine
+        if query_engine:
+            for attr in ['llm', '_llm', 'chat_llm']:
+                if hasattr(query_engine, attr):
+                    val = getattr(query_engine, attr)
+                    if val: return val
+        return None
+
+    def _generate_llm_based_questions(self, context: str, llm=None) -> List[str]:
+        """使用 LLM 基于上下文生成推荐问题"""
         try:
-            # 限制上下文长度，避免 Token 溢出
+            if not llm:
+                return []
+                
+            # 限制上下文长度
             safe_context = context[:2000] if context else ""
             
             prompt = (
@@ -108,25 +125,19 @@ class UnifiedSuggestionEngine:
                 "推荐问题（每行一个）："
             )
             
-            # 使用全局 Settings.llm
-            if hasattr(Settings, 'llm') and Settings.llm:
-                response = Settings.llm.complete(prompt)
-                text = response.text
+            response = llm.complete(prompt)
+            text = response.text
+            
+            questions = []
+            for line in text.split('\n'):
+                line = line.strip()
+                line = re.sub(r'^[\d\.\-\s]+', '', line)
+                line = line.replace('"', '').replace("'", "")
                 
-                questions = []
-                for line in text.split('\n'):
-                    line = line.strip()
-                    # 去除序号 (1. 或 -)
-                    line = re.sub(r'^[1.- ]+', '', line)
-                    # 简单清洗
-                    line = line.replace('"', '').replace("'", "")
-                    
-                    if len(line) > 4 and ('?' in line or '？' in line):
-                        questions.append(line)
-                return questions
-            return []
-        except Exception as e:
-            # 静默失败，回退到其他方法
+                if len(line) > 4 and ('?' in line or '？' in line):
+                    questions.append(line)
+            return questions
+        except:
             return []
     
     def _generate_web_questions(self, context: str, metadata: Dict) -> List[str]:
@@ -261,19 +272,23 @@ class UnifiedSuggestionEngine:
         # 简单的关键词提取
         entities = []
         
-        # 提取中文词汇（2-6个字符）
+        # 1. 提取日期格式 (如 2025-01-17)
+        dates = re.findall(r'\d{4}[-/年]\d{1,2}[-/月]\d{1,2}', text)
+        entities.extend(dates)
+        
+        # 2. 提取中文词汇（2-6个字符）
         chinese_words = re.findall(r'[\u4e00-\u9fff]{2,6}', text)
         
-        # 过滤常见词汇
-        stop_words = {'这个', '那个', '可以', '需要', '应该', '因为', '所以', '但是', '然后', '如果', '虽然', '由于'}
-        entities = [word for word in chinese_words if word not in stop_words]
+        # 过滤常见词汇和否定词
+        stop_words = {'这个', '那个', '可以', '需要', '应该', '因为', '所以', '但是', '然后', '如果', '虽然', '由于', '抱歉', '知识库', '提供'}
+        entities.extend([word for word in chinese_words if word not in stop_words])
         
-        # 提取英文术语
-        english_terms = re.findall(r'\b[A-Z][a-zA-Z]{2,}\b', text)
+        # 3. 提取英文术语或项目代号
+        english_terms = re.findall(r'\b[A-Z][a-zA-Z0-9_-]{2,}\b', text)
         entities.extend(english_terms)
         
-        # 去重并返回前5个
-        return list(dict.fromkeys(entities))[:5]
+        # 去重并返回前8个
+        return list(dict.fromkeys(entities))[:8]
     
     def _can_answer_from_kb(self, question: str, query_engine) -> bool:
         """检查问题是否能从知识库中找到答案"""
