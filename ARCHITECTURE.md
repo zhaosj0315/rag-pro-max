@@ -238,6 +238,20 @@ RetrievalSystem
 └── 结果融合 (RRF)
 ```
 
+### 5. 智能推荐系统 (Suggestion Engine)
+v2.6.0 引入了全新的动态推荐架构：
+- **动态生成层**: 
+    - **LLM Core**: 优先使用 LLM 基于“用户提问 + AI 回答”的完整上下文生成后续问题。
+    - **Entity Extraction**: 基于改进的正则表达式提取日期、项目代号等关键实体作为补充。
+- **验证与救助机制**:
+    - **KB Pre-verification**: 所有建议在显示前通过 `query_engine` 进行模拟检索，确保“有据可查”。
+    - **Rescue Fallback**: 若知识库验证过于严格，自动启用高置信度的 LLM 原始建议填充，保证推荐连续性。
+- **四层去重过滤**:
+    - 内部历史建议过滤 (Engine Internal History)
+    - 会话消息过滤 (Session Message History)
+    - 实时处理队列过滤 (Active Question Queue)
+    - UI 层动态隐藏 (Front-end Fragment filtering)
+
 ## 🔧 技术栈详解
 
 ### 前端技术栈
