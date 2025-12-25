@@ -3754,13 +3754,28 @@ for msg_idx, msg in enumerate(state.get_messages()):
         
         @st.fragment
         def suggestions_fragment():
+            # 动态过滤：排除已在队列中或已问过的问题
+            raw_suggestions = st.session_state.get('suggestions_history', [])
+            
+            # 构建过滤集合
+            forbidden_set = set()
+            # 1. 队列中的问题
+            if hasattr(st.session_state, 'question_queue'):
+                forbidden_set.update(st.session_state.question_queue)
+            # 2. 历史消息中的问题 (最近20条)
+            user_msgs = [m['content'] for m in st.session_state.messages if m['role'] == 'user']
+            forbidden_set.update(user_msgs[-20:])
+            
+            # 执行过滤
+            filtered_suggestions = [s for s in raw_suggestions if s not in forbidden_set]
+            
             # 显示调试信息（直接显示，不折叠）
-            suggestions_count = len(st.session_state.get('suggestions_history', []))
+            suggestions_count = len(filtered_suggestions)
             st.caption(f"🔍 调试: 推荐问题数量 = {suggestions_count}")
             
             if suggestions_count > 0:
                 st.markdown("##### 🚀 追问推荐")
-                for idx, q in enumerate(st.session_state.suggestions_history):
+                for idx, q in enumerate(filtered_suggestions):
                     if st.button(f"👉 {q}", key=f"dyn_sug_{msg_hash}_{idx}", use_container_width=True):
                         click_btn(q)
             else:
@@ -3770,12 +3785,28 @@ for msg_idx, msg in enumerate(state.get_messages()):
                 # 手动生成推荐问题按钮
                 if st.button("🔄 手动生成推荐问题", key=f"manual_gen_{msg_hash}"):
                     with st.spinner("生成中..."):
+                        # 获取已有历史用于过滤
+                        existing_qs = [m['content'] for m in st.session_state.messages if m['role'] == 'user']
+                        if hasattr(st.session_state, 'question_queue'):
+                            existing_qs.extend(st.session_state.question_queue)
+                        
+                        # 构建更丰富的上下文：结合用户上一条问题
+                        context_text = msg['content']
+                        if msg_idx > 0:
+                            try:
+                                prev_msg = st.session_state.messages[msg_idx - 1]
+                                if prev_msg['role'] == 'user':
+                                    context_text = f"用户问题: {prev_msg['content']}\nAI回答: {msg['content']}"
+                            except:
+                                pass
+
                         engine = get_unified_suggestion_engine(active_kb_name)
                         manual_sugs = engine.generate_suggestions(
-                            context=msg['content'],
+                            context=context_text,
                             source_type='chat',
-                            query_engine=None,  # 不验证知识库，直接生成
-                            num_questions=3
+                            query_engine=st.session_state.chat_engine if st.session_state.get('chat_engine') else None,
+                            num_questions=3,
+                            existing_history=existing_qs
                         )
                         if manual_sugs:
                             st.session_state.suggestions_history = manual_sugs
@@ -3799,8 +3830,19 @@ for msg_idx, msg in enumerate(state.get_messages()):
                     
                     # 使用统一推荐引擎
                     engine = get_unified_suggestion_engine(active_kb_name)
+                    
+                    # 构建更丰富的上下文：结合用户上一条问题
+                    context_text = msg['content']
+                    if msg_idx > 0:
+                        try:
+                            prev_msg = st.session_state.messages[msg_idx - 1]
+                            if prev_msg['role'] == 'user':
+                                context_text = f"用户问题: {prev_msg['content']}\nAI回答: {msg['content']}"
+                        except:
+                            pass
+                            
                     new_sugs = engine.generate_suggestions(
-                        context=msg['content'],
+                        context=context_text,
                         source_type='chat',
                         query_engine=st.session_state.chat_engine if st.session_state.get('chat_engine') else None,
                         num_questions=3
@@ -4436,23 +4478,21 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     })
                     
                     # 生成推荐问题（在spinner内完成）
+                    # 组合上下文：用户问题 + AI回答
                     existing_questions = [m['content'] for m in st.session_state.messages if m['role'] == 'user']
-                    existing_questions.extend(st.session_state.question_queue)
-                    existing_questions.extend(st.session_state.suggestions_history)
+                    last_user_query = existing_questions[-1] if existing_questions else ""
+                    combined_context = f"用户问题: {last_user_query}\nAI回答: {full_text}"
                     
-                    # 获取LLM模型
-                    llm_model = None
-                    if st.session_state.get('chat_engine'):
-                        chat_engine = st.session_state.chat_engine
-                        if hasattr(chat_engine, '_llm'):
-                            llm_model = chat_engine._llm
-                        elif hasattr(chat_engine, 'llm'):
-                            llm_model = chat_engine.llm
+                    existing_questions.extend(st.session_state.question_queue)
+                    existing_questions.extend(st.session_state.get('suggestions_history', []))
                     
                     # 使用统一推荐引擎
-                    engine = get_unified_suggestion_engine(current_kb_name)
+                    # 优先使用 active_kb_name 确保配置正确加载
+                    suggestion_kb = active_kb_name or st.session_state.get('current_kb_name')
+                    engine = get_unified_suggestion_engine(suggestion_kb)
+                    
                     initial_sugs = engine.generate_suggestions(
-                        context=full_text,
+                        context=combined_context,
                         source_type='chat',
                         query_engine=st.session_state.chat_engine if st.session_state.get('chat_engine') else None,
                         num_questions=3,
@@ -4467,15 +4507,8 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         for i, q in enumerate(initial_sugs[:3], 1):
                             logger.info(f"   {i}. {q}")
                     else:
-                        logger.warning("⚠️ 推荐引擎未返回任何问题")
-                        # 提供默认推荐问题，避免完全没有推荐
-                        default_suggestions = [
-                            "能否提供更多详细信息？",
-                            "有哪些相关的内容？", 
-                            "如何进一步了解这个话题？"
-                        ]
-                        st.session_state.suggestions_history = default_suggestions
-                        logger.info("🔄 使用默认推荐问题")
+                        logger.warning("⚠️ 推荐引擎未返回任何问题 (严格模式)")
+                        st.session_state.suggestions_history = []
                     
                     # 延迟保存：确认所有步骤都成功后再保存
                     if active_kb_name: HistoryManager.save(active_kb_name, state.get_messages())

@@ -9,6 +9,7 @@ import re
 from typing import List, Optional, Dict, Any
 from urllib.parse import urlparse
 from datetime import datetime
+from llama_index.core import Settings
 
 class UnifiedSuggestionEngine:
     """统一推荐问题生成引擎"""
@@ -60,19 +61,26 @@ class UnifiedSuggestionEngine:
         # 1. 优先使用自定义推荐
         if self.custom_suggestions:
             suggestions.extend(self.custom_suggestions[:2])
+            
+        # 2. 核心：基于知识库和上下文生成问题
+        if query_engine:
+            # 2.1 尝试使用 LLM 生成高质量追问 (New & Powerful)
+            # 这解决了"没有新内容"的问题，因为LLM总能基于上下文想出新问题
+            llm_questions = self._generate_llm_based_questions(context)
+            suggestions.extend(llm_questions)
+
+            # 2.2 补充：基于实体提取的传统方法 (作为保底)
+            kb_questions = self._generate_kb_aware_questions(context, query_engine)
+            suggestions.extend(kb_questions)
         
-        # 2. 基于来源类型生成特定问题
+        # 3. 基于来源类型生成特定问题 (作为补充)
         if source_type == 'web_crawl':
             suggestions.extend(self._generate_web_questions(context, metadata))
         elif source_type == 'file_upload':
             suggestions.extend(self._generate_file_questions(context, metadata))
         else:  # chat
-            suggestions.extend(self._generate_chat_questions(context))
-        
-        # 3. 基于知识库内容生成验证过的问题
-        if query_engine:
-            kb_questions = self._generate_kb_aware_questions(context, query_engine)
-            suggestions.extend(kb_questions)
+            # 如果有查询引擎，不生成通用的填充问题，只生成基于内容的特定问题
+            suggestions.extend(self._generate_chat_questions(context, allow_generic=not query_engine))
         
         # 4. 去重、过滤历史、验证可答性
         final_suggestions = self._filter_and_validate(suggestions, query_engine, existing_history)
@@ -82,6 +90,44 @@ class UnifiedSuggestionEngine:
         self._save_config()
         
         return final_suggestions[:num_questions]
+
+    def _generate_llm_based_questions(self, context: str) -> List[str]:
+        """使用 LLM 基于上下文生成推荐问题 (无限生成的核心)"""
+        try:
+            # 限制上下文长度，避免 Token 溢出
+            safe_context = context[:2000] if context else ""
+            
+            prompt = (
+                "基于以下对话上下文，生成 3 个用户可能会进一步追问的问题。\n"
+                "要求：\n"
+                "1. 问题必须简短、具体（20字以内）。\n"
+                "2. 问题必须紧扣上下文，且能在知识库中找到答案。\n"
+                "3. 严禁生成'更多信息'、'相关内容'等通用废话。\n"
+                "4. 必须是疑问句。\n\n"
+                f"上下文：\n{safe_context}\n\n"
+                "推荐问题（每行一个）："
+            )
+            
+            # 使用全局 Settings.llm
+            if hasattr(Settings, 'llm') and Settings.llm:
+                response = Settings.llm.complete(prompt)
+                text = response.text
+                
+                questions = []
+                for line in text.split('\n'):
+                    line = line.strip()
+                    # 去除序号 (1. 或 -)
+                    line = re.sub(r'^[1.- ]+', '', line)
+                    # 简单清洗
+                    line = line.replace('"', '').replace("'", "")
+                    
+                    if len(line) > 4 and ('?' in line or '？' in line):
+                        questions.append(line)
+                return questions
+            return []
+        except Exception as e:
+            # 静默失败，回退到其他方法
+            return []
     
     def _generate_web_questions(self, context: str, metadata: Dict) -> List[str]:
         """生成网页抓取相关问题"""
@@ -150,7 +196,7 @@ class UnifiedSuggestionEngine:
         
         return questions[:3]
     
-    def _generate_chat_questions(self, context: str) -> List[str]:
+    def _generate_chat_questions(self, context: str, allow_generic: bool = True) -> List[str]:
         """生成对话相关问题"""
         questions = []
         
@@ -178,12 +224,6 @@ class UnifiedSuggestionEngine:
                 "如何在实际工作中应用这些方法？",
                 "有哪些常见的执行障碍？",
                 "如何衡量改进效果？"
-            ])
-        else:
-            questions.extend([
-                "能否提供更多详细信息？",
-                "有哪些相关的内容？",
-                "如何进一步了解这个话题？"
             ])
         
         return questions[:3]
@@ -239,15 +279,21 @@ class UnifiedSuggestionEngine:
         """检查问题是否能从知识库中找到答案"""
         try:
             result = query_engine.query(question)
+            
+            # 1. 检查是否检索到了内容 (Source Nodes)
+            # 如果没有检索到任何节点，说明知识库没有相关内容，直接判为 False
+            if hasattr(result, 'source_nodes') and not result.source_nodes:
+                return False
+                
             response = result.response if hasattr(result, 'response') else str(result)
             
-            # 检查回答质量
-            if not response or len(response.strip()) < 20:
+            # 2. 检查回答质量
+            if not response or len(response.strip()) < 10: # 放宽一点长度限制
                 return False
             
-            # 检查是否包含"没有相关信息"等否定回答
-            negative_indicators = ['没有相关', '无法找到', '不清楚', '没有提到', '无相关信息']
-            if any(indicator in response for indicator in negative_indicators):
+            # 3. 检查是否包含"没有相关信息"等否定回答
+            negative_indicators = ['没有相关', '无法找到', '不清楚', '没有提到', '无相关信息', '抱歉', 'sorry', "don't know"]
+            if any(indicator in response.lower() for indicator in negative_indicators):
                 return False
             
             return True
@@ -264,47 +310,23 @@ class UnifiedSuggestionEngine:
 
     def _filter_and_validate(self, suggestions: List[str], query_engine, existing_history: List[str] = None) -> List[str]:
         """过滤和验证问题"""
-        # 去重 (保留顺序)
-        seen = set()
+        # 1. 简单去重 (保持顺序)
         unique_suggestions = []
+        seen = set()
         for s in suggestions:
-            norm = self._normalize(s)
-            if norm and norm not in seen:
-                seen.add(norm)
+            if s and s not in seen:
+                seen.add(s)
                 unique_suggestions.append(s)
         
-        # 准备归一化的历史记录
-        normalized_history = set()
-        if self.history:
-            normalized_history.update(self._normalize(h) for h in self.history[-10:]) # 增加内部历史回溯深度
-        
+        # 2. 准备历史集合 (纯文本匹配)
+        history_set = set(self.history) # 内部历史
         if existing_history:
-            normalized_history.update(self._normalize(h) for h in existing_history)
+            history_set.update(existing_history) # 外部历史(当前会话)
             
-        # 过滤历史问题
-        filtered = [q for q in unique_suggestions if self._normalize(q) not in normalized_history]
+        # 3. 严格过滤: 只要在历史中出现过，绝对不推荐
+        filtered = [q for q in unique_suggestions if q not in history_set]
         
-        # 如果没有过滤后的问题，返回原始问题（但排除绝对重复的）
-        if not filtered and unique_suggestions:
-            if existing_history:
-                # 尽量找一个差异最大的
-                filtered = unique_suggestions[:3]
-            else:
-                filtered = unique_suggestions[:3]
-        
-        # 确保至少有3个问题
-        if len(filtered) < 3 and len(unique_suggestions) >= 3:
-            for q in unique_suggestions:
-                if q not in filtered and self._normalize(q) not in normalized_history:
-                     filtered.append(q)
-                if len(filtered) >= 3: break
-            
-            # 如果还是不够，被迫使用一些重复的（但尽量避免）
-            if len(filtered) < 3:
-                remaining = [q for q in unique_suggestions if q not in filtered]
-                filtered.extend(remaining[:3-len(filtered)])
-        
-        # 如果有查询引擎，验证可答性（但保留至少2个问题）
+        # 如果有查询引擎，执行验证
         if query_engine and filtered:
             validated = []
             for question in filtered:
@@ -312,12 +334,14 @@ class UnifiedSuggestionEngine:
                 if self._can_answer_from_kb(question, query_engine):
                     validated.append(question)
             
-            # 如果验证后问题太少，保留前2个原始问题
-            if len(validated) < 2 and len(filtered) >= 2:
-                validated = filtered[:2]
-            elif not validated and filtered:
-                validated = [filtered[0]]
-            
+            # 策略调整：优先返回验证通过的问题
+            # 但如果验证通过的太少（甚至为0），为了保证"无限追问"的体验，
+            # 我们从剩下的候选问题中补齐（因为这些问题主要是由LLM基于上下文生成的，本身质量较高）
+            if len(validated) < 3:
+                rejected = [q for q in filtered if q not in validated]
+                needed = 3 - len(validated)
+                validated.extend(rejected[:needed])
+                
             return validated
         
         return filtered
