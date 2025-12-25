@@ -1,42 +1,25 @@
 {
-  "version": "2.5.1",
-  "release_date": "2025-12-24",
-  "codename": "稳定增强版",
+  "version": "2.6.0",
+  "release_date": "2025-12-25",
+  "codename": "智能推荐完整版",
   "features": [
-    "修复知识库跳转逻辑 (Unified Jump Logic)",
-    "修复Web爬虫后无法跳转问题",
-    "增强知识库模型维度检测稳定性",
-    "集成多进程联合查询引擎 (Multi-KB Query)",
-    "统一知识库选择UI交互"
+    "无限追问 (Infinite Follow-up) - 基于 LLM 上下文生成",
+    "智能去重 (Smart Deduplication) - 严格过滤历史与队列",
+    "零结果修复 (Zero-Result Fix) - 多源 LLM 检测与实体兜底",
+    "UI 动态过滤 (Dynamic UI Filtering) - 实时响应点击状态"
   ],
   "architecture": {
     "layers": 4,
     "modules": 153,
-    "unified_components": 8,
+    "unified_components": 9,
     "services": 6,
-    "test_coverage": "87/95 (91.6%)",
-    "code_reduction": "6000+ lines"
+    "test_coverage": "92%"
   },
   "optimization_achievements": {
-    "removed_duplicates": [
-      "WebSuggestionEngine",
-      "SuggestionEngine", 
-      "SuggestionPanel",
-      "show_document_detail_dialog (重复函数)",
-      "Redundant KB Jump Logic"
-    ],
-    "unified_system": "UnifiedSuggestionEngine & UnifiedKBJump",
-    "unified_ui": "unified_dialogs.py",
     "new_features": [
-      "多进程知识库联合查询",
-      "自动模型维度匹配",
-      "Web爬虫自动跳转"
+      "LLM Contextual Suggestions",
+      "Robust Fallback Mechanism",
+      "Date Entity Extraction"
     ]
-  },
-  "bug_fixes": [
-    "Fix NameError 'kb_dim' in apppro.py",
-    "Fix KB selection infinite loop",
-    "Fix risky metadata overwriting",
-    "Fix duplicate navigation state updates"
-  ]
+  }
 }
