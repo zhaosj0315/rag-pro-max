@@ -2,7 +2,13 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-v2.5.1%20稳定增强版-brightgreen)
+![Version](https://img.shields.io/badge/version-v2.6.0%20智能推荐完整版-brightgreen)
+![Status](https://img.shields.io/badge/status-Stable-blue)
+![Last Update](https://img.shields.io/badge/last%20update-2025--12--25-orange)
+
+# 🚀 RAG Pro Max v2.6.0
+
+> **企业级 RAG 知识库系统 - 智能推荐与极速检索的终极进化**
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Docker-lightgrey.svg)
