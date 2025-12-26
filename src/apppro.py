@@ -698,6 +698,27 @@ with st.sidebar:
         target_path = ""
         
         if is_create_mode:
+            # 注入 CSS 增强核心功能视觉效果
+            st.markdown("""
+            <style>
+            /* 放大 4x1 选择器的文字和图标 */
+            div[data-testid="stRadio"] > div[role="radiogroup"] > label {
+                padding: 10px 15px !important;
+                border-radius: 8px !important;
+                transition: all 0.2s ease !important;
+            }
+            div[data-testid="stRadio"] > div[role="radiogroup"] > label p {
+                font-size: 1.15rem !important;
+                font-weight: 600 !important;
+                color: #31333F !important;
+            }
+            /* 选中状态稍微变色提醒 */
+            div[data-testid="stRadio"] > div[role="radiogroup"] > label[data-baseweb="radio"]:has(input:checked) {
+                background-color: rgba(255, 75, 75, 0.05) !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+
             # 4x1 水平数据源选择
             source_mode = st.radio(
                 "数据源", 
@@ -848,8 +869,8 @@ with st.sidebar:
                     with st.expander("🎯 推荐: " + analysis['site_type'].title(), expanded=True):
                         st.caption(f"💡 {analysis['description']}")
 
-                # 参数行 (紧凑)
-                c_p1, c_p2, c_p3 = st.columns(3)
+                # 参数行 (紧凑 4列布局)
+                c_p1, c_p2, c_p3, c_p4 = st.columns(4)
                 with c_p1:
                     default_depth = st.session_state.crawl_analysis['recommended_depth'] if 'crawl_analysis' in st.session_state else 2
                     crawl_depth = st.number_input("递归深度", 1, 10, default_depth)
@@ -861,14 +882,11 @@ with st.sidebar:
                 with c_p3:
                     parser_type = st.selectbox("解析器", ["default", "article", "documentation"], label_visibility="visible")
                     st.session_state.parser_type = parser_type
-                
-                # 质量筛选
-                enable_url_filter = st.checkbox("🎯 质量筛选", value=True)
-                if enable_url_filter:
-                    url_quality_threshold = st.slider("阈值", 10.0, 50.0, 45.0, 5.0, label_visibility="collapsed")
+                with c_p4:
+                    # 质量筛选 (简化为数字输入，0表示关闭)
+                    url_quality_threshold = st.number_input("质量阈值 (0=关)", 0.0, 100.0, 45.0, 5.0, help="内容质量评分阈值，低于此分数的页面将被丢弃")
                     st.session_state.url_quality_threshold = url_quality_threshold
-                else:
-                    st.session_state.url_quality_threshold = 0.0
+                    enable_url_filter = (url_quality_threshold > 0)
                 
                 search_keyword = None # 互斥
 
@@ -893,8 +911,8 @@ with st.sidebar:
                 with c_btn:
                     st.button("🧠", help="AI推荐", key="smart_analyze_search", use_container_width=True)
 
-                # 参数行
-                c_s1, c_s2, c_s3 = st.columns(3)
+                # 参数行 (紧凑 4列布局)
+                c_s1, c_s2, c_s3, c_s4 = st.columns(4)
                 with c_s1:
                     crawl_depth = st.number_input("深度", 1, 5, 2)
                     st.session_state.search_crawl_depth = crawl_depth
@@ -904,9 +922,10 @@ with st.sidebar:
                 with c_s3:
                     parser_type = st.selectbox("解析器", ["default", "article", "documentation"], key="parser_search")
                     st.session_state.search_parser_type = parser_type
-                
-                # 质量筛选
-                st.session_state.quality_threshold = 0.0 # 简化，默认关闭或固定
+                with c_s4:
+                    # 质量筛选 (简化为数字输入，0表示关闭)
+                    quality_threshold = st.number_input("质量阈值 (0=关)", 0.0, 100.0, 0.0, 5.0, key="search_quality_threshold", help="内容质量评分阈值")
+                    st.session_state.quality_threshold = quality_threshold
                 
                 # 预估提示
                 est_pages = max_pages ** crawl_depth
