@@ -10,7 +10,7 @@
   ],
   "architecture": {
     "layers": 4,
-    "modules": 153,
+    "modules": 189,
     "unified_components": 9,
     "services": 6,
     "test_coverage": "93%"

@@ -38,7 +38,7 @@ def test_ui_refactor_features():
     try:
         with open(app_file, 'r', encoding='utf-8') as f:
             content = f.read()
-            if "📂 文件" in content and "📝 文本" in content and "🔗 网址" in content and "🔍 搜索" in content:
+            if "📂 文件上传" in content and "📝 粘贴文本" in content and "🔗 网址抓取" in content and "🔍 智能搜索" in content:
                 print("✅ 4x1扁平布局代码存在")
                 tests_passed += 1
             else:

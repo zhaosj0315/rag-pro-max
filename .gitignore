@@ -1,5 +1,5 @@
 # RAG Pro Max - 出厂标准版 .gitignore
-# 版本: v2.4.5
+# 版本: v2.6.1
 # 原则: 非必要不推送 - 本地保留所有数据，远程只推送核心代码
 
 # ===== 运行时数据 (本地保留，远程忽略) =====
@@ -64,6 +64,14 @@ hf_cache/*
 # 建议历史 - 用户交互数据
 suggestion_history/*
 !suggestion_history/.gitkeep
+
+# 建议配置 - 用户配置数据 (v2.6.1 新增)
+suggestion_config/*
+!suggestion_config/.gitkeep
+
+# 运行时输出文件 (v2.6.1 新增)
+nohup.out
+*.out
 
 # 导出文件 - 用户导出的数据
 exports/
