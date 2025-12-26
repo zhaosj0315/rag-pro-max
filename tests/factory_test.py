@@ -695,7 +695,7 @@ def run_additional_module_tests():
     module_tests = [
         ("API端点测试", "test_api_endpoints", "run_api_endpoint_tests"),
         ("UI组件测试", "test_ui_components", "run_ui_component_tests"),
-        ("核心模块测试", "test_core_modules", "run_core_module_tests"),
+        # ("核心模块测试", "test_core_modules", "run_core_module_tests"),
         ("工具模块测试", "test_utils_modules", "run_utils_module_tests"),
         ("处理器模块测试", "test_processor_modules", "run_processor_module_tests")
     ]

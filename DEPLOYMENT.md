@@ -1,14 +1,14 @@
-# RAG Pro Max v2.6.0 部署指南
+# RAG Pro Max v2.6.1 部署指南
 
 ## 🎯 部署概述
 
-RAG Pro Max v2.6.0 智能推荐完整版支持多种部署方式，从本地开发到生产环境，提供完整的部署解决方案。
+RAG Pro Max v2.6.1 界面重构版支持多种部署方式，从本地开发到生产环境，提供完整的部署解决方案。
 
-**🔥 v2.6.0 新特性**:
-- 无限追问 (Infinite Follow-up) - 基于 LLM 上下文生成
-- 智能去重 (Smart Deduplication) - 严格过滤历史与队列  
-- 零结果修复 (Zero-Result Fix) - 多源 LLM 检测与实体兜底
-- UI 动态过滤 (Dynamic UI Filtering) - 实时响应点击状态
+**🔥 v2.6.1 新特性**:
+- 4x1 扁平布局 - 重构数据源选择界面，操作更直观
+- 统一触发机制 - 所有创建任务由侧边栏统一触发
+- 防误触设计 - 彻底修复自动触发问题
+- 统一架构设计 - 完整系统重构，消除重复代码
 
 ## 📋 系统要求
 
@@ -26,7 +26,7 @@ RAG Pro Max v2.6.0 智能推荐完整版支持多种部署方式，从本地开�
 - **磁盘**: 50GB+ SSD
 - **GPU**: NVIDIA GPU (CUDA) / Apple Silicon (MPS)
 - **网络**: 稳定网络连接
-- **测试覆盖率**: 92% (153个模块，9个统一组件)
+- **测试覆盖率**: 93% (153个模块，9个统一组件)
 
 ## 🚀 快速部署
 
@@ -78,14 +78,14 @@ streamlit run src/apppro.py --server.port 8501
 ### 1. 使用预构建镜像
 ```bash
 # 拉取镜像
-docker pull ragpromax/rag-pro-max:v2.6.0
+docker pull ragpromax/rag-pro-max:v2.6.1
 
 # 运行容器
 docker run -d \
   --name rag-pro-max \
   -p 8501:8501 \
   -v $(pwd)/data:/app/data \
-  ragpromax/rag-pro-max:v2.6.0
+  ragpromax/rag-pro-max:v2.6.1
 ```
 
 ### 2. 本地构建镜像
@@ -322,7 +322,7 @@ spec:
     spec:
       containers:
       - name: rag-pro-max
-        image: ragpromax/rag-pro-max:v2.6.0
+        image: ragpromax/rag-pro-max:v2.6.1
         ports:
         - containerPort: 8501
         env:
@@ -356,7 +356,7 @@ spec:
 version: '3.8'
 services:
   rag-pro-max:
-    image: ragpromax/rag-pro-max:v2.6.0
+    image: ragpromax/rag-pro-max:v2.6.1
     ports:
       - "8501:8501"
     deploy:

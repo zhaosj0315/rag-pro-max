@@ -1,0 +1,22 @@
+{
+  "kb_name": "pdf知识库_20251226_7",
+  "history": [
+    "pdfminer 如何读取 PDF？",
+    "怎样把 JSON 导入 Confluence？",
+    "如何定期更新术语表？",
+    "如何设置 API_TOKEN？",
+    "JSON Importer 支持哪些字段？",
+    "大文件分批上传怎么做？",
+    "如何上传附件？",
+    "body.storage.representation 必填吗？",
+    "metadata 能映射哪些自定义字段？",
+    "representation 可有哪些值？",
+    "不写 representation 会报错吗？",
+    "editor representation 如何写？",
+    "representation 支持哪些取值？",
+    "写 representation 时需要注意什么？",
+    "representation 与 storage 区别？"
+  ],
+  "custom": [],
+  "updated": "2025-12-26T09:38:54.432584"
+}

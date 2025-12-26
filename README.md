@@ -2,24 +2,24 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-v2.6.0%20智能推荐完整版-brightgreen)
+![Version](https://img.shields.io/badge/version-v2.6.1%20界面重构版-brightgreen)
 ![Status](https://img.shields.io/badge/status-Stable-blue)
-![Last Update](https://img.shields.io/badge/last%20update-2025--12--25-orange)
+![Last Update](https://img.shields.io/badge/last%20update-2025--12--26-orange)
 
-# 🚀 RAG Pro Max v2.6.0
+# 🚀 RAG Pro Max v2.6.1
 
 > **企业级 RAG 知识库系统 - 智能推荐与极速检索的终极进化**
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Docker-lightgrey.svg)
-![Test Coverage](https://img.shields.io/badge/test%20coverage-91.6%25-brightgreen.svg)
+![Test Coverage](https://img.shields.io/badge/test%20coverage-93%25-brightgreen.svg)
 ![Code Quality](https://img.shields.io/badge/code%20quality-企业级-blue.svg)
 
 **🔥 开源免费的企业级RAG应用 | 支持本地部署 | 极致交互体验 | 生产就绪**
 
 基于 Streamlit + LlamaIndex 的智能文档问答系统，支持多格式文档上传，提供语义检索、macOS 原生预览和 AI 问答功能。
 
-**🎯 核心优势**: 统一架构 • 零重复代码 • 企业级标准 • 多模态支持 • GPU加速 • 生产就绪
+**🎯 核心优势**: 极简 UI • 统一架构 • 零重复代码 • 企业级标准 • GPU加速 • 生产就绪
 
 </div>
 
@@ -27,18 +27,20 @@
 
 ## ✨ 核心功能
 
-### 🎨 极致交互 (v2.5.0 系统优化完成版)
+### 🎨 极致交互 (v2.6.1 界面重构版)
+- **4x1 扁平布局**: 重构数据源选择界面 (`📂 文件`, `📝 文本`, `🔗 网址`, `🔍 搜索`)，操作更直观
+- **统一触发机制**: 所有创建任务由侧边栏 **"🚀 立即创建"** 统一触发，逻辑更清晰
+- **防误触设计**: 彻底修复自动触发问题，确保配置完成后再执行任务
 - **统一架构设计**: 完整的系统重构，消除所有重复代码
-- **8个统一组件库**: UI、配置、文档、监控等核心组件完全统一
-- **企业级代码质量**: 6000+行重复代码消除，维护效率提升50%+
-- **统一推荐系统**: 消除重复建设，聊天/文件/网页使用统一推荐引擎
-- **智能行业配置**: 可自定义每个行业的网站列表，支持动态推荐
-- **统一文档处理**: 上传、预览、处理流程完全标准化
-- **统一监控系统**: 实时性能监控、日志管理、系统状态追踪
 - **macOS 原生预览**: 非阻塞式 Quick Look 集成，支持置顶预览与并行操作
 
+### 🧠 智能问答 (v2.6.1 界面重构版)
+- **无限追问**: 基于上下文动态生成高质量追问，彻底解决推荐枯竭
+- **智能去重**: 历史记录与实时队列双重去重，杜绝重复内容
+- **零结果兜底**: 增强 LLM 实例检测与实体提取，无结果时智能补位
+
 ### 📄 文档处理
-- **多格式支持**: PDF、TXT...
+- **多格式支持**: PDF、TXT、DOCX、MD、Excel
 - **OCR识别**: 扫描版PDF自动OCR，GPU加速，CPU保护机制
 - **批量上传**: 支持文件夹批量导入，智能目录选择
 - **文件验证**: 大小限制100MB，类型安全检查

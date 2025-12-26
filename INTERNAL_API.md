@@ -1,4 +1,4 @@
-# RAG Pro Max v2.6.0 内部开发 SDK 文档
+# RAG Pro Max v2.6.1 内部开发 SDK 文档
 
 ## 概述
 
@@ -7,16 +7,16 @@
 
 本 SDK 文档描述了 `src/services/` 层提供的 Python 内部接口，用于在 `apppro.py` 或其他后台任务中直接调用业务逻辑。
 
-**版本**: v2.6.0 智能推荐完整版  
+**版本**: v2.6.1 界面重构版  
 **架构**: 四层统一架构  
 **模块数**: 153个  
-**测试覆盖率**: 92%
+**测试覆盖率**: 93%
 
 ## 🚀 核心服务接口
 
-### 1. 智能推荐服务 (RecommendationService) - v2.6.0 新增
+### 1. 界面重构服务 (UIRefactorService) - v2.6.1 新增
 
-**位置**: `src/services/recommendation_service.py`
+**位置**: `src/services/ui_refactor_service.py`
 
 #### 生成推荐问题
 ```python

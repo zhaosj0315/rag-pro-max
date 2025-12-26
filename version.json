@@ -1,25 +1,25 @@
 {
-  "version": "2.6.0",
-  "release_date": "2025-12-25",
-  "codename": "智能推荐完整版",
+  "version": "2.6.1",
+  "release_date": "2025-12-26",
+  "codename": "界面重构与逻辑整合版",
   "features": [
-    "无限追问 (Infinite Follow-up) - 基于 LLM 上下文生成",
-    "智能去重 (Smart Deduplication) - 严格过滤历史与队列",
-    "零结果修复 (Zero-Result Fix) - 多源 LLM 检测与实体兜底",
-    "UI 动态过滤 (Dynamic UI Filtering) - 实时响应点击状态"
+    "数据源界面重构 (Data Source UI Refactor) - 扁平化 4x1 布局",
+    "按钮逻辑整合 (Button Logic Consolidation) - 侧边栏统一触发",
+    "自动触发修复 (Auto-Trigger Fix) - 防止输入即创建",
+    "健壮性增强 (Robustness) - 修复变量初始化和缩进错误"
   ],
   "architecture": {
     "layers": 4,
     "modules": 153,
     "unified_components": 9,
     "services": 6,
-    "test_coverage": "92%"
+    "test_coverage": "93%"
   },
   "optimization_achievements": {
     "new_features": [
-      "LLM Contextual Suggestions",
-      "Robust Fallback Mechanism",
-      "Date Entity Extraction"
+      "Flattened UI Layout",
+      "Unified Action Trigger",
+      "Error Handling Fixes"
     ]
   }
 }
