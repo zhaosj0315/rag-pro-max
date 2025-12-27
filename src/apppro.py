@@ -2373,106 +2373,107 @@ elif active_kb_name:
             st.session_state.renaming = True
     
     # 文件管理
-    with st.expander("📊 知识库详情与管理", expanded=False):
-        if not doc_manager.manifest['files']: 
-            st.info("暂无文件")
-        else:
-            # 🔧 高级选项处理统计
-            total_files = len(doc_manager.manifest['files'])
-            ocr_files = sum(1 for f in doc_manager.manifest['files'] if f.get('used_ocr', False))
-            metadata_files = sum(1 for f in doc_manager.manifest['files'] if f.get('keywords') or f.get('category'))
-            summary_files = sum(1 for f in doc_manager.manifest['files'] if f.get('summary'))
-            total_chunks = sum(len(f.get('doc_ids', [])) for f in doc_manager.manifest['files'])
-            storage_size = KBManager.format_size(stats.get('size', 0)) if stats else "未知"
-            
-            # 只有当有高级数据时才展开
-            has_advanced_data = (ocr_files + metadata_files + summary_files) > 0
-            
-            with st.expander("🔧 高级选项处理统计", expanded=has_advanced_data):
-                # 优化为单行 6 列布局
-                adv_cols = st.columns(6)
+    with st.container(key="kb_details_container"):
+        with st.expander("📊 知识库详情与管理", expanded=False):
+            if not doc_manager.manifest['files']: 
+                st.info("暂无文件")
+            else:
+                # 🔧 高级选项处理统计
+                total_files = len(doc_manager.manifest['files'])
+                ocr_files = sum(1 for f in doc_manager.manifest['files'] if f.get('used_ocr', False))
+                metadata_files = sum(1 for f in doc_manager.manifest['files'] if f.get('keywords') or f.get('category'))
+                summary_files = sum(1 for f in doc_manager.manifest['files'] if f.get('summary'))
+                total_chunks = sum(len(f.get('doc_ids', [])) for f in doc_manager.manifest['files'])
+                storage_size = KBManager.format_size(stats.get('size', 0)) if stats else "未知"
                 
-                with adv_cols[0]:
-                    st.metric("📄 总文档", total_files)
-                with adv_cols[1]:
-                    st.metric("🧩 总片段", total_chunks)
-                    
-                with adv_cols[2]:
-                    ocr_percentage = (ocr_files / total_files * 100) if total_files > 0 else 0
-                    st.metric("🔍 OCR处理", f"{ocr_files}", delta=f"{ocr_percentage:.1f}%")
-                with adv_cols[3]:
-                    metadata_percentage = (metadata_files / total_files * 100) if total_files > 0 else 0
-                    st.metric("📊 元数据提取", f"{metadata_files}", delta=f"{metadata_percentage:.1f}%")
-                    
-                with adv_cols[4]:
-                    summary_percentage = (summary_files / total_files * 100) if total_files > 0 else 0
-                    st.metric("📝 生成摘要", f"{summary_files}", delta=f"{summary_percentage:.1f}%")
-                with adv_cols[5]:
-                    st.metric("💾 存储占用", storage_size)
+                # 只有当有高级数据时才展开
+                has_advanced_data = (ocr_files + metadata_files + summary_files) > 0
                 
-                # 处理建议
-                if not has_advanced_data:
-                    st.caption("💡 **提示**: 在上传文档时启用高级选项，可以获得更丰富的文档信息和更好的检索效果")
-                elif ocr_files < total_files // 2:
-                    st.caption("💡 **建议**: 对于包含图片或扫描内容的PDF文档，建议启用OCR识别功能")
-            
-            st.divider()
-            
-            # 文档列表查看与统计
-            # tab1, tab2 = st.tabs(["📊 统计信息", "📄 文档列表"])
-            
-            if True: # 统计信息
-                # 详细统计信息
-                quality_info = doc_manager.render_detailed_statistics(stats)
+                with st.expander("🔧 高级选项处理统计", expanded=has_advanced_data):
+                    # 优化为单行 6 列布局
+                    adv_cols = st.columns(6)
+                    
+                    with adv_cols[0]:
+                        st.metric("📄 总文档", total_files)
+                    with adv_cols[1]:
+                        st.metric("🧩 总片段", total_chunks)
+                        
+                    with adv_cols[2]:
+                        ocr_percentage = (ocr_files / total_files * 100) if total_files > 0 else 0
+                        st.metric("🔍 OCR处理", f"{ocr_files}", delta=f"{ocr_percentage:.1f}%")
+                    with adv_cols[3]:
+                        metadata_percentage = (metadata_files / total_files * 100) if total_files > 0 else 0
+                        st.metric("📊 元数据提取", f"{metadata_files}", delta=f"{metadata_percentage:.1f}%")
+                        
+                    with adv_cols[4]:
+                        summary_percentage = (summary_files / total_files * 100) if total_files > 0 else 0
+                        st.metric("📝 生成摘要", f"{summary_files}", delta=f"{summary_percentage:.1f}%")
+                    with adv_cols[5]:
+                        st.metric("💾 存储占用", storage_size)
+                    
+                    # 处理建议
+                    if not has_advanced_data:
+                        st.caption("💡 **提示**: 在上传文档时启用高级选项，可以获得更丰富的文档信息和更好的检索效果")
+                    elif ocr_files < total_files // 2:
+                        st.caption("💡 **建议**: 对于包含图片或扫描内容的PDF文档，建议启用OCR识别功能")
+                
                 st.divider()
                 
-                # 分布分析
-                doc_manager.render_distribution_analysis(stats)
-                st.divider()
+                # 文档列表查看与统计
+                # tab1, tab2 = st.tabs(["📊 统计信息", "📄 文档列表"])
                 
-                # 元数据统计
-                try:
-                    metadata_mgr = MetadataManager(db_path)
-                    if metadata_mgr.metadata or metadata_mgr.stats:
-                        with st.expander("📊 元数据统计", expanded=True):
-                            stat_col1, stat_col2, stat_col3 = st.columns(3)
-                            
-                            with stat_col1:
-                                st.markdown("**🔥 热门文件 Top 5**")
-                                hot_files = metadata_mgr.get_hot_files(top_k=5)
-                                if hot_files:
-                                    for i, (fname, count) in enumerate(hot_files, 1):
-                                        st.caption(f"{i}. {fname[:20]}... ({count})")
-                                else:
-                                    st.caption("暂无数据")
-                            
-                            with stat_col2:
-                                st.markdown("**📂 文档分类**")
-                                categories = metadata_mgr.get_all_categories()
-                                if categories:
-                                    for cat, count in sorted(categories.items(), key=lambda x: x[1], reverse=True)[:5]:
-                                        st.caption(f"{cat}: {count}")
-                                else:
-                                    st.caption("暂无数据")
-                            
-                            with stat_col3:
-                                st.markdown("**🏷️ 热门关键词**")
-                                keywords = metadata_mgr.get_all_keywords(top_k=8)
-                                if keywords:
-                                    kw_text = " · ".join([f"{kw}({cnt})" for kw, cnt in keywords[:8]])
-                                    st.caption(kw_text)
-                                else:
-                                    st.caption("暂无数据")
-                            
-                            # 重复文件检测
-                            duplicates = metadata_mgr.find_duplicates()
-                            if duplicates:
-                                st.divider()
-                                st.markdown(f"**⚠️ 发现 {len(duplicates)} 组重复文件**")
-                                for i, (file_hash, files) in enumerate(list(duplicates.items())[:2], 1):
-                                    st.caption(f"组{i}: {', '.join([f[:15] for f in files[:3]])}...")
-                except:
-                    pass  # 如果元数据不存在，静默跳过
+                if True: # 统计信息
+                    # 详细统计信息
+                    quality_info = doc_manager.render_detailed_statistics(stats)
+                    st.divider()
+                    
+                    # 分布分析
+                    doc_manager.render_distribution_analysis(stats)
+                    st.divider()
+                    
+                    # 元数据统计
+                    try:
+                        metadata_mgr = MetadataManager(db_path)
+                        if metadata_mgr.metadata or metadata_mgr.stats:
+                            with st.expander("📊 元数据统计", expanded=True):
+                                stat_col1, stat_col2, stat_col3 = st.columns(3)
+                                
+                                with stat_col1:
+                                    st.markdown("**🔥 热门文件 Top 5**")
+                                    hot_files = metadata_mgr.get_hot_files(top_k=5)
+                                    if hot_files:
+                                        for i, (fname, count) in enumerate(hot_files, 1):
+                                            st.caption(f"{i}. {fname[:20]}... ({count})")
+                                    else:
+                                        st.caption("暂无数据")
+                                
+                                with stat_col2:
+                                    st.markdown("**📂 文档分类**")
+                                    categories = metadata_mgr.get_all_categories()
+                                    if categories:
+                                        for cat, count in sorted(categories.items(), key=lambda x: x[1], reverse=True)[:5]:
+                                            st.caption(f"{cat}: {count}")
+                                    else:
+                                        st.caption("暂无数据")
+                                
+                                with stat_col3:
+                                    st.markdown("**🏷️ 热门关键词**")
+                                    keywords = metadata_mgr.get_all_keywords(top_k=8)
+                                    if keywords:
+                                        kw_text = " · ".join([f"{kw}({cnt})" for kw, cnt in keywords[:8]])
+                                        st.caption(kw_text)
+                                    else:
+                                        st.caption("暂无数据")
+                                
+                                # 重复文件检测
+                                duplicates = metadata_mgr.find_duplicates()
+                                if duplicates:
+                                    st.divider()
+                                    st.markdown(f"**⚠️ 发现 {len(duplicates)} 组重复文件**")
+                                    for i, (file_hash, files) in enumerate(list(duplicates.items())[:2], 1):
+                                        st.caption(f"组{i}: {', '.join([f[:15] for f in files[:3]])}...")
+                    except:
+                        pass  # 如果元数据不存在，静默跳过
             
             st.divider()
             

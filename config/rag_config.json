@@ -1,5 +1,5 @@
 {
-  "target_path": "/Users/zhaosj/Documents/rag-pro-max/temp_uploads/batch_1766809357",
+  "target_path": "/Users/zhaosj/Documents/rag-pro-max/temp_uploads/text_1766818177",
   "output_path": "/Users/zhaosj/Documents/rag-pro-max/vector_db_storage",
   "llm_type_idx": 1,
   "llm_url_ollama": "http://localhost:11434",
@@ -11,7 +11,7 @@
   "embed_model_hf": "sentence-transformers/all-MiniLM-L6-v2",
   "embed_url_ollama": "",
   "embed_model_ollama": "",
-  "llm_provider": "OpenAI-Compatible",
+  "llm_provider": "Ollama",
   "llm_url_other": "https://cn.gptapi.asia/v1",
   "llm_key_other": "sk-nWYfVnuZMkPnLFsR5d02Af5b6c31478889C12520775f8f12",
   "llm_model_other": "chatgpt-4o-latest",
