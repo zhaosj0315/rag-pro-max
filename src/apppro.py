@@ -490,24 +490,29 @@ if 'app_initialized' not in st.session_state:
     
     # 立即设置全局LLM（确保摘要生成等功能可用）
     try:
-        # 读取配置文件获取LLM设置
-        config_file = "app_config.json"
-        if os.path.exists(config_file):
-            with open(config_file, 'r') as f:
-                config = json.load(f)
-            
-            llm_provider = config.get('llm_provider', 'Ollama')
-            if config.get('llm_type_idx', 0) == 0:  # Ollama
-                llm_model = config.get('llm_model_ollama', 'gpt-oss:20b')
-                llm_url = config.get('llm_url_ollama', 'http://localhost:11434')
-                llm_key = ""
-            else:  # OpenAI
-                llm_model = config.get('llm_model_openai', 'gpt-3.5-turbo')
-                llm_url = config.get('llm_url_openai', 'https://api.openai.com/v1')
-                llm_key = config.get('llm_key', '')
-            
-            # 设置全局LLM
+        # 使用统一配置加载器 (读取 rag_config.json)
+        config = ConfigLoader.load()
+        
+        llm_provider = config.get('llm_provider', 'Ollama')
+        
+        # 提取配置
+        if llm_provider == 'OpenAI-Compatible':
+            llm_model = config.get('llm_model_other', '')
+            llm_url = config.get('llm_url_other', '')
+            llm_key = config.get('llm_key_other', '')
+        elif llm_provider == 'OpenAI':
+            llm_model = config.get('llm_model_openai', 'gpt-3.5-turbo')
+            llm_url = config.get('llm_url_openai', 'https://api.openai.com/v1')
+            llm_key = config.get('llm_key', '')
+        else:  # Ollama & Default
+            llm_model = config.get('llm_model_ollama', 'gpt-oss:20b')
+            llm_url = config.get('llm_url_ollama', 'http://localhost:11434')
+            llm_key = ""
+        
+        # 设置全局LLM
+        if llm_model:
             set_global_llm_model(llm_provider, llm_model, llm_key, llm_url)
+            
     except Exception as e:
         logger.warning(f"全局LLM初始化失败: {e}")
     
@@ -2214,21 +2219,40 @@ if btn_start:
     current_generate_summary = st.session_state.get('kb_generate_summary', False)
     current_force_reindex = st.session_state.get('kb_force_reindex', False)
 
-    config_to_save = {
+    # 优化配置保存逻辑：读取-合并-保存
+    existing_config = ConfigLoader.load()
+    
+    config_update = {
         "target_path": target_path,
         "output_path": output_base,
-        "llm_type_idx": 0 if llm_provider == "Ollama" else 1,
-        "llm_url_ollama": llm_url if llm_provider == "Ollama" else "",
-        "llm_model_ollama": llm_model if llm_provider == "Ollama" else "",
-        "llm_url_openai": llm_url if llm_provider != "Ollama" else "",
-        "llm_key": llm_key,
-        "llm_model_openai": llm_model if llm_provider != "Ollama" else "",
+        "llm_provider": llm_provider, # 保存供应商类型
         "embed_provider_idx": ["HuggingFace (本地/极速)", "OpenAI-Compatible", "Ollama"].index(embed_provider),
         "embed_model_hf": embed_model if embed_provider.startswith("HuggingFace") else "",
         "embed_url_ollama": embed_url if embed_provider.startswith("Ollama") else "",
         "embed_model_ollama": embed_model if embed_provider.startswith("Ollama") else ""
     }
-    ConfigLoader.save(config_to_save)
+    
+    # 根据供应商类型保存对应字段
+    if llm_provider == "OpenAI-Compatible":
+        config_update["llm_url_other"] = llm_url
+        config_update["llm_key_other"] = llm_key
+        config_update["llm_model_other"] = llm_model
+        # 同时也保存通用字段以便兼容
+        config_update["llm_url"] = llm_url
+        config_update["llm_key"] = llm_key
+        config_update["llm_model"] = llm_model
+        
+    elif llm_provider == "OpenAI":
+        config_update["llm_url_openai"] = llm_url
+        config_update["llm_key"] = llm_key
+        config_update["llm_model_openai"] = llm_model
+        
+    elif llm_provider == "Ollama":
+        config_update["llm_url_ollama"] = llm_url
+        config_update["llm_model_ollama"] = llm_model
+    
+    existing_config.update(config_update)
+    ConfigLoader.save(existing_config)
 
     if not final_kb_name:
         st.error("请输入知识库名称")
@@ -3227,46 +3251,67 @@ with st.container():
     with col_pop:
         with st.popover("⚙️", help="模型与任务设置"):
             st.markdown("### 🤖 模型设置")
-            # 获取可用模型列表
-            try:
-                ollama_url = st.session_state.get('llm_url', "http://localhost:11434")
-                models, error = fetch_remote_models(ollama_url, "")
-                
-                if models:
-                    available_models = models
-                    # 确保 gpt-oss:20b 在第一位
-                    if "gpt-oss:20b" in available_models:
-                        available_models.remove("gpt-oss:20b")
-                        available_models.insert(0, "gpt-oss:20b")
-                else:
-                    available_models = ["gpt-oss:20b", "llama3", "mistral", "gemma", "deepseek-coder", "qwen2.5:7b"] # Fallback list
-            except Exception as e:
-                available_models = ["gpt-oss:20b", "llama3", "mistral", "qwen2.5:7b"]
-                
-            # 获取当前模型 - 使用统一配置
+            
+            # 读取当前配置
+            from src.config import ConfigLoader
+            config = ConfigLoader.load()
+            llm_provider = config.get('llm_provider', 'Ollama')
             current_model = st.session_state.get('selected_model', get_default_model())
-            if current_model not in available_models:
-                if available_models:
-                    if current_model not in ["gpt-oss:20b", "llama3", "mistral", "qwen2.5:7b"]:
-                         current_model = available_models[0]
             
-            # 模型选择下拉框
-            selected_model_new = st.selectbox(
-                "选择 AI 模型",
-                options=available_models,
-                index=available_models.index(current_model) if current_model in available_models else 0,
-                key="model_selector_dropdown",
-                help="Code: 写代码 | Vision: 看图 | Chat: 闲聊"
-            )
+            if llm_provider == "Ollama":
+                # --- Ollama 逻辑 (保持原有功能) ---
+                # 获取可用模型列表
+                try:
+                    ollama_url = config.get('llm_url_ollama', "http://localhost:11434")
+                    models, error = fetch_remote_models(ollama_url, "")
+                    
+                    if models:
+                        available_models = models
+                        if "gpt-oss:20b" in available_models:
+                            available_models.remove("gpt-oss:20b")
+                            available_models.insert(0, "gpt-oss:20b")
+                    else:
+                        available_models = ["gpt-oss:20b", "llama3", "mistral", "gemma", "deepseek-coder", "qwen2.5:7b"]
+                except Exception:
+                    available_models = ["gpt-oss:20b", "llama3", "mistral", "qwen2.5:7b"]
+                
+                # 自动修正: 如果当前模型不在可用列表中，强制切换到第一个可用模型
+                if available_models and current_model not in available_models:
+                    default_model = available_models[0]
+                    # 避免无限刷新：只有当 default_model 确实不同时才切换
+                    if current_model != default_model:
+                        logger.info(f"🔄 自动切换 Ollama 模型: {current_model} -> {default_model}")
+                        if update_all_model_configs(default_model):
+                            st.session_state.selected_model = default_model
+                            current_model = default_model
+                            st.rerun()
 
-            # 检测模型变更 - 使用统一更新
-            if selected_model_new != st.session_state.get('selected_model'):
-                if update_all_model_configs(selected_model_new):
-                    st.toast(f"✅ 已切换到模型: {selected_model_new}", icon="🤖")
-                    st.rerun()  # 刷新界面显示
-                else:
-                    st.toast(f"❌ 切换模型失败: {selected_model_new}", icon="⚠️")
+                # 确保当前模型在列表中
+                idx = 0
+                if current_model in available_models:
+                    idx = available_models.index(current_model)
+
+                def on_ollama_model_change():
+                    """Ollama 模型变更回调"""
+                    new_model = st.session_state.model_selector_dropdown_ollama
+                    if update_all_model_configs(new_model):
+                        st.toast(f"✅ 已切换到模型: {new_model}", icon="🤖")
+                        # 不需要 st.rerun()，回调会在 rerun 前执行
+
+                st.selectbox(
+                    "选择 AI 模型",
+                    options=available_models,
+                    index=idx,
+                    key="model_selector_dropdown_ollama",
+                    on_change=on_ollama_model_change
+                )
             
+            else:
+                # --- 非 Ollama 逻辑 (只读显示) ---
+                st.info(f"当前供应商: **{llm_provider}**")
+                st.text_input("当前模型", value=current_model, disabled=True, key="model_display_readonly")
+                st.caption("💡 请前往 **⚙️ 配置** 页面修改远程模型")
+
             st.divider()
             
             # 查询优化开关

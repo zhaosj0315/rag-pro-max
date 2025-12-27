@@ -307,7 +307,12 @@ class UnifiedSuggestionEngine:
                 return False
             
             # 3. 检查是否包含"没有相关信息"等否定回答
-            negative_indicators = ['没有相关', '无法找到', '不清楚', '没有提到', '无相关信息', '抱歉', 'sorry', "don't know"]
+            negative_indicators = [
+                '没有相关', '无法找到', '不清楚', '没有提到', '无相关信息', 
+                '抱歉', 'sorry', "don't know", '知识库中未找到', '未找到相关内容',
+                '未提供', '未提及', '没提到', '没说', '不知道', '没有找到', '不包含',
+                '没有关于', '知识库中没有'
+            ]
             if any(indicator in response.lower() for indicator in negative_indicators):
                 return False
             

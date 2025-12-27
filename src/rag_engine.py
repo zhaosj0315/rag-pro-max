@@ -12,7 +12,8 @@ from llama_index.core import (
     VectorStoreIndex, 
     StorageContext, 
     load_index_from_storage,
-    Settings
+    Settings,
+    PromptTemplate
 )
 from llama_index.core.schema import Document
 
@@ -136,7 +137,7 @@ class RAGEngine:
         return self.index
     
     def get_query_engine(
-        self, 
+        self,
         similarity_top_k: int = 5,
         streaming: bool = True
     ):
@@ -153,9 +154,24 @@ class RAGEngine:
         if not self.index:
             raise ValueError("索引未加载，请先创建或加载索引")
         
+        # 定义中文问答模板 (优化 Gemini/DeepSeek 等模型的指令遵循)
+        qa_prompt_tmpl_str = (
+            "以下是已知信息：\n"
+            "---------------------\n"
+            "{context_str}\n"
+            "---------------------\n"
+            "请完全根据上述上下文信息回答用户的问题。不要使用外部知识。\n"
+            "如果上下文中包含相关信息，请详细回答。\n"
+            "如果上下文中没有相关信息，请回答“知识库中未找到相关内容”。\n"
+            "问题：{query_str}\n"
+            "回答："
+        )
+        qa_prompt_tmpl = PromptTemplate(qa_prompt_tmpl_str)
+        
         return self.index.as_query_engine(
             similarity_top_k=similarity_top_k,
-            streaming=streaming
+            streaming=streaming,
+            text_qa_template=qa_prompt_tmpl
         )
     
     def query(

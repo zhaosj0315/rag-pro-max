@@ -181,6 +181,36 @@ def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: s
             
         # 2. OpenAI / Moonshot / Groq (OpenAI-Compatible)
         elif provider in ["OpenAI", "Moonshot", "Groq"] or provider.startswith("OpenAI-Compatible"):
+            # Monkey-patch: 注册自定义模型以绕过 LlamaIndex 的严格验证
+            try:
+                import llama_index.llms.openai.utils as openai_utils
+                
+                # 注册上下文窗口大小 (默认 128k)
+                if model_name not in openai_utils.openai_modelname_to_contextsize:
+                    openai_utils.openai_modelname_to_contextsize[model_name] = 128000
+                
+                # 注册到可用模型列表
+                if hasattr(openai_utils, 'ALL_AVAILABLE_MODELS'):
+                    # 检查是否为 Set，如果是则 add，否则 append
+                    if isinstance(openai_utils.ALL_AVAILABLE_MODELS, set):
+                        openai_utils.ALL_AVAILABLE_MODELS.add(model_name)
+                    elif isinstance(openai_utils.ALL_AVAILABLE_MODELS, list):
+                        if model_name not in openai_utils.ALL_AVAILABLE_MODELS:
+                            openai_utils.ALL_AVAILABLE_MODELS.append(model_name)
+                            
+                # 注册到聊天模型列表 (关键验证点)
+                if hasattr(openai_utils, 'CHAT_MODELS'):
+                    if isinstance(openai_utils.CHAT_MODELS, dict):
+                        openai_utils.CHAT_MODELS[model_name] = 128000
+                    elif isinstance(openai_utils.CHAT_MODELS, set):
+                        openai_utils.CHAT_MODELS.add(model_name)
+                    elif isinstance(openai_utils.CHAT_MODELS, list):
+                         if model_name not in openai_utils.CHAT_MODELS:
+                            openai_utils.CHAT_MODELS.append(model_name)
+                            
+            except Exception as e:
+                logger.warning(f"⚠️ 注册自定义模型失败 (可能导致验证错误): {e}")
+
             return OpenAI(
                 model=model_name,
                 api_key=api_key if api_key else "EMPTY",

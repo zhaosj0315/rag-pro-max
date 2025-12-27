@@ -107,9 +107,9 @@ class LogManager:
         
         # 终端输出
         if self.enable_terminal:
-            self._print_terminal(level, message, stage)
+            self._print_terminal(level, message, stage, details)
     
-    def _print_terminal(self, level: str, message: str, stage: str = ""):
+    def _print_terminal(self, level: str, message: str, stage: str = "", details: Optional[Dict] = None):
         """终端输出"""
         icons = {
             self.DEBUG: "🔍",
@@ -120,6 +120,10 @@ class LogManager:
         }
         icon = icons.get(level, "📝")
         ts = datetime.now().strftime("%H:%M:%S")
+        
+        # 增强显示：如果有模型信息，追加到消息中
+        if details and 'model' in details:
+            message += f" (Model: {details['model']})"
         
         if stage:
             print(f"{icon} [{ts}] [{stage}] {message}")

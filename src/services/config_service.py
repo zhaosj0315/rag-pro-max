@@ -174,8 +174,29 @@ class ConfigService:
         }
 
     def get_default_model(self) -> str:
-        """获取默认模型"""
-        return self.get_config_value('llm_model_ollama', 'gpt-oss:20b')
+        """获取默认模型 (智能判断供应商)"""
+        # 显式读取 rag_config
+        config = self.get_config("rag_config")
+        
+        provider = config.get('llm_provider', 'Ollama')
+        
+        if provider == 'OpenAI':
+            return config.get('llm_model_openai', 'gpt-3.5-turbo')
+        elif provider == 'OpenAI-Compatible':
+            return config.get('llm_model_other', '')
+        elif provider == 'Azure OpenAI':
+            return config.get('azure_deployment', '')
+        elif provider == 'Anthropic':
+            return config.get('config_anthropic_model', '')
+        elif provider == 'Moonshot':
+            return config.get('config_moonshot_model', '')
+        elif provider == 'Gemini':
+            return config.get('config_gemini_model', '')
+        elif provider == 'Groq':
+            return config.get('config_groq_model', '')
+            
+        # 默认回退到 Ollama
+        return config.get('llm_model_ollama', 'gpt-oss:20b')
     
     def update_model_config(self, new_model: str) -> bool:
         """更新模型配置"""
