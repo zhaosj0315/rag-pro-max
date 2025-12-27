@@ -2815,8 +2815,8 @@ elif active_kb_name:
 
                     # === 极简卡片容器 ===
                     with st.container(border=True):
-                        # 单行布局：标题 + 元数据 + 摘要 + 详情 + 操作
-                        col_info, col_summary, col_detail, col_ops = st.columns([5.5, 1.5, 1.5, 1.5])
+                        # 单行布局：标题 + 元数据 + 摘要 + 操作
+                        col_info, col_summary, col_ops = st.columns([6, 2.5, 1.5])
                         
                         with col_info:
                             # 核心改动：一行显示所有关键信息
@@ -2959,12 +2959,6 @@ elif active_kb_name:
                             elif f.get('summary'):
                                 st.caption("📖 已有摘要")
                         
-                        with col_detail:
-                            # 更多详情按钮 - 打开文档详情对话框
-                            if st.button("🔍 详情", key=f"detail_{i}", help="查看文档详情"):
-                                st.session_state['show_doc_detail'] = f
-                                st.session_state['show_doc_detail_kb'] = active_kb_name
-                        
                         with col_ops:
                             # 预览和删除
                             op_c1, op_c2 = st.columns([1, 1])
@@ -3002,6 +2996,55 @@ elif active_kb_name:
                                             st.session_state.chat_engine = None
                                             time.sleep(0.5); st.rerun()
                                         except Exception as e: st.error(str(e))
+                        
+                        # 详情直接展开 (不再使用弹窗)
+                        with st.expander(f"🔍 更多详情 - {f['name']}", expanded=False):
+                            # 基本信息 - 两列布局
+                            d_col1, d_col2 = st.columns(2)
+                            
+                            with d_col1:
+                                st.markdown("### 📊 基本信息")
+                                st.markdown(f"**📂 路径**: `{f.get('file_path', 'N/A')}`")
+                                st.markdown(f"**📏 大小**: {f.get('size', '未知')} ({f.get('size_bytes', 0):,} 字节)")
+                                st.markdown(f"**📄 类型**: {f.get('type', '未知')}")
+                                st.markdown(f"**🌐 语言**: {f.get('language', '未知')}")
+                                
+                            with d_col2:
+                                st.markdown("### 🕒 时间信息")
+                                st.markdown(f"**📅 添加时间**: {f.get('added_at', '未知')}")
+                                st.markdown(f"**🕒 最后访问**: {f.get('last_accessed', '从未访问') or '从未访问'}")
+                                st.markdown(f"**📁 目录**: {f.get('parent_folder', '未知')}")
+                                st.markdown(f"**🔐 哈希**: `{f.get('file_hash', 'N/A')}`")
+                            
+                            st.divider()
+                            
+                            # 统计信息
+                            st.markdown("### 📈 统计信息")
+                            stat_col1, stat_col2, stat_col3 = st.columns(3)
+                            stat_col1.metric("🧩 向量片段", len(f.get('doc_ids', [])))
+                            stat_col2.metric("🔥 查询命中", f.get('hit_count', 0))
+                            stat_col3.metric("⭐ 平均评分", f"{f.get('avg_score', 0.0):.2f}" if f.get('avg_score') else 'N/A')
+                            
+                            # 分类和关键词
+                            if f.get('category') or f.get('keywords'):
+                                st.divider()
+                                st.markdown("### 🏷️ 分类标签")
+                                tag_col1, tag_col2 = st.columns(2)
+                                tag_col1.markdown(f"**📚 分类**: {f.get('category', '未分类')}")
+                                if f.get('keywords'):
+                                    tag_col2.markdown(f"**🏷️ 关键词**: {', '.join(f.get('keywords', [])[:8])}")
+                            
+                            # 向量片段ID
+                            if f.get('doc_ids'):
+                                st.divider()
+                                st.markdown("### 🧬 向量片段ID")
+                                st.text_area(
+                                    "片段ID列表", 
+                                    value='\n'.join(f['doc_ids']), 
+                                    height=100,
+                                    label_visibility="collapsed",
+                                    key=f"doc_ids_{i}"
+                                )
                 
                 # 底部分页（方便翻页）
                 if total_pages > 1:
@@ -3014,10 +3057,6 @@ elif active_kb_name:
                         page_cols[1].markdown(f"<div style='text-align:center'>第 {st.session_state.file_page}/{total_pages} 页 · 共 {total_files} 个文件</div>", unsafe_allow_html=True)
                         if page_cols[2].button("➡️", key="next_bottom", disabled=st.session_state.file_page >= total_pages):
                             st.session_state.file_page += 1
-
-# 文档详情对话框调用
-if st.session_state.get('show_doc_detail') and st.session_state.get('show_doc_detail_kb'):
-    show_document_detail_dialog(st.session_state.show_doc_detail_kb, st.session_state.show_doc_detail)
 
 # 创建模式的欢迎界面
 if is_create_mode:
