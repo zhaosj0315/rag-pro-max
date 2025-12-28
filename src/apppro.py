@@ -1632,8 +1632,8 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
     current_target_path = st.session_state.get('uploaded_path') or st.session_state.get('path_input')
     if not current_target_path or not os.path.exists(current_target_path):
         status_container.update(label="❌ 路径无效", state="error")
-        logger.error(f"❌ 路径无效: {current_target_path}")
-        raise ValueError(f"路径无效: {current_target_path}")
+        logger.error(f"❌ 路径无效: {current_target_path} (uploaded_path={st.session_state.get('uploaded_path')}, path_input={st.session_state.get('path_input')})")
+        raise ValueError(f"路径无效: {current_target_path} - 请检查文件是否已上传或路径是否正确")
     
     # 使用 IndexBuilder 构建索引
     builder = IndexBuilder(
@@ -2338,6 +2338,8 @@ if btn_start:
             
             # DEBUG: Check parameters
             print(f"DEBUG: Calling process_knowledge_base_logic with: kb={final_kb_name}, ocr={current_use_ocr}, meta={current_extract_metadata}, summary={current_generate_summary}")
+            print(f"DEBUG: st.session_state.uploaded_path = {st.session_state.get('uploaded_path')}")
+            print(f"DEBUG: uploaded_files present? = {bool(uploaded_files) if 'uploaded_files' in locals() else 'Not in locals'}")
 
             process_knowledge_base_logic(
                 kb_name=final_kb_name,
