@@ -1610,7 +1610,7 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
             logger.warning(f"   ⚠️  {warn_msg}")
     
     # 获取源路径
-    current_target_path = st.session_state.get('uploaded_path') or st.session_state.path_input
+    current_target_path = st.session_state.get('uploaded_path') or st.session_state.get('path_input')
     if not current_target_path or not os.path.exists(current_target_path):
         status_container.update(label="❌ 路径无效", state="error")
         logger.error(f"❌ 路径无效: {current_target_path}")
