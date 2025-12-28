@@ -706,6 +706,7 @@ with st.sidebar:
         crawl_url = None
         search_keyword = None
         target_path = ""
+        btn_start = False # Initialize early to avoid NameError and support APPEND mode
         
         if is_create_mode:
             # 注入 CSS 增强核心功能视觉效果
@@ -854,7 +855,7 @@ with st.sidebar:
                     """, unsafe_allow_html=True)
 
         # 统一的数据源处理逻辑（仅针对 Web 抓取保留在外部，本地文件已在内部处理）
-        btn_start = False # Initialize to avoid NameError
+        # btn_start already initialized above
         
         if is_create_mode:
             if source_mode == "🔗 网址抓取":
