@@ -3147,7 +3147,13 @@ elif active_kb_name:
                                 with btn_c2:
                                     if platform.system() == "Darwin":
                                         if st.button("👁️ QuickLook", key=f"ql_{i}", use_container_width=True):
-                                            subprocess.Popen(["qlmanage", "-p", actual_file_path], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                                            try:
+                                                subprocess.Popen(["qlmanage", "-p", actual_file_path], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                                                # 强制置顶脚本
+                                                top_script = 'tell application "System Events"\n repeat 20 times\n if exists process "qlmanage" then\n set frontmost of process "qlmanage" to true\n exit repeat\n end if\n delay 0.1\n end repeat\n end tell'
+                                                subprocess.Popen(['osascript', '-e', top_script])
+                                            except Exception as e:
+                                                st.error(f"预览失败: {e}")
                                     else:
                                         if st.button("📋 复制路径", key=f"copy_path_{i}", use_container_width=True):
                                             st.code(actual_file_path)

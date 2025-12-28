@@ -1,5 +1,5 @@
 {
-  "target_path": "/Users/zhaosj/Documents/rag-pro-max/temp_uploads/text_1766881849",
+  "target_path": "/Users/zhaosj/Documents/rag-pro-max/temp_uploads/batch_1766882743",
   "output_path": "/Users/zhaosj/Documents/rag-pro-max/vector_db_storage",
   "llm_type_idx": 1,
   "llm_url_ollama": "http://localhost:11434",
