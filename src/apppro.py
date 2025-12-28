@@ -971,7 +971,13 @@ with st.sidebar:
                 import hashlib
                 upload_hash = hashlib.md5("".join([f"{f.name}_{f.size}" for f in uploaded_files]).encode()).hexdigest()
                 
-                if st.session_state.get('last_upload_hash') != upload_hash:
+                print(f"DEBUG: Upload detected. Files: {len(uploaded_files)}, Hash: {upload_hash}")
+                print(f"DEBUG: Last Hash: {st.session_state.get('last_upload_hash')}")
+                
+                # 只要哈希不同，或者当前没有有效的上传路径，就重新处理
+                # 这能修复“路径丢失”的问题，同时保留哈希优化
+                if st.session_state.get('last_upload_hash') != upload_hash or not st.session_state.get('uploaded_path'):
+                    print("DEBUG: New upload hash detected OR path missing. Processing...")
                     progress_bar = st.progress(0)
                     status_text = st.empty()
 
@@ -983,6 +989,8 @@ with st.sidebar:
                     progress_bar.progress(0.5)
 
                     result = handler.process_uploads(uploaded_files)
+                    
+                    print(f"DEBUG: Process result dir: {result.batch_dir}")
 
                     progress_bar.empty()
                     status_text.empty()
@@ -991,6 +999,8 @@ with st.sidebar:
                     st.session_state.last_upload_hash = upload_hash
                     st.session_state.uploaded_path = os.path.abspath(result.batch_dir)
                     st.session_state.last_processed_path = st.session_state.uploaded_path
+                    
+                    print(f"DEBUG: Saved uploaded_path: {st.session_state.uploaded_path}")
 
                     # 显示上传结果
                     if result.success_count > 0:
@@ -1018,7 +1028,10 @@ with st.sidebar:
                 
                 elif st.session_state.get('last_processed_path'):
                     # 如果哈希匹配（说明是 rerun），且有备份路径，则恢复
+                    print(f"DEBUG: Hash matched. Restoring path: {st.session_state.last_processed_path}")
                     st.session_state.uploaded_path = st.session_state.last_processed_path
+                else:
+                    print("DEBUG: Hash matched but no last_processed_path found!")
 
 
             # 使用上传路径或手动输入的路径
