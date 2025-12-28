@@ -86,9 +86,14 @@ if cleaned_count > 0:
 
 import json
 import zipfile
+import platform
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import multiprocessing as mp
+
+# 引入新工具
+from src.utils.file_system_utils import get_deep_file_attributes, reveal_in_file_manager, NotesManager
+notes_manager = NotesManager()
 
 # 引入新的优化组件
 from src.utils.enhanced_ocr_optimizer import enhanced_ocr_optimizer
@@ -734,6 +739,7 @@ with st.sidebar:
             )
             
             if source_mode == "📂 文件上传":
+                # 双模式：支持上传和手动输入路径
                 uploaded_files = st.file_uploader(
                     "拖入文件", 
                     accept_multiple_files=True, 
@@ -741,6 +747,17 @@ with st.sidebar:
                     label_visibility="collapsed",
                     help="支持格式: PDF, DOCX, TXT, MD, Excel"
                 )
+                
+                # 恢复路径输入
+                st.markdown("<div style='margin-top: -5px; margin-bottom: 5px;'><span style='font-size: 0.75rem; color: gray;'>或粘贴本地目录路径:</span></div>", unsafe_allow_html=True)
+                manual_path = st.text_input(
+                    "本地路径",
+                    placeholder="例如: /Users/name/Documents/docs",
+                    key="manual_path_input",
+                    label_visibility="collapsed"
+                )
+                if manual_path and os.path.exists(manual_path):
+                    st.session_state.uploaded_path = manual_path
             
             elif source_mode == "📝 粘贴文本":
                 # 注入 CSS 模仿上传框样式 (虚线边框 + 灰色背景)
@@ -2997,56 +3014,150 @@ elif active_kb_name:
                                             time.sleep(0.5); st.rerun()
                                         except Exception as e: st.error(str(e))
                         
-                        # 详情直接展开 (不再使用弹窗)
-                        with st.expander(f"🔍 更多详情 - {f['name']}", expanded=False):
-                            # 基本信息 - 两列布局
-                            d_col1, d_col2 = st.columns(2)
+                        # 详情直接展开 (专业版)
+                        with st.expander(f"🔍 深度档案与数据取证 - {f['name']}", expanded=False):
+                            actual_file_path = f.get('file_path')
+                            if not actual_file_path or not os.path.exists(actual_file_path):
+                                actual_file_path = os.path.join(db_path, f['name'])
                             
-                            with d_col1:
-                                st.markdown("### 📊 基本信息")
-                                st.markdown(f"**📂 路径**: `{f.get('file_path', 'N/A')}`")
-                                st.markdown(f"**📏 大小**: {f.get('size', '未知')} ({f.get('size_bytes', 0):,} 字节)")
-                                st.markdown(f"**📄 类型**: {f.get('type', '未知')}")
-                                st.markdown(f"**🌐 语言**: {f.get('language', '未知')}")
+                            # 获取深度属性
+                            deep_attrs = get_deep_file_attributes(actual_file_path)
+                            
+                            # 1. 顶部专业仪表盘 (Health Dashboard)
+                            h_col1, h_col2, h_col3, h_col4 = st.columns(4)
+                            
+                            with h_col1:
+                                indexed_status = "✅ 已索引" if f.get('doc_ids') else "⏳ 未索引"
+                                st.markdown(f"<div style='background:#f0f7ff; color:#0550ae; padding:4px 10px; border-radius:15px; text-align:center; font-size:0.8rem; font-weight:600;'>{indexed_status}</div>", unsafe_allow_html=True)
+                            
+                            with h_col2:
+                                efficiency = deep_attrs.get('efficiency', '100%')
+                                st.markdown(f"<div style='background:#f6ffed; color:#389e0d; padding:4px 10px; border-radius:15px; text-align:center; font-size:0.8rem; font-weight:600;'>💾 存储效率 {efficiency}</div>", unsafe_allow_html=True)
                                 
-                            with d_col2:
-                                st.markdown("### 🕒 时间信息")
-                                st.markdown(f"**📅 添加时间**: {f.get('added_at', '未知')}")
-                                st.markdown(f"**🕒 最后访问**: {f.get('last_accessed', '从未访问') or '从未访问'}")
-                                st.markdown(f"**📁 目录**: {f.get('parent_folder', '未知')}")
-                                st.markdown(f"**🔐 哈希**: `{f.get('file_hash', 'N/A')}`")
+                            with h_col3:
+                                heat = "🔥 热数据" if f.get('hit_count', 0) > 5 else "❄️ 冷数据"
+                                st.markdown(f"<div style='background:#fff7e6; color:#d46b08; padding:4px 10px; border-radius:15px; text-align:center; font-size:0.8rem; font-weight:600;'>📈 {heat} ({f.get('hit_count', 0)})</div>", unsafe_allow_html=True)
+                                
+                            with h_col4:
+                                days = deep_attrs.get('longevity_days', 0)
+                                st.markdown(f"<div style='background:#fff1f0; color:#cf1322; padding:4px 10px; border-radius:15px; text-align:center; font-size:0.8rem; font-weight:600;'>🕒 存活 {days} 天</div>", unsafe_allow_html=True)
                             
-                            st.divider()
+                            st.write("")
                             
-                            # 统计信息
-                            st.markdown("### 📈 统计信息")
-                            stat_col1, stat_col2, stat_col3 = st.columns(3)
-                            stat_col1.metric("🧩 向量片段", len(f.get('doc_ids', [])))
-                            stat_col2.metric("🔥 查询命中", f.get('hit_count', 0))
-                            stat_col3.metric("⭐ 平均评分", f"{f.get('avg_score', 0.0):.2f}" if f.get('avg_score') else 'N/A')
+                            # 2. 60/40 黄金分割布局
+                            detail_col_left, detail_col_right = st.columns([6, 4])
                             
-                            # 分类和关键词
-                            if f.get('category') or f.get('keywords'):
+                            with detail_col_left:
+                                # --- 左侧：智能洞察 (60%) ---
+                                if f.get('summary'):
+                                    st.markdown("##### 🧠 智能摘要")
+                                    st.info(f"{f['summary']}")
+                                
+                                # RAG 预估与密度
+                                st.markdown("##### 📊 RAG 内容动力学")
+                                r_c1, r_c2, r_c3 = st.columns(3)
+                                with r_c1:
+                                    tokens = deep_attrs.get('token_estimate', 0)
+                                    st.metric("预估 Token", f"~{tokens}", help="基于字符数的估算值")
+                                with r_c2:
+                                    chunks = len(f.get('doc_ids', []))
+                                    st.metric("向量片段", f"{chunks} Pkts")
+                                with r_c3:
+                                    # 密度 = 字符/片段
+                                    density = tokens // chunks if chunks > 0 else 0
+                                    st.metric("内容密度", f"{density} c/p", help="平均每个片段包含的字符数")
+
+                                # 内容采样
+                                if os.path.exists(actual_file_path) and f.get('type', '').lower() in ['.txt', '.md', '.py', '.js', '.html', '.css', '.json']:
+                                    st.markdown("##### 📄 文本取证采样")
+                                    try:
+                                        with open(actual_file_path, 'r', encoding='utf-8', errors='ignore') as preview_f:
+                                            preview_content = preview_f.read(800)
+                                            st.code(preview_content, language='text')
+                                    except:
+                                        st.caption("无法读取内容预览")
+                                
+                                # 用户备注
+                                st.markdown("##### 📝 用户自定义备注")
+                                file_hash = f.get('file_hash', 'no_hash')
+                                current_note = notes_manager.get_note(file_hash)
+                                new_note = st.text_area("备注信息", value=current_note, height=80, key=f"note_{i}", label_visibility="collapsed")
+                                if new_note != current_note:
+                                    notes_manager.set_note(file_hash, new_note)
+                                    st.toast("✅ 备注已保存")
+
+                            with detail_col_right:
+                                # --- 右侧：技术档案 (40%) ---
+                                if "error" not in deep_attrs:
+                                    # macOS 专属增强元数据
+                                    if platform.system() == "Darwin" and deep_attrs.get("macos"):
+                                        m = deep_attrs["macos"]
+                                        if any([m.get("tags"), m.get("finder_comment"), m.get("where_from")]):
+                                            st.markdown("##### 🍎 macOS 增强元数据")
+                                            
+                                            # 展示标签
+                                            if m.get("tags"):
+                                                tag_html = "".join([f"<span style='background:#f0f0f0; padding:2px 6px; border-radius:10px; font-size:0.7rem; margin-right:4px;'>🏷️ {t}</span>" for t in m["tags"]])
+                                                st.markdown(tag_html, unsafe_allow_html=True)
+                                            
+                                            # 展示来源
+                                            if m.get("where_from"):
+                                                with st.expander("🌐 下载来源", expanded=False):
+                                                    for url in m["where_from"]:
+                                                        st.caption(f"`{url}`")
+                                            
+                                            # 展示系统注释
+                                            if m.get("finder_comment"):
+                                                st.caption(f"💬 **Finder 注释**: {m['finder_comment']}")
+                                            
+                                            if m.get("version"):
+                                                st.caption(f"🔢 **内部版本**: {m['version']}")
+                                            
+                                            st.divider()
+
+                                    # 取证与底层
+                                    st.markdown("##### 🕵️ 系统取证")
+                                    st.caption(f"Magic Bytes: `{deep_attrs['magic_bytes']}`")
+                                    st.caption(f"SHA-256: `{deep_attrs['sha256'][:32]}...`")
+                                    st.caption(f"Inode: `{deep_attrs['inode']}` | FS: `{deep_attrs['fs_type']}`")
+                                    
+                                    # 时间轴与位置
+                                    st.markdown("##### 🕒 时间轴与位置")
+                                    st.caption(f"创建: `{deep_attrs['created']}`")
+                                    st.caption(f"最后访问: `{deep_attrs['accessed']}`")
+                                    
+                                    st.markdown("##### 📍 拓扑位置")
+                                    st.caption(f"真实路径: `{deep_attrs['real_path'][:40]}...`")
+                                    st.caption(f"符号链接: `{'是' if deep_attrs['is_symlink'] else '否'}`")
+                                    
+                                    # 权限系统
+                                    st.markdown("##### 🛡️ 权限系统")
+                                    st.caption(f"Unix权限: `{deep_attrs['permissions']}`")
+                                    st.caption(f"所有者: `{deep_attrs['owner']}` | 只读: `{'是' if deep_attrs['is_readonly'] else '否'}`")
+                                else:
+                                    st.warning(f"数据抓取异常: {deep_attrs['error']}")
+                                
+                                # 快捷功能按钮
                                 st.divider()
-                                st.markdown("### 🏷️ 分类标签")
-                                tag_col1, tag_col2 = st.columns(2)
-                                tag_col1.markdown(f"**📚 分类**: {f.get('category', '未分类')}")
-                                if f.get('keywords'):
-                                    tag_col2.markdown(f"**🏷️ 关键词**: {', '.join(f.get('keywords', [])[:8])}")
-                            
-                            # 向量片段ID
+                                btn_c1, btn_c2 = st.columns(2)
+                                with btn_c1:
+                                    if st.button("📂 在 Finder 中显示", key=f"reveal_{i}", use_container_width=True):
+                                        reveal_in_file_manager(actual_file_path)
+                                            
+                                with btn_c2:
+                                    if platform.system() == "Darwin":
+                                        if st.button("👁️ QuickLook", key=f"ql_{i}", use_container_width=True):
+                                            subprocess.Popen(["qlmanage", "-p", actual_file_path], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                                    else:
+                                        if st.button("📋 复制路径", key=f"copy_path_{i}", use_container_width=True):
+                                            st.code(actual_file_path)
+
+                            # 向量片段ID (折叠)
                             if f.get('doc_ids'):
-                                st.divider()
-                                st.markdown("### 🧬 向量片段ID")
-                                st.text_area(
-                                    "片段ID列表", 
-                                    value='\n'.join(f['doc_ids']), 
-                                    height=100,
-                                    label_visibility="collapsed",
-                                    key=f"doc_ids_{i}"
-                                )
+                                with st.expander("🧬 向量片段 ID 序列 (RAW)", expanded=False):
+                                    st.text_area("IDs", value='\n'.join(f['doc_ids']), height=100, label_visibility="collapsed", key=f"ids_raw_{i}")
                 
-                # 底部分页（方便翻页）
+                # 底部分页 (方便翻页)
                 if total_pages > 1:
                     st.divider()
                     col1, col2, col3 = st.columns([1, 2, 1])
