@@ -17,6 +17,21 @@ class ConfigLoader:
         """保存配置 (rag_config)"""
         return save_config(config, "rag_config")
 
+    @staticmethod
+    def quick_setup() -> bool:
+        """一键配置默认设置"""
+        default_config = {
+            "llm_provider": "Ollama",
+            "llm_url_ollama": "http://localhost:11434",
+            "llm_model_ollama": "gpt-oss:20b",
+            "llm_provider_label": "🦙 Ollama (本地)",
+            "embed_provider_idx": 0,
+            "embed_model_hf": "sentence-transformers/all-MiniLM-L6-v2",
+            "chat_history_limit": 10,
+            "system_prompt": "你是一个精准的知识库助手，请务必仅基于提供的上下文和知识回答问题。如果知识库中没有相关信息，请明确指出。回答应清晰、简洁、专业。"
+        }
+        return ConfigLoader.save(default_config)
+
     # 兼容旧接口
     def load_config(self):
         return self.load()

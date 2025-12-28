@@ -514,9 +514,11 @@ if 'app_initialized' not in st.session_state:
             llm_url = config.get('llm_url_ollama', 'http://localhost:11434')
             llm_key = ""
         
+        system_prompt = config.get('system_prompt', None)
+        
         # 设置全局LLM
         if llm_model:
-            set_global_llm_model(llm_provider, llm_model, llm_key, llm_url)
+            set_global_llm_model(llm_provider, llm_model, llm_key, llm_url, system_prompt=system_prompt)
             
     except Exception as e:
         logger.warning(f"全局LLM初始化失败: {e}")

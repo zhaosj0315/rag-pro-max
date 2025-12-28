@@ -1,10 +1,10 @@
-# RAG Pro Max v2.7.3 接口汇总
+# RAG Pro Max 接口汇总
 
 ## 📊 统计信息
 
 - **Python模块**: 176个
 - **类定义**: 159个  
-- **函数定义**: 1359个
+- **函数定义**: 1360个
 - **API端点**: 11个
 - **配置文件**: 3个
 
@@ -254,7 +254,7 @@
 - `llm_model_ollama`: gpt-oss:20b
 
 ### config/rag_config.json
-- `target_path`: /Users/zhaosj/Documents/rag-pro-max/temp_uploads/text_1766962829
+- `target_path`: /Users/zhaosj/Documents/rag-pro-max/temp_uploads/batch_1766963766
 - `output_path`: /Users/zhaosj/Documents/rag-pro-max/vector_db_storage
 - `llm_type_idx`: 1
 - `llm_url_ollama`: http://localhost:11434
@@ -284,7 +284,7 @@
 
 ## 📝 生成时间
 
-Mon Dec 29 07:10:14 CST 2025
+Mon Dec 29 07:19:47 CST 2025
 
 ---
 
