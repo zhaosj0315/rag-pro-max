@@ -1,25 +1,12 @@
 {
-  "version": "2.6.1",
-  "release_date": "2025-12-26",
-  "codename": "界面重构与逻辑整合版",
-  "features": [
-    "数据源界面重构 (Data Source UI Refactor) - 扁平化 4x1 布局",
-    "按钮逻辑整合 (Button Logic Consolidation) - 侧边栏统一触发",
-    "自动触发修复 (Auto-Trigger Fix) - 防止输入即创建",
-    "健壮性增强 (Robustness) - 修复变量初始化和缩进错误"
-  ],
-  "architecture": {
-    "layers": 4,
-    "modules": 189,
-    "unified_components": 9,
-    "services": 6,
-    "test_coverage": "93%"
-  },
-  "optimization_achievements": {
-    "new_features": [
-      "Flattened UI Layout",
-      "Unified Action Trigger",
-      "Error Handling Fixes"
+    "version": "2.7.2",
+    "release_date": "2025-12-28",
+    "features": [
+        "修复 LlamaIndex v0.10+ 自定义模型注册时的类型错误 (TypeError)",
+        "工业级文件详情深度分析系统",
+        "macOS 原生元数据（标签、注释、溯源）深度集成",
+        "智能搜索与抓取全链路自动溯源注入",
+        "取证级数据校验（SHA-256, Magic Bytes）",
+        "60/40 黄金分割 Split View 布局重构"
     ]
-  }
 }

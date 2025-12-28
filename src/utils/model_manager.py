@@ -186,8 +186,11 @@ def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: s
                 import llama_index.llms.openai.utils as openai_utils
                 
                 # 注册上下文窗口大小 (默认 128k)
-                if model_name not in openai_utils.openai_modelname_to_contextsize:
-                    openai_utils.openai_modelname_to_contextsize[model_name] = 128000
+                if hasattr(openai_utils, 'openai_modelname_to_contextsize'):
+                    # 检查是否为字典，某些版本可能是函数
+                    if isinstance(openai_utils.openai_modelname_to_contextsize, dict):
+                        if model_name not in openai_utils.openai_modelname_to_contextsize:
+                            openai_utils.openai_modelname_to_contextsize[model_name] = 128000
                 
                 # 注册到可用模型列表
                 if hasattr(openai_utils, 'ALL_AVAILABLE_MODELS'):

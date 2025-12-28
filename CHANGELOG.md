@@ -1,5 +1,11 @@
 # 更新日志 (CHANGELOG)
 
+## [2.7.2] - 2025-12-28
+
+### 🔧 框架兼容性修复
+- **模型注册修复**: 修复了在 LlamaIndex v0.10+ 中 `openai_modelname_to_contextsize` 变为函数导致的 `TypeError: argument of type 'function' is not iterable` 错误。
+- **启动稳定性**: 增加了对 `llama-index` 内部工具对象的类型检查（dict vs function），确保系统在不同版本的依赖环境下均能平稳启动。
+
 ## [2.7.1] - 2025-12-28
 
 ### 🐛 溯源系统修复与增强
