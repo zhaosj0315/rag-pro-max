@@ -110,12 +110,13 @@ def get_deep_file_attributes(file_path: str) -> Dict[str, Any]:
 
         # 8. 智能内容指纹：从文件头提取 URL (针对爬虫文件)
         header_url = None
-        if p.suffix.lower() == '.txt' and logical_size < 1024 * 10:
+        if p.suffix.lower() == '.txt' and logical_size < 1024 * 100: # 提高到100KB以内
             try:
                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f_head:
                     first_line = f_head.readline().strip()
-                    if first_line.startswith("URL: "):
-                        header_url = first_line.replace("URL: ", "")
+                    # 兼容 "URL: http" 或 "URL:http"
+                    if first_line.upper().startswith("URL:"):
+                        header_url = first_line[4:].strip()
             except: pass
 
         return {

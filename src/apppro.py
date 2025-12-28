@@ -92,7 +92,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import multiprocessing as mp
 
 # 引入新工具
-from src.utils.file_system_utils import get_deep_file_attributes, reveal_in_file_manager, NotesManager
+from src.utils.file_system_utils import get_deep_file_attributes, reveal_in_file_manager, NotesManager, set_where_from_metadata
 notes_manager = NotesManager()
 
 # 引入新的优化组件
@@ -2139,10 +2139,17 @@ if btn_start:
                                 
                                 filepath = os.path.join(unique_output_dir, filename)
                                 
+                                # 确保导入 (防止多进程或动态加载导致的 NameError)
+                                from src.utils.file_system_utils import set_where_from_metadata
+                                
                                 with open(filepath, 'w', encoding='utf-8') as f:
-                                    f.write(f"标题: {result['title']}\n")
+                                    # 🔥 核心修正：添加标准 URL: 头，以便溯源引擎识别
                                     f.write(f"URL: {result['url']}\n")
+                                    f.write(f"标题: {result['title']}\n")
                                     f.write(f"内容:\n{result['content']}\n")
+                                
+                                # 为文件设置 macOS 下载来源元数据
+                                set_where_from_metadata(filepath, result['url'])
                                 
                                 saved_files.append(filepath)
                 
