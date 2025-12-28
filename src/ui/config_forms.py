@@ -13,7 +13,6 @@ from .model_selectors import (
     render_openai_model_selector,
     render_hf_embedding_selector
 )
-from .unified_config_components import render_basic_config, render_embedding_config
 from src.utils.model_utils import fetch_remote_models
 from src.services.unified_config_service import save_config, load_config
 from src.utils.model_manager import set_global_llm_model
@@ -21,48 +20,60 @@ from src.utils.model_manager import set_global_llm_model
 
 def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
     """
-    渲染 LLM 配置表单 (增强版)
-    Returns: (provider, url, model, key, extra_params)
+    渲染 LLM 配置表单 (优化版 - 仿 ChatOllama 布局)
     """
-    with st.container(border=True):
-        st.markdown("#### 🤖 LLM 对话模型")
+    st.markdown("### 🧠 模型服务配置")
+    
+    # 定义供应商列表
+    PROVIDERS = {
+        "Ollama": "🦙 Ollama (本地)",
+        "OpenAI": "☁️ OpenAI (云端)",
+        "OpenAI-Compatible": "🔌 Other (兼容协议)",
+        "Azure OpenAI": "🟦 Azure OpenAI",
+        "Anthropic": "🧠 Anthropic (Claude)",
+        "Moonshot": "🌙 Moonshot (Kimi)",
+        "Gemini": "💎 Gemini (Google)",
+        "Groq": "⚡ Groq (极速)"
+    }
+    
+    # 布局: 左侧导航，右侧详情
+    col_nav, col_form = st.columns([1, 3])
+    
+    # --- 左侧导航栏 ---
+    with col_nav:
+        st.markdown("#### 服务商")
         
-        # 1. 供应商选择
-        provider_options = [
-            "Ollama (本地)", 
-            "OpenAI (云端)", 
-            "Azure OpenAI", 
-            "Anthropic (Claude)", 
-            "Moonshot (Kimi)", 
-            "Gemini (Google)", 
-            "Groq (极速)",
-            "Other (自定义)"
-        ]
+        # 尝试恢复上次的选择 (将 label 转换为 key)
+        saved_label = defaults.get("llm_provider_label", "Ollama (本地)")
+        default_key = "Ollama"
+        for k, v in PROVIDERS.items():
+            if v == saved_label:
+                default_key = k
+                break
         
-        # 尝试恢复上次的选择
-        saved_provider = defaults.get("llm_provider_label", "Ollama (本地)")
-        if saved_provider not in provider_options:
-            saved_provider = "Ollama (本地)"
-            
-        llm_provider_choice = st.selectbox(
-            "供应商",
-            provider_options,
-            index=provider_options.index(saved_provider),
-            key="config_llm_provider_select"
+        # 能够保持状态的选择器
+        selected_key = st.radio(
+            "选择服务商",
+            options=list(PROVIDERS.keys()),
+            format_func=lambda x: PROVIDERS[x],
+            index=list(PROVIDERS.keys()).index(default_key) if default_key in PROVIDERS else 0,
+            key="llm_provider_nav",
+            label_visibility="collapsed"
         )
-        
-        # 保存显示标签以便下次恢复
-        st.session_state.llm_provider_label = llm_provider_choice
-        
-        llm_provider = ""
-        llm_url = ""
-        llm_model = ""
-        llm_key = ""
-        extra_params = {}
+        st.caption("选择 AI 服务提供商配置连接与模型")
 
-        # 2. 动态配置表单
-        if llm_provider_choice.startswith("Ollama"):
-            llm_provider = "Ollama"
+    # --- 右侧配置表单 ---
+    llm_provider = selected_key
+    llm_url = ""
+    llm_model = ""
+    llm_key = ""
+    extra_params = {}
+    
+    with col_form:
+        st.markdown(f"#### {PROVIDERS[selected_key]} 设置")
+        
+        # 1. Ollama
+        if selected_key == "Ollama":
             col_url, col_status = st.columns([3, 1])
             with col_url:
                 llm_url = st.text_input("Ollama URL", defaults.get("llm_url_ollama") or "http://localhost:11434", key="config_ollama_url")
@@ -80,316 +91,232 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
             saved_model = defaults.get("llm_model_ollama", "gpt-oss:20b")
             llm_model, _ = render_ollama_model_selector(llm_url, saved_model, ollama_ok)
             
-            # 持久化保存按钮 (新增)
-            if st.button("💾 保存 Ollama 配置", key="save_ollama_config"):
+            # 按钮区域
+            if st.button("💾 保存 Ollama 配置", key="save_ollama_config", type="primary"):
                 config_data = {
                     "llm_provider": "Ollama",
                     "llm_url_ollama": llm_url,
                     "llm_model_ollama": llm_model,
-                    "llm_provider_label": "Ollama (本地)"
+                    "llm_provider_label": PROVIDERS["Ollama"]
                 }
-                
-                # 加载现有配置并合并
-                existing_config = load_config("rag_config")
-                existing_config.update(config_data)
-                
-                # 保存到 rag_config.json
-                if save_config(existing_config, "rag_config"):
-                    # 立即生效：更新全局 LLM
-                    if set_global_llm_model(llm_provider, llm_model, "", llm_url):
-                        st.success("✅ Ollama 配置已保存并生效 (Hot Reload)")
-                        st.session_state.selected_model = llm_model
-                    else:
-                        st.warning("⚠️ 配置已保存，但热更新失败")
-                        
-                    defaults.update(config_data)
-                else:
-                    st.error("❌ 保存失败")
-            
-        elif llm_provider_choice.startswith("OpenAI"):
-            llm_provider = "OpenAI"
-            
+                _save_and_apply_config(config_data, "Ollama", llm_model, "", llm_url, defaults)
+
+        # 2. OpenAI
+        elif selected_key == "OpenAI":
             col1, col2 = st.columns([2, 1])
             with col1:
                 llm_url = st.text_input("Base URL", defaults.get("llm_url_openai", "https://api.openai.com/v1"), key="config_openai_url")
             with col2:
                 llm_key = st.text_input("API Key", defaults.get("llm_key", ""), type="password", key="config_openai_key")
             
-            # 自动获取模型逻辑
-            # 使用 URL + Key 作为缓存键
-            cache_key = f"models_openai_{llm_url}_{llm_key}"
-            available_models = st.session_state.get(cache_key, [])
-            
-            # 如果没有缓存且有足够的凭证，尝试获取
-            if not available_models and llm_url and llm_key:
-                with st.spinner("🔄 正在自动加载模型列表..."):
-                    models, err = fetch_remote_models(llm_url, llm_key)
-                    if models:
-                        available_models = models
-                        st.session_state[cache_key] = models
-                        st.toast(f"✅ 已加载 {len(models)} 个模型")
-                    elif err:
-                        st.caption(f"⚠️ 无法加载模型: {err}")
-            
-            # 模型选择器
+            # 模型选择逻辑
             saved_model = defaults.get("llm_model_openai", "gpt-3.5-turbo")
+            llm_model = _render_remote_model_selector(llm_url, llm_key, saved_model, "openai")
             
-            if available_models:
-                # 确保保存的模型在列表中
-                if saved_model not in available_models:
-                    available_models.insert(0, saved_model)
-                
-                llm_model = st.selectbox(
-                    "选择模型", 
-                    available_models, 
-                    index=available_models.index(saved_model) if saved_model in available_models else 0,
-                    key="config_openai_model_select"
-                )
-            else:
-                llm_model = st.text_input("模型名称", saved_model, help="无法自动加载时请手动输入", key="config_openai_model_input")
-            
-            # 持久化保存按钮
-            if st.button("💾 保存 OpenAI 配置", key="save_openai_config"):
+            if st.button("💾 保存 OpenAI 配置", key="save_openai_config", type="primary"):
                 config_data = {
                     "llm_provider": "OpenAI",
                     "llm_url_openai": llm_url,
                     "llm_key": llm_key,
                     "llm_model_openai": llm_model,
-                    "llm_provider_label": "OpenAI (云端)"
+                    "llm_provider_label": PROVIDERS["OpenAI"]
                 }
-                
-                # 加载现有配置并合并
-                existing_config = load_config("rag_config")
-                existing_config.update(config_data)
-                
-                # 保存到 rag_config.json
-                if save_config(existing_config, "rag_config"):
-                    # 立即生效：更新全局 LLM
-                    if set_global_llm_model(llm_provider, llm_model, llm_key, llm_url):
-                        st.success("✅ 配置已保存并生效 (Hot Reload)")
-                        st.session_state.selected_model = llm_model  # <--- 关键修复：立即更新前端状态
-                    else:
-                        st.warning("⚠️ 配置已保存，但热更新失败")
-                        
-                    # 同时也更新当前的 defaults 以便即时生效 (可选)
-                    defaults.update(config_data)
-                else:
-                    st.error("❌ 保存失败")
+                _save_and_apply_config(config_data, "OpenAI", llm_model, llm_key, llm_url, defaults)
 
-        elif llm_provider_choice.startswith("Other"):
-            llm_provider = "OpenAI-Compatible"
+        # 3. OpenAI-Compatible (Other)
+        elif selected_key == "OpenAI-Compatible":
             st.caption("💡 适用于 DeepSeek, Yi, ChatGLM, vLLM 等兼容 OpenAI 协议的服务")
-            
             col1, col2 = st.columns([2, 1])
             with col1:
-                # 智能回退：如果 specific key 为空，尝试使用 generic key
                 def_url = defaults.get("llm_url_other") or defaults.get("llm_url") or "https://api.deepseek.com/v1"
                 llm_url = st.text_input("Base URL", def_url, key="config_other_url")
             with col2:
-                # 智能回退：如果 specific key 为空，尝试使用 generic key
                 def_key = defaults.get("llm_key_other") or defaults.get("llm_key", "")
                 llm_key = st.text_input("API Key", def_key, type="password", key="config_other_key")
             
-            # 自动获取模型逻辑 (复用 OpenAI 逻辑)
-            cache_key = f"models_other_{llm_url}_{llm_key}"
-            available_models = st.session_state.get(cache_key, [])
-            
-            if not available_models and llm_url:
-                with st.spinner("🔄 正在探测模型列表..."):
-                    models, err = fetch_remote_models(llm_url, llm_key)
-                    if models:
-                        available_models = models
-                        st.session_state[cache_key] = models
-                        st.toast(f"✅ 已加载 {len(models)} 个模型")
-            
             saved_model = defaults.get("llm_model_other", "")
+            llm_model = _render_remote_model_selector(llm_url, llm_key, saved_model, "other")
             
-            if available_models:
-                if saved_model and saved_model not in available_models:
-                    available_models.insert(0, saved_model)
-                
-                llm_model = st.selectbox(
-                    "选择模型", 
-                    available_models, 
-                    index=available_models.index(saved_model) if saved_model in available_models else 0,
-                    key="config_other_model_select"
-                )
-            else:
-                llm_model = st.text_input("模型名称", saved_model, placeholder="例如: deepseek-chat", key="config_other_model_input")
-            
-            if st.button("💾 保存自定义配置", key="save_other_config"):
+            if st.button("💾 保存自定义配置", key="save_other_config", type="primary"):
                 config_data = {
-                    "llm_provider": "OpenAI-Compatible", # 内部标识为兼容模式
+                    "llm_provider": "OpenAI-Compatible",
                     "llm_url_other": llm_url,
                     "llm_key_other": llm_key,
                     "llm_model_other": llm_model,
-                    "llm_provider_label": "Other (自定义)"
+                    "llm_provider_label": PROVIDERS["OpenAI-Compatible"],
+                    # 兼容字段
+                    "llm_url": llm_url,
+                    "llm_key": llm_key,
+                    "llm_model": llm_model
                 }
-                
-                # 为了兼容统一读取逻辑，我们同时也写入标准字段
-                config_data["llm_url"] = llm_url
-                config_data["llm_key"] = llm_key
-                config_data["llm_model"] = llm_model
-                
-                # 加载现有配置并合并
-                existing_config = load_config("rag_config")
-                existing_config.update(config_data)
-                
-                if save_config(existing_config, "rag_config"):
-                    if set_global_llm_model("OpenAI-Compatible", llm_model, llm_key, llm_url):
-                        st.success("✅ 自定义配置已保存并生效")
-                        st.session_state.selected_model = llm_model  # <--- 关键修复：立即更新前端状态
-                    defaults.update(config_data)
-                else:
-                    st.error("❌ 保存失败")
-            
-        elif llm_provider_choice.startswith("Azure"):
-            llm_provider = "Azure OpenAI"
+                _save_and_apply_config(config_data, "OpenAI-Compatible", llm_model, llm_key, llm_url, defaults)
+
+        # 4. Azure OpenAI
+        elif selected_key == "Azure OpenAI":
             llm_url = st.text_input("Azure Endpoint", defaults.get("azure_endpoint", ""), placeholder="https://{resource}.openai.azure.com/", key="config_azure_endpoint")
             llm_key = st.text_input("API Key", defaults.get("azure_key", ""), type="password", key="config_azure_key")
             llm_model = st.text_input("Deployment Name", defaults.get("azure_deployment", ""), help="在Azure控制台中部署的模型名称", key="config_azure_deployment")
-            
-            api_version = st.text_input("API Version", defaults.get("azure_api_version", "2023-05-15"), help="例如: 2023-05-15, 2024-02-15-preview", key="config_azure_api_version")
+            api_version = st.text_input("API Version", defaults.get("azure_api_version", "2023-05-15"), help="例如: 2023-05-15", key="config_azure_api_version")
             extra_params = {"api_version": api_version}
             
-            if st.button("💾 保存 Azure 配置", key="save_azure_config"):
+            if st.button("💾 保存 Azure 配置", key="save_azure_config", type="primary"):
                 config_data = {
                     "llm_provider": "Azure OpenAI",
                     "azure_endpoint": llm_url,
                     "azure_key": llm_key,
                     "azure_deployment": llm_model,
                     "azure_api_version": api_version,
-                    "llm_provider_label": "Azure OpenAI",
-                    # 兼容性字段
+                    "llm_provider_label": PROVIDERS["Azure OpenAI"],
                     "llm_url": llm_url,
                     "llm_key": llm_key,
                     "llm_model": llm_model
                 }
-                
-                existing_config = load_config("rag_config")
-                existing_config.update(config_data)
-                
-                if save_config(existing_config, "rag_config"):
-                    if set_global_llm_model("Azure OpenAI", llm_model, llm_key, llm_url, api_version=api_version):
-                        st.success("✅ Azure 配置已保存并生效")
-                        st.session_state.selected_model = llm_model
-                    else:
-                        st.warning("⚠️ 保存成功但热更新失败")
-                    defaults.update(config_data)
-                else:
-                    st.error("❌ 保存失败")
-            
-        elif llm_provider_choice.startswith("Anthropic"):
-            llm_provider = "Anthropic"
+                _save_and_apply_config(config_data, "Azure OpenAI", llm_model, llm_key, llm_url, defaults, api_version=api_version)
+
+        # 5. Anthropic
+        elif selected_key == "Anthropic":
             llm_key = st.text_input("API Key", defaults.get("anthropic_key", ""), type="password", key="config_anthropic_key")
             llm_model = st.selectbox("模型", ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"], index=0, key="config_anthropic_model")
             
-            if st.button("💾 保存 Anthropic 配置", key="save_anthropic_config"):
+            if st.button("💾 保存 Anthropic 配置", key="save_anthropic_config", type="primary"):
                 config_data = {
                     "llm_provider": "Anthropic",
                     "anthropic_key": llm_key,
                     "config_anthropic_model": llm_model,
-                    "llm_provider_label": "Anthropic (Claude)",
+                    "llm_provider_label": PROVIDERS["Anthropic"],
                     "llm_key": llm_key,
                     "llm_model": llm_model
                 }
-                
-                existing_config = load_config("rag_config")
-                existing_config.update(config_data)
-                
-                if save_config(existing_config, "rag_config"):
-                    if set_global_llm_model("Anthropic", llm_model, llm_key):
-                        st.success("✅ Anthropic 配置已保存并生效")
-                        st.session_state.selected_model = llm_model
-                    defaults.update(config_data)
-                else:
-                    st.error("❌ 保存失败")
-            
-        elif llm_provider_choice.startswith("Moonshot"):
-            llm_provider = "Moonshot"
-            llm_url = st.text_input("Base URL", "https://api.moonshot.cn/v1", disabled=True, key="config_moonshot_url")
+                _save_and_apply_config(config_data, "Anthropic", llm_model, llm_key, "", defaults)
+
+        # 6. Moonshot
+        elif selected_key == "Moonshot":
+            llm_url = "https://api.moonshot.cn/v1"
+            st.text_input("Base URL", llm_url, disabled=True, key="config_moonshot_url")
             llm_key = st.text_input("API Key", defaults.get("moonshot_key", ""), type="password", key="config_moonshot_key")
             llm_model = st.selectbox("模型", ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"], index=0, key="config_moonshot_model")
             
-            if st.button("💾 保存 Moonshot 配置", key="save_moonshot_config"):
+            if st.button("💾 保存 Moonshot 配置", key="save_moonshot_config", type="primary"):
                 config_data = {
                     "llm_provider": "Moonshot",
                     "moonshot_key": llm_key,
                     "config_moonshot_model": llm_model,
-                    "llm_provider_label": "Moonshot (Kimi)",
+                    "llm_provider_label": PROVIDERS["Moonshot"],
                     "llm_key": llm_key,
                     "llm_model": llm_model,
                     "llm_url": llm_url
                 }
-                
-                existing_config = load_config("rag_config")
-                existing_config.update(config_data)
-                
-                if save_config(existing_config, "rag_config"):
-                    if set_global_llm_model("Moonshot", llm_model, llm_key, llm_url):
-                        st.success("✅ Moonshot 配置已保存并生效")
-                        st.session_state.selected_model = llm_model
-                    defaults.update(config_data)
-                else:
-                    st.error("❌ 保存失败")
-            
-        elif llm_provider_choice.startswith("Gemini"):
-            llm_provider = "Gemini"
+                _save_and_apply_config(config_data, "Moonshot", llm_model, llm_key, llm_url, defaults)
+        
+        # 7. Gemini
+        elif selected_key == "Gemini":
             llm_key = st.text_input("API Key", defaults.get("gemini_key", ""), type="password", key="config_gemini_key")
             llm_model = st.selectbox("模型", ["gemini-pro", "gemini-pro-vision"], index=0, key="config_gemini_model")
             
-            if st.button("💾 保存 Gemini 配置", key="save_gemini_config"):
+            if st.button("💾 保存 Gemini 配置", key="save_gemini_config", type="primary"):
                 config_data = {
                     "llm_provider": "Gemini",
                     "gemini_key": llm_key,
                     "config_gemini_model": llm_model,
-                    "llm_provider_label": "Gemini (Google)",
+                    "llm_provider_label": PROVIDERS["Gemini"],
                     "llm_key": llm_key,
                     "llm_model": llm_model
                 }
-                
-                existing_config = load_config("rag_config")
-                existing_config.update(config_data)
-                
-                if save_config(existing_config, "rag_config"):
-                    if set_global_llm_model("Gemini", llm_model, llm_key):
-                        st.success("✅ Gemini 配置已保存并生效")
-                        st.session_state.selected_model = llm_model
-                    defaults.update(config_data)
-                else:
-                    st.error("❌ 保存失败")
-            
-        elif llm_provider_choice.startswith("Groq"):
-            llm_provider = "Groq"
-            llm_url = st.text_input("Base URL", "https://api.groq.com/openai/v1", disabled=True, key="config_groq_url")
+                _save_and_apply_config(config_data, "Gemini", llm_model, llm_key, "", defaults)
+        
+        # 8. Groq
+        elif selected_key == "Groq":
+            llm_url = "https://api.groq.com/openai/v1"
+            st.text_input("Base URL", llm_url, disabled=True, key="config_groq_url")
             llm_key = st.text_input("API Key", defaults.get("groq_key", ""), type="password", key="config_groq_key")
             llm_model = st.selectbox("模型", ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768"], index=0, key="config_groq_model")
 
-            if st.button("💾 保存 Groq 配置", key="save_groq_config"):
+            if st.button("💾 保存 Groq 配置", key="save_groq_config", type="primary"):
                 config_data = {
                     "llm_provider": "Groq",
                     "groq_key": llm_key,
                     "config_groq_model": llm_model,
-                    "llm_provider_label": "Groq (极速)",
+                    "llm_provider_label": PROVIDERS["Groq"],
                     "llm_key": llm_key,
                     "llm_model": llm_model,
                     "llm_url": llm_url
                 }
-                
+                _save_and_apply_config(config_data, "Groq", llm_model, llm_key, llm_url, defaults)
+
+        # --- 通用对话设置 (仿 Screenshot) ---
+        st.divider()
+        st.markdown("#### 💬 对话设置")
+        
+        # 附带消息条数 (Context Limit)
+        current_limit = defaults.get("chat_history_limit", 10)
+        history_limit = st.slider(
+            "附带历史消息数 (Context Window)", 
+            min_value=1, 
+            max_value=50, 
+            value=current_limit,
+            help="每次对话发送给模型的历史消息数量 (+1 表示加上当前问题)"
+        )
+        
+        # 如果值发生变化，提供保存按钮
+        if history_limit != current_limit:
+            if st.button("💾 保存对话设置", key="save_chat_settings"):
+                config_data = {"chat_history_limit": history_limit}
                 existing_config = load_config("rag_config")
                 existing_config.update(config_data)
-                
                 if save_config(existing_config, "rag_config"):
-                    if set_global_llm_model("Groq", llm_model, llm_key, llm_url):
-                        st.success("✅ Groq 配置已保存并生效")
-                        st.session_state.selected_model = llm_model
+                    st.success("✅ 对话设置已保存")
                     defaults.update(config_data)
+                    st.rerun()
+
+        extra_params['chat_history_limit'] = history_limit
+
+    return llm_provider, llm_url, llm_model, llm_key, extra_params
+
+
+def _render_remote_model_selector(url: str, key: str, saved_model: str, prefix: str) -> str:
+    """辅助函数：渲染远程模型选择器"""
+    cache_key = f"models_{prefix}_{url}_{key}"
+    available_models = st.session_state.get(cache_key, [])
+    
+    if not available_models and url:
+        if st.button("🔄 刷新模型列表", key=f"refresh_{prefix}"):
+            with st.spinner("🔄 正在加载模型列表..."):
+                models, err = fetch_remote_models(url, key)
+                if models:
+                    available_models = models
+                    st.session_state[cache_key] = models
+                    st.toast(f"✅ 已加载 {len(models)} 个模型")
                 else:
-                    st.error("❌ 保存失败")
+                    st.warning(f"加载失败: {err}")
 
-    return llm_provider, llm_url, llm_model, llm_key, extra_params
+    if available_models:
+        if saved_model and saved_model not in available_models:
+            available_models.insert(0, saved_model)
+        
+        return st.selectbox(
+            "选择模型", 
+            available_models, 
+            index=available_models.index(saved_model) if saved_model in available_models else 0,
+            key=f"config_{prefix}_model_select"
+        )
+    else:
+        return st.text_input("模型名称", saved_model, placeholder="例如: gpt-3.5-turbo", key=f"config_{prefix}_model_input")
 
-    return llm_provider, llm_url, llm_model, llm_key, extra_params
+
+def _save_and_apply_config(config_data: dict, provider: str, model: str, key: str, url: str, defaults: dict, **kwargs):
+    """辅助函数：保存并应用配置"""
+    existing_config = load_config("rag_config")
+    existing_config.update(config_data)
+    
+    if save_config(existing_config, "rag_config"):
+        if set_global_llm_model(provider, model, key, url, **kwargs):
+            st.success(f"✅ {provider} 配置已保存并生效 (Hot Reload)")
+            st.session_state.selected_model = model
+        else:
+            st.warning("⚠️ 配置已保存，但热更新失败")
+        defaults.update(config_data)
+    else:
+        st.error("❌ 保存失败")
 
 
 def render_embedding_config(defaults: dict) -> Tuple[str, str, str, str]:
