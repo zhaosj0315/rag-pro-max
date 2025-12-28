@@ -3089,12 +3089,17 @@ elif active_kb_name:
                             with detail_col_right:
                                 # --- 右侧：技术档案 (40%) ---
                                 if "error" not in deep_attrs:
-                                    # macOS 专属增强元数据
-                                    if platform.system() == "Darwin" and deep_attrs.get("macos"):
-                                        m = deep_attrs["macos"]
-                                        if any([m.get("tags"), m.get("finder_comment"), m.get("where_from")]):
-                                            st.markdown("##### 🍎 macOS 增强元数据")
-                                            
+                                    # 1. 优先展示系统记录的溯源 (针对抓取文件)
+                                    if deep_attrs.get("header_url"):
+                                        st.markdown("##### 🌐 溯源 (系统记录)")
+                                        st.caption(f"`{deep_attrs['header_url']}`")
+                                        st.divider()
+
+                                    # 2. macOS 专属增强元数据
+                                    if platform.system() == "Darwin":
+                                        st.markdown("##### 🍎 macOS 增强元数据")
+                                        m = deep_attrs.get("macos", {})
+                                        if any([m.get("tags"), m.get("finder_comment"), m.get("where_from"), m.get("version")]):
                                             # 展示标签
                                             if m.get("tags"):
                                                 tag_html = "".join([f"<span style='background:#f0f0f0; padding:2px 6px; border-radius:10px; font-size:0.7rem; margin-right:4px;'>🏷️ {t}</span>" for t in m["tags"]])
@@ -3102,9 +3107,9 @@ elif active_kb_name:
                                             
                                             # 展示来源
                                             if m.get("where_from"):
-                                                with st.expander("🌐 下载来源", expanded=False):
-                                                    for url in m["where_from"]:
-                                                        st.caption(f"`{url}`")
+                                                st.markdown("**🌐 下载来源**")
+                                                for url in m["where_from"]:
+                                                    st.caption(f"`{url}`")
                                             
                                             # 展示系统注释
                                             if m.get("finder_comment"):
@@ -3112,8 +3117,10 @@ elif active_kb_name:
                                             
                                             if m.get("version"):
                                                 st.caption(f"🔢 **内部版本**: {m['version']}")
-                                            
-                                            st.divider()
+                                        else:
+                                            st.caption("ℹ️ 未发现扩展元数据 (标签、来源等)")
+                                        
+                                        st.divider()
 
                                     # 取证与底层
                                     st.markdown("##### 🕵️ 系统取证")

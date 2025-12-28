@@ -18,6 +18,7 @@ import logging
 
 # 🔥 新增：导入智能优化器
 from .crawl_optimizer import CrawlOptimizer
+from src.utils.file_system_utils import set_where_from_metadata
 
 class AsyncWebCrawler:
     def __init__(self, max_concurrent=10, delay_range=(0.5, 2.0), ignore_robots=False):
@@ -413,6 +414,9 @@ class AsyncWebCrawler:
                     await f.write(f"Timestamp: {result['timestamp']}\n")
                     await f.write(f"Content Length: {len(result['content'])}\n")
                     await f.write(f"\n{result['content']}")
+                
+                # 为文件设置 macOS 下载来源元数据
+                set_where_from_metadata(str(filepath), result['url'])
                 
                 saved_files.append(str(filepath))
                 

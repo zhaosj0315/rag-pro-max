@@ -96,6 +96,26 @@ def get_deep_file_attributes(file_path: str) -> Dict[str, Any]:
                     "label_index": md_data.get("kMDItemFSLabel", 0), # 0-7 对应 Finder 颜色
                     "authors": md_data.get("kMDItemAuthors", [])
                 }
+                
+                # 备选方案：如果 mdls 没拿到 where_from，尝试直接读取 xattr
+                if not macos_info["where_from"]:
+                    try:
+                        import xattr
+                        attr_data = xattr.getxattr(file_path, 'com.apple.metadata:kMDItemWhereFroms')
+                        # 这里是一个二进制 plist，解析比较复杂，仅尝试捕获是否存在
+                        if attr_data:
+                            macos_info["where_from"] = ["(存在元数据，建议查看系统简介)"]
+                    except: pass
+            except: pass
+
+        # 8. 智能内容指纹：从文件头提取 URL (针对爬虫文件)
+        header_url = None
+        if p.suffix.lower() == '.txt' and logical_size < 1024 * 10:
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f_head:
+                    first_line = f_head.readline().strip()
+                    if first_line.startswith("URL: "):
+                        header_url = first_line.replace("URL: ", "")
             except: pass
 
         return {
@@ -111,6 +131,8 @@ def get_deep_file_attributes(file_path: str) -> Dict[str, Any]:
             "magic_bytes": magic_hex,
             "sha256": file_sha256,
             "inode": st.st_ino,
+            # 溯源
+            "header_url": header_url,
             # macOS 专属
             "macos": macos_info,
             # RAG 专家
@@ -183,3 +205,24 @@ class NotesManager:
     def set_note(self, file_hash: str, note: str):
         self.notes[file_hash] = note
         self._save()
+
+def set_where_from_metadata(file_path: str, url: str):
+    """为文件设置 '下载来源' 元数据 (仅限 macOS)"""
+    if platform.system() != "Darwin":
+        return False
+    
+    try:
+        import xattr
+        import plistlib
+        
+        # macOS 的 kMDItemWhereFroms 是一个二进制 plist 格式的数组
+        # 我们构建这个列表并序列化
+        urls = [url]
+        # 使用 bplist 格式 (macOS 期望的格式)
+        plist_data = plistlib.dumps(urls, fmt=plistlib.FMT_BINARY)
+        
+        xattr.setxattr(file_path, 'com.apple.metadata:kMDItemWhereFroms', plist_data)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to set where_from metadata: {e}")
+        return False

@@ -10,6 +10,7 @@ from typing import List, Optional, Callable, Dict
 
 # 导入智能优化器
 from .crawl_optimizer import CrawlOptimizer
+from src.utils.file_system_utils import set_where_from_metadata
 
 class WebCrawler:
     def __init__(self, output_dir="temp_uploads/web_crawl"):
@@ -305,6 +306,9 @@ class WebCrawler:
         
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(file_content)
+        
+        # 为文件设置 macOS 下载来源元数据
+        set_where_from_metadata(filepath, url)
         
         return filepath
 
