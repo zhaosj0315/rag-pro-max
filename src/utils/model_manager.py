@@ -149,7 +149,7 @@ def load_embedding_model(provider: str, model_name: str, api_key: str = "", api_
     return None
 
 
-def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: str = "", temperature: float = 0.7, **kwargs):
+def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: str = "", temperature: float = 0.7, system_prompt: str = None, **kwargs):
     """
     加载 LLM 模型
     
@@ -159,6 +159,7 @@ def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: s
         api_key: API密钥
         api_url: API地址 (Base URL 或 Endpoint)
         temperature: 温度参数
+        system_prompt: 系统提示词
         **kwargs: 其他参数 (如 api_version)
     
     Returns:
@@ -176,7 +177,8 @@ def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: s
                 model=model_name,
                 base_url=base_url,
                 request_timeout=360.0,
-                temperature=temperature
+                temperature=temperature,
+                system_prompt=system_prompt
             )
             
         # 2. OpenAI / Moonshot / Groq (OpenAI-Compatible)
@@ -219,7 +221,8 @@ def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: s
                 api_key=api_key if api_key else "EMPTY",
                 api_base=api_url,
                 temperature=temperature,
-                request_timeout=120.0
+                request_timeout=120.0,
+                system_prompt=system_prompt
             )
             
         # 3. Azure OpenAI
@@ -232,7 +235,8 @@ def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: s
                     api_key=api_key,
                     azure_endpoint=api_url,
                     api_version=kwargs.get("api_version", "2023-05-15"),
-                    temperature=temperature
+                    temperature=temperature,
+                    system_prompt=system_prompt
                 )
             except ImportError:
                 logger.error("❌ 未安装 Azure 支持: pip install llama-index-llms-azure-openai")
@@ -245,7 +249,8 @@ def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: s
                 return Anthropic(
                     model=model_name,
                     api_key=api_key,
-                    temperature=temperature
+                    temperature=temperature,
+                    system_prompt=system_prompt
                 )
             except ImportError:
                 logger.error("❌ 未安装 Anthropic 支持: pip install llama-index-llms-anthropic")
@@ -261,7 +266,8 @@ def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: s
                 return Gemini(
                     model=model_name,
                     api_key=api_key,
-                    temperature=temperature
+                    temperature=temperature,
+                    system_prompt=system_prompt
                 )
             except ImportError:
                 logger.error("❌ 未安装 Gemini 支持: pip install llama-index-llms-gemini")
@@ -294,14 +300,14 @@ def set_global_embedding_model(provider: str, model_name: str, api_key: str = ""
         return False
 
 
-def set_global_llm_model(provider: str, model_name: str, api_key: str = "", api_url: str = "", temperature: float = 0.7, **kwargs):
+def set_global_llm_model(provider: str, model_name: str, api_key: str = "", api_url: str = "", temperature: float = 0.7, system_prompt: str = None, **kwargs):
     """
     设置全局 LLM 模型（Settings.llm）
     
     Returns:
         bool: 是否设置成功
     """
-    llm_model = load_llm_model(provider, model_name, api_key, api_url, temperature, **kwargs)
+    llm_model = load_llm_model(provider, model_name, api_key, api_url, temperature, system_prompt=system_prompt, **kwargs)
     if llm_model:
         Settings.llm = llm_model
         logger.success(f"✅ 全局 LLM 已设置: {model_name} ({provider})")

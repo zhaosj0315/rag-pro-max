@@ -247,7 +247,7 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
         st.divider()
         st.markdown("#### 💬 对话设置")
         
-        # 附带消息条数 (Context Limit)
+        # 1. 附带消息条数 (Context Window)
         current_limit = defaults.get("chat_history_limit", 10)
         history_limit = st.slider(
             "附带历史消息数 (Context Window)", 
@@ -256,19 +256,30 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
             value=current_limit,
             help="每次对话发送给模型的历史消息数量 (+1 表示加上当前问题)"
         )
+
+        # 2. 系统提示词 (System Prompt) - NEW
+        current_system_prompt = defaults.get("system_prompt", "")
+        system_prompt = st.text_area(
+            "系统提示词 (System Prompt)",
+            value=current_system_prompt,
+            placeholder="例如: 你是一个专业的AI助手，请基于提供的上下文回答问题...",
+            height=100,
+            help="设定模型的角色、回答风格或行为准则 (Pre-prompt)"
+        )
         
-        # 如果值发生变化，提供保存按钮
-        if history_limit != current_limit:
-            if st.button("💾 保存对话设置", key="save_chat_settings"):
-                config_data = {"chat_history_limit": history_limit}
-                existing_config = load_config("rag_config")
-                existing_config.update(config_data)
-                if save_config(existing_config, "rag_config"):
-                    st.success("✅ 对话设置已保存")
-                    defaults.update(config_data)
-                    st.rerun()
+        # 保存逻辑
+        has_changes = (history_limit != current_limit) or (system_prompt != current_system_prompt)
+        
+        if has_changes:
+            if st.button("💾 保存对话设置", key="save_chat_settings", type="primary"):
+                config_data = {
+                    "chat_history_limit": history_limit,
+                    "system_prompt": system_prompt
+                }
+                _save_and_apply_config(config_data, selected_key, llm_model, llm_key, llm_url, defaults, only_chat_settings=True)
 
         extra_params['chat_history_limit'] = history_limit
+        extra_params['system_prompt'] = system_prompt
 
     return llm_provider, llm_url, llm_model, llm_key, extra_params
 
@@ -303,18 +314,54 @@ def _render_remote_model_selector(url: str, key: str, saved_model: str, prefix: 
         return st.text_input("模型名称", saved_model, placeholder="例如: gpt-3.5-turbo", key=f"config_{prefix}_model_input")
 
 
-def _save_and_apply_config(config_data: dict, provider: str, model: str, key: str, url: str, defaults: dict, **kwargs):
+def _save_and_apply_config(config_data: dict, provider: str, model: str, key: str, url: str, defaults: dict, only_chat_settings: bool = False, **kwargs):
     """辅助函数：保存并应用配置"""
     existing_config = load_config("rag_config")
     existing_config.update(config_data)
     
+    # 确保 system_prompt 被包含
+    if "system_prompt" not in config_data:
+        # 如果当前保存的不是聊天设置，我们需要从现有配置或 defaults 中获取 system_prompt，以防重置为空
+        system_prompt = existing_config.get("system_prompt") or defaults.get("system_prompt", "")
+    else:
+        system_prompt = config_data["system_prompt"]
+
+    # 同样处理 chat_history_limit (虽然它不直接影响 set_global_llm_model，但为了完整性)
+    
     if save_config(existing_config, "rag_config"):
-        if set_global_llm_model(provider, model, key, url, **kwargs):
-            st.success(f"✅ {provider} 配置已保存并生效 (Hot Reload)")
-            st.session_state.selected_model = model
+        # 如果只是保存对话设置，我们可能不需要重新初始化整个 LLM，
+        # 但为了让 System Prompt 生效，通常需要重新初始化 LLM (LlamaIndex 的 LLM 对象通常是不可变的配置)
+        
+        # 如果是从 provider 按钮调用的，参数齐全。
+        # 如果是从 chat settings 调用的，我们需要从 defaults 补全参数
+        if only_chat_settings:
+            # 尝试从 defaults 获取当前活动的 LLM 配置
+            # 注意：这里的 provider 参数可能只是 selected_key，不一定是当前全局生效的 provider
+            # 这是一个潜在问题：用户在左侧选了 Ollama，改了 System Prompt，点击保存，但当前全局生效的可能是 OpenAI。
+            # 但通常用户改配置时，意图是让当前视图的配置生效。
+            # 实际上，`set_global_llm_model` 会切换全局 LLM。
+            # 所以，保存 Chat Settings 同时也意味着应用了当前左侧面板选中的 Provider 配置。
+            # 为了避免混淆，我们可以只更新 System Prompt 而不切换 Provider？
+            # 不，System Prompt 是 LLM 的属性。
+            # 简单策略：应用当前面板的所有配置。
+            
+            # 补全缺失参数 (model, key, url)
+            # 注意：config_data 里只有 chat settings，所以我们需要从 defaults 获取 provider settings
+            # 但是 defaults 是旧的。我们需要从 UI 控件获取？
+            # render_llm_config 里的 llm_model 等变量是当前渲染的值。
+            # 我们在调用 _save_and_apply_config 时已经传入了这些值 (model, key, url)。
+            pass
+            
+        if set_global_llm_model(provider, model, key, url, system_prompt=system_prompt, **kwargs):
+            st.success(f"✅ 配置已更新并生效 (System Prompt: {'已设置' if system_prompt else '未设置'})")
+            if not only_chat_settings:
+                st.session_state.selected_model = model
         else:
             st.warning("⚠️ 配置已保存，但热更新失败")
+            
         defaults.update(config_data)
+        if only_chat_settings:
+             st.rerun()
     else:
         st.error("❌ 保存失败")
 
