@@ -1095,35 +1095,47 @@ with st.sidebar:
 
             # 高级选项
             with st.expander("🔧 高级选项", expanded=False):
-                # 一键全选控制 - 统一逻辑
-                select_all = st.checkbox("✅ 一键全选", value=False, key="kb_adv_select_all", help="开启/关闭所有高级选项")
+                # 布局优化：全选 + 状态提示在一行
+                h_col1, h_col2 = st.columns([1.5, 2.5])
+                with h_col1:
+                    select_all = st.checkbox("✅ 一键全选", value=False, key="kb_adv_select_all", help="开启/关闭所有高级选项")
+                with h_col2:
+                    status_placeholder = st.empty()
                 
                 # 根据一键全选状态设置默认值
                 default_val = select_all
 
-                # 第一行：索引和元数据选项
-                adv_col1, adv_col2 = st.columns(2)
-                with adv_col1:
+                # 选项布局：如果非新建模式，显示强制重建索引
+                # 新建模式下隐藏强制重建（本身就是新建）
+                if not is_create_mode:
                     force_reindex = st.checkbox("🔄 强制重建索引", value=default_val, key="kb_force_reindex", help="删除现有索引，重新构建")
-                    use_ocr = st.checkbox("🔍 启用OCR识别", value=default_val, key="kb_use_ocr", help="识别PDF中的图片文字（耗时较长）")
-                with adv_col2:
-                    extract_metadata = st.checkbox("📊 提取元数据", value=default_val, key="kb_extract_metadata", help="提取文件分类、关键词等信息")
-                    generate_summary = st.checkbox("📝 生成文档摘要", value=default_val, key="kb_generate_summary", help="为每个文档生成AI摘要")
+                else:
+                    force_reindex = False
+
+                # 剩下的3个选项显示在一行
+                opt_col1, opt_col2, opt_col3 = st.columns(3)
+                with opt_col1:
+                    use_ocr = st.checkbox("🔍 OCR识别", value=default_val, key="kb_use_ocr", help="识别PDF中的图片文字")
+                with opt_col2:
+                    extract_metadata = st.checkbox("📊 元数据", value=default_val, key="kb_extract_metadata", help="提取文件分类、关键词")
+                with opt_col3:
+                    generate_summary = st.checkbox("📝 生成摘要", value=default_val, key="kb_generate_summary", help="生成AI摘要")
                 
                 # 保存到session state
                 st.session_state.use_ocr = use_ocr
                 st.session_state.generate_summary = generate_summary
                 
-                # 简化的处理模式提示
-                if use_ocr or generate_summary or extract_metadata or force_reindex:
-                    options = []
-                    if force_reindex: options.append("重建索引")
-                    if extract_metadata: options.append("提取元数据")
-                    if use_ocr: options.append("OCR识别")
-                    if generate_summary: options.append("生成摘要")
-                    st.caption(f"🔧 启用选项: {' | '.join(options)}")
+                # 更新状态提示
+                options = []
+                if force_reindex: options.append("重建索引")
+                if extract_metadata: options.append("元数据")
+                if use_ocr: options.append("OCR")
+                if generate_summary: options.append("摘要")
+                
+                if options:
+                    status_placeholder.caption(f"🔧 启用: {'|'.join(options)}")
                 else:
-                    st.caption("⚡ 快速模式：所有高级选项已关闭")
+                    status_placeholder.caption("⚡ 快速模式：已关闭高级选项")
 
 
             st.write("")
