@@ -36,7 +36,8 @@ class AsyncWebCrawler:
         
         # 状态持久化 - 使用唯一文件名避免冲突
         import time
-        self.state_file = f"crawler_state_{int(time.time())}.json"
+        import os
+        self.state_file = os.path.join("temp_uploads", f"crawler_state_{int(time.time())}.json")
         self.semaphore = None
         
     async def __aenter__(self):
