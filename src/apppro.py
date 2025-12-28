@@ -839,6 +839,22 @@ with st.sidebar:
             if uploaded_files:
                 st.info("💡 上传后请点击下方 '更新知识库' 按钮")
                 if st.button("🔄 更新知识库", type="primary", use_container_width=True, key="update_kb_btn"):
+                    # 立即处理上传，确保路径存在 (Failsafe)
+                    try:
+                        from src.processors.upload_handler import UploadHandler
+                        # UPLOAD_DIR is global/imported
+                        handler = UploadHandler(UPLOAD_DIR, logger)
+                        with st.spinner("正在预处理文件..."):
+                            result = handler.process_uploads(uploaded_files)
+                            st.session_state.uploaded_path = os.path.abspath(result.batch_dir)
+                            st.session_state.last_processed_path = st.session_state.uploaded_path
+                            # Update hash to prevent double processing downstream
+                            import hashlib
+                            upload_hash = hashlib.md5("".join([f"{f.name}_{f.size}" for f in uploaded_files]).encode()).hexdigest()
+                            st.session_state.last_upload_hash = upload_hash
+                    except Exception as e:
+                        logger.error(f"Immediate upload processing failed: {e}")
+                    
                     btn_start = True
                     action_mode = "APPEND"
                     st.session_state.sidebar_state = "collapsed"
