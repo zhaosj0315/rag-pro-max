@@ -707,6 +707,7 @@ with st.sidebar:
         search_keyword = None
         target_path = ""
         btn_start = False # Initialize early to avoid NameError and support APPEND mode
+        source_mode = None # Initialize to avoid NameError in APPEND mode
         
         if is_create_mode:
             # 注入 CSS 增强核心功能视觉效果
@@ -989,6 +990,7 @@ with st.sidebar:
                     # 记录哈希，防止重复处理
                     st.session_state.last_upload_hash = upload_hash
                     st.session_state.uploaded_path = os.path.abspath(result.batch_dir)
+                    st.session_state.last_processed_path = st.session_state.uploaded_path
 
                     # 显示上传结果
                     if result.success_count > 0:
@@ -1013,6 +1015,10 @@ with st.sidebar:
                     
                     # 关键修复：不再强制全页面 rerun，而是依靠 Streamlit 自然流转
                     # 这样可以保留 uploader 的状态，避免其因刷新而报错或重置
+                
+                elif st.session_state.get('last_processed_path'):
+                    # 如果哈希匹配（说明是 rerun），且有备份路径，则恢复
+                    st.session_state.uploaded_path = st.session_state.last_processed_path
 
 
             # 使用上传路径或手动输入的路径
