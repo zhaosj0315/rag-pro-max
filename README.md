@@ -2,11 +2,11 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-v2.7.2-brightgreen)
+![Version](https://img.shields.io/badge/version-v2.7.3-brightgreen)
 ![Status](https://img.shields.io/badge/status-Stable-blue)
-![Last Update](https://img.shields.io/badge/last%20update-2025--12--28-orange)
+![Last Update](https://img.shields.io/badge/last%20update-2025--12--29-orange)
 
-# 🚀 RAG Pro Max v2.7.2
+# 🚀 RAG Pro Max v2.7.3
 
 > **企业级 RAG 知识库系统 - 智能推荐与极速检索的终极进化**
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
@@ -27,7 +27,7 @@
 
 ## ✨ 核心功能
 
-### 🔧 知识库管理增强 (v2.7.2 新增)
+### 🔧 知识库管理增强 (v2.7.3 新增)
 - **更新模式高级选项**: 在追加文档到现有知识库时，完整支持与新建模式一致的高级处理能力
 - **全链路一致性**: **OCR文字识别**、**元数据提取**、**AI摘要生成**、**一键全选**等功能在更新模式下均可使用
 - **逻辑统一**: 复用核心底层逻辑，确保无论新建还是更新，文档处理质量完全一致

@@ -1,34 +1,17 @@
-# RAG Pro Max v2.7.2 接口汇总
+# RAG Pro Max v2.7.3 接口汇总
 
 ## 📊 统计信息
 
-- **Python模块**: 191个
-- **类定义**: 91个
-- **函数定义**: 1255个
-- **API端点**: 23个
+- **Python模块**: 176个
+- **类定义**: 159个  
+- **函数定义**: 1359个
+- **API端点**: 11个
 - **配置文件**: 3个
-- **统一组件**: 10个
-- **测试覆盖率**: 93%
 
-## 🏗️ v2.7.2 模块结构
-
-### 🎨 界面重构 (v2.7.2)
-- **src/apppro.py**: 主入口，新增 **管理模式高级选项** (Update Knowledge Base Advanced Options)
-- **src/ui/kb_management_ui.py**: 知识库管理界面逻辑优化
-
-### 📂 文件详情与取证 (v2.7.1)
-- **src/utils/file_system_utils.py**: 30+项属性挖掘与 macOS 深度集成
-- **src/ui/unified_dialogs.py**: 统一文件详情对话框 (Split View 布局)
-
-### 🤖 智能推荐系统 (v2.6.0)
-- services/recommendation_service.py
-- ui/recommendation_ui.py
-- utils/llm_context_generator.py
-- utils/deduplication_engine.py
+## 🏗️ 模块结构
 
 ### api/
 - api/fastapi_server.py
-- api/recommendation_api.py
 
 ### app/
 - app/__init__.py
@@ -45,9 +28,8 @@
 - chat/chat_engine.py
 - chat/chat_interface.py
 - chat/history_manager.py
-- chat/suggestion_engine.py
 - chat/suggestion_manager.py
-- chat/web_suggestion_engine.py
+- chat/unified_suggestion_engine.py
 
 ### common/
 - common/__init__.py
@@ -104,6 +86,7 @@
 
 ### monitoring/
 - monitoring/file_watcher.py
+- monitoring/unified_monitoring_system.py
 
 ### processors/
 - processors/__init__.py
@@ -119,11 +102,13 @@
 - processors/multimodal_processor.py
 - processors/multimodal_vectorizer.py
 - processors/summary_generator.py
+- processors/unified_document_processor.py
 - processors/upload_handler.py
 - processors/web_crawler.py
 - processors/web_to_kb_processor.py
 
 ### query/
+- query/multi_kb_query_engine.py
 - query/query_handler.py
 - query/query_processor.py
 - query/query_rewriter.py
@@ -145,8 +130,10 @@
 ### services/
 - services/__init__.py
 - services/config_service.py
+- services/configurable_industry_service.py
 - services/file_service.py
 - services/knowledge_base_service.py
+- services/unified_config_service.py
 
 ### summary/
 - summary/auto_summary.py
@@ -154,8 +141,14 @@
 ### ui/
 - ui/__init__.py
 - ui/advanced_config.py
+- ui/complete_sidebar.py
+- ui/config_forms.py
+- ui/crawl_progress.py
+- ui/display_components.py
+- ui/document_preview.py
 - ui/enhanced_controls.py
 - ui/horizontal_tabs_sidebar.py
+- ui/industry_config_interface.py
 - ui/kb_advanced_options.py
 - ui/kb_management_ui.py
 - ui/knowledge_graph.py
@@ -174,8 +167,10 @@
 - ui/sidebar_config.py
 - ui/sidebar_manager.py
 - ui/status_bar.py
-- ui/suggestion_panel.py
 - ui/tabbed_sidebar.py
+- ui/unified_config_components.py
+- ui/unified_dialogs.py
+- ui/unified_display_components.py
 - ui/user_experience_enhanced.py
 - ui/web_to_kb_interface.py
 
@@ -237,19 +232,13 @@
 
 ## 🔌 API端点
 
-- `DELETE /api/kb/{kb_name}`
 - `DELETE /cache`
 - `GET /`
-- `GET /`
-- `GET /api/health`
-- `GET /api/kb`
 - `GET /cache/stats`
 - `GET /health`
 - `GET /kb/{kb_name}/incremental-stats`
 - `GET /knowledge-bases`
 - `GET /multimodal/formats`
-- `POST /api/query`
-- `POST /api/upload`
 - `POST /incremental-update`
 - `POST /query`
 - `POST /query-multimodal`
@@ -265,26 +254,25 @@
 - `llm_model_ollama`: gpt-oss:20b
 
 ### config/rag_config.json
-- `output_base`: ./vector_db_storage
-- `target_path`: /Users/zhaosj/Documents/用所选项目新建的文件夹/temp_uploads/batch_1765164435
-- `llm_type_idx`: 0
-- `embed_idx`: 0
-- `output_path`: /Users/zhaosj/Documents/用所选项目新建的文件夹/vector_db_storage
+- `target_path`: /Users/zhaosj/Documents/rag-pro-max/temp_uploads/text_1766962829
+- `output_path`: /Users/zhaosj/Documents/rag-pro-max/vector_db_storage
+- `llm_type_idx`: 1
 - `llm_url_ollama`: http://localhost:11434
 - `llm_model_ollama`: gpt-oss:20b
-- `llm_url_openai`: 
-- `llm_key`: 
-- `llm_model_openai`: 
+- `llm_url_openai`: https://cn.gptapi.asia/v1
+- `llm_key`: sk-nWYfVnuZMkPnLFsR5d02Af5b6c31478889C12520775f8f12
+- `llm_model_openai`: chatgpt-4o-latest
 - `embed_provider_idx`: 0
-- `embed_model_hf`: BAAI/bge-large-zh-v1.5
+- `embed_model_hf`: sentence-transformers/all-MiniLM-L6-v2
 - `embed_url_ollama`: 
 - `embed_model_ollama`: 
-- `chunk_size`: 512
-- `top_k`: 3
-- `rerank_enabled`: True
-- `rerank_model`: BAAI/bge-reranker-base
-- `parallel_workers`: 20
 - `llm_provider`: Ollama
+- `llm_url_other`: https://cn.gptapi.asia/v1
+- `llm_key_other`: sk-nWYfVnuZMkPnLFsR5d02Af5b6c31478889C12520775f8f12
+- `llm_model_other`: chatgpt-4o-latest
+- `llm_provider_label`: Ollama (本地)
+- `llm_url`: https://cn.gptapi.asia/v1
+- `llm_model`: chatgpt-4o-latest
 
 ### rag_config.json
 - `target_path`: rag_storage
@@ -296,7 +284,7 @@
 
 ## 📝 生成时间
 
-Sun Dec 28 07:47:51 CST 2025
+Mon Dec 29 07:10:14 CST 2025
 
 ---
 
