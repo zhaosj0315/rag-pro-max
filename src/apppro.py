@@ -1535,11 +1535,11 @@ def jump_to_knowledge_base(kb_name: str, output_base: str):
     logger.log("知识库跳转", "complete", f"✅ 跳转函数执行完成: {kb_name}")
 
 
-def process_knowledge_base_logic(action_mode="NEW", use_ocr=False, extract_metadata=False, generate_summary=False, force_reindex=False):
+def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extract_metadata=False, generate_summary=False, force_reindex=False):
     """处理知识库逻辑 (Stage 4.2 - 使用 IndexBuilder)"""
     global logger
     
-    persist_dir = os.path.join(output_base, final_kb_name)
+    persist_dir = os.path.join(output_base, kb_name)
     start_time = time.time()
     
     # 资源保护检查
@@ -1586,10 +1586,10 @@ def process_knowledge_base_logic(action_mode="NEW", use_ocr=False, extract_metad
     except:
         logger.success(f"✅ 嵌入模型已设置: {embed_model}")
 
-    logger.log("INFO", f"开始处理知识库: {final_kb_name}", stage="知识库处理")
+    logger.log("INFO", f"开始处理知识库: {kb_name}", stage="知识库处理")
     
     # UI 状态容器
-    status_container = st.status(f"🚀 处理知识库: {final_kb_name}", expanded=True)
+    status_container = st.status(f"🚀 处理知识库: {kb_name}", expanded=True)
     prog_bar = status_container.progress(0)
     status_container.write(f"⏱️ 开始时间: {datetime.now().strftime('%H:%M:%S')}")
     
@@ -1618,7 +1618,7 @@ def process_knowledge_base_logic(action_mode="NEW", use_ocr=False, extract_metad
     
     # 使用 IndexBuilder 构建索引
     builder = IndexBuilder(
-        kb_name=final_kb_name,
+        kb_name=kb_name,
         persist_dir=persist_dir,
         embed_model=embed,
         embed_model_name=embed_model,
@@ -1651,19 +1651,19 @@ def process_knowledge_base_logic(action_mode="NEW", use_ocr=False, extract_metad
     # 计算耗时
     duration = time.time() - start_time
     logger.separator("处理完成")
-    logger.success(f"✅ 知识库 '{final_kb_name}' 处理完成")
+    logger.success(f"✅ 知识库 '{kb_name}' 处理完成")
     logger.info(f"📊 统计: {result.file_count} 个文件, {result.doc_count} 个文档片段")
     logger.info(f"⏱️  耗时: {duration:.1f} 秒")
     
-    logger.log("SUCCESS", f"知识库处理完成: {final_kb_name}, 文档数: {result.doc_count}", stage="知识库处理")
+    logger.log("SUCCESS", f"知识库处理完成: {kb_name}, 文档数: {result.doc_count}", stage="知识库处理")
     
-    status_container.update(label=f"✅ 知识库 '{final_kb_name}' 处理完成", state="complete", expanded=True)
+    status_container.update(label=f"✅ 知识库 '{kb_name}' 处理完成", state="complete", expanded=True)
     
     # 跳转到新创建的知识库
-    jump_to_knowledge_base(final_kb_name, output_base)
+    jump_to_knowledge_base(kb_name, output_base)
     
     # 显示成功消息并自动跳转
-    st.success(f"🎉 知识库 '{final_kb_name}' 创建成功！正在跳转...")
+    st.success(f"🎉 知识库 '{kb_name}' 创建成功！正在跳转...")
     st.rerun()
     
     # 资源清理
@@ -2291,27 +2291,37 @@ if btn_start:
     existing_config.update(config_update)
     ConfigLoader.save(existing_config)
 
+    # Ensure final_kb_name is defined (crucial for APPEND mode where sidebar logic might differ)
+    if 'final_kb_name' not in locals():
+        if is_create_mode:
+            final_kb_name = st.session_state.get('new_kb_name', '') # Try session state or empty
+        else:
+            final_kb_name = current_kb_name
+
     if not final_kb_name:
         st.error("请输入知识库名称")
     else:
         try:
             # 使用优化器生成唯一名称，避免重复和时间戳冲突
-            optimized_name = KBNameOptimizer.generate_unique_name(final_kb_name, output_base)
-            
-            if not optimized_name: 
-                raise ValueError("知识库名称包含非法字符或为空")
-            
-            # 如果名称被优化了，提示用户
-            if optimized_name != final_kb_name:
-                st.info(f"💡 名称已优化: `{final_kb_name}` → `{optimized_name}`")
+            # Only optimize name in NEW mode to avoid renaming existing KBs in APPEND mode
+            if is_create_mode:
+                optimized_name = KBNameOptimizer.generate_unique_name(final_kb_name, output_base)
                 
-            # 使用优化后的名称
-            final_kb_name = optimized_name
+                if not optimized_name: 
+                    raise ValueError("知识库名称包含非法字符或为空")
+                
+                # 如果名称被优化了，提示用户
+                if optimized_name != final_kb_name:
+                    st.info(f"💡 名称已优化: `{final_kb_name}` → `{optimized_name}`")
+                    
+                # 使用优化后的名称
+                final_kb_name = optimized_name
             
             # DEBUG: Check parameters
-            print(f"DEBUG: Calling process_knowledge_base_logic with: ocr={current_use_ocr}, meta={current_extract_metadata}, summary={current_generate_summary}")
+            print(f"DEBUG: Calling process_knowledge_base_logic with: kb={final_kb_name}, ocr={current_use_ocr}, meta={current_extract_metadata}, summary={current_generate_summary}")
 
             process_knowledge_base_logic(
+                kb_name=final_kb_name,
                 action_mode=action_mode,
                 use_ocr=current_use_ocr,
                 extract_metadata=current_extract_metadata,

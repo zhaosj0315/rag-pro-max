@@ -90,6 +90,42 @@ class IndexBuilder:
             # 步骤4: 构建清单
             progress.start_step(4, "构建文件清单")
             file_map = self._build_manifest(source_path, status_callback)
+
+            # --- 合并清单逻辑 (APPEND 模式) ---
+            if action_mode == "APPEND":
+                try:
+                    from src.config import ManifestManager
+                    existing = ManifestManager.load(self.persist_dir)
+                    existing_files = existing.get('files', [])
+                    
+                    # 将现有文件转换为 map 格式
+                    existing_map = {}
+                    for f in existing_files:
+                        if isinstance(f, dict):
+                            fname = f.get('name')
+                            if fname:
+                                existing_map[fname] = f
+                    
+                    # 记录统计
+                    old_count = len(existing_map)
+                    new_count = len(file_map)
+                    
+                    # 合并：保留现有文件，用新文件覆盖同名文件
+                    # 注意：file_map 中是新扫描的文件，应优先保留 (覆盖旧的同名文件)
+                    # 将不在新 batch 中的旧文件加回来
+                    for fname, info in existing_map.items():
+                        if fname not in file_map:
+                            file_map[fname] = info
+                            
+                    if status_callback:
+                        status_callback("info", f"➕ 追加模式: 原有 {old_count} + 新增 {new_count} = 总计 {len(file_map)} 个文件")
+                    if self.logger:
+                        self.logger.info(f"清单合并: 原有 {old_count} + 新增 {new_count} -> {len(file_map)}")
+                        
+                except Exception as e:
+                    if self.logger: self.logger.warning(f"合并清单失败: {e}")
+            # -------------------------------
+
             progress.end_step(f"登记 {len(file_map)} 个文件")
             
             # 步骤5: 解析片段
