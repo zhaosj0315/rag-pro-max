@@ -837,6 +837,36 @@ with st.sidebar:
             
             # 添加更新知识库按钮
             if uploaded_files:
+                # 高级选项 (复用新建模式的逻辑)
+                with st.expander("🔧 高级选项 (本次更新有效)", expanded=False):
+                    # 布局优化：全选 + 状态提示在一行
+                    h_col1, h_col2 = st.columns([1.5, 2.5])
+                    with h_col1:
+                        select_all = st.checkbox("✅ 一键全选", value=False, key="kb_adv_select_all_update", help="开启/关闭所有高级选项")
+                    with h_col2:
+                        status_placeholder = st.empty()
+                    
+                    default_val = select_all
+                    
+                    opt_col1, opt_col2, opt_col3 = st.columns(3)
+                    with opt_col1:
+                        st.checkbox("🔍 OCR识别", value=default_val, key="kb_use_ocr", help="识别PDF中的图片文字")
+                    with opt_col2:
+                        st.checkbox("📊 元数据", value=default_val, key="kb_extract_metadata", help="提取文件分类、关键词")
+                    with opt_col3:
+                        st.checkbox("📝 生成摘要", value=default_val, key="kb_generate_summary", help="生成AI摘要")
+                    
+                    # 更新状态提示
+                    options = []
+                    if st.session_state.get("kb_use_ocr"): options.append("OCR")
+                    if st.session_state.get("kb_extract_metadata"): options.append("元数据")
+                    if st.session_state.get("kb_generate_summary"): options.append("摘要")
+                    
+                    if options:
+                        status_placeholder.caption(f"🔧 启用: {'|'.join(options)}")
+                    else:
+                        status_placeholder.caption("⚡ 快速模式：已关闭高级选项")
+
                 st.info("💡 上传后请点击下方 '更新知识库' 按钮")
                 if st.button("🔄 更新知识库", type="primary", use_container_width=True, key="update_kb_btn"):
                     # 立即处理上传，确保路径存在 (Failsafe)

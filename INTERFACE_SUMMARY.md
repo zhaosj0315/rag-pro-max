@@ -1,20 +1,24 @@
-# RAG Pro Max v2.6.1 接口汇总
+# RAG Pro Max v2.7.2 接口汇总
 
 ## 📊 统计信息
 
-- **Python模块**: 189个
-- **类定义**: 89个
-- **函数定义**: 1247个
+- **Python模块**: 191个
+- **类定义**: 91个
+- **函数定义**: 1255个
 - **API端点**: 23个
 - **配置文件**: 3个
-- **统一组件**: 9个
+- **统一组件**: 10个
 - **测试覆盖率**: 93%
 
-## 🏗️ v2.6.1 模块结构
+## 🏗️ v2.7.2 模块结构
 
-### 🎨 界面重构 (v2.6.1)
-- **src/apppro.py**: 主入口，实现 4x1 扁平化数据源选择与统一侧边栏触发逻辑
-- **src/ui/complete_sidebar.py**: 侧边栏统一渲染，包含 "立即创建" 核心按钮
+### 🎨 界面重构 (v2.7.2)
+- **src/apppro.py**: 主入口，新增 **管理模式高级选项** (Update Knowledge Base Advanced Options)
+- **src/ui/kb_management_ui.py**: 知识库管理界面逻辑优化
+
+### 📂 文件详情与取证 (v2.7.1)
+- **src/utils/file_system_utils.py**: 30+项属性挖掘与 macOS 深度集成
+- **src/ui/unified_dialogs.py**: 统一文件详情对话框 (Split View 布局)
 
 ### 🤖 智能推荐系统 (v2.6.0)
 - services/recommendation_service.py
@@ -24,7 +28,7 @@
 
 ### api/
 - api/fastapi_server.py
-- api/recommendation_api.py (新增)
+- api/recommendation_api.py
 
 ### app/
 - app/__init__.py
@@ -201,6 +205,7 @@
 - utils/enhanced_ocr_optimizer.py
 - utils/error_handler_enhanced.py
 - utils/export_manager.py
+- utils/file_system_utils.py
 - utils/gpu_ocr_accelerator.py
 - utils/gpu_optimizer.py
 - utils/kb_name_optimizer.py
@@ -291,7 +296,7 @@
 
 ## 📝 生成时间
 
-Sat Dec 20 07:47:51 CST 2025
+Sun Dec 28 07:47:51 CST 2025
 
 ---
 
