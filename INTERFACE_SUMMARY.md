@@ -2,9 +2,9 @@
 
 ## 📊 统计信息
 
-- **Python模块**: 176个
-- **类定义**: 159个  
-- **函数定义**: 1360个
+- **Python模块**: 177个
+- **类定义**: 160个  
+- **函数定义**: 1370个
 - **API端点**: 11个
 - **配置文件**: 3个
 
@@ -43,6 +43,7 @@
 - config/config_loader.py
 - config/config_validator.py
 - config/manifest_manager.py
+- config/prompt_manager.py
 - config/unified_sites.py
 
 ### core/
@@ -254,7 +255,7 @@
 - `llm_model_ollama`: gpt-oss:20b
 
 ### config/rag_config.json
-- `target_path`: /Users/zhaosj/Documents/rag-pro-max/temp_uploads/batch_1766963766
+- `target_path`: /Users/zhaosj/Documents/rag-pro-max/temp_uploads/text_1766968896
 - `output_path`: /Users/zhaosj/Documents/rag-pro-max/vector_db_storage
 - `llm_type_idx`: 1
 - `llm_url_ollama`: http://localhost:11434
@@ -284,7 +285,7 @@
 
 ## 📝 生成时间
 
-Mon Dec 29 07:19:47 CST 2025
+Mon Dec 29 09:08:35 CST 2025
 
 ---
 

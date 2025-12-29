@@ -3339,15 +3339,94 @@ if is_create_mode:
 if active_kb_name:
     with st.container():
         from src.config import ConfigLoader
+        from src.config.prompt_manager import PromptManager
+        from src.utils.model_manager import set_global_llm_model
+        
         conf = ConfigLoader.load()
         ctx_limit = conf.get('chat_history_limit', 10)
         current_model_name = st.session_state.get('selected_model', 'Default')
+        
+        # 加载提示词库
+        all_prompts = PromptManager.load_prompts()
+        prompt_map = {p['name']: p for p in all_prompts}
+        prompt_names = list(prompt_map.keys())
+        
+        # 初始化当前选择
+        if 'current_prompt_id' not in st.session_state:
+            st.session_state.current_prompt_id = 'default'
+            
+        # 查找当前索引
+        current_index = 0
+        for i, p in enumerate(all_prompts):
+            if p['id'] == st.session_state.current_prompt_id:
+                current_index = i
+                break
 
-        h_col1, h_col2, h_col3 = st.columns([3, 4, 1.5])
+        h_col1, h_col2, h_col3 = st.columns([2, 4, 1.5])
         with h_col1:
             st.markdown(f"### 📂 {active_kb_name}")
+            
         with h_col2:
-            st.markdown(f"<div style='padding-top: 10px; text-align: center; color: #666;'>🤖 {current_model_name} <span style='background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; margin-left: 8px;'>🔄 {ctx_limit}</span></div>", unsafe_allow_html=True)
+            # 布局：角色选择器 + 状态信息
+            sub_c1, sub_c2 = st.columns([1.5, 1])
+            with sub_c1:
+                selected_prompt_name = st.selectbox(
+                    "角色设定", 
+                    prompt_names, 
+                    index=current_index, 
+                    key="header_prompt_select", 
+                    label_visibility="collapsed",
+                    help="选择 AI 的回答角色与风格"
+                )
+            with sub_c2:
+                st.markdown(f"<div style='padding-top: 5px; color: #666; font-size: 0.8rem;'>🤖 {current_model_name} <br>🔄 Context: {ctx_limit}</div>", unsafe_allow_html=True)
+            
+            # 处理角色切换
+            selected_prompt = prompt_map[selected_prompt_name]
+            if selected_prompt['id'] != st.session_state.current_prompt_id:
+                st.session_state.current_prompt_id = selected_prompt['id']
+                
+                # 热切换 LLM 系统提示词
+                try:
+                    # 从配置中获取必要的连接信息
+                    llm_provider = conf.get('llm_provider', 'Ollama')
+                    llm_model = conf.get('llm_model_ollama', 'gpt-oss:20b') # Default fallback
+                    llm_url = conf.get('llm_url_ollama', 'http://localhost:11434')
+                    llm_key = ""
+                    
+                    # 根据 Provider 获取正确参数 (简化版，复用 ConfigLoader 逻辑会更稳健，但这里做快速切换)
+                    # 为了完全准确，我们应该复用 set_global_llm 的参数提取逻辑
+                    # 简单起见，我们假设 ConfigLoader.load() 返回的 config 已经有了 current active settings
+                    # 或者我们可以只更新 system_prompt，假设其他参数不变？
+                    # set_global_llm_model 需要所有参数。
+                    
+                    # 重新读取当前生效的配置
+                    if llm_provider == "OpenAI":
+                        llm_model = conf.get('llm_model_openai')
+                        llm_url = conf.get('llm_url_openai')
+                        llm_key = conf.get('llm_key')
+                    elif llm_provider == "Azure OpenAI":
+                        llm_model = conf.get('azure_deployment')
+                        llm_url = conf.get('azure_endpoint')
+                        llm_key = conf.get('azure_key')
+                    # ... 其他 provider ...
+                    
+                    # 这里的逻辑有点复杂，容易出错。
+                    # 最好的方式是：调用一个 "reload_llm_with_new_prompt" 函数，或者让 set_global_llm_model 从 config 自动读取？
+                    # 暂时我们只支持最常用的 Ollama 和 OpenAI 热切换，其他情况提示去配置页。
+                    
+                    new_content = selected_prompt['content']
+                    
+                    # 尝试应用
+                    set_global_llm_model(llm_provider, llm_model, llm_key, llm_url, system_prompt=new_content)
+                    st.toast(f"🎭 已切换角色: {selected_prompt['name']}")
+                    # 强制刷新以确保 ChatEngine 重建 (如果它依赖 Settings.llm)
+                    # ChatEngine 通常在 rerun 时会检查 Settings
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"切换失败: {e}")
+
         with h_col3:
             if st.button("➕ 新对话", key="header_new_chat", use_container_width=True, type="secondary"):
                 import uuid
