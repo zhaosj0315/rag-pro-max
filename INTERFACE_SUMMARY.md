@@ -1,4 +1,4 @@
-# RAG Pro Max 接口汇总
+# RAG Pro Max v2.7.4 接口汇总
 
 ## 📊 统计信息
 
