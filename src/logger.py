@@ -136,13 +136,16 @@ class Logger:
             msg += f" [知识库: {kb_name}]"
         self.log("查询对话", "success", msg, {"doc_count": doc_count, "kb_name": kb_name})
     
-    def log_answer_complete(self, kb_name=None, model=None, tokens=None, prompt_tokens=None, completion_tokens=None):
+    def log_answer_complete(self, kb_name=None, model=None, tokens=None, prompt_tokens=None, completion_tokens=None, role=None):
         elapsed = self.get_elapsed(f"query_{kb_name}")
         msg = f"✅ 回答生成完成 ({elapsed}s)"
         details = {"elapsed": elapsed}
         if kb_name:
             msg += f" [知识库: {kb_name}]"
             details["kb_name"] = kb_name
+        if role:
+            msg += f" [角色: {role}]"
+            details["role"] = role
         if model:
             msg += f" [模型: {model}]"
             details["model"] = model

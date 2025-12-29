@@ -125,6 +125,10 @@ class LogManager:
         if details and 'model' in details:
             message += f" (Model: {details['model']})"
         
+        # 增加角色显示
+        if details and 'role' in details:
+            message += f" [角色: {details['role']}]"
+        
         if stage:
             print(f"{icon} [{ts}] [{stage}] {message}")
         else:

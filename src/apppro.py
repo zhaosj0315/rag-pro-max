@@ -3418,6 +3418,7 @@ if active_kb_name:
                     new_content = selected_prompt['content']
                     
                     # 尝试应用
+                    logger.info(f"🔄 切换角色: {selected_prompt['name']}")
                     set_global_llm_model(llm_provider, llm_model, llm_key, llm_url, system_prompt=new_content)
                     st.toast(f"🎭 已切换角色: {selected_prompt['name']}")
                     # 强制刷新以确保 ChatEngine 重建 (如果它依赖 Settings.llm)
@@ -3883,6 +3884,14 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
     # 记录开始时间用于死锁检测
     st.session_state.process_start_time = time.time()
     final_prompt = st.session_state.question_queue.pop(0)
+    
+    # 记录当前角色状态 (v2.7.4)
+    from src.config.prompt_manager import PromptManager
+    all_prompts = PromptManager.load_prompts()
+    current_role_id = st.session_state.get('current_prompt_id', 'default')
+    role_name = next((p['name'] for p in all_prompts if p['id'] == current_role_id), current_role_id)
+    
+    logger.info(f"🎭 当前角色: {role_name}")
     logger.info(f"🚀 开始处理队列问题: {final_prompt[:50]}...")
     
     if active_kb_name == "multi_kb_mode":
@@ -4255,7 +4264,13 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         else:
                             logger.info(f"⚡ 单节点处理: {len(srcs)} 个节点")
                     
-                    logger.log("SUCCESS", "回答生成完成", stage="查询对话", details={"kb_name": active_kb_name, "model": llm_model, "tokens": token_count, "prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens
+                    logger.log("SUCCESS", "回答生成完成", stage="查询对话", details={
+                        "kb_name": active_kb_name, 
+                        "model": llm_model, 
+                        "role": role_name,
+                        "tokens": token_count, 
+                        "prompt_tokens": prompt_tokens, 
+                        "completion_tokens": completion_tokens
                     })
                     
                     # 计算总耗时

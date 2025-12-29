@@ -33,7 +33,8 @@ class ChatEngine:
         self, 
         question: str,
         llm_model: str,
-        quoted_text: Optional[str] = None
+        quoted_text: Optional[str] = None,
+        role: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         处理用户问题
@@ -42,6 +43,7 @@ class ChatEngine:
             question: 用户问题
             llm_model: LLM 模型名称
             quoted_text: 引用的文本（可选）
+            role: 当前角色名称（可选）
         
         Returns:
             包含回答、来源、统计信息的字典
@@ -168,7 +170,8 @@ class ChatEngine:
             model=llm_model,
             tokens=token_count,
             prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens
+            completion_tokens=completion_tokens,
+            role=role
         )
         
         # 计算总耗时
