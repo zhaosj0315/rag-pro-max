@@ -255,7 +255,7 @@
 - `llm_model_ollama`: gpt-oss:20b
 
 ### config/rag_config.json
-- `target_path`: /Users/zhaosj/Documents/rag-pro-max/temp_uploads/text_1766968896
+- `target_path`: /Users/zhaosj/Documents/rag-pro-max/temp_uploads/batch_1766974677
 - `output_path`: /Users/zhaosj/Documents/rag-pro-max/vector_db_storage
 - `llm_type_idx`: 1
 - `llm_url_ollama`: http://localhost:11434
@@ -285,7 +285,7 @@
 
 ## 📝 生成时间
 
-Mon Dec 29 09:08:35 CST 2025
+Mon Dec 29 10:22:19 CST 2025
 
 ---
 

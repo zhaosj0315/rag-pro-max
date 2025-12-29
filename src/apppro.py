@@ -3492,6 +3492,10 @@ for msg_idx, msg in enumerate(state.get_messages()):
     role = msg["role"]
     avatar = "🤖" if role == "assistant" else "🧑‍💻"
     with st.chat_message(role, avatar=avatar):
+        # 显示角色标签 (v2.7.4)
+        if role == "assistant" and msg.get("prompt_role"):
+            st.caption(f"🎭 {msg['prompt_role']}")
+            
         st.markdown(msg["content"])
         
         # 显示统计信息（如果有）- 使用新组件 (Stage 3.1)
@@ -4291,7 +4295,8 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         "role": "assistant", 
                         "content": full_text, 
                         "sources": srcs,
-                        "stats": stats
+                        "stats": stats,
+                        "prompt_role": role_name
                     })
                     
                     # 生成推荐问题（在spinner内完成）

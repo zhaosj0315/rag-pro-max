@@ -2,6 +2,8 @@
     "version": "2.7.4",
     "release_date": "2025-12-29",
     "features": [
+        "深度日志追踪 (终端显示角色身份)",
+        "前端角色标签 (消息气泡显示Prompt Role)",
         "多角色提示词系统 (Prompt Library) 与即时切换",
         "多会话历史管理系统 (单知识库多会话存储)",
         "对话顶栏融合 (Session Header 实时状态显示)",
