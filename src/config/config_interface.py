@@ -14,7 +14,7 @@ class ConfigInterface:
     
     def render_config_tab(self):
         """渲染配置标签页"""
-        st.markdown("### ⚙️ 模型配置")
+        st.markdown("#### ⚙️ 模型配置")
         
         # 获取默认配置
         from src.config import ConfigLoader
@@ -41,7 +41,7 @@ class ConfigInterface:
     
     def render_model_config(self):
         """渲染模型配置"""
-        st.markdown("#### 🤖 LLM 配置")
+        st.markdown("##### 🤖 LLM 配置")
         
         # LLM 提供商选择
         llm_provider = st.selectbox(
@@ -57,7 +57,7 @@ class ConfigInterface:
         elif llm_provider == "OpenAI":
             config_values.update(self.render_openai_config())
         
-        st.markdown("#### 🧠 嵌入模型配置")
+        st.markdown("##### 🧠 嵌入模型配置")
         embed_config = self.render_embedding_config()
         config_values.update(embed_config)
         
@@ -183,7 +183,7 @@ class ConfigInterface:
     
     def render_rag_config(self):
         """渲染RAG配置"""
-        st.markdown("#### 🔍 RAG 参数配置")
+        st.markdown("##### 🔍 RAG 参数配置")
         
         col1, col2 = st.columns(2)
         
@@ -233,7 +233,7 @@ class ConfigInterface:
     
     def render_performance_config(self):
         """渲染性能配置"""
-        st.markdown("#### ⚡ 性能配置")
+        st.markdown("##### ⚡ 性能配置")
         
         col1, col2 = st.columns(2)
         
@@ -285,7 +285,7 @@ class ConfigInterface:
     
     def test_config(self, config_values: dict):
         """测试配置"""
-        st.markdown("#### 🧪 配置测试")
+        st.markdown("##### 🧪 配置测试")
         
         if st.button("🔍 测试LLM连接", use_container_width=True):
             self.test_llm_connection(config_values)
@@ -339,7 +339,7 @@ class ConfigInterface:
     
     def render_quick_setup(self):
         """渲染快速设置"""
-        st.markdown("#### ⚡ 快速设置")
+        st.markdown("##### ⚡ 快速设置")
         
         setup_type = st.selectbox(
             "选择配置方案",

@@ -8,10 +8,10 @@ from pathlib import Path
 
 def render_kb_creation_wizard(form_key="kb_creation_form"):
     """知识库创建向导"""
-    st.markdown("### 📚 创建新知识库")
+    st.markdown("#### 📚 创建新知识库")
     
     with st.form(form_key):
-        st.markdown("#### 📝 基本信息")
+        st.markdown("##### 📝 基本信息")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -33,7 +33,7 @@ def render_kb_creation_wizard(form_key="kb_creation_form"):
             height=100
         )
         
-        st.markdown("#### ⚙️ 高级设置")
+        st.markdown("##### ⚙️ 高级设置")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -85,7 +85,7 @@ def render_kb_creation_wizard(form_key="kb_creation_form"):
 
 def render_kb_selector():
     """知识库选择器"""
-    st.markdown("### 📚 选择知识库")
+    st.markdown("#### 📚 选择知识库")
     
     # 获取知识库列表
     kb_list = get_knowledge_base_list()
@@ -148,7 +148,7 @@ def render_kb_selector():
 
 def render_kb_management():
     """知识库管理"""
-    st.markdown("### 🛠️ 知识库管理")
+    st.markdown("#### 🛠️ 知识库管理")
     
     # 获取知识库列表
     kb_list = get_knowledge_base_list()

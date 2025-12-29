@@ -102,12 +102,12 @@ class ProgressTracker:
     
     def render_progress_panel(self):
         """渲染进度面板"""
-        st.header("📊 实时处理进度")
+        st.markdown("#### 📊 实时处理进度")
         
         # 活跃任务
         active_tasks = self.get_all_active_tasks()
         if active_tasks:
-            st.subheader("🔄 正在处理")
+            st.markdown("##### 🔄 正在处理")
             
             for task in active_tasks:
                 self._render_task_progress(task)
@@ -117,7 +117,7 @@ class ProgressTracker:
         # 最近完成的任务
         completed_tasks = self.get_recent_completed_tasks(5)
         if completed_tasks:
-            st.subheader("✅ 最近完成")
+            st.markdown("##### ✅ 最近完成")
             
             for task in reversed(completed_tasks):
                 self._render_completed_task(task)

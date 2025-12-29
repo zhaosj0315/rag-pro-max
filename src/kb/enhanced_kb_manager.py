@@ -137,7 +137,7 @@ class EnhancedKBManager:
     
     def render_knowledge_graph(self, documents: List[Dict]):
         """渲染知识图谱"""
-        st.markdown("### 🕸️ 知识图谱")
+        st.markdown("###### 🕸️ 知识图谱")
         
         if len(documents) < 2:
             st.info("需要至少2个文档才能生成知识图谱")
@@ -195,7 +195,7 @@ class EnhancedKBManager:
     
     def render_smart_recommendations(self, current_doc: Dict, all_docs: List[Dict]):
         """渲染智能推荐"""
-        st.markdown("### 🎯 智能推荐")
+        st.markdown("###### 🎯 智能推荐")
         
         # 计算相似度并排序
         similarities = []

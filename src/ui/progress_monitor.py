@@ -157,7 +157,7 @@ class ProgressMonitor:
         if not active_tasks:
             return
         
-        st.subheader("📊 处理进度")
+        st.markdown("##### 📊 处理进度")
         
         for task in active_tasks:
             self.render_progress(task.task_id)

@@ -198,7 +198,7 @@ class MainInterface:
             )
             
             if display_suggestions:
-                st.markdown("##### 🚀 追问推荐")
+                st.markdown("###### 🚀 追问推荐")
                 for idx, q in enumerate(display_suggestions[:3]):  # 只显示3个
                     if st.button(f"👉 {q}", key=f"dyn_sug_{msg_hash}_{idx}", use_container_width=True):
                         click_btn_func(q)

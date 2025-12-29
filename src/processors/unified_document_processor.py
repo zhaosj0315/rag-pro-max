@@ -29,7 +29,7 @@ class UnifiedDocumentProcessor:
     
     def render_upload_interface(self, key_prefix: str = "upload") -> List[Any]:
         """渲染统一的文件上传界面"""
-        st.subheader("📁 文档上传")
+        st.markdown("##### 📁 文档上传")
         
         # 上传方式选择
         upload_method = st.radio(

@@ -16,7 +16,7 @@ class KBInterface:
     
     def render_kb_console(self):
         """渲染知识库控制台"""
-        st.markdown("### 💠 知识库控制台")
+        st.markdown("###### 💠 知识库控制台")
         
         # 获取知识库列表
         from src.kb import KBManager
@@ -29,7 +29,7 @@ class KBInterface:
         existing_kbs = kb_manager.list_all()
         
         # 知识库管理
-        st.markdown("#### 📚 知识库管理")
+        st.markdown("###### 📚 知识库管理")
         
         # 准备表格数据
         from src.config.manifest_manager import ManifestManager

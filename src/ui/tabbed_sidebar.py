@@ -63,7 +63,7 @@ class TabbedSidebar:
     
     def _render_home_tab(self):
         """主页标签 - 核心功能"""
-        st.markdown("### 📚 知识库")
+        st.markdown("##### 📚 知识库")
         
         # 知识库管理 - 紧凑布局
         col1, col2 = st.columns([4, 1])
@@ -110,7 +110,7 @@ class TabbedSidebar:
                 st.button("🗑️ 删除文档", key="delete_doc")
         
         # 快速操作
-        st.markdown("### ⚡ 快速操作")
+        st.markdown("##### ⚡ 快速操作")
         
         # 2x2 网格布局
         col1, col2 = st.columns(2)
@@ -129,7 +129,7 @@ class TabbedSidebar:
     
     def _render_config_tab(self):
         """配置标签 - 系统设置"""
-        st.markdown("### 🤖 模型配置")
+        st.markdown("##### 🤖 模型配置")
         
         # LLM 配置
         with st.expander("🧠 大语言模型", expanded=True):
@@ -175,7 +175,7 @@ class TabbedSidebar:
     
     def _render_monitor_tab(self):
         """监控标签 - 系统状态"""
-        st.markdown("### 💻 系统状态")
+        st.markdown("##### 💻 系统状态")
         
         # 实时指标 - 2x2 网格
         col1, col2 = st.columns(2)
@@ -219,7 +219,7 @@ class TabbedSidebar:
     
     def _render_tools_tab(self):
         """工具标签 - 实用工具"""
-        st.markdown("### 🛠️ 系统工具")
+        st.markdown("##### 🛠️ 系统工具")
         
         # 工具按钮 - 2x3 网格
         col1, col2 = st.columns(2)
@@ -244,7 +244,7 @@ class TabbedSidebar:
             if st.button("📦 导出配置", key="export_config", use_container_width=True):
                 st.info("导出配置文件...")
         
-        st.markdown("### 🔧 维护工具")
+        st.markdown("##### 🔧 维护工具")
         
         # 维护工具
         with st.expander("🧹 清理工具"):
@@ -268,7 +268,7 @@ class TabbedSidebar:
     
     def _render_help_tab(self):
         """帮助标签 - 文档和支持"""
-        st.markdown("### 📖 帮助中心")
+        st.markdown("##### 📖 帮助中心")
         
         # 帮助链接
         help_items = [
@@ -293,7 +293,7 @@ class TabbedSidebar:
         st.divider()
         
         # 版本信息
-        st.markdown("### ℹ️ 版本信息")
+        st.markdown("##### ℹ️ 版本信息")
         st.info("""
         **RAG Pro Max v2.1.0**
         - 🧠 自适应调度
@@ -303,7 +303,7 @@ class TabbedSidebar:
         """)
         
         # 快速反馈
-        st.markdown("### 💬 快速反馈")
+        st.markdown("##### 💬 快速反馈")
         feedback = st.text_area("反馈建议", placeholder="请输入您的建议或问题...")
         if st.button("提交反馈", key="submit_feedback"):
             if feedback:

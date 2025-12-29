@@ -8,7 +8,7 @@ from src.utils.search_engine import search_engine
 
 def render_search_interface():
     """渲染搜索界面"""
-    st.markdown("### 🔍 智能搜索")
+    st.markdown("###### 🔍 智能搜索")
     
     # 搜索输入框
     col1, col2 = st.columns([4, 1])
@@ -132,7 +132,7 @@ def render_search_interface():
         results = search_engine.sort_results(results, sort_by)
         
         # 显示搜索结果
-        st.markdown(f"### 📋 搜索结果 ({len(results)} 个)")
+        st.markdown(f"#### 📋 搜索结果 ({len(results)} 个)")
         
         if results:
             for i, doc in enumerate(results):
@@ -168,7 +168,7 @@ def render_search_interface():
 
 def render_tag_management():
     """渲染标签管理界面"""
-    st.markdown("### 🏷️ 标签管理")
+    st.markdown("##### 🏷️ 标签管理")
     
     # 添加新标签
     col1, col2 = st.columns([3, 1])
@@ -186,7 +186,7 @@ def render_tag_management():
     # 显示现有标签
     all_tags = search_engine.get_all_tags()
     if all_tags:
-        st.markdown("#### 📋 现有标签")
+        st.markdown("###### 📋 现有标签")
         
         # 分列显示标签
         cols = st.columns(3)
@@ -198,12 +198,12 @@ def render_tag_management():
 
 def render_search_analytics():
     """渲染搜索分析界面"""
-    st.markdown("### 📊 搜索分析")
+    st.markdown("##### 📊 搜索分析")
     
     # 搜索历史
     search_history = search_engine.search_history
     if search_history:
-        st.markdown("#### 🕒 最近搜索")
+        st.markdown("###### 🕒 最近搜索")
         for i, query in enumerate(reversed(search_history[-5:])):
             col1, col2 = st.columns([4, 1])
             with col1:
@@ -216,7 +216,7 @@ def render_search_analytics():
         st.info("📝 还没有搜索记录")
     
     # 搜索统计
-    st.markdown("#### 📈 搜索统计")
+    st.markdown("###### 📈 搜索统计")
     col1, col2, col3 = st.columns(3)
     
     with col1:

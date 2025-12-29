@@ -16,7 +16,7 @@ class SystemMonitorUI:
     
     def render_monitor_panel(self):
         """渲染监控面板"""
-        st.markdown("### 📊 系统监控")
+        st.markdown("#### 📊 系统监控")
         
         # 自动刷新选项
         auto_refresh = st.checkbox("🔄 自动刷新 (2秒)", value=False, key="monitor_auto_refresh")
@@ -120,7 +120,7 @@ class SystemMonitorUI:
     
     def render_resource_usage(self):
         """渲染资源使用情况"""
-        st.markdown("#### 📈 资源使用趋势")
+        st.markdown("##### 📈 资源使用趋势")
         
         # 简单的资源使用历史
         if 'resource_history' not in st.session_state:
@@ -161,7 +161,7 @@ class SystemMonitorUI:
     
     def render_alert_system(self):
         """渲染告警系统"""
-        st.markdown("#### 🚨 系统告警")
+        st.markdown("##### 🚨 系统告警")
         
         # 检查告警条件
         cpu_percent = psutil.cpu_percent(interval=0.1)
@@ -190,7 +190,7 @@ class SystemMonitorUI:
     
     def render_process_monitor(self):
         """渲染进程监控"""
-        st.markdown("#### 🔍 进程监控")
+        st.markdown("##### 🔍 进程监控")
         
         # 获取当前进程信息
         current_proc = psutil.Process()

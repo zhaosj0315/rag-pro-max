@@ -106,7 +106,7 @@ class ChatInterface:
         """渲染推荐问题"""
         # 显示全局推荐问题
         if hasattr(st.session_state, 'global_suggestions') and st.session_state.global_suggestions:
-            st.markdown("### 💡 推荐问题")
+            st.markdown("#### 💡 推荐问题")
             
             cols = st.columns(min(len(st.session_state.global_suggestions), 3))
             for i, suggestion in enumerate(st.session_state.global_suggestions[:3]):

@@ -117,10 +117,10 @@ class SidebarManager:
     
     def render_help_tab(self):
         """渲染帮助标签"""
-        st.markdown("### 📖 帮助")
+        st.markdown("#### 📖 帮助")
         st.info("RAG Pro Max v2.3.1 - 安全增强版")
         
-        st.markdown("#### 🚀 快速开始")
+        st.markdown("##### 🚀 快速开始")
         st.markdown("""
         1. 点击"⚡ 一键配置"自动设置
         2. 创建知识库并上传文档

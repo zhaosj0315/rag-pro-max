@@ -62,7 +62,7 @@ class PerformanceDashboard:
         """显示实时指标"""
         metrics = self.collect_metrics()
         
-        st.subheader("🔥 实时性能监控")
+        st.markdown("##### 🔥 实时性能监控")
         
         # 主要指标
         col1, col2, col3, col4 = st.columns(4)
@@ -104,7 +104,7 @@ class PerformanceDashboard:
             st.info("收集数据中，请稍候...")
             return
         
-        st.subheader("📈 性能趋势")
+        st.markdown("##### 📈 性能趋势")
         
         # 准备数据
         timestamps = [m["timestamp"] for m in self.metrics_history[-20:]]
@@ -131,7 +131,7 @@ class PerformanceDashboard:
     
     def display_benchmark_results(self):
         """显示基准测试结果"""
-        st.subheader("🏃 性能基准")
+        st.markdown("##### 🏃 性能基准")
         
         if st.button("运行基准测试"):
             with st.spinner("运行基准测试..."):

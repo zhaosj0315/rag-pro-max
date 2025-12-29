@@ -137,7 +137,7 @@ class UserExperienceEnhancer:
         
         with st.sidebar:
             st.markdown("---")
-            st.subheader("📊 系统状态")
+            st.markdown("##### 📊 系统状态")
             
             # 快速状态检查
             import psutil

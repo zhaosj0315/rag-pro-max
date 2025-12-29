@@ -31,7 +31,7 @@ def show_kb_documents(kb_name: str) -> None:
         st.info("📭 知识库中暂无文档")
         return
     
-    st.subheader(f"📚 文档列表 ({len(docs)})")
+    st.markdown(f"##### 📚 文档列表 ({len(docs)})")
     
     for doc in docs:
         with st.container():
@@ -94,9 +94,9 @@ def show_kb_documents(kb_name: str) -> None:
 
 
 @st.dialog("📄 文档详情")
-def show_document_detail(kb_name: str, doc: DocumentInfo) -> None:
-    """显示文档详情对话框"""
-    st.subheader(doc.name)
+def render_document_details(doc):
+    """渲染文档详情"""
+    st.markdown(f"##### {doc.name}")
     
     # 元数据
     col1, col2 = st.columns(2)
@@ -104,13 +104,13 @@ def show_document_detail(kb_name: str, doc: DocumentInfo) -> None:
     col2.metric("📊 文件大小", f"{doc.size_mb:.2f} MB")
     
     # 文档预览
-    st.subheader("📖 内容预览")
+    st.markdown("##### 📖 内容预览")
     viewer = DocumentViewer()
     preview = viewer.preview_file(doc.file_path, max_chars=2000)
     st.text_area("内容", preview, height=300, disabled=True, label_visibility="collapsed")
     
     # 分块信息
-    st.subheader("🧩 文档分块")
+    st.markdown("##### 🧩 文档分块")
     chunks = viewer.get_document_chunks(kb_name, doc.file_path, max_chunks=5)
     
     if chunks:

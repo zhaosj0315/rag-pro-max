@@ -141,7 +141,7 @@ class CrawlProgressMonitor:
             col1, col2 = st.columns(2)
             
             with col1:
-                st.subheader("爬取统计")
+                st.markdown("##### 爬取统计")
                 st.write(f"• 总URL数: {self.stats['total_urls']}")
                 st.write(f"• 成功爬取: {self.stats['crawled_urls']}")
                 st.write(f"• 失败数量: {self.stats['failed_urls']}")
@@ -149,7 +149,7 @@ class CrawlProgressMonitor:
                 st.write(f"• robots.txt阻止: {self.stats['robots_blocked']}")
             
             with col2:
-                st.subheader("性能指标")
+                st.markdown("##### 性能指标")
                 elapsed = time.time() - self.start_time
                 st.write(f"• 运行时间: {elapsed/60:.1f} 分钟")
                 st.write(f"• 平均速度: {self.stats['crawled_urls']/(elapsed/60):.1f} 页/分钟")
@@ -166,7 +166,7 @@ class AsyncCrawlUI:
     
     def setup_ui(self):
         """设置UI容器"""
-        st.subheader("🚀 异步并发爬虫")
+        st.markdown("##### 🚀 异步并发爬虫")
         
         # 配置区域
         col1, col2, col3 = st.columns(3)

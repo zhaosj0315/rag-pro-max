@@ -118,7 +118,7 @@ class MonitoringDashboard:
 
     def render_full_dashboard(self):
         """渲染完整监控页面（用于独立Tab）"""
-        st.subheader("🖥️ 系统资源监控")
+        st.markdown("##### 🖥️ 系统资源监控")
         
         stats = self._get_system_stats()
         mem_pct = stats.get('memory_percent', stats.get('mem_percent', 0))
@@ -136,7 +136,7 @@ class MonitoringDashboard:
             
         # 历史趋势图
         if len(self.history['timestamps']) > 0:
-            st.subheader("📈 实时趋势")
+            st.markdown("##### 📈 实时趋势")
             chart_data = {
                 'CPU': self.history['cpu'],
                 'Memory': self.history['memory']

@@ -111,7 +111,7 @@ class UnifiedDisplayRenderer:
     def render_progress_panel(self, tasks: List[Dict[str, Any]], 
                             title: str = "📊 处理进度") -> None:
         """渲染进度面板"""
-        st.subheader(title)
+        st.markdown(f"##### {title}")
         
         if not tasks:
             st.info("暂无任务")

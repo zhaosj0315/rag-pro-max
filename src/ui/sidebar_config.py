@@ -40,7 +40,7 @@ class SidebarConfig:
     def _render_industry_config():
         """渲染行业网站配置"""
         st.markdown("---")
-        st.markdown("### 🔧 网站配置")
+        st.markdown("###### 🔧 网站配置")
         
         if st.button("🌐 配置行业网站", use_container_width=True):
             st.session_state.show_industry_config = True
@@ -55,7 +55,7 @@ class SidebarConfig:
     @staticmethod
     def _render_quick_start(defaults):
         """渲染快速开始区域"""
-        st.markdown("### ⚡ 快速开始")
+        st.markdown("###### ⚡ 快速开始")
         
         if st.button("⚡ 一键配置（推荐新手）", type="primary", use_container_width=True, 
                     help="自动配置默认设置，1分钟开始使用"):

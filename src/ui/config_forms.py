@@ -22,7 +22,7 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
     """
     渲染 LLM 配置表单 (优化版 - 仿 ChatOllama 布局)
     """
-    st.markdown("### 🧠 模型服务配置")
+    st.markdown("#### 🧠 模型服务配置")
     
     # 定义供应商列表
     PROVIDERS = {
@@ -41,7 +41,7 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
     
     # --- 左侧导航栏 ---
     with col_nav:
-        st.markdown("#### 服务商")
+        st.markdown("##### 服务商")
         
         # 尝试恢复上次的选择 (将 label 转换为 key)
         saved_label = defaults.get("llm_provider_label", "Ollama (本地)")
@@ -245,7 +245,7 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
 
         # --- 通用对话设置 (仿 Screenshot) ---
         st.divider()
-        st.markdown("#### 💬 对话设置")
+        st.markdown("##### 💬 对话设置")
         
         # 1. 附带消息条数 (Context Window)
         current_limit = defaults.get("chat_history_limit", 10)
@@ -361,7 +361,7 @@ def render_embedding_config(defaults: dict) -> Tuple[str, str, str, str]:
     渲染 Embedding 配置表单 (优化版)
     """
     with st.container(border=True):
-        st.markdown("#### 🧬 向量模型 (Embedding)")
+        st.markdown("##### 🧬 向量模型 (Embedding)")
         
         embed_idx = defaults.get("embed_provider_idx", 0)
         if embed_idx > 2: embed_idx = 0

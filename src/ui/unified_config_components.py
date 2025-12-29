@@ -24,7 +24,7 @@ class UnifiedConfigRenderer:
             
             with col1:
                 # 模型配置
-                st.subheader("🤖 模型设置")
+                st.markdown("##### 🤖 模型设置")
                 updated_config['default_model'] = st.selectbox(
                     "默认模型",
                     options=['gpt-3.5-turbo', 'gpt-4', 'qwen2.5:7b', 'llama3.1:8b'],
@@ -44,7 +44,7 @@ class UnifiedConfigRenderer:
             
             with col2:
                 # 检索配置
-                st.subheader("🔍 检索设置")
+                st.markdown("##### 🔍 检索设置")
                 updated_config['top_k'] = st.number_input(
                     "检索数量",
                     min_value=1,
@@ -72,7 +72,7 @@ class UnifiedConfigRenderer:
             col1, col2 = st.columns(2)
             
             with col1:
-                st.subheader("📊 模型选择")
+                st.markdown("##### 📊 模型选择")
                 updated_config['embedding_model'] = st.selectbox(
                     "嵌入模型",
                     options=[
@@ -95,7 +95,7 @@ class UnifiedConfigRenderer:
                 )
             
             with col2:
-                st.subheader("⚡ 性能设置")
+                st.markdown("##### ⚡ 性能设置")
                 updated_config['batch_size'] = st.number_input(
                     "批处理大小",
                     min_value=1,
@@ -120,7 +120,7 @@ class UnifiedConfigRenderer:
             col1, col2 = st.columns(2)
             
             with col1:
-                st.subheader("🔄 缓存设置")
+                st.markdown("##### 🔄 缓存设置")
                 updated_config['enable_cache'] = st.checkbox(
                     "启用缓存",
                     value=config_data.get('enable_cache', True),
@@ -136,7 +136,7 @@ class UnifiedConfigRenderer:
                 )
             
             with col2:
-                st.subheader("📝 日志设置")
+                st.markdown("##### 📝 日志设置")
                 updated_config['log_level'] = st.selectbox(
                     "日志级别",
                     options=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
@@ -160,7 +160,7 @@ class UnifiedConfigRenderer:
         if sections is None:
             sections = ['basic', 'embedding', 'advanced']
         
-        st.header(f"⚙️ {tab_name}")
+        st.markdown(f"#### ⚙️ {tab_name}")
         
         all_config = {}
         

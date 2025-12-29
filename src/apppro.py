@@ -1430,7 +1430,7 @@ with st.sidebar:
 
     with tab_config:
         st.session_state.current_tab = "config"
-        st.markdown("### ⚙️ 模型配置")
+        st.markdown("##### ⚙️ 模型配置")
         
         # P0改进3: 侧边栏分组 - 基础配置（默认展开）- 使用新组件 (Stage 3.2.2)
         config_values = render_basic_config(defaults)
@@ -1469,7 +1469,7 @@ with st.sidebar:
         ToolsUI.render()
     
     with tab_help:
-        st.markdown("### 📖 帮助")
+        st.markdown("##### 📖 帮助")
         st.info("RAG Pro Max v2.4.7 - Web爬取与数据处理增强版")
 
 # ==========================================
@@ -1481,7 +1481,7 @@ if st.session_state.get('main_mode', 'rag') == 'sql':
     # ==========================================
     # 📊 数据分析模式
     # ==========================================
-    st.markdown("### 📊 数据分析 (Text-to-SQL)")
+    st.markdown("##### 📊 数据分析 (Text-to-SQL)")
     
     # 初始化SQL引擎
     if 'sql_engine' not in st.session_state:
@@ -1495,7 +1495,7 @@ if st.session_state.get('main_mode', 'rag') == 'sql':
     col1, col2 = st.columns([1, 2])
 
     with col1:
-        st.markdown("#### 📁 数据导入")
+        st.markdown("###### 📁 数据导入")
         
         uploaded_data = st.file_uploader(
             "上传Excel/CSV文件", 
@@ -1520,7 +1520,7 @@ if st.session_state.get('main_mode', 'rag') == 'sql':
         
         # 显示数据结构
         if st.session_state.get('main_data_imported'):
-            st.markdown("#### 📋 数据结构")
+            st.markdown("###### 📋 数据结构")
             try:
                 schema = st.session_state.sql_engine.get_schema()
                 for table, columns in schema.items():
@@ -1530,7 +1530,7 @@ if st.session_state.get('main_mode', 'rag') == 'sql':
                 st.write("暂无数据")
 
     with col2:
-        st.markdown("#### 💬 数据问答")
+        st.markdown("###### 💬 数据问答")
         
         if st.session_state.get('main_data_imported'):
             data_query = st.text_input(
@@ -3181,11 +3181,11 @@ elif active_kb_name:
                             with detail_col_left:
                                 # --- 左侧：智能洞察 (60%) ---
                                 if f.get('summary'):
-                                    st.markdown("##### 🧠 智能摘要")
+                                    st.markdown("####### 🧠 智能摘要")
                                     st.info(f"{f['summary']}")
                                 
                                 # RAG 预估与密度
-                                st.markdown("##### 📊 RAG 内容动力学")
+                                st.markdown("####### 📊 RAG 内容动力学")
                                 r_c1, r_c2, r_c3 = st.columns(3)
                                 with r_c1:
                                     tokens = deep_attrs.get('token_estimate', 0)
@@ -3200,7 +3200,7 @@ elif active_kb_name:
 
                                 # 内容采样
                                 if os.path.exists(actual_file_path) and f.get('type', '').lower() in ['.txt', '.md', '.py', '.js', '.html', '.css', '.json']:
-                                    st.markdown("##### 📄 文本取证采样")
+                                    st.markdown("####### 📄 文本取证采样")
                                     try:
                                         with open(actual_file_path, 'r', encoding='utf-8', errors='ignore') as preview_f:
                                             preview_content = preview_f.read(800)
@@ -3209,7 +3209,7 @@ elif active_kb_name:
                                         st.caption("无法读取内容预览")
                                 
                                 # 用户备注
-                                st.markdown("##### 📝 用户自定义备注")
+                                st.markdown("####### 📝 用户自定义备注")
                                 file_hash = f.get('file_hash', 'no_hash')
                                 current_note = notes_manager.get_note(file_hash)
                                 new_note = st.text_area("备注信息", value=current_note, height=80, key=f"note_{i}", label_visibility="collapsed")
@@ -3222,13 +3222,13 @@ elif active_kb_name:
                                 if "error" not in deep_attrs:
                                     # 1. 优先展示系统记录的溯源 (针对抓取文件)
                                     if deep_attrs.get("header_url"):
-                                        st.markdown("##### 🌐 溯源 (系统记录)")
+                                        st.markdown("####### 🌐 溯源 (系统记录)")
                                         st.caption(f"`{deep_attrs['header_url']}`")
                                         st.divider()
 
                                     # 2. macOS 专属增强元数据
                                     if platform.system() == "Darwin":
-                                        st.markdown("##### 🍎 macOS 增强元数据")
+                                        st.markdown("####### 🍎 macOS 增强元数据")
                                         m = deep_attrs.get("macos", {})
                                         if any([m.get("tags"), m.get("finder_comment"), m.get("where_from"), m.get("version")]):
                                             # 展示标签
@@ -3254,22 +3254,22 @@ elif active_kb_name:
                                         st.divider()
 
                                     # 取证与底层
-                                    st.markdown("##### 🕵️ 系统取证")
+                                    st.markdown("####### 🕵️ 系统取证")
                                     st.caption(f"Magic Bytes: `{deep_attrs['magic_bytes']}`")
                                     st.caption(f"SHA-256: `{deep_attrs['sha256'][:32]}...`")
                                     st.caption(f"Inode: `{deep_attrs['inode']}` | FS: `{deep_attrs['fs_type']}`")
                                     
                                     # 时间轴与位置
-                                    st.markdown("##### 🕒 时间轴与位置")
+                                    st.markdown("####### 🕒 时间轴与位置")
                                     st.caption(f"创建: `{deep_attrs['created']}`")
                                     st.caption(f"最后访问: `{deep_attrs['accessed']}`")
                                     
-                                    st.markdown("##### 📍 拓扑位置")
+                                    st.markdown("####### 📍 拓扑位置")
                                     st.caption(f"真实路径: `{deep_attrs['real_path'][:40]}...`")
                                     st.caption(f"符号链接: `{'是' if deep_attrs['is_symlink'] else '否'}`")
                                     
                                     # 权限系统
-                                    st.markdown("##### 🛡️ 权限系统")
+                                    st.markdown("####### 🛡️ 权限系统")
                                     st.caption(f"Unix权限: `{deep_attrs['permissions']}`")
                                     st.caption(f"所有者: `{deep_attrs['owner']}` | 只读: `{'是' if deep_attrs['is_readonly'] else '否'}`")
                                 else:
@@ -3367,7 +3367,7 @@ if active_kb_name:
             with c_set:
                 # ⚙️ 会话设置弹窗 (Popover)
                 with st.popover("⚙️", use_container_width=True, help="当前会话设置"):
-                    st.markdown("### 💬 当前会话设置")
+                    st.markdown("##### 💬 当前会话设置")
                     
                     # 1. 角色选择
                     prompt_names = [p['name'] for p in all_prompts]
@@ -3553,7 +3553,7 @@ for msg_idx, msg in enumerate(state.get_messages()):
             suggestions_count = len(filtered_suggestions)
             
             if suggestions_count > 0:
-                st.markdown("##### 🚀 追问推荐")
+                st.markdown("####### 🚀 追问推荐")
                 for idx, q in enumerate(filtered_suggestions):
                     if st.button(f"👉 {q}", key=f"dyn_sug_{msg_hash}_{idx}", use_container_width=True):
                         click_btn(q)
@@ -3802,7 +3802,7 @@ with st.container():
     # --- 4. 操作按钮 (Popover/Button) ---
     with c_filter:
         with st.popover("⚙️", help="高级筛选"): 
-            st.markdown("### 🎯 搜索筛选")
+            st.markdown("###### 🎯 搜索筛选")
             file_types = ["PDF", "Word", "Markdown", "Web"]
             selected_types = st.multiselect("文件类型", file_types, default=[], key="search_filter_types", placeholder="全部类型")
             
@@ -4082,7 +4082,7 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                 for i, result in enumerate(successful_results, 1):
                     kb_name = result["kb_name"]
                     answer = result.get("answer", "无答案")
-                    integrated_answer += f"### 📚 知识库 {i}: {kb_name}\n{answer}\n\n"
+                    integrated_answer += f"#### 📚 知识库 {i}: {kb_name}\n{answer}\n\n"
                 
                 integrated_answer += f"---\n**查询统计**: {len(successful_results)}/{len(selected_kbs)} 个知识库响应成功，耗时 {total_time:.2f} 秒"
                 
@@ -4147,29 +4147,71 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                 logger.info(f"🧠 深度思考: 查询清晰，无需改写 ({reason})")
 
         # 联网搜索集成 (v2.8)
+        user_display_prompt = final_prompt  # 保存原始提问用于 UI 显示
         if st.session_state.get('enable_web_search', False):
             try:
                 from duckduckgo_search import DDGS
+                from src.utils.search_quality import search_quality_analyzer
+                from urllib.parse import urlparse
+                
                 logger.info(f"🌐 正在执行联网搜索: {final_prompt[:50]}...")
+                search_start_time = time.time()
+                
                 with st.status("🌐 正在联网搜索最新信息...", expanded=False) as status:
                     with DDGS() as ddgs:
                         results = list(ddgs.text(final_prompt, max_results=5))
                     
+                    search_duration = round(time.time() - search_start_time, 2)
+                    
                     if results:
-                        web_context_parts = []
-                        for i, res in enumerate(results, 1):
-                            web_context_parts.append(f"[{i}] {res['title']}\n{res['body']}\n来源: {res['href']}")
+                        # 质量分析和排序
+                        analyzed_results = []
+                        for res in results:
+                            quality_info = search_quality_analyzer.analyze_result_quality(res)
+                            res.update(quality_info)
+                            analyzed_results.append(res)
                         
-                        web_context = "\n\n=== 联网搜索实时信息 ===\n" + "\n".join(web_context_parts) + "\n========================\n"
+                        # 按质量评分排序
+                        analyzed_results.sort(key=lambda x: x['quality_score'], reverse=True)
+                        
+                        # 生成增强的搜索结果展示
+                        web_context_parts = []
+                        quality_summary = []
+                        
+                        # 在状态栏内部渲染结果详情，默认折叠
+                        st.markdown("#### 🔍 联网搜索结果详情")
+                        for i, res in enumerate(analyzed_results, 1):
+                            emoji, label = res['quality_label']
+                            quality_summary.append(f"{emoji} {label}")
+                            
+                            # 构建结果内容
+                            result_content = f"[{i}] {emoji} {res['title']}\n"
+                            result_content += f"📝 摘要: {res['summary']}\n"
+                            if res['key_points']:
+                                result_content += f"🎯 要点: {'; '.join(res['key_points'][:2])}\n"
+                            result_content += f"🔗 来源: {res['href']}"
+                            
+                            web_context_parts.append(result_content)
+                            
+                            # 前端显示
+                            with st.container():
+                                st.markdown(f"**{i}. {emoji} {res['title']}**")
+                                st.caption(f"{res['summary'][:150]}...")
+                                st.markdown(f"🔗 [{urlparse(res['href']).netloc}]({res['href']})")
+                                if i < len(analyzed_results): st.divider()
+                        
+                        # 生成搜索统计信息
+                        stats_info = f"⏱️ 搜索耗时: {search_duration}秒 | 📊 结果数量: {len(results)}条 | 🏆 质量分布: {', '.join(quality_summary)}"
+                        
+                        web_context = f"\n\n#### 联网搜索实时信息\n{stats_info}\n\n" + "\n\n".join(web_context_parts) + "\n\n"
                         final_prompt = f"{web_context}\n用户原始问题：{final_prompt}\n\n请结合以上联网搜索到的实时信息和你的知识库内容来回答。"
                         
-                        logger.info(f"✅ 联网搜索完成，获得 {len(results)} 条结果:")
-                        for idx, res in enumerate(results, 1):
-                            logger.info(f"   [{idx}] {res['title']} ({res['href']})")
+                        logger.info(f"✅ 联网搜索完成，获得 {len(results)} 条结果 (耗时 {search_duration}s):")
+                        for idx, res in enumerate(analyzed_results, 1):
+                            emoji, label = res['quality_label']
+                            logger.info(f"   [{idx}] {emoji} {res['title']} (评分: {res['quality_score']}) - {res['href']}")
                         
-                        logger.info(f"📄 已注入上下文 (前500字符): {web_context[:500]}...")
-                        
-                        status.update(label=f"✅ 已获取 {len(results)} 条联网搜索结果", state="complete")
+                        status.update(label=f"✅ 已获取 {len(results)} 条联网搜索结果 (耗时 {search_duration}s)", state="complete")
                     else:
                         logger.warning("⚠️ 联网搜索未返回结果")
                         status.update(label="⚠️ 联网搜索未找到相关结果", state="error")
@@ -4189,11 +4231,10 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                 quoted_text = quoted_text[:2000] + "...(已截断)"
             
             # 构建包含引用的 prompt
-            # 注意：这里我们修改 final_prompt 发送给 LLM，但在 UI 上用户只看到自己的简短输入
-            # 为了历史记录的完整性，我们可以选择保存组合后的 prompt，或者分开保存
-            # 这里选择修改 final_prompt，这样历史记录里也是完整的，方便后续回顾
-            original_prompt = final_prompt
-            final_prompt = f"基于以下引用内容：\n> {quoted_text}\n\n我的问题是：{original_prompt}"
+            original_prompt_temp = final_prompt
+            final_prompt = f"基于以下引用内容：\n> {quoted_text}\n\n我的问题是：{original_prompt_temp}"
+            # 更新显示用的 prompt，加入引用样式
+            user_display_prompt = f"📌 **引用内容**:\n> {quoted_text[:100]}...\n\n{user_display_prompt}"
             
             # 清除引用状态
             st.session_state.quote_content = None
@@ -4211,7 +4252,8 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
         st.session_state.messages.append({"role": "user", "content": final_prompt})
         if active_kb_name: HistoryManager.save_session(active_kb_name, state.get_messages(), st.session_state.get('current_session_id'))
 
-        with st.chat_message("user", avatar="🧑‍💻"): st.markdown(final_prompt)
+        # UI 仅显示原始问题或带引用的简洁版
+        with st.chat_message("user", avatar="🧑‍💻"): st.markdown(user_display_prompt)
         
         with st.chat_message("assistant", avatar="🤖"):
             msg_placeholder = st.empty()

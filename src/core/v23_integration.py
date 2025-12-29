@@ -91,7 +91,7 @@ class V23Integration:
     
     def _render_scheduler_panel(self):
         """渲染调度器面板"""
-        st.header("🤖 智能资源调度")
+        st.markdown("#### 🤖 智能资源调度")
         
         # 当前配置
         optimal_config = self.scheduler.get_optimal_workers()
@@ -113,7 +113,7 @@ class V23Integration:
         # 优化建议
         recommendations = self.scheduler.get_recommendations()
         if recommendations['recommendations']:
-            st.subheader("💡 优化建议")
+            st.markdown("##### 💡 优化建议")
             for i, rec in enumerate(recommendations['recommendations'], 1):
                 st.write(f"{i}. {rec}")
         
@@ -122,7 +122,7 @@ class V23Integration:
             col1, col2 = st.columns(2)
             
             with col1:
-                st.subheader("阈值设置")
+                st.markdown("##### 阈值设置")
                 cpu_low = st.slider("CPU低负载阈值", 10, 50, 
                                    self.scheduler.config['cpu_thresholds']['low'])
                 cpu_medium = st.slider("CPU中负载阈值", 40, 80, 
@@ -131,7 +131,7 @@ class V23Integration:
                                     self.scheduler.config['cpu_thresholds']['high'])
             
             with col2:
-                st.subheader("学习设置")
+                st.markdown("##### 学习设置")
                 adaptive_enabled = st.checkbox("启用自适应调整", 
                                              self.scheduler.config['adaptive_enabled'])
                 learning_enabled = st.checkbox("启用学习功能", 

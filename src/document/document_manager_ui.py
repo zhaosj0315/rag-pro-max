@@ -43,7 +43,7 @@ class DocumentManagerUI:
             metadata_files = sum(1 for f in doc_manager.manifest['files'] if f.get('keywords') or f.get('category'))
             summary_files = sum(1 for f in doc_manager.manifest['files'] if f.get('summary'))
             
-            st.markdown("#### 🔧 高级选项处理统计")
+            st.markdown("##### 🔧 高级选项处理统计")
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
@@ -232,7 +232,7 @@ class DocumentManagerUI:
     
     def render_document_operations(self, kb_name: str):
         """渲染文档操作"""
-        st.markdown("#### ⚡ 快速操作")
+        st.markdown("##### ⚡ 快速操作")
         
         col1, col2, col3, col4 = st.columns(4)
         

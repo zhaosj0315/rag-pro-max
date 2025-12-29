@@ -49,7 +49,7 @@ class CompleteSidebar:
     
     def _render_quick_start(self):
         """渲染快速开始区域"""
-        st.markdown("### ⚡ 快速开始")
+        st.markdown("#### ⚡ 快速开始")
         
         if st.button("⚡ 一键配置（推荐新手）", type="primary", use_container_width=True, 
                     help="自动配置默认设置，1分钟开始使用"):
@@ -96,7 +96,7 @@ class CompleteSidebar:
     def _render_kb_management(self):
         """渲染知识库管理"""
         st.markdown("---")
-        st.markdown("### 📚 知识库管理")
+        st.markdown("#### 📚 知识库管理")
         
         # 获取现有知识库
         existing_kbs = self._get_existing_kbs()

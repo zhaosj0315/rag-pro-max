@@ -253,7 +253,7 @@ class MultiKBInterface:
             st.warning("📭 暂无可用知识库，请先创建知识库并上传文档。" )
             return []
         
-        st.subheader("📚 选择知识库")
+        st.markdown("##### 📚 选择知识库")
         
         # 全选/全不选
         col1, col2 = st.columns([1, 4])
@@ -319,7 +319,7 @@ class MultiKBInterface:
         # 整合答案
         integrated_answer = self.query_engine.generate_integrated_answer(multi_kb_results)
         
-        st.subheader("🎯 整合答案")
+        st.markdown("##### 🎯 整合答案")
         st.markdown(integrated_answer)
         
         # 详细结果
@@ -358,7 +358,7 @@ class MultiKBInterface:
         query_options = self.render_query_options()
         
         # 查询输入
-        st.subheader("💬 提出问题")
+        st.markdown("##### 💬 提出问题")
         query = st.text_area(
             "请输入您的问题",
             placeholder="例如：什么是人工智能？",

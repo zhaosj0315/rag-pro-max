@@ -12,7 +12,7 @@ class EnhancedControls:
     @staticmethod
     def render_processing_options():
         """渲染处理选项控制（OCR和摘要）"""
-        st.write("### 📋 处理选项")
+        st.write("#### 📋 处理选项")
         
         col1, col2 = st.columns(2)
         
@@ -49,7 +49,7 @@ class EnhancedControls:
     @staticmethod
     def render_chat_controls_2x2(state, current_kb_name: Optional[str] = None):
         """渲染2×2布局的聊天控制"""
-        st.write("### 💬 聊天控制")
+        st.write("#### 💬 聊天控制")
         
         # 2×2 布局
         row1_col1, row1_col2 = st.columns(2)
@@ -139,7 +139,7 @@ class EnhancedControls:
     @staticmethod
     def render_system_operations():
         """渲染系统操作控制"""
-        st.write("### 🛠️ 系统操作")
+        st.write("#### 🛠️ 系统操作")
         
         # 2×2 布局
         row1_col1, row1_col2 = st.columns(2)

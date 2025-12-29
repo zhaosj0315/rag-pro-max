@@ -14,7 +14,7 @@ class ToolsUI:
     @staticmethod
     def render():
         """渲染工具箱界面"""
-        st.markdown("### 🔧 工具箱")
+        st.markdown("#### 🔧 工具箱")
         
         # 知识库管理入口
         with st.expander("📚 知识库管理", expanded=True):
@@ -91,7 +91,7 @@ class ToolsUI:
                 st.rerun()
         
         st.markdown("---")
-        st.markdown("#### ⬆️ 快速上传")
+        st.markdown("##### ⬆️ 快速上传")
         uploaded_file = st.file_uploader("选择文件", type=['pdf', 'txt', 'docx', 'md'], key="tools_uploader")
         if uploaded_file:
             st.success(f"✅ 已选择: {uploaded_file.name}")

@@ -12,7 +12,7 @@ class RoleManagerUI:
     @staticmethod
     def render():
         """渲染角色管理界面"""
-        st.markdown("### 🎭 角色库管理 (Prompt Library)")
+        st.markdown("#### 🎭 角色库管理 (Prompt Library)")
         st.caption("在此管理所有可用的 AI 角色提示词。这些角色可以在对话顶栏中快速切换。")
         
         # 加载提示词
@@ -52,7 +52,7 @@ class RoleManagerUI:
                             st.caption("🔒 内置角色不可删除")
 
         with tab_add:
-            st.markdown("#### 创建新角色")
+            st.markdown("##### 创建新角色")
             with st.container(border=True):
                 add_name = st.text_input("角色名称", placeholder="例如: 法律顾问", key="add_role_name")
                 add_content = st.text_area("提示词内容", placeholder="你是一个专业的法律顾问，请基于...", height=200, key="add_role_content")

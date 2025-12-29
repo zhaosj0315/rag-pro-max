@@ -30,7 +30,7 @@ class UnifiedMonitoringSystem:
         
     def render_monitoring_dashboard(self, show_detailed: bool = True) -> None:
         """渲染统一监控仪表板"""
-        st.subheader("📊 系统监控")
+        st.markdown("##### 📊 系统监控")
         
         # 实时系统状态
         self._render_realtime_metrics()

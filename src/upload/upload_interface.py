@@ -309,7 +309,7 @@ class UploadInterface:
     
     def render_batch_upload(self):
         """渲染批量上传"""
-        st.markdown("#### 📦 批量上传")
+        st.markdown("##### 📦 批量上传")
         
         if st.button("📁 选择文件夹", use_container_width=True):
             st.info("💡 请使用文件路径输入框指定文件夹路径")

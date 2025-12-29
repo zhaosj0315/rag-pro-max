@@ -37,12 +37,12 @@ class IndustryConfigInterface:
         selected_industry = st.selectbox("选择要管理的行业", industries)
         
         if selected_industry:
-            st.subheader(f"管理 {selected_industry}")
+            st.markdown(f"##### 管理 {selected_industry}")
             
             # 显示当前网站列表
             sites = self.service.get_industry_sites(selected_industry)
             
-            st.write("### 当前网站列表")
+            st.write("#### 当前网站列表")
             
             # 编辑现有网站
             for i, site in enumerate(sites):
@@ -71,7 +71,7 @@ class IndustryConfigInterface:
                             st.rerun()
             
             # 添加新网站
-            st.write("### 添加新网站")
+            st.write("#### 添加新网站")
             with st.form(f"add_site_{selected_industry}"):
                 col1, col2, col3 = st.columns([3, 3, 2])
                 
@@ -91,7 +91,7 @@ class IndustryConfigInterface:
                         st.error("请填写网站名称和URL")
             
             # 删除整个行业
-            st.write("### 危险操作")
+            st.write("#### 危险操作")
             if st.button(f"🗑️ 删除整个行业: {selected_industry}", type="secondary"):
                 if st.session_state.get(f"confirm_delete_{selected_industry}"):
                     self.service.remove_industry(selected_industry)
@@ -103,7 +103,7 @@ class IndustryConfigInterface:
     
     def _render_add_industry(self):
         """添加新行业"""
-        st.subheader("➕ 添加新行业")
+        st.markdown("##### ➕ 添加新行业")
         
         with st.form("add_industry"):
             industry_name = st.text_input("行业名称", placeholder="例如: 🎨 设计创意")
