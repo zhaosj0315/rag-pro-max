@@ -257,43 +257,6 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
             help="每次对话发送给模型的历史消息数量 (+1 表示加上当前问题)"
         )
 
-        # 2. 系统提示词管理 (Prompt Library)
-        st.divider()
-        st.markdown("#### 🎭 角色库管理 (Prompt Library)")
-        
-        from src.config.prompt_manager import PromptManager
-        prompts = PromptManager.load_prompts()
-        
-        tab_list, tab_add = st.tabs(["📋 现有角色", "➕ 新增角色"])
-        
-        with tab_list:
-            for p in prompts:
-                with st.expander(f"{p['name']}", expanded=False):
-                    new_content = st.text_area("提示词内容", p['content'], height=100, key=f"prompt_content_{p['id']}")
-                    c1, c2 = st.columns([1, 5])
-                    with c1:
-                        if st.button("💾 更新", key=f"save_prompt_{p['id']}"):
-                            PromptManager.update_prompt(p['id'], p['name'], new_content)
-                            st.toast("✅ 更新成功")
-                            st.rerun()
-                    with c2:
-                        # 保护默认提示词不被删除
-                        if p['id'] not in ['default', 'coder', 'analyst', 'creative', 'academic']:
-                            if st.button("🗑️ 删除", key=f"del_prompt_{p['id']}"):
-                                PromptManager.delete_prompt(p['id'])
-                                st.rerun()
-        
-        with tab_add:
-            new_name = st.text_input("角色名称", placeholder="例如: 法律顾问")
-            new_content = st.text_area("提示词内容", placeholder="你是一个...", height=100, key="new_prompt_content")
-            if st.button("➕ 添加到库", key="add_new_prompt"):
-                if new_name and new_content:
-                    PromptManager.add_prompt(new_name, new_content)
-                    st.success("✅ 添加成功")
-                    st.rerun()
-                else:
-                    st.warning("请填写名称和内容")
-        
         # 保存逻辑 (仅针对 Context Window)
         has_changes = (history_limit != current_limit)
         

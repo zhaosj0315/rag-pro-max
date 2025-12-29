@@ -1,10 +1,10 @@
-# RAG Pro Max v2.7.4 接口汇总
+# RAG Pro Max 接口汇总
 
 ## 📊 统计信息
 
-- **Python模块**: 177个
-- **类定义**: 160个  
-- **函数定义**: 1370个
+- **Python模块**: 179个
+- **类定义**: 162个  
+- **函数定义**: 1374个
 - **API端点**: 11个
 - **配置文件**: 3个
 
@@ -164,11 +164,13 @@
 - ui/progress_monitor.py
 - ui/progress_tracker.py
 - ui/responsive_layout.py
+- ui/role_manager_ui.py
 - ui/search_ui.py
 - ui/sidebar_config.py
 - ui/sidebar_manager.py
 - ui/status_bar.py
 - ui/tabbed_sidebar.py
+- ui/tools_ui.py
 - ui/unified_config_components.py
 - ui/unified_dialogs.py
 - ui/unified_display_components.py
@@ -255,7 +257,7 @@
 - `llm_model_ollama`: gpt-oss:20b
 
 ### config/rag_config.json
-- `target_path`: /Users/zhaosj/Documents/rag-pro-max/temp_uploads/batch_1766974677
+- `target_path`: /Users/zhaosj/Documents/rag-pro-max/temp_uploads/batch_1766983143
 - `output_path`: /Users/zhaosj/Documents/rag-pro-max/vector_db_storage
 - `llm_type_idx`: 1
 - `llm_url_ollama`: http://localhost:11434
@@ -285,7 +287,7 @@
 
 ## 📝 生成时间
 
-Mon Dec 29 10:22:19 CST 2025
+Mon Dec 29 12:50:36 CST 2025
 
 ---
 

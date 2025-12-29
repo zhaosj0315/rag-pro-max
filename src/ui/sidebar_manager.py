@@ -14,22 +14,38 @@ class SidebarManager:
     
     def render(self):
         """渲染完整的侧边栏"""
-        # 横向标签页布局
-        tab_main, tab_config, tab_monitor, tab_help = st.tabs([
-            "🏠 主页", "⚙️ 配置", "📊 监控", "❓ 帮助"
+        # 横向标签页布局 (v2.7.5: 新增角色页, 优化顺序)
+        tab_main, tab_roles, tab_config, tab_monitor, tab_tools, tab_help = st.tabs([
+            "🏠 主页", "🎭 角色", "⚙️ 配置", "📊 监控", "🔧 工具", "❓ 帮助"
         ])
         
         with tab_main:
             self.render_main_tab()
+            
+        with tab_roles:
+            self.render_roles_tab()
         
         with tab_config:
             self.render_config_tab()
         
         with tab_monitor:
             self.render_monitor_tab()
+            
+        with tab_tools:
+            self.render_tools_tab()
         
         with tab_help:
             self.render_help_tab()
+
+    def render_roles_tab(self):
+        """渲染角色管理标签"""
+        from src.ui.role_manager_ui import RoleManagerUI
+        RoleManagerUI.render()
+    
+    def render_tools_tab(self):
+        """渲染工具标签"""
+        from src.ui.tools_ui import ToolsUI
+        ToolsUI.render()
     
     def render_main_tab(self):
         """渲染主页标签"""

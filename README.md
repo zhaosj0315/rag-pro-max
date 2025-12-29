@@ -2,11 +2,11 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-v2.7.4-brightgreen)
+![Version](https://img.shields.io/badge/version-v2.7.5-brightgreen)
 ![Status](https://img.shields.io/badge/status-Stable-blue)
 ![Last Update](https://img.shields.io/badge/last%20update-2025--12--29-orange)
 
-# 🚀 RAG Pro Max v2.7.4
+# 🚀 RAG Pro Max v2.7.5
 
 > **企业级 RAG 知识库系统 - 智能推荐与极速检索的终极进化**
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
@@ -27,12 +27,12 @@
 
 ## ✨ 核心功能
 
-### 🎭 多角色提示词系统 (v2.7.4 新增)
+### 🎭 多角色提示词系统 (v2.7.5 新增)
 - **Prompt Library**: 内置“代码专家”、“数据分析师”、“创意文案”等 5 款专家角色，支持自定义添加
 - **即时热切换**: 对话顶栏集成角色下拉框，支持在任意对话中即时切换 AI 风格，底层模型自动热重载系统提示词
 - **深度日志追踪**: 终端日志与前端界面同步显示当前回答问题的角色身份，确保交互透明
 
-### 🕒 多会话历史管理 (v2.7.4 新增)
+### 🕒 多会话历史管理 (v2.7.5 新增)
 - **会话隔离**: 单知识库支持无限创建独立会话，互不干扰
 - **侧边栏管理**: 专用“历史会话”面板，支持一键切换、查看历史记录
 - **无缝衔接**: "新建对话"按钮一键开启空白会话，旧数据自动归档

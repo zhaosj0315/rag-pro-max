@@ -546,7 +546,7 @@ from src.common.business import generate_doc_summary
 
 with st.sidebar:
     # 横向标签页布局
-    tab_main, tab_config, tab_monitor, tab_tools, tab_help = st.tabs(["🏠 主页", "⚙️ 配置", "📊 监控", "🔧 工具", "❓ 帮助"])
+    tab_main, tab_roles, tab_config, tab_monitor, tab_tools, tab_help = st.tabs(["🏠 主页", "🎭 角色", "⚙️ 配置", "📊 监控", "🔧 工具", "❓ 帮助"])
     
     with tab_main:
 
@@ -589,12 +589,24 @@ with st.sidebar:
         base_kbs = kb_manager.list_all()
         
         # 为每个知识库创建带复选框的选项
-        nav_options = ["➕ 新建知识库..."]
+        from src.config.manifest_manager import ManifestManager
+        nav_options = ["➕ 新建知识库...", "💬 纯对话模式 (Pure Chat)"]
         for kb in base_kbs:
+            # 获取统计信息 (v2.7.6: 增强信息展示)
+            try:
+                kb_path = os.path.join(output_base, kb)
+                stats = ManifestManager.get_stats(kb_path)
+                doc_count = stats.get('file_count', 0)
+                size_str = ManifestManager.format_size(stats.get('total_size', 0))
+                date_str = stats.get('created_time', '').split('T')[0] if stats.get('created_time') else 'N/A'
+                info_str = f" (📄{doc_count} | 💾{size_str} | 🕒{date_str})"
+            except Exception:
+                info_str = " (N/A)"
+
             # 检查是否被选中
             is_selected = st.session_state.get(f"kb_check_{kb}", False)
             checkbox_symbol = "☑️" if is_selected else "☐"
-            nav_options.append(f"{checkbox_symbol} 📂 {kb}")
+            nav_options.append(f"{checkbox_symbol} 📂 {kb}{info_str}")
         
         # 保存选中的知识库列表
         selected_kbs = [kb for kb in base_kbs if st.session_state.get(f"kb_check_{kb}", False)]
@@ -613,18 +625,22 @@ with st.sidebar:
             render_industry_config_interface()
             st.stop()  # 停止执行后续代码
 
-        # 默认选择"新建知识库"，避免自动加载大知识库
         default_idx = 0
         if "current_nav" in st.session_state:
-            # 强化匹配逻辑：兼容带/不带复选框图标的情况
+            # 强化匹配逻辑 (v2.7.6): 兼容带统计信息和复选框图标的情况
+            # 1. 移除图标
             current_nav_clean = st.session_state.current_nav.replace("☑️ ", "").replace("☐ ", "")
+            # 2. 移除统计信息 (📄... | 💾... | 🕒...)
+            current_nav_clean = current_nav_clean.split(" (")[0].strip()
+            
             for i, opt in enumerate(nav_options):
-                opt_clean = opt.replace("☑️ ", "").replace("☐ ", "")
+                # 对待匹配项执行同样的清理
+                opt_clean = opt.replace("☑️ ", "").replace("☐ ", "").split(" (")[0].strip()
                 if opt_clean == current_nav_clean:
                     default_idx = i
                     break
             
-            # 兜底：如果清理后匹配到了，更新 session_state 确保图标正确
+            # 兜底：如果清理后匹配到了，更新 session_state 确保同步最新格式
             if default_idx > 0 and nav_options[default_idx] != st.session_state.current_nav:
                 st.session_state.current_nav = nav_options[default_idx]
 
@@ -635,10 +651,29 @@ with st.sidebar:
         with select_col2:
             selected_nav = st.selectbox("", nav_options, index=default_idx, label_visibility="collapsed")
             
+            # 自动启动纯对话模式 (v2.7.6)
+            if selected_nav == "💬 纯对话模式 (Pure Chat)" and st.session_state.get('current_kb_id') != "pure_chat":
+                try:
+                    from llama_index.core.chat_engine import SimpleChatEngine
+                    from src.config.prompt_manager import PromptManager
+                    
+                    # 获取当前角色提示词
+                    current_role_id = st.session_state.get('current_prompt_id', 'default')
+                    system_prompt = PromptManager.get_content(current_role_id)
+                    
+                    st.session_state.chat_engine = SimpleChatEngine.from_defaults(
+                        system_prompt=system_prompt
+                    )
+                    st.session_state.current_kb_id = "pure_chat"
+                    st.toast("✅ 纯对话模式已自动启动")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"启动失败: {e}")
+
             # 处理复选框点击逻辑 - 只有当用户手动更改选择时才触发
             if selected_nav != st.session_state.get('current_nav') and (selected_nav.startswith("☐") or selected_nav.startswith("☑️")):
-                # 提取知识库名称
-                kb_name = selected_nav.split("📂 ")[1] if "📂 " in selected_nav else ""
+                # 提取知识库名称 (支持带统计信息的格式)
+                kb_name = selected_nav.split("📂 ")[1].split(" (")[0].strip() if "📂 " in selected_nav else ""
                 if kb_name:
                     # 切换复选框状态
                     current_state = st.session_state.get(f"kb_check_{kb_name}", False)
@@ -653,11 +688,30 @@ with st.sidebar:
             if st.button("🔄", help="刷新知识库列表", use_container_width=True, key="refresh_kb_list"):
                 st.rerun()
 
-        # 启动系统按钮（当选择了知识库时显示）
-        if len(st.session_state.get('selected_kbs', [])) > 0:
-            if st.button("🚀 启动系统", type="primary", use_container_width=True, key="start_system"):
+        # 启动系统按钮（当选择了知识库或纯对话模式时显示）
+        is_pure_chat = (selected_nav == "💬 纯对话模式 (Pure Chat)")
+        
+        if len(st.session_state.get('selected_kbs', [])) > 0 or is_pure_chat:
+            btn_text = "🚀 启动纯对话" if is_pure_chat else "🚀 启动系统"
+            if st.button(btn_text, type="primary", use_container_width=True, key="start_system"):
+                if is_pure_chat:
+                    try:
+                        from llama_index.core.chat_engine import SimpleChatEngine
+                        from src.config.prompt_manager import PromptManager
+                        
+                        # 获取当前角色提示词
+                        current_role_id = st.session_state.get('current_prompt_id', 'default')
+                        system_prompt = PromptManager.get_content(current_role_id)
+                        
+                        st.session_state.chat_engine = SimpleChatEngine.from_defaults(
+                            system_prompt=system_prompt
+                        )
+                        st.session_state.current_kb_id = "pure_chat"
+                        st.success("✅ 纯对话模式已启动")
+                    except Exception as e:
+                        st.error(f"❌ 启动失败: {str(e)}")
                 # 初始化聊天引擎
-                if len(st.session_state.get('selected_kbs', [])) == 1:
+                elif len(st.session_state.get('selected_kbs', [])) == 1:
                     # 单知识库模式
                     kb_name = st.session_state.selected_kbs[0]
                     try:
@@ -694,7 +748,7 @@ with st.sidebar:
         # 局部判断是否为创建模式，避免 NameError
         _is_creating = (selected_nav == "➕ 新建知识库...")
         if not _is_creating and "📂 " in selected_nav:
-             current_active_kb = selected_nav.split("📂 ")[1]
+             current_active_kb = selected_nav.split("📂 ")[1].split(" (")[0].strip()
         
         if current_active_kb:
             st.markdown("---")
@@ -745,7 +799,12 @@ with st.sidebar:
             current_kb_name = None  # 多知识库模式
             st.info(f"🔍 已选择 {len(selected_kbs)} 个知识库: {', '.join(selected_kbs)}")
         else:
-            current_kb_name = selected_nav.replace("📂 ", "").replace("☐ ", "").replace("☑️ ", "") if not is_create_mode else None
+            if selected_nav == "💬 纯对话模式 (Pure Chat)":
+                current_kb_name = "pure_chat"
+            else:
+                # 兼容带统计信息的格式
+                raw_name = selected_nav.split("📂 ")[1] if "📂 " in selected_nav else ""
+                current_kb_name = raw_name.split(" (")[0].strip() if not is_create_mode and raw_name else None
 
         # 统一的数据源处理逻辑
         uploaded_files = None
@@ -1365,6 +1424,10 @@ with st.sidebar:
                         st.rerun()
             
     
+    with tab_roles:
+        from src.ui.role_manager_ui import RoleManagerUI
+        RoleManagerUI.render()
+
     with tab_config:
         st.session_state.current_tab = "config"
         st.markdown("### ⚙️ 模型配置")
@@ -1402,83 +1465,8 @@ with st.sidebar:
             perf_monitor.render_panel()
     
     with tab_tools:
-        st.markdown("### 🔧 工具箱")
-        
-        # P0改进3: 系统工具（默认展开）
-        with st.expander("🛠️ 系统工具", expanded=True):
-            # 系统监控
-            auto_refresh = st.checkbox("🔄 自动刷新 (2秒)", value=False, key="tools_auto_refresh")
-
-            monitor_placeholder = st.empty()
-
-            import psutil
-            import subprocess
-            cpu_percent = psutil.cpu_percent(interval=0.1)
-            mem = psutil.virtual_memory()
-            disk = psutil.disk_usage('/System/Volumes/Data')
-
-            gpu_active = False
-            try:
-                result = subprocess.run(['ioreg', '-r', '-d', '1', '-w', '0', '-c', 'IOAccelerator'],
-                                      capture_output=True, text=True, timeout=1)
-                if 'PerformanceStatistics' in result.stdout:
-                    gpu_active = True
-            except:
-                pass
-
-            with monitor_placeholder.container():
-                # 优化为 2*3 布局 (一行两个)
-                m_row1_col1, m_row1_col2 = st.columns(2)
-                m_row2_col1, m_row2_col2 = st.columns(2)
-                m_row3_col1, m_row3_col2 = st.columns(2)
-
-                with m_row1_col1:
-                    st.metric("CPU 使用率", f"{cpu_percent:.1f}%")
-                    st.caption(f"⚙️ {psutil.cpu_count()} 核")
-                    st.progress(cpu_percent / 100)
-
-                with m_row1_col2:
-                    st.metric("GPU 状态", "活跃" if gpu_active else "空闲")
-                    st.caption("🎮 Apple Metal")
-                    if gpu_active:
-                        st.progress(0.5)
-                    else:
-                        st.progress(0.0)
-
-                with m_row2_col1:
-                    st.metric("内存使用", f"{mem.percent:.1f}%")
-                    st.caption(f"🧠 {mem.used/1024**3:.1f}GB / {mem.total/1024**3:.1f}GB")
-                    st.progress(mem.percent / 100)
-
-                with m_row2_col2:
-                    st.metric("磁盘使用", f"{disk.percent:.1f}%")
-                    st.caption(f"💾 {disk.used/1024**3:.0f}GB / {disk.total/1024**3:.0f}GB")
-                    st.progress(disk.percent / 100)
-
-                current_proc = psutil.Process()
-                proc_mem = current_proc.memory_info().rss / 1024**3
-                
-                with m_row3_col1:
-                    st.metric("进程内存", f"{proc_mem:.1f} GB")
-                    st.caption("🔍 当前应用占用")
-                
-                with m_row3_col2:
-                    st.metric("线程数量", f"{current_proc.num_threads()}")
-                    st.caption("🧵 活动线程数")
-
-                st.caption("💡 GPU 详细信息需要: `sudo python3 system_monitor.py`")
-
-            if auto_refresh:
-                import time
-                time.sleep(2)
-                st.rerun()
-        
-        st.markdown("---")
-        st.markdown("#### ⬆️ 快速上传")
-        uploaded_file = st.file_uploader("选择文件", type=['pdf', 'txt', 'docx', 'md'], key="tools_uploader")
-        if uploaded_file:
-            st.success(f"✅ 已选择: {uploaded_file.name}")
-            st.info("💡 请到主页完成处理")
+        from src.ui.tools_ui import ToolsUI
+        ToolsUI.render()
     
     with tab_help:
         st.markdown("### 📖 帮助")
@@ -3494,7 +3482,13 @@ for msg_idx, msg in enumerate(state.get_messages()):
     with st.chat_message(role, avatar=avatar):
         # 显示角色标签 (v2.7.4)
         if role == "assistant" and msg.get("prompt_role"):
-            st.caption(f"🎭 {msg['prompt_role']}")
+            st.markdown(f"""
+            <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                <span style="background-color: rgba(0,0,0,0.05); padding: 2px 8px; border-radius: 4px; color: #666; font-size: 0.8rem; border: 1px solid rgba(0,0,0,0.1);">
+                    🎭 {msg['prompt_role']}
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
             
         st.markdown(msg["content"])
         

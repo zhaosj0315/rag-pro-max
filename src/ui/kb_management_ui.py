@@ -150,41 +150,83 @@ def render_kb_management():
     """知识库管理"""
     st.markdown("### 🛠️ 知识库管理")
     
-    # 选择要管理的知识库
+    # 获取知识库列表
     kb_list = get_knowledge_base_list()
     if not kb_list:
         st.info("📝 没有知识库可管理")
         return
     
-    selected_kb = st.selectbox(
-        "选择知识库",
-        [kb['name'] for kb in kb_list],
-        index=0 if not st.session_state.get('manage_kb') else [kb['name'] for kb in kb_list].index(st.session_state.get('manage_kb', kb_list[0]['name']))
+    # 准备表格数据
+    import pandas as pd
+    from src.config.manifest_manager import ManifestManager
+    data = []
+    for kb in kb_list:
+        # 尝试获取更准确的大小和片段信息
+        kb_path = os.path.join("vector_db_storage", kb['name'])
+        stats = ManifestManager.get_stats(kb_path)
+        
+        data.append({
+            "名称": kb['name'],
+            "文件数量": stats.get('file_count', kb.get('doc_count', 0)),
+            "状态": "就绪",
+            "片段数": stats.get('doc_count', kb.get('chunk_count', 0)),
+            "大小": ManifestManager.format_size(stats.get('total_size', 0)),
+            "创建时间": stats.get('created_time', '').split('T')[0] if stats.get('created_time') else 'N/A',
+            "描述": kb.get('description', ''),
+            "分类": kb.get('category', '通用文档')
+        })
+    
+    df = pd.DataFrame(data)
+    
+    # 显示表格
+    st.dataframe(
+        df,
+        column_config={
+            "名称": st.column_config.TextColumn("名称", help="知识库名称", width="medium"),
+            "文件数量": st.column_config.NumberColumn("文件数量", help="包含的文档总数"),
+            "状态": st.column_config.TextColumn("状态", help="当前索引状态"),
+            "片段数": st.column_config.NumberColumn("片段数", help="向量片段总数"),
+            "大小": st.column_config.TextColumn("大小", help="占用存储空间"),
+            "创建时间": st.column_config.TextColumn("创建时间", help="创建日期"),
+            "分类": st.column_config.TextColumn("分类", width="small")
+        },
+        use_container_width=True,
+        hide_index=True
     )
+    
+    st.divider()
+    
+    # 选择要管理的知识库
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        selected_kb = st.selectbox(
+            "选择要操作的知识库",
+            [kb['name'] for kb in kb_list],
+            index=0 if not st.session_state.get('manage_kb') else [kb['name'] for kb in kb_list].index(st.session_state.get('manage_kb', kb_list[0]['name']))
+        )
     
     if selected_kb:
         kb_info = next((kb for kb in kb_list if kb['name'] == selected_kb), None)
         
         # 知识库信息编辑
-        st.markdown("#### 📝 基本信息")
-        
-        with st.form("kb_edit_form"):
-            new_name = st.text_input("知识库名称", value=kb_info['name'])
-            new_category = st.selectbox(
-                "知识库类别",
-                ["📚 通用文档", "💼 工作资料", "📖 学习笔记", "🔬 研究资料", "📋 项目文档", "🎯 其他"],
-                index=0
-            )
-            new_description = st.text_area("知识库描述", value=kb_info.get('description', ''))
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.form_submit_button("💾 保存修改", use_container_width=True, type="primary"):
-                    st.success("✅ 知识库信息已更新")
-            
-            with col2:
-                if st.form_submit_button("🗑️ 删除知识库", use_container_width=True):
-                    st.session_state.confirm_delete = selected_kb
+        with st.expander(f"⚙️ 编辑知识库: {selected_kb}", expanded=True):
+            with st.form("kb_edit_form"):
+                new_name = st.text_input("知识库名称", value=kb_info['name'])
+                new_category = st.selectbox(
+                    "知识库类别",
+                    ["📚 通用文档", "💼 工作资料", "📖 学习笔记", "🔬 研究资料", "📋 项目文档", "🎯 其他"],
+                    index=0 # 简化处理，实际应匹配当前类别
+                )
+                new_description = st.text_area("知识库描述", value=kb_info.get('description', ''))
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.form_submit_button("💾 保存修改", use_container_width=True, type="primary"):
+                        st.success("✅ 知识库信息已更新")
+                
+                with col2:
+                    if st.form_submit_button("🗑️ 删除知识库", use_container_width=True):
+                        st.session_state.confirm_delete = selected_kb
         
         # 删除确认
         if st.session_state.get('confirm_delete') == selected_kb:
@@ -200,19 +242,6 @@ def render_kb_management():
                 if st.button("❌ 取消"):
                     st.session_state.confirm_delete = None
                     st.rerun()
-        
-        # 知识库统计
-        st.markdown("#### 📊 统计信息")
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("📄 文档数量", kb_info.get('doc_count', 0))
-        with col2:
-            st.metric("💬 对话数量", kb_info.get('chat_count', 0))
-        with col3:
-            st.metric("📊 文档片段", kb_info.get('chunk_count', 0))
-        with col4:
-            st.metric("💾 存储大小", f"{kb_info.get('size_mb', 0):.1f}MB")
 
 def create_knowledge_base(name, category, description, settings):
     """创建知识库"""

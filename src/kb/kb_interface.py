@@ -31,6 +31,46 @@ class KBInterface:
         # 知识库管理
         st.markdown("#### 📚 知识库管理")
         
+        # 准备表格数据
+        from src.config.manifest_manager import ManifestManager
+        import pandas as pd
+        
+        kb_data = []
+        for kb in existing_kbs:
+            kb_path = os.path.join(output_base, kb)
+            stats = ManifestManager.get_stats(kb_path)
+            
+            kb_data.append({
+                "名称": kb,
+                "文件数量": stats.get('file_count', 0),
+                "状态": "就绪", # 简化状态
+                "片段数": stats.get('doc_count', 0),
+                "大小": ManifestManager.format_size(stats.get('total_size', 0)),
+                "创建时间": stats.get('created_time', '').split('T')[0]
+            })
+        
+        df = pd.DataFrame(kb_data)
+        
+        # 显示表格
+        if not df.empty:
+            st.dataframe(
+                df,
+                column_config={
+                    "名称": st.column_config.TextColumn("名称", help="知识库名称", width="medium"),
+                    "文件数量": st.column_config.NumberColumn("文件数量", help="包含的文档总数"),
+                    "状态": st.column_config.TextColumn("状态", help="当前索引状态"),
+                    "片段数": st.column_config.NumberColumn("片段数", help="向量片段总数"),
+                    "大小": st.column_config.TextColumn("大小", help="占用存储空间"),
+                    "创建时间": st.column_config.TextColumn("创建时间", help="创建日期")
+                },
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.info("暂无知识库")
+
+        st.divider()
+
         # 知识库搜索/过滤
         if len(existing_kbs) > 5:
             search_kb = st.text_input(
@@ -48,14 +88,24 @@ class KBInterface:
             filtered_kbs = existing_kbs
         
         # 知识库选择器
-        nav_options = ["➕ 新建知识库..."] + [f"📂 {kb}" for kb in filtered_kbs]
+        nav_options = ["➕ 新建知识库..."]
+        for kb in filtered_kbs:
+            # 从之前加载的数据中查找统计 (v2.7.6: 增强展示)
+            stat = next((item for item in kb_data if item["名称"] == kb), {})
+            count = stat.get("文件数量", 0)
+            size = stat.get("大小", "0B")
+            date = stat.get("创建时间", "N/A")
+            nav_options.append(f"📂 {kb} (📄{count} | 💾{size} | 🕒{date})")
         
         default_idx = 0
         if "current_nav" in st.session_state:
             # 强化匹配逻辑：兼容带/不带复选框图标的情况
             current_nav_clean = st.session_state.current_nav.replace("☑️ ", "").replace("☐ ", "")
+            # 还要移除统计信息才能匹配
+            current_nav_clean = current_nav_clean.split(" (")[0].strip()
+            
             for i, opt in enumerate(nav_options):
-                opt_clean = opt.replace("☑️ ", "").replace("☐ ", "")
+                opt_clean = opt.replace("☑️ ", "").replace("☐ ", "").split(" (")[0].strip()
                 if opt_clean == current_nav_clean:
                     default_idx = i
                     break
@@ -79,7 +129,16 @@ class KBInterface:
         
         # 判断是否为创建模式
         is_create_mode = (selected_nav == "➕ 新建知识库...")
-        current_kb_name = selected_nav.replace("📂 ", "") if not is_create_mode else None
+        
+        # 解析知识库名称 (v2.7.6)
+        if is_create_mode:
+            current_kb_name = None
+        else:
+            # 格式: 📂 Name (Count 文件)
+            if "📂 " in selected_nav:
+                current_kb_name = selected_nav.split("📂 ")[1].split(" (")[0].strip()
+            else:
+                current_kb_name = selected_nav
         
         # 更新全局知识库状态
         st.session_state.current_kb_name = current_kb_name
