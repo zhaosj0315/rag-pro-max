@@ -524,6 +524,8 @@ if 'app_initialized' not in st.session_state:
         logger.warning(f"全局LLM初始化失败: {e}")
     
     st.session_state.app_initialized = True
+    if 'current_session_id' not in st.session_state:
+        st.session_state.current_session_id = None
     logger.success("应用初始化完成")
 
 # ==========================================
@@ -685,6 +687,48 @@ with st.sidebar:
                 cleanup_memory()
                 st.toast("✅ 知识库已卸载，内存已释放")
                 st.rerun()
+
+        # --- 会话历史 (Session History) v2.7.3 ---
+        # 提取当前的 active_kb_name (如果已选择)
+        current_active_kb = None
+        # 局部判断是否为创建模式，避免 NameError
+        _is_creating = (selected_nav == "➕ 新建知识库...")
+        if not _is_creating and "📂 " in selected_nav:
+             current_active_kb = selected_nav.split("📂 ")[1]
+        
+        if current_active_kb:
+            st.markdown("---")
+            with st.expander("🕒 历史会话", expanded=True):
+                from src.chat.history_manager import HistoryManager
+                sessions = HistoryManager.list_sessions(current_active_kb)
+                
+                # 新建会话按钮
+                if st.button("➕ 新建会话", use_container_width=True, key="sidebar_new_chat"):
+                    import uuid
+                    new_id = str(uuid.uuid4())[:8]
+                    st.session_state.current_session_id = new_id
+                    st.session_state.messages = []
+                    st.session_state.suggestions_history = []
+                    HistoryManager.save_session(current_active_kb, [], new_id)
+                    st.rerun()
+                
+                # 会话列表
+                for sess in sessions:
+                    sess_id = sess['id']
+                    label = sess['title']
+                    is_active = (sess_id == st.session_state.get('current_session_id'))
+                    
+                    if sess.get('is_default'):
+                        label = "📝 默认会话"
+                    
+                    btn_type = "primary" if is_active else "secondary"
+                    icon = "📂" if is_active else "📄"
+                    
+                    if st.button(f"{icon} {label}", key=f"sess_{sess_id}", use_container_width=True, type=btn_type):
+                        st.session_state.current_session_id = sess_id
+                        st.session_state.messages = HistoryManager.load_session(current_active_kb, sess_id)
+                        st.session_state.suggestions_history = []
+                        st.rerun()
 
         if selected_nav != st.session_state.get('current_nav'):
             st.session_state.pop('suggestions_history', None) 
@@ -1264,7 +1308,7 @@ with st.sidebar:
                             st.session_state.messages.pop()
                             st.session_state.messages.pop()
                             if current_kb_name:
-                                HistoryManager.save(current_kb_name, state.get_messages())
+                                HistoryManager.save_session(current_kb_name, state.get_messages(), st.session_state.get('current_session_id'))
                             st.toast("✅ 已撤销")
                             time.sleep(0.5)
                             st.rerun()
@@ -1274,7 +1318,7 @@ with st.sidebar:
                         st.session_state.messages = []
                         st.session_state.suggestions_history = []
                         if current_kb_name:
-                            HistoryManager.save(current_kb_name, [])
+                            HistoryManager.save_session(current_kb_name, [], st.session_state.get('current_session_id'))
                         st.toast("✅ 已清空")
                         time.sleep(0.5)
                         st.rerun()
@@ -1877,7 +1921,7 @@ if active_kb_name and active_kb_name != st.session_state.current_kb_id:
         st.session_state.current_kb_id = active_kb_name
         st.session_state.chat_engine = None
         with st.spinner("📜 正在加载对话历史..."):
-            st.session_state.messages = HistoryManager.load(active_kb_name)
+            st.session_state.messages = HistoryManager.load_session(active_kb_name, st.session_state.get('current_session_id'))
         st.session_state.suggestions_history = []
     else:
         st.warning("⚠️ 正在处理问题，请等待完成后再切换知识库")
@@ -3291,6 +3335,31 @@ if is_create_mode:
     """, unsafe_allow_html=True)
 
 
+# --- 融合 ChatOllama 风格：会话顶栏 (v2.7.3) ---
+if active_kb_name:
+    with st.container():
+        from src.config import ConfigLoader
+        conf = ConfigLoader.load()
+        ctx_limit = conf.get('chat_history_limit', 10)
+        current_model_name = st.session_state.get('selected_model', 'Default')
+
+        h_col1, h_col2, h_col3 = st.columns([3, 4, 1.5])
+        with h_col1:
+            st.markdown(f"### 📂 {active_kb_name}")
+        with h_col2:
+            st.markdown(f"<div style='padding-top: 10px; text-align: center; color: #666;'>🤖 {current_model_name} <span style='background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; margin-left: 8px;'>🔄 {ctx_limit}</span></div>", unsafe_allow_html=True)
+        with h_col3:
+            if st.button("➕ 新对话", key="header_new_chat", use_container_width=True, type="secondary"):
+                import uuid
+                new_id = str(uuid.uuid4())[:8]
+                st.session_state.current_session_id = new_id
+                st.session_state.messages = []
+                st.session_state.suggestions_history = []
+                from src.chat import HistoryManager
+                HistoryManager.save_session(active_kb_name, [], new_id)
+                st.rerun()
+    st.divider()
+
 # 自动摘要 (仅在知识库首次加载且无历史消息时触发)
 if active_kb_name and st.session_state.chat_engine and not st.session_state.messages:
     with st.chat_message("assistant", avatar="🤖"):
@@ -3324,7 +3393,7 @@ if active_kb_name and st.session_state.chat_engine and not st.session_state.mess
                 sug = [re.sub(r'^\d+\.\s*', '', q.strip()) for q in summary_lines[1:] if q.strip()][:3]
 
                 st.session_state.messages.append({"role": "assistant", "content": summary, "suggestions": sug})
-                HistoryManager.save(active_kb_name, state.get_messages())
+                HistoryManager.save_session(active_kb_name, state.get_messages(), st.session_state.get('current_session_id'))
                 st.rerun()
             except Exception as e:
                 error_msg = str(e)
@@ -3973,7 +4042,7 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             st.stop()
         
         st.session_state.messages.append({"role": "user", "content": final_prompt})
-        if active_kb_name: HistoryManager.save(active_kb_name, state.get_messages())
+        if active_kb_name: HistoryManager.save_session(active_kb_name, state.get_messages(), st.session_state.get('current_session_id'))
 
         with st.chat_message("user", avatar="🧑‍💻"): st.markdown(final_prompt)
         
@@ -4165,7 +4234,7 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         st.session_state.suggestions_history = []
                     
                     # 延迟保存：确认所有步骤都成功后再保存
-                    if active_kb_name: HistoryManager.save(active_kb_name, state.get_messages())
+                    if active_kb_name: HistoryManager.save_session(active_kb_name, state.get_messages(), st.session_state.get('current_session_id'))
                     
                     # 释放内存
                     cleanup_memory()

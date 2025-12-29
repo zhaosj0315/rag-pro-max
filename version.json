@@ -2,6 +2,9 @@
     "version": "2.7.3",
     "release_date": "2025-12-29",
     "features": [
+        "多会话历史管理系统 (单知识库多会话存储)",
+        "对话顶栏融合 (Session Header 实时状态显示)",
+        "系统提示词功能 (全模型支持前置指令注入)",
         "模型配置界面重构 (仿 ChatOllama 双栏布局)",
         "新增对话历史上下文长度控制 (Context Window)",
         "爬虫状态文件路径优化 (归档至 temp_uploads)",
