@@ -3550,21 +3550,77 @@ for msg_idx, msg in enumerate(state.get_messages()):
             # 执行过滤
             filtered_suggestions = [s for s in raw_suggestions if s not in forbidden_set]
             
-            # 显示调试信息（直接显示，不折叠）
             suggestions_count = len(filtered_suggestions)
-            st.caption(f"🔍 调试: 推荐问题数量 = {suggestions_count}")
             
             if suggestions_count > 0:
                 st.markdown("##### 🚀 追问推荐")
                 for idx, q in enumerate(filtered_suggestions):
                     if st.button(f"👉 {q}", key=f"dyn_sug_{msg_hash}_{idx}", use_container_width=True):
                         click_btn(q)
-            else:
-                # 如果没有推荐问题，显示提示
-                st.info("💡 回答完成后会自动生成推荐问题")
                 
-                # 手动生成推荐问题按钮
-                if st.button("🔄 手动生成推荐问题", key=f"manual_gen_{msg_hash}"):
+                # 只有在已有推荐时，才显示"更多"按钮
+                if st.button("✨ 换一批 / 更多追问", key=f"gen_more_{msg_hash}", type="secondary", use_container_width=True):
+                    with st.spinner("⏳ 正在生成新问题..."):
+                        all_history_questions = [m['content'] for m in st.session_state.messages if m['role'] == 'user']
+                        all_history_questions.extend(st.session_state.suggestions_history)
+                        # 排除队列中的问题
+                        all_history_questions.extend(st.session_state.question_queue)
+                        
+                        # 获取LLM模型
+                        llm_model = None
+                        if st.session_state.get('chat_engine'):
+                            chat_engine = st.session_state.chat_engine
+                            if hasattr(chat_engine, '_llm'):
+                                llm_model = chat_engine._llm
+                            elif hasattr(chat_engine, 'llm'):
+                                llm_model = chat_engine.llm
+                        
+                        # 使用统一推荐引擎
+                        engine = get_unified_suggestion_engine(active_kb_name)
+                        
+                        # 构建更丰富的上下文：结合用户上一条问题
+                        context_text = msg['content']
+                        if msg_idx > 0:
+                            try:
+                                prev_msg = st.session_state.messages[msg_idx - 1]
+                                if prev_msg['role'] == 'user':
+                                    context_text = f"用户问题: {prev_msg['content']}\nAI回答: {msg['content']}"
+                            except:
+                                pass
+                                
+                        new_sugs = engine.generate_suggestions(
+                            context=context_text,
+                            source_type='chat',
+                            query_engine=st.session_state.chat_engine if st.session_state.get('chat_engine') else None,
+                            num_questions=3
+                        )
+                        
+                        if new_sugs:
+                            # 详细日志记录
+                            logger.info(f"🔄 继续生成 {len(new_sugs)} 个新推荐问题")
+                            for i, q in enumerate(new_sugs[:3], 1):
+                                logger.info(f"   {i}. {q}")
+                            
+                            # 累积历史推荐，避免重复
+                            if not hasattr(st.session_state, 'suggestions_history'):
+                                st.session_state.suggestions_history = []
+                            
+                            # 过滤重复问题
+                            new_suggestions = []
+                            for sugg in new_sugs:
+                                if sugg not in st.session_state.suggestions_history:
+                                    new_suggestions.append(sugg)
+                            
+                            # 更新显示（使用新生成的问题）
+                            st.session_state.suggestions_history = new_suggestions[:3] if new_suggestions else new_sugs[:3]
+                            st.rerun(scope="fragment")
+                        else:
+                            logger.info("⚠️ 未能生成更多追问")
+                            st.warning("未能生成更多追问，请尝试输入新问题。")
+
+            else:
+                # 如果没有推荐问题，仅显示手动生成按钮，保持界面清爽
+                if st.button("🔄 生成追问推荐", key=f"manual_gen_{msg_hash}", help="点击基于当前回答生成推荐问题"):
                     with st.spinner("生成中..."):
                         # 获取已有历史用于过滤
                         existing_qs = [m['content'] for m in st.session_state.messages if m['role'] == 'user']
@@ -3592,193 +3648,189 @@ for msg_idx, msg in enumerate(state.get_messages()):
                         if manual_sugs:
                             st.session_state.suggestions_history = manual_sugs
                             st.rerun(scope="fragment")
-            
-            if st.button("✨ 继续推荐 3 个追问 (无限追问)", key=f"gen_more_{msg_hash}", type="secondary", use_container_width=True):
-                with st.spinner("⏳ 正在生成新问题..."):
-                    all_history_questions = [m['content'] for m in st.session_state.messages if m['role'] == 'user']
-                    all_history_questions.extend(st.session_state.suggestions_history)
-                    # 排除队列中的问题
-                    all_history_questions.extend(st.session_state.question_queue)
-                    
-                    # 获取LLM模型
-                    llm_model = None
-                    if st.session_state.get('chat_engine'):
-                        chat_engine = st.session_state.chat_engine
-                        if hasattr(chat_engine, '_llm'):
-                            llm_model = chat_engine._llm
-                        elif hasattr(chat_engine, 'llm'):
-                            llm_model = chat_engine.llm
-                    
-                    # 使用统一推荐引擎
-                    engine = get_unified_suggestion_engine(active_kb_name)
-                    
-                    # 构建更丰富的上下文：结合用户上一条问题
-                    context_text = msg['content']
-                    if msg_idx > 0:
-                        try:
-                            prev_msg = st.session_state.messages[msg_idx - 1]
-                            if prev_msg['role'] == 'user':
-                                context_text = f"用户问题: {prev_msg['content']}\nAI回答: {msg['content']}"
-                        except:
-                            pass
-                            
-                    new_sugs = engine.generate_suggestions(
-                        context=context_text,
-                        source_type='chat',
-                        query_engine=st.session_state.chat_engine if st.session_state.get('chat_engine') else None,
-                        num_questions=3
-                    )
-                    
-                    if new_sugs:
-                        # 详细日志记录
-                        logger.info(f"🔄 继续生成 {len(new_sugs)} 个新推荐问题")
-                        for i, q in enumerate(new_sugs[:3], 1):
-                            logger.info(f"   {i}. {q}")
-                        
-                        # 累积历史推荐，避免重复
-                        if not hasattr(st.session_state, 'suggestions_history'):
-                            st.session_state.suggestions_history = []
-                        
-                        # 过滤重复问题
-                        new_suggestions = []
-                        for sugg in new_sugs:
-                            if sugg not in st.session_state.suggestions_history:
-                                new_suggestions.append(sugg)
-                        
-                        # 更新显示（使用新生成的问题）
-                        st.session_state.suggestions_history = new_suggestions[:3] if new_suggestions else new_sugs[:3]
-                        st.rerun(scope="fragment")
-                    else:
-                        logger.info("⚠️ 未能生成更多追问")
-                        st.warning("未能生成更多追问，请尝试输入新问题。")
+                        else:
+                            logger.info("⚠️ 未能生成更多追问")
+                            st.warning("未能生成更多追问，请尝试输入新问题。")
             
         suggestions_fragment()
 
 # 极简工具栏：模型与设置
 with st.container():
-    # 使用极窄列宽放置按钮，右侧显示状态
-    col_pop, col_filter, col_info = st.columns([0.08, 0.08, 0.84])
+    # Tools: Leading Spacer | Provider | Model | Deep | Web | Filter | Clear | Stop/Trailing Spacer
+    # 通过增加前置 Spacer (0.05) 将内容往后推，并增加各组件比例以减少拥挤感
+    if st.session_state.get('is_processing'):
+        cols = st.columns([0.05, 0.15, 0.25, 0.15, 0.15, 0.05, 0.05, 0.15], gap="medium")
+        c_lead, c_prov, c_model, c_deep, c_web, c_filter, c_clear, c_stop = cols
+    else:
+        cols = st.columns([0.05, 0.15, 0.25, 0.15, 0.15, 0.05, 0.05, 0.15], gap="medium")
+        c_lead, c_prov, c_model, c_deep, c_web, c_filter, c_clear, c_spacer = cols
     
-    with col_pop:
-        with st.popover("⚙️", help="模型与任务设置"):
-            st.markdown("### 🤖 模型设置")
+    # --- 0. 前置留白 (c_lead 不放置内容) ---
+
+    # --- 1. 厂商/供应商选择 ---
+    with c_prov:
+        from src.config import ConfigLoader
+        config = ConfigLoader.load()
+        current_provider = config.get('llm_provider', 'Ollama')
+        
+        # 统一供应商完整定义 (与 config_forms.py 一致)
+        ALL_PROVIDERS = {
+            "Ollama": "🦙 Ollama (本地)",
+            "OpenAI": "☁️ OpenAI (云端)",
+            "OpenAI-Compatible": "🔌 Other (兼容协议)",
+            "Azure OpenAI": "🟦 Azure OpenAI",
+            "Anthropic": "🧠 Anthropic (Claude)",
+            "Moonshot": "🌙 Moonshot (Kimi)",
+            "Gemini": "💎 Gemini (Google)",
+            "Groq": "⚡ Groq (极速)"
+        }
+        
+        # 动态筛选：仅显示已配置（有 Key 或 URL）的供应商
+        configured_providers = []
+        
+        # Ollama 默认始终检查
+        configured_providers.append("Ollama")
+        
+        # 检查其他供应商是否有配置信息
+        if config.get("llm_key") or config.get("llm_url_openai"): configured_providers.append("OpenAI")
+        if config.get("llm_key_other") or config.get("llm_url_other"): configured_providers.append("OpenAI-Compatible")
+        if config.get("azure_key") and config.get("azure_endpoint"): configured_providers.append("Azure OpenAI")
+        if config.get("anthropic_key"): configured_providers.append("Anthropic")
+        if config.get("moonshot_key"): configured_providers.append("Moonshot")
+        if config.get("gemini_key"): configured_providers.append("Gemini")
+        if config.get("groq_key"): configured_providers.append("Groq")
+        
+        # 确保当前使用的供应商在列表中
+        if current_provider not in configured_providers:
+            configured_providers.append(current_provider)
             
-            # 读取当前配置
-            from src.config import ConfigLoader
-            config = ConfigLoader.load()
-            llm_provider = config.get('llm_provider', 'Ollama')
-            current_model = st.session_state.get('selected_model', get_default_model())
+        # 按 ALL_PROVIDERS 的顺序排序
+        display_providers = [p for p in ALL_PROVIDERS.keys() if p in configured_providers]
             
-            if llm_provider == "Ollama":
-                # --- Ollama 逻辑 (保持原有功能) ---
-                # 获取可用模型列表
-                try:
-                    ollama_url = config.get('llm_url_ollama', "http://localhost:11434")
-                    models, error = fetch_remote_models(ollama_url, "")
-                    
-                    if models:
-                        available_models = models
-                        if "gpt-oss:20b" in available_models:
-                            available_models.remove("gpt-oss:20b")
-                            available_models.insert(0, "gpt-oss:20b")
-                    else:
-                        available_models = ["gpt-oss:20b", "llama3", "mistral", "gemma", "deepseek-coder", "qwen2.5:7b"]
-                except Exception:
-                    available_models = ["gpt-oss:20b", "llama3", "mistral", "qwen2.5:7b"]
-                
-                # 自动修正: 如果当前模型不在可用列表中，强制切换到第一个可用模型
-                if available_models and current_model not in available_models:
-                    default_model = available_models[0]
-                    # 避免无限刷新：只有当 default_model 确实不同时才切换
-                    if current_model != default_model:
-                        logger.info(f"🔄 自动切换 Ollama 模型: {current_model} -> {default_model}")
-                        if update_all_model_configs(default_model):
-                            st.session_state.selected_model = default_model
-                            current_model = default_model
-                            st.rerun()
+        def on_provider_change():
+            new_prov = st.session_state.toolbar_provider_selector
+            st.session_state.temp_provider = new_prov
+        
+        selected_provider = st.selectbox(
+            "厂商",
+            options=display_providers,
+            format_func=lambda x: ALL_PROVIDERS.get(x, x),
+            index=display_providers.index(current_provider) if current_provider in display_providers else 0,
+            key="toolbar_provider_selector",
+            on_change=on_provider_change,
+            label_visibility="collapsed"
+        )
 
-                # 确保当前模型在列表中
-                idx = 0
-                if current_model in available_models:
-                    idx = available_models.index(current_model)
-
-                def on_ollama_model_change():
-                    """Ollama 模型变更回调"""
-                    new_model = st.session_state.model_selector_dropdown_ollama
-                    if update_all_model_configs(new_model):
-                        st.toast(f"✅ 已切换到模型: {new_model}", icon="🤖")
-                        # 不需要 st.rerun()，回调会在 rerun 前执行
-
-                st.selectbox(
-                    "选择 AI 模型",
-                    options=available_models,
-                    index=idx,
-                    key="model_selector_dropdown_ollama",
-                    on_change=on_ollama_model_change
-                )
+    # --- 2. 模型选择 ---
+    with c_model:
+        # 读取对应供应商保存的模型
+        saved_models = {
+            "Ollama": config.get("llm_model_ollama", "gpt-oss:20b"),
+            "OpenAI": config.get("llm_model_openai", "gpt-3.5-turbo"),
+            "OpenAI-Compatible": config.get("llm_model_other", ""),
+            "Azure OpenAI": config.get("azure_deployment", ""),
+            "Anthropic": config.get("config_anthropic_model", ""),
+            "Moonshot": config.get("config_moonshot_model", ""),
+            "Gemini": config.get("config_gemini_model", ""),
+            "Groq": config.get("config_groq_model", "")
+        }
+        
+        current_model = saved_models.get(selected_provider, "")
+        available_models = []
+        
+        # 动态加载或显示已保存模型
+        if selected_provider == "Ollama":
+            try:
+                ollama_url = config.get('llm_url_ollama', "http://localhost:11434")
+                from src.utils.model_utils import fetch_remote_models
+                models, error = fetch_remote_models(ollama_url, "")
+                available_models = models if models else ([current_model] if current_model else ["gpt-oss:20b"])
+            except:
+                available_models = [current_model] if current_model else ["gpt-oss:20b"]
+        else:
+            # 对于云端供应商，直接显示已保存的模型，或提供刷新（如果已配置）
+            # 这里优先保证 UI 显示用户在“模型配置”页保存的那个模型
+            available_models = [current_model] if current_model else ["未配置模型"]
             
-            else:
-                # --- 非 Ollama 逻辑 (只读显示) ---
-                st.info(f"当前供应商: **{llm_provider}**")
-                st.text_input("当前模型", value=current_model, disabled=True, key="model_display_readonly")
-                st.caption("💡 请前往 **⚙️ 配置** 页面修改远程模型")
+            # 如果是 OpenAI 且有缓存，则合并
+            if selected_provider == "OpenAI":
+                cache_key = f"models_openai_{config.get('llm_url_openai')}_{config.get('llm_key')}"
+                if cache_key in st.session_state:
+                    available_models = list(set(available_models + st.session_state[cache_key]))
 
-            st.divider()
+        if current_model and current_model not in available_models:
+            available_models.insert(0, current_model)
             
-            # 查询优化开关
-            enable_query_optimization = st.checkbox(
-                "✨ 启用智能查询优化", 
-                value=st.session_state.get('enable_query_optimization', False),
-                help="启用后，AI会分析并优化你的提问，提升检索准确性"
-            )
-            st.session_state.enable_query_optimization = enable_query_optimization
+        idx = available_models.index(current_model) if current_model in available_models else 0
 
-    # New Filter Popover
-    with col_filter:
-        with st.popover("🔍", help="高级搜索筛选"):
+        def on_model_change():
+            new_model = st.session_state.toolbar_model_selector
+            if new_model not in ["未配置模型", ""]:
+                if update_all_model_configs(new_model):
+                    config = ConfigLoader.load()
+                    config['llm_provider'] = st.session_state.toolbar_provider_selector
+                    prov = st.session_state.toolbar_provider_selector
+                    # 同步更新对应供应商的模型字段
+                    field_map = {
+                        "Ollama": "llm_model_ollama", "OpenAI": "llm_model_openai",
+                        "OpenAI-Compatible": "llm_model_other", "Azure OpenAI": "azure_deployment",
+                        "Anthropic": "config_anthropic_model", "Moonshot": "config_moonshot_model",
+                        "Gemini": "config_gemini_model", "Groq": "config_groq_model"
+                    }
+                    if prov in field_map: config[field_map[prov]] = new_model
+                    ConfigLoader.save(config)
+                    st.toast(f"✅ 已切换为: {new_model}", icon="🤖")
+
+        st.selectbox(
+            "选择模型",
+            options=available_models,
+            index=idx,
+            key="toolbar_model_selector",
+            on_change=on_model_change,
+            label_visibility="collapsed"
+        )
+
+    # --- 3. 功能开关 (Toggle) ---
+    with c_deep:
+        deep_on = st.toggle("深度思考", value=st.session_state.get('enable_query_optimization', False), help="启用智能查询优化")
+        st.session_state.enable_query_optimization = deep_on
+
+    with c_web:
+        web_search_on = st.toggle("联网搜索", value=st.session_state.get('enable_web_search', False), help="启用联网搜索")
+        st.session_state.enable_web_search = web_search_on
+
+    # --- 4. 操作按钮 (Popover/Button) ---
+    with c_filter:
+        with st.popover("⚙️", help="高级筛选"): 
             st.markdown("### 🎯 搜索筛选")
-            
-            # File Type Filter
             file_types = ["PDF", "Word", "Markdown", "Web"]
-            selected_types = st.multiselect(
-                "文件类型",
-                file_types,
-                default=[],
-                key="search_filter_types",
-                placeholder="全部类型"
-            )
+            selected_types = st.multiselect("文件类型", file_types, default=[], key="search_filter_types", placeholder="全部类型")
             
-            # Apply Filter Logic
             current_filters = st.session_state.get('search_filters', [])
             if selected_types != current_filters:
                 st.session_state.search_filters = selected_types
-                # Trigger engine reload if index exists
                 if st.session_state.get('kb_index_obj') and active_kb_name:
                     with st.spinner("🔄 更新检索策略..."):
                         from src.kb.kb_loader import KnowledgeBaseLoader
-                        # Re-instantiate loader just for method access (stateless)
                         temp_loader = KnowledgeBaseLoader(output_base)
-                        # Recreate engine with new filters
-                        new_engine = temp_loader._create_chat_engine(
-                            st.session_state.kb_index_obj, 
-                            os.path.join(output_base, active_kb_name), 
-                            st.empty() # dummy status
-                        )
+                        new_engine = temp_loader._create_chat_engine(st.session_state.kb_index_obj, os.path.join(output_base, active_kb_name), st.empty())
                         st.session_state.chat_engine = new_engine
                         st.toast(f"✅ 已应用筛选: {', '.join(selected_types) if selected_types else '全部'}")
+
+    with c_clear:
+        if st.button("🗑️", help="清空对话", use_container_width=True):
+            st.session_state.messages = []
+            st.session_state.question_queue = []
+            st.session_state.quote_content = None
+            st.rerun()
     
-    with col_info:
-        # 显示当前状态摘要
-        curr_model = st.session_state.get('selected_model', get_default_model())
-        opt_status = "✅ 开启" if st.session_state.get('enable_query_optimization', False) else "⬜ 关闭"
-        
-        # Add filter status
-        filter_status = ""
-        active_filters = st.session_state.get('search_filters', [])
-        if active_filters:
-            filter_status = f"&nbsp;&nbsp;|&nbsp;&nbsp; 🔍 筛选: {len(active_filters)}项"
-            
-        st.caption(f"**当前模型**: `{curr_model}` &nbsp;&nbsp;|&nbsp;&nbsp; **智能优化**: {opt_status}{filter_status}")
+    # --- 5. 停止按钮 (仅处理时显示) ---
+    if st.session_state.get('is_processing'):
+        with c_stop:
+            if st.button("⏹ 停止", type="primary", use_container_width=True):
+                st.session_state.is_processing = False
+                st.session_state.stop_generation = True
+                st.rerun()
 
 # 引用内容预览区
 if st.session_state.get("quote_content"):
@@ -3794,18 +3846,9 @@ if st.session_state.get("quote_content"):
             st.rerun()
 
 # 处理输入
-# 🛑 停止按钮功能
+# 保持输入框形态一致，避免布局跳动
 if st.session_state.get('is_processing'):
-    # 正在处理时显示停止按钮
-    col1, col2 = st.columns([4, 1])
-    with col1:
-        st.chat_input("正在生成回答中...", disabled=True)
-    with col2:
-        if st.button("⏹ 停止", type="primary", use_container_width=True):
-            st.session_state.is_processing = False
-            st.session_state.stop_generation = True
-            st.success("✅ 已停止生成")
-            st.rerun()
+    st.chat_input("正在生成回答中...", disabled=True)
 else:
     # 正常输入状态
     user_input = st.chat_input("输入问题...")
@@ -4073,11 +4116,12 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
         # 查询改写 (v1.6) - 在处理引用内容之前
         # 只有在用户启用查询优化时才进行
         if st.session_state.get('enable_query_optimization', False):
+            logger.info("🧠 深度思考(查询优化)已激活")
             query_rewriter = QueryRewriter(Settings.llm)
             should_rewrite, reason = query_rewriter.should_rewrite(final_prompt)
             
             if should_rewrite:
-                logger.info(f"💡 检测到需要改写查询: {reason}")
+                logger.info(f"💡 深度思考: 检测到需要改写查询 - {reason}")
                 rewritten_query = query_rewriter.suggest_rewrite(final_prompt)
                 
                 if rewritten_query and rewritten_query != final_prompt:
@@ -4089,16 +4133,52 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         with col1:
                             if st.button("✅ 使用优化后的查询", key=f"use_optimized_{len(st.session_state.messages)}"):
                                 final_prompt = rewritten_query
-                                logger.info(f"✅ 用户选择使用优化后的查询: {rewritten_query}")
+                                logger.info(f"✅ 深度思考: 用户选择使用优化后的查询 - {rewritten_query}")
                                 st.rerun()
                         with col2:
                             if st.button("📝 使用原问题", key=f"use_original_{len(st.session_state.messages)}"):
-                                logger.info(f"📝 用户选择使用原问题: {final_prompt}")
+                                logger.info(f"📝 深度思考: 用户选择使用原问题 - {final_prompt}")
                                 st.rerun()
                         
                         # 核心修复：停止前释放处理锁，但标记当前问题，避免丢失或重入
                         st.session_state.is_processing = False
                         st.stop()  # 等待用户选择
+            else:
+                logger.info(f"🧠 深度思考: 查询清晰，无需改写 ({reason})")
+
+        # 联网搜索集成 (v2.8)
+        if st.session_state.get('enable_web_search', False):
+            try:
+                from duckduckgo_search import DDGS
+                logger.info(f"🌐 正在执行联网搜索: {final_prompt[:50]}...")
+                with st.status("🌐 正在联网搜索最新信息...", expanded=False) as status:
+                    with DDGS() as ddgs:
+                        results = list(ddgs.text(final_prompt, max_results=5))
+                    
+                    if results:
+                        web_context_parts = []
+                        for i, res in enumerate(results, 1):
+                            web_context_parts.append(f"[{i}] {res['title']}\n{res['body']}\n来源: {res['href']}")
+                        
+                        web_context = "\n\n=== 联网搜索实时信息 ===\n" + "\n".join(web_context_parts) + "\n========================\n"
+                        final_prompt = f"{web_context}\n用户原始问题：{final_prompt}\n\n请结合以上联网搜索到的实时信息和你的知识库内容来回答。"
+                        
+                        logger.info(f"✅ 联网搜索完成，获得 {len(results)} 条结果:")
+                        for idx, res in enumerate(results, 1):
+                            logger.info(f"   [{idx}] {res['title']} ({res['href']})")
+                        
+                        logger.info(f"📄 已注入上下文 (前500字符): {web_context[:500]}...")
+                        
+                        status.update(label=f"✅ 已获取 {len(results)} 条联网搜索结果", state="complete")
+                    else:
+                        logger.warning("⚠️ 联网搜索未返回结果")
+                        status.update(label="⚠️ 联网搜索未找到相关结果", state="error")
+            except ImportError:
+                logger.error("❌ 未安装 duckduckgo_search 库")
+                st.error("未安装联网搜索依赖，请运行 `pip install duckduckgo-search`")
+            except Exception as e:
+                logger.error(f"❌ 联网搜索异常: {str(e)}")
+                st.warning("联网搜索暂时不可用，将仅使用本地知识库回答")
         
         
         # 处理引用内容
