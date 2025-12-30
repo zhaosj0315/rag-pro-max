@@ -247,3 +247,46 @@
 
 **结论**: 项目已通过 10 角色 5 轮次审查，准予发布。
 ```
+
+------
+
+## 6. 推送决策与执行 (Phase 4: Push Decision & Execution)
+
+### 推送必要性评估
+
+完成全量同步后，必须按照 **[NON_ESSENTIAL_PUSH_STANDARD.md](NON_ESSENTIAL_PUSH_STANDARD.md)** 的"非必要不推送"原则进行最终评估：
+
+#### 评估流程
+1. **变更性质分析**: 区分核心功能变更 vs 文档同步 vs 代码优化
+2. **用户影响评估**: 评估变更对最终用户的实际影响
+3. **推送必要性判断**: 
+   - 🔴 **必须推送**: 核心功能、安全修复、关键Bug修复
+   - 🟡 **建议推送**: 用户体验改进、文档完整性、性能优化
+   - 🟢 **可选推送**: 代码重构、注释更新、内部优化
+
+#### 推送执行
+```bash
+# 1. 最终检查
+git status  # 确保工作区干净
+git log --oneline -5  # 确认提交历史
+
+# 2. 按需推送
+git push origin main  # 仅在通过必要性评估后执行
+```
+
+### 推送后验证
+- [ ] 远程仓库状态确认
+- [ ] CI/CD 流水线状态检查
+- [ ] 部署环境验证（如适用）
+
+------
+
+## 📚 相关标准文档
+
+- [NON_ESSENTIAL_PUSH_STANDARD.md](NON_ESSENTIAL_PUSH_STANDARD.md) - 非必要不推送原则
+- [DEVELOPMENT_CLEANUP_STANDARD.md](DEVELOPMENT_CLEANUP_STANDARD.md) - 开发清理标准
+- [DOCUMENTATION_MAINTENANCE_STANDARD.md](DOCUMENTATION_MAINTENANCE_STANDARD.md) - 文档维护标准
+
+---
+
+**遵循此标准，确保每次发布的质量和一致性** 🚀

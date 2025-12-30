@@ -1,6 +1,6 @@
 """
-RAG Pro Max - RAG 核心引擎
-提取自 apppro.py，负责知识库的创建、加载和查询
+RAG Pro Max - RAG 十心引擎
+提匸自 apppro.py，负责知识库的创建、加载和查询
 """
 
 import os
@@ -19,7 +19,7 @@ from llama_index.core.schema import Document
 
 
 class RAGEngine:
-    """RAG 核心引擎"""
+    """RAG 十心引擎"""
     
     def __init__(
         self, 
@@ -30,7 +30,7 @@ class RAGEngine:
         logger=None
     ):
         """
-        初始化 RAG 引擎
+        初化 RAG 引擎
         
         Args:
             kb_name: 知识库名称
@@ -156,16 +156,16 @@ class RAGEngine:
         
         # 定义中文问答模板 (优化 Gemini/DeepSeek 等模型的指令遵循)
         qa_prompt_tmpl_str = (
-            "以下是已知信息：\n"
-            "---------------------\n"
-            "{context_str}\n"
-            "---------------------\n"
-            "请完全根据上述上下文信息回答用户的问题。不要使用外部知识。\n"
-            "如果上下文中包含相关信息，请详细回答。\n"
-            "如果上下文中没有相关信息，请回答“知识库中未找到相关内容”。\n"
-            "问题：{query_str}\n"
-            "回答："
-        )
+            """以下是已知信息：
+            ---------------------
+            {context_str}
+            ---------------------
+            请完全根据上述上下文息回答用户的问题。不要使用外部知识。
+            如果上下文中包含相关信息，请详细回答。
+            如果上下文中没有相关信息，请回答“知识库中未找到相关内容”。
+            问题：{query_str}
+            回答："
+        ) # noqa
         qa_prompt_tmpl = PromptTemplate(qa_prompt_tmpl_str)
         
         return self.index.as_query_engine(
@@ -242,7 +242,7 @@ class RAGEngine:
             }
     
     def delete(self):
-        """删除知识库"""
+        ""删除知识库"""
         if os.path.exists(self.persist_dir):
             shutil.rmtree(self.persist_dir)
             if self.logger:
@@ -253,3 +253,61 @@ class RAGEngine:
     def __repr__(self):
         stats = self.get_stats()
         return f"RAGEngine(kb_name='{self.kb_name}', status='{stats['status']}')"
+
+def create_rag_engine(kb_name: str, logger=None) -> Optional['RAGEngine']:
+    """
+    创建 RAGEngine 实例的工厂函数
+    
+    Args:
+        kb_name: 知识库名称
+        logger: 日志记录器
+        
+    Returns:
+        RAGEngine 实例，如果创建失败则返回 None
+    """
+    try:
+        from src.core.app_config import load_config, output_base
+        from src.utils.model_manager import load_embedding_model, load_llm_model
+        
+        # 加载配置
+        config = load_config()
+        persist_dir = os.path.join(output_base, kb_name)
+        
+        # 加载 Embedding 模型
+        embed_model = load_embedding_model(
+            provider=config.get('embed_provider'),
+            model_name=config.get('embed_model'),
+            api_key=config.get('embed_key'),
+            api_url=config.get('embed_url')
+        )
+        
+        # 加载 LLM 模型
+        llm_model = load_llm_model(
+            provider=config.get('llm_provider'),
+            model_name=config.get('llm_model'),
+            api_key=config.get('llm_key'),
+            api_url=config.get('llm_url'),
+            temperature=config.get('temperature', 0.7)
+        )
+        
+        # 创建引擎实例
+        engine = RAGEngine(
+            kb_name=kb_name,
+            persist_dir=persist_dir,
+            embed_model=embed_model,
+            llm_model=llm_model,
+            logger=logger
+        )
+        
+        # 加载已有索引
+        if engine.load_existing_index():
+            return engine
+        else:
+            if logger:
+                logger.error(f"❌ 无法加载知识库索引: {kb_name}")
+            return None
+            
+    except Exception as e:
+        if logger:
+            logger.error(f"❌ 创建 RAG 引擎失败: {str(e)}")
+        return None
