@@ -1376,8 +1376,8 @@ with st.sidebar:
             with st.container(border=True):
                 # 顶部信息栏已移除（用户反馈冗余）
                 
-                # 底部：操作栏 (优化为 1x5 一行化布局)
-                op_cols = st.columns(5)
+                # 底部：操作栏 (优化为 1x4 一行化布局，新窗口移至下方)
+                op_cols = st.columns(4)
                 
                 with op_cols[0]:
                     if st.button("🔄 撤销", use_container_width=True, disabled=len(state.get_messages()) < 2, help="撤销最近一轮对话"):
@@ -1411,14 +1411,12 @@ with st.sidebar:
                     st.download_button("📥 导出", export_content, file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d')}.md", mime="text/markdown", use_container_width=True, disabled=len(state.get_messages()) == 0)
 
                 with op_cols[3]:
-                    st.link_button("🔀 新窗口", "http://localhost:8501", use_container_width=True, help="打开新窗口")
-
-                with op_cols[4]:
                     if st.button("🗑️ 删除", use_container_width=True, type="primary", disabled=not current_kb_name, help="永久删除该知识库"):
                         st.session_state.confirm_delete = True
                         st.rerun()
                 
-                # op_row3_col2 留空或用于将来扩展
+                # 新窗口移至最下方，避免样式干扰
+                st.link_button("🔀 在新窗口打开", "http://localhost:8501", use_container_width=True, help="打开新窗口")
             
             # 删除确认对话框 (放在卡片外，避免嵌套问题)
             if st.session_state.get('confirm_delete', False):
