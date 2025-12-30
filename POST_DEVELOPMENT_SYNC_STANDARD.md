@@ -47,7 +47,7 @@
 
 
 -  **文档同步检查**: 运行 `./scripts/check_docs_sync.sh` (如有) 或相关检查脚本，扫描文档中的版本号是否滞后。
--  **清理脚本执行**: 运行 `./scripts/cleanup.sh`，自动清理 `__pycache__`, `.DS_Store`, 临时日志等。
+-  **清理脚本执行**: 运行 `bash ./scripts/cleanup.sh`，自动清理 `__pycache__`, `.DS_Store`, 临时日志等。
 
 #### 2. 配置层 (Configuration Layer)
 
@@ -99,7 +99,7 @@
   :
 
   - **UI截图**: 若 UI 布局变更（如新按钮、新布局），必须替换对应截图。
-  - **参数说明**: 检查配置项说明是否与代码中的 `rag_config.json` 默认值一致。
+  - **参数说明**: 检查配置项说明是否与代码中定义的默认配置值 (e.g., `src/core/app_config.py` 中的 `defaults`) 一致。
 
 -  **FAQ.md**: 针对本次更新可能引发的常见疑问（如：为什么原来的按钮不见了？），预置 Q&A。
 
@@ -127,7 +127,8 @@
 - **代码变量**: 关键配置项 Key (e.g., `enable_web_search`, `enable_deep_think`).
 - **文档描述**: 用户手册中的用词 (e.g., "联网搜索 (Web Search)", "深度思考 (Deep Think)").
 
-**v2.8.0 核心术语检查清单**:
+**v2.8.0 核心术语检查清单 (示例/当前版本重点)**:
+*(注：新版本发布时需在此处更新当期核心功能的关键术语)*
 
 -  联网搜索 / Web Search / enable_web_search
 -  深度思考 / Deep Think / enable_deep_think
