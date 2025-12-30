@@ -918,13 +918,11 @@ with st.sidebar:
                     on_change=on_text_paste
                 )
         else:
-            # 管理模式 - 使用一行化布局
-            manage_title_col1, manage_title_col2, manage_title_col3 = st.columns([2, 2, 1])
+            # 管理模式 - 使用一行化布局 (1x2 紧凑布局)
+            manage_title_col1, manage_title_col2 = st.columns([4, 1])
             with manage_title_col1:
-                pass # 移除冗余的知识库名称显示
-            with manage_title_col2:
                 st.markdown("📤 **添加文档**")
-            with manage_title_col3:
+            with manage_title_col2:
                 if st.button("🔄", help="重建索引 (覆盖该库)", use_container_width=True):
                     # 触发重建逻辑
                     st.session_state.uploaded_path = os.path.join("vector_db_storage", current_kb_name)
@@ -1350,12 +1348,10 @@ with st.sidebar:
             with st.container(border=True):
                 # 顶部信息栏已移除（用户反馈冗余）
                 
-                # 底部：操作栏 (优化为 2*3 布局)
-                op_row1_col1, op_row1_col2 = st.columns(2)
-                op_row2_col1, op_row2_col2 = st.columns(2)
-                op_row3_col1, op_row3_col2 = st.columns(2)
+                # 底部：操作栏 (优化为 1x5 一行化布局)
+                op_cols = st.columns(5)
                 
-                with op_row1_col1:
+                with op_cols[0]:
                     if st.button("🔄 撤销", use_container_width=True, disabled=len(state.get_messages()) < 2, help="撤销最近一轮对话"):
                         if len(state.get_messages()) >= 2:
                             st.session_state.messages.pop()
@@ -1366,7 +1362,7 @@ with st.sidebar:
                             time.sleep(0.5)
                             st.rerun()
                 
-                with op_row1_col2:
+                with op_cols[1]:
                     if st.button("🧹 清空", use_container_width=True, disabled=len(state.get_messages()) == 0, help="清空当前对话记录"):
                         st.session_state.messages = []
                         st.session_state.suggestions_history = []
@@ -1376,7 +1372,7 @@ with st.sidebar:
                         time.sleep(0.5)
                         st.rerun()
                 
-                with op_row2_col1:
+                with op_cols[2]:
                     export_content = ""
                     if len(state.get_messages()) > 0:
                         export_content = f"# 对话记录 - {current_kb_name}\n\n**导出时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n\n"
@@ -1386,10 +1382,10 @@ with st.sidebar:
                     
                     st.download_button("📥 导出", export_content, file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d')}.md", mime="text/markdown", use_container_width=True, disabled=len(state.get_messages()) == 0)
 
-                with op_row2_col2:
+                with op_cols[3]:
                     st.link_button("🔀 新窗口", "http://localhost:8501", use_container_width=True, help="打开新窗口")
 
-                with op_row3_col1:
+                with op_cols[4]:
                     if st.button("🗑️ 删除", use_container_width=True, type="primary", disabled=not current_kb_name, help="永久删除该知识库"):
                         st.session_state.confirm_delete = True
                         st.rerun()
