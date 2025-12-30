@@ -274,6 +274,10 @@ def create_rag_engine(kb_name: str, logger=None) -> Optional['RAGEngine']:
         config = load_config()
         persist_dir = os.path.join(output_base, kb_name)
         
+        # 确保配置值有效 (防止空字符串导致模型加载失败)
+        llm_provider = config.get('llm_provider') or "Ollama"
+        llm_model_name = config.get('llm_model') or "gpt-oss:20b"
+        
         # 加载 Embedding 模型
         embed_model = load_embedding_model(
             provider=config.get('embed_provider'),
@@ -284,8 +288,8 @@ def create_rag_engine(kb_name: str, logger=None) -> Optional['RAGEngine']:
         
         # 加载 LLM 模型
         llm_model = load_llm_model(
-            provider=config.get('llm_provider'),
-            model_name=config.get('llm_model'),
+            provider=llm_provider,
+            model_name=llm_model_name,
             api_key=config.get('llm_key'),
             api_url=config.get('llm_url'),
             temperature=config.get('temperature', 0.7)
