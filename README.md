@@ -1,14 +1,14 @@
 # RAG Pro Max - 智能文档问答系统
 
-![Version](https://img.shields.io/badge/version-v2.9.3-brightgreen)
+![Version](https://img.shields.io/badge/version-v3.2.1-brightgreen)
 ![Status](https://img.shields.io/badge/status-Stable-blue)
 ![Last Update](https://img.shields.io/badge/last%20update-2025--12--30-orange)
 
-# 🚀 RAG Pro Max v2.9.3
+# 🚀 RAG Pro Max v3.2.1
 
 > **企业级 RAG 知识库系统 - 智能推荐与极速检索的终极进化**
 ...
-**🎯 核心优势**: 语义防火墙(Semantic Guard) • 智能研究(Deep Research) • 搜索意图拆解 • 中英双语检索
+**🎯 核心优势**: 现代化配置中心 • 插件式自定义厂商 • 语义防火墙 • 专家级智能研究
 
 ---
 

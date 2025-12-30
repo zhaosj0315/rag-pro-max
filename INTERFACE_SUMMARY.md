@@ -4,7 +4,7 @@
 
 - **Python模块**: 180个
 - **类定义**: 163个  
-- **函数定义**: 1386个
+- **函数定义**: 1387个
 - **API端点**: 11个
 - **配置文件**: 3个
 
@@ -258,25 +258,25 @@
 - `llm_model_ollama`: gpt-oss:20b
 
 ### config/rag_config.json
-- `target_path`: /Users/zhaosj/Documents/rag-pro-max/temp_uploads/batch_1767062080
+- `target_path`: /Users/zhaosj/Documents/rag-pro-max/temp_uploads/batch_1767074419
 - `output_path`: /Users/zhaosj/Documents/rag-pro-max/vector_db_storage
 - `llm_type_idx`: 1
 - `llm_url_ollama`: http://localhost:11434
 - `llm_model_ollama`: gpt-oss:20b
-- `llm_url_openai`: https://cn.gptapi.asia/v1
-- `llm_key`: sk-nWYfVnuZMkPnLFsR5d02Af5b6c31478889C12520775f8f12
-- `llm_model_openai`: chatgpt-4o-latest
+- `llm_url_openai`: https://api.openai.com/v1
+- `llm_key`: 
+- `llm_model_openai`: llama3-8b-8192
 - `embed_provider_idx`: 0
 - `embed_model_hf`: sentence-transformers/all-MiniLM-L6-v2
 - `embed_url_ollama`: 
 - `embed_model_ollama`: 
-- `llm_provider`: Ollama
-- `llm_url_other`: https://cn.gptapi.asia/v1
-- `llm_key_other`: sk-nWYfVnuZMkPnLFsR5d02Af5b6c31478889C12520775f8f12
-- `llm_model_other`: chatgpt-4o-latest
-- `llm_provider_label`: Ollama (本地)
-- `llm_url`: https://cn.gptapi.asia/v1
-- `llm_model`: chatgpt-4o-latest
+- `llm_provider`: OpenAI-Compatible
+- `llm_url_other`: https://api.deepseek.com/v1
+- `llm_key_other`: 
+- `llm_model_other`: 
+- `llm_provider_label`: 🦙 Ollama
+- `llm_url`: https://api.deepseek.com/v1
+- `llm_model`: 
 
 ### rag_config.json
 - `target_path`: rag_storage
@@ -288,7 +288,7 @@
 
 ## 📝 生成时间
 
-Tue Dec 30 10:41:09 CST 2025
+Tue Dec 30 20:24:54 CST 2025
 
 ---
 
