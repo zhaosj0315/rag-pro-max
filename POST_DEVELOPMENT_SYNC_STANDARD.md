@@ -2,7 +2,8 @@
 
 
 
-**版本**: v2.8.0 (Expert Reviewed)
+**版本**: v3.2.1 (Expert Reviewed)  
+**更新日期**: 2025-12-30
 **类型**: 工程管理规范
 **适用阶段**: 开发完成 (Code Freeze) 后，发布/推送前
 **执行角色**: Release Manager / Tech Lead
