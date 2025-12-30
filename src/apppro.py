@@ -1351,6 +1351,28 @@ with st.sidebar:
 
         # --- 现有库的管理 (卡片式布局) ---
         if not is_create_mode:
+            # 注入 CSS 修复按钮对齐问题
+            st.markdown("""
+            <style>
+            /* 强制统一操作栏按钮的高度和对齐 */
+            div[data-testid="column"] button, 
+            div[data-testid="column"] a {
+                min-height: 38px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                margin-top: 0px !important;
+            }
+            /* 修复下载按钮和链接按钮的文字偏移 */
+            div[data-testid="stDownloadButton"] > button,
+            div[data-testid="stLinkButton"] > a {
+                padding-top: 0px !important;
+                padding-bottom: 0px !important;
+                line-height: 1 !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
             with st.container(border=True):
                 # 顶部信息栏已移除（用户反馈冗余）
                 
