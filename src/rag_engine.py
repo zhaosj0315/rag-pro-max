@@ -1,6 +1,6 @@
 """
-RAG Pro Max - RAG 十心引擎
-提匸自 apppro.py，负责知识库的创建、加载和查询
+RAG Pro Max - RAG 核心引擎
+提取自 apppro.py，负责知识库的创建、加载和查询
 """
 
 import os
@@ -19,7 +19,7 @@ from llama_index.core.schema import Document
 
 
 class RAGEngine:
-    """RAG 十心引擎"""
+    """RAG 核心引擎"""
     
     def __init__(
         self, 
@@ -30,7 +30,7 @@ class RAGEngine:
         logger=None
     ):
         """
-        初化 RAG 引擎
+        初始化 RAG 引擎
         
         Args:
             kb_name: 知识库名称
@@ -156,16 +156,16 @@ class RAGEngine:
         
         # 定义中文问答模板 (优化 Gemini/DeepSeek 等模型的指令遵循)
         qa_prompt_tmpl_str = (
-            """以下是已知信息：
-            ---------------------
-            {context_str}
-            ---------------------
-            请完全根据上述上下文息回答用户的问题。不要使用外部知识。
-            如果上下文中包含相关信息，请详细回答。
-            如果上下文中没有相关信息，请回答“知识库中未找到相关内容”。
-            问题：{query_str}
-            回答："
-        ) # noqa
+            "以下是已知信息：\n"
+            "---------------------\n"
+            "{context_str}\n"
+            "---------------------\n"
+            "请完全根据上述上下文信息回答用户的问题。不要使用外部知识。\n"
+            "如果上下文中包含相关信息，请详细回答。\n"
+            "如果上下文中没有相关信息，请回答“知识库中未找到相关内容”。\n"
+            "问题：{query_str}\n"
+            "回答："
+        )
         qa_prompt_tmpl = PromptTemplate(qa_prompt_tmpl_str)
         
         return self.index.as_query_engine(
