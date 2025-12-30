@@ -164,30 +164,84 @@
 
 ------
 
-## 3. 交付反馈报告 (Final Audit Report)
+## 4. 多轮专家审查协议 (Multi-Round Expert Review Protocol)
+
+
+
+为了确保逻辑一致性和交付质量，执行严格的**十人五轮**审查机制。这不一定需要十个不同的人，而是要求审查者戴上十顶不同的“专家帽”进行五轮深度遍历。
+
+### 🎩 十位虚拟专家角色 (The 10 Expert Personas)
+
+1.  **🏗️ 架构师 (System Architect)**: 审查模块依赖、架构图一致性、代码结构完整性。
+2.  **🛡️ 安全审计员 (Security Auditor)**: 扫描敏感信息泄露、权限漏洞、依赖库风险。
+3.  **⚡ 性能工程师 (Performance Engineer)**: 检查资源泄露、潜在的 IO 瓶颈、启动时间劣化。
+4.  **🎨 UI/UX 专家 (UI/UX Specialist)**: 验证界面文案一致性、布局回退、交互逻辑闭环。
+5.  **📝 文档官 (Doc Specialist)**: 确保 README/手册与代码 1:1 对应，无歧义、无死链。
+6.  **🧪 QA 负责人 (QA Lead)**: 确认测试覆盖率、边缘用例覆盖、Bug 修复验证。
+7.  **🚀 DevOps 工程师 (DevOps Engineer)**: 验证 Docker 构建、部署脚本、环境变量配置。
+8.  **💼 产品经理 (Product Owner)**: 确认功能完整性、业务价值交付、版本变更日志准确性。
+9.  **⚖️ 合规专员 (Compliance Officer)**: 检查开源协议冲突、引用规范、版权声明。
+10. **🧹 代码洁癖者 (Clean Code Advocate)**: 审查命名规范、注释质量、废弃代码清理。
+
+### 🔄 五轮审查流程 (The 5-Round Review Cycle)
+
+#### 第一轮：静态与基础 (Round 1: Static & Foundation)
+- **参与专家**: 🏗️ 架构师, 🛡️ 安全审计员, 🚀 DevOps 工程师
+- **关注点**: 代码能否通过编译/Lint？脚本能否跑通？是否有明文密钥提交？
+- **动作**: 执行所有自动化检查脚本 (`check_push.sh`, `test.sh`)。
+
+#### 第二轮：逻辑与功能 (Round 2: Logic & Functionality)
+- **参与专家**: 💼 产品经理, 🧪 QA 负责人, ⚡ 性能工程师
+- **关注点**: 核心功能（如联网搜索、深度思考）是否符合逻辑预期？是否存在死循环或逻辑断路？
+- **动作**: 手动走查核心业务流程，模拟极端输入。
+
+#### 第三轮：体验与一致性 (Round 3: Experience & Consistency)
+- **参与专家**: 🎨 UI/UX 专家, 📝 文档官
+- **关注点**: "界面上写的" vs "文档里写的" vs "代码里做的" 是否三位一体？
+- **动作**: 对照 `USER_MANUAL.md` 操作软件，寻找任何不一致之处。
+
+#### 第四轮：代码与规范 (Round 4: Code & Standards)
+- **参与专家**: 🧹 代码洁癖者, ⚖️ 合规专员
+- **关注点**: 代码风格是否统一？TODO 是否已清理？引用是否合规？
+- **动作**: 深度 Code Review，查阅 `DEVELOPMENT_STANDARD.md` 对齐情况。
+
+#### 第五轮：终局验收 (Round 5: Final Sign-off)
+- **参与专家**: 🏗️ 架构师 (回归), 💼 产品经理 (回归)
+- **关注点**: 前四轮发现的问题是否已修正？是否准备好发布？
+- **动作**: 签署发布确认，打 Tag。
+
+------
+
+## 5. 交付反馈报告 (Final Audit Report)
 
 
 
 任务完成后，必须输出以下格式的报告，作为 Release Note 的一部分：
 
 ```
-### ✅ 全量同步与清理报告
+### ✅ 全量同步与清理报告 (Expert Reviewed)
 
 **版本**: [vX.Y.Z] (当前: v2.8.0)
-**审计人**: [Role/Name]
+**执行人**: [Role/Name]
 
 #### 1. 变更摘要 (Summary)
-- **核心变更**: [一句话描述，如：集成联网搜索与深度思考查询优化模块]
-- **文档同步**: [已完成/有遗留]
+- **核心变更**: [一句话描述]
+- **文档同步**: [已完成]
 
-#### 2. 一致性检查 (Consistency Checklist)
-- [ ] 版本号 (Version Tag): [vX.Y.Z]
-- [ ] UI/文档术语对齐 (Terminology Match)
-- [ ] 敏感信息扫描 (Security Check)
-- [ ] v2.8.0 核心功能术语检查 (联网搜索、深度思考、功能工具栏)
+#### 2. 五轮审查概览 (5-Round Review Status)
+- [ ] Round 1 (Static/Sec): Pass
+- [ ] Round 2 (Logic/Func): Pass
+- [ ] Round 3 (UI/Doc): Pass
+- [ ] Round 4 (Code/Std): Pass
+- [ ] Round 5 (Final): Pass
 
-#### 3. 遗留问题/风险 (Risks)
-- [如有，请列出；无则填 None]
+#### 3. 核心一致性检查 (Consistency Checklist)
+- [ ] 术语一致性 (UI vs Doc vs Code)
+- [ ] 敏感信息零残留 (Security)
+- [ ] 临时文件全清理 (Zero Noise)
 
-**结论**: 项目已达到交付标准，准备推送。
+#### 4. 遗留风险 (Risks)
+- [None / Describe Risk]
+
+**结论**: 项目已通过 10 角色 5 轮次审查，准予发布。
 ```
