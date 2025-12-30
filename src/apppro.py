@@ -926,8 +926,9 @@ with st.sidebar:
                 if st.button("🔄", help="重建索引 (覆盖该库)", use_container_width=True):
                     # 触发重建逻辑
                     st.session_state.uploaded_path = os.path.join("vector_db_storage", current_kb_name)
-                    # 这里需要一种方式标记为 NEW 模式，通常是通过 btn_start 触发
+                    # 这里需要一种方式标记为 NEW 模式，并通过 trigger_btn_start 强制触发
                     st.session_state.trigger_rebuild = True
+                    st.session_state.trigger_btn_start = True
                     st.rerun()
 
             # 追加模式的文件上传
@@ -936,6 +937,11 @@ with st.sidebar:
             if st.session_state.get('trigger_rebuild'):
                 action_mode = "NEW"
                 st.session_state.trigger_rebuild = False # 消费掉标记
+            
+            # 初始化 btn_start
+            if st.session_state.get('trigger_btn_start'):
+                btn_start = True
+                st.session_state.trigger_btn_start = False # 消费掉标记
             
             target_path = "" # 管理模式不需要手动指定路径，使用KB原有路径
             
