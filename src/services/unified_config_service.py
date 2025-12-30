@@ -33,17 +33,23 @@ class UnifiedConfigService:
             return False
     
     def load_config(self, config_name: str, default_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """统一配置加载方法"""
+        """统一配置加载方法 - 自动合并默认配置"""
         config_file = self.config_dir / f"{config_name}.json"
         
+        loaded_config = {}
         if config_file.exists():
             try:
                 with open(config_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    loaded_config = json.load(f)
             except Exception as e:
                 print(f"加载配置失败 {config_name}: {e}")
         
-        return default_config or {}
+        # 合并逻辑: 使用默认配置作为基础，用加载的配置覆盖
+        final_config = (default_config or {}).copy()
+        if loaded_config:
+            final_config.update(loaded_config)
+            
+        return final_config
     
     def validate_config(self, config_data: Dict[str, Any], schema: Dict[str, Any]) -> bool:
         """验证配置数据"""
