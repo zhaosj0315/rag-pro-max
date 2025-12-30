@@ -83,7 +83,10 @@ def initialize_session_state():
         "is_processing": False,
         "quote_content": None,
         "first_time_guide_shown": False,
-        "question_queue": []
+        "question_queue": [],
+        "enable_query_optimization": False,
+        "enable_web_search": False,
+        "enable_deep_research": False
     }
     
     for key, default_value in defaults.items():

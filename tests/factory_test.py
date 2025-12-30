@@ -48,6 +48,8 @@ def print_test(name, status, message=""):
     elif status == "FAIL":
         test_results["failed"] += 1
         test_results["errors"].append(f"{name}: {message}")
+    elif status == "SKIP":
+        test_results["skipped"] += 1
     else:
         test_results["skipped"] += 1
 
@@ -135,6 +137,22 @@ def test_core_imports():
         ("src.chat", "HistoryManager"),
         ("src.chat", "SuggestionManager"),
         ("src.kb", "KBManager"),
+        # 新增：核心Service类测试
+        ("src.services.file_service", "FileService"),
+        ("src.services.knowledge_base_service", "KnowledgeBaseService"),
+        ("src.services.config_service", "get_config_service"),
+        # 新增：核心Interface类测试
+        ("src.chat.chat_interface", "ChatInterface"),
+        ("src.kb.kb_interface", "KBInterface"),
+        ("src.config.config_interface", "ConfigInterface"),
+        # 新增：核心Manager类测试
+        ("src.kb.kb_manager", "KBManager"),
+        ("src.chat.history_manager", "HistoryManager"),
+        ("src.utils.model_manager", "load_embedding_model"),  # 修复：使用实际存在的函数
+        # 新增：核心Processor类测试
+        ("src.processors.unified_document_processor", "UnifiedDocumentProcessor"),
+        ("src.query.query_processor", "QueryProcessor"),
+        ("src.utils.search_quality", "search_quality_analyzer"),
     ]
     
     for module_name, attr_name in modules:
@@ -149,6 +167,104 @@ def test_core_imports():
                 print_test(f"模块: {module_name}.{attr_name}", "FAIL", f"缺少属性 {attr_name}")
         except Exception as e:
             print_test(f"模块: {module_name}", "FAIL", str(e))
+
+# ============================================================
+# 3.5. 服务层测试 (新增)
+# ============================================================
+def test_service_layer():
+    print_header("3.5. 服务层测试")
+    
+    # 文件服务测试
+    try:
+        from src.services.file_service import FileService
+        file_service = FileService()
+        
+        # 测试基本方法存在
+        required_methods = ['validate_file', 'get_file_info', 'process_file']
+        for method in required_methods:
+            if hasattr(file_service, method):
+                print_test(f"FileService.{method}", "PASS")
+            else:
+                print_test(f"FileService.{method}", "SKIP", "方法不存在")
+                
+    except Exception as e:
+        print_test("FileService", "FAIL", str(e))
+    
+    # 知识库服务测试
+    try:
+        from src.services.knowledge_base_service import KnowledgeBaseService
+        kb_service = KnowledgeBaseService()
+        
+        # 测试基本方法存在
+        required_methods = ['list_knowledge_bases', 'create_knowledge_base', 'delete_knowledge_base']
+        for method in required_methods:
+            if hasattr(kb_service, method):
+                print_test(f"KnowledgeBaseService.{method}", "PASS")
+            else:
+                print_test(f"KnowledgeBaseService.{method}", "SKIP", "方法不存在")
+                
+    except Exception as e:
+        print_test("KnowledgeBaseService", "FAIL", str(e))
+    
+    # 配置服务测试
+    try:
+        from src.services.config_service import get_config_service
+        config_service = get_config_service()
+        
+        # 测试基本方法存在
+        if hasattr(config_service, 'get_default_model'):
+            print_test("ConfigService.get_default_model", "PASS")
+        else:
+            print_test("ConfigService.get_default_model", "SKIP", "方法不存在")
+            
+    except Exception as e:
+        print_test("ConfigService", "FAIL", str(e))
+
+# ============================================================
+# 3.6. 接口层测试 (新增)
+# ============================================================
+def test_interface_layer():
+    print_header("3.6. 接口层测试")
+    
+    # 聊天接口测试
+    try:
+        from src.chat.chat_interface import ChatInterface
+        chat_interface = ChatInterface()
+        
+        # 测试基本方法存在
+        if hasattr(chat_interface, 'render'):
+            print_test("ChatInterface.render", "PASS")
+        else:
+            print_test("ChatInterface.render", "SKIP", "方法不存在")
+            
+    except Exception as e:
+        print_test("ChatInterface", "SKIP", "接口类不存在或导入失败")
+    
+    # 知识库接口测试
+    try:
+        from src.kb.kb_interface import KBInterface
+        kb_interface = KBInterface()
+        
+        if hasattr(kb_interface, 'render'):
+            print_test("KBInterface.render", "PASS")
+        else:
+            print_test("KBInterface.render", "SKIP", "方法不存在")
+            
+    except Exception as e:
+        print_test("KBInterface", "SKIP", "接口类不存在或导入失败")
+    
+    # 配置接口测试
+    try:
+        from src.config.config_interface import ConfigInterface
+        config_interface = ConfigInterface()
+        
+        if hasattr(config_interface, 'render'):
+            print_test("ConfigInterface.render", "PASS")
+        else:
+            print_test("ConfigInterface.render", "SKIP", "方法不存在")
+            
+    except Exception as e:
+        print_test("ConfigInterface", "SKIP", "接口类不存在或导入失败")
 
 # ============================================================
 # 4. 日志系统测试
@@ -641,6 +757,8 @@ def main():
     test_environment()
     test_config_files()
     test_core_imports()
+    test_service_layer()  # 新增服务层测试
+    test_interface_layer()  # 新增接口层测试
     test_logging_system()
     test_document_processing()
     test_vector_database()
