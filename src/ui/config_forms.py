@@ -20,255 +20,224 @@ from src.utils.model_manager import set_global_llm_model
 
 def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
     """
-    渲染 LLM 配置表单 (优化版 - 仿 ChatOllama 布局)
+    渲染 LLM 配置表单 (v3.2 顶部导航 + 修复数据覆盖 Bug)
     """
-    st.markdown("#### 🧠 模型服务配置")
+    st.markdown("#### 🧠 模型服务中心")
     
-    # 定义供应商列表
-    PROVIDERS = {
-        "Ollama": "🦙 Ollama (本地)",
-        "OpenAI": "☁️ OpenAI (云端)",
-        "OpenAI-Compatible": "🔌 Other (兼容协议)",
-        "Azure OpenAI": "🟦 Azure OpenAI",
-        "Anthropic": "🧠 Anthropic (Claude)",
-        "Moonshot": "🌙 Moonshot (Kimi)",
-        "Gemini": "💎 Gemini (Google)",
-        "Groq": "⚡ Groq (极速)"
+    # 1. 准备供应商数据
+    BASE_PROVIDERS = {
+        "Ollama": "🦙 Ollama",
+        "OpenAI": "☁️ OpenAI",
+        "OpenAI-Compatible": "🔌 OpenAI-Other",
+        "Azure OpenAI": "🟦 Azure",
+        "Anthropic": "🧠 Anthropic",
+        "Moonshot": "🌙 Moonshot",
+        "Gemini": "💎 Gemini",
+        "Groq": "⚡ Groq"
     }
     
-    # 布局: 左侧导航，右侧详情
-    col_nav, col_form = st.columns([1, 3])
+    custom_providers = defaults.get("custom_llm_providers", {})
+    PROVIDERS = BASE_PROVIDERS.copy()
+    for cp_id, cp_info in custom_providers.items():
+        PROVIDERS[cp_id] = f"🎨 {cp_info.get('name', cp_id)}"
     
-    # --- 左侧导航栏 ---
-    with col_nav:
-        st.markdown("##### 服务商")
-        
-        # 尝试恢复上次的选择 (将 label 转换为 key)
-        saved_label = defaults.get("llm_provider_label", "Ollama (本地)")
-        default_key = "Ollama"
-        for k, v in PROVIDERS.items():
-            if v == saved_label:
-                default_key = k
-                break
-        
-        # 能够保持状态的选择器
-        selected_key = st.radio(
-            "选择服务商",
-            options=list(PROVIDERS.keys()),
-            format_func=lambda x: PROVIDERS[x],
-            index=list(PROVIDERS.keys()).index(default_key) if default_key in PROVIDERS else 0,
-            key="llm_provider_nav",
-            label_visibility="collapsed"
-        )
-        st.caption("选择 AI 服务提供商配置连接与模型")
+    nav_keys = list(PROVIDERS.keys()) + ["ADD_CUSTOM"]
+    
+    # --- 核心修复 1: 使用顶部单选框模拟标签页，确保能获取选中的 Key ---
+    saved_provider = defaults.get("llm_provider", "Ollama")
+    if saved_provider not in nav_keys: saved_provider = "Ollama"
+    
+    # 在顶部显示水平选择器
+    selected_key = st.radio(
+        "厂商切换",
+        options=nav_keys,
+        format_func=lambda x: PROVIDERS.get(x, "➕ 新增自定义"),
+        index=nav_keys.index(saved_provider),
+        horizontal=True,
+        key="top_provider_selector"
+    )
+    
+    st.divider()
 
-    # --- 右侧配置表单 ---
+    # 初始返回变量 (核心修复 2: 确保只从选中的厂商提取数据)
     llm_provider = selected_key
     llm_url = ""
     llm_model = ""
     llm_key = ""
     extra_params = {}
-    
-    with col_form:
-        st.markdown(f"#### {PROVIDERS[selected_key]} 设置")
-        
-        # 1. Ollama
-        if selected_key == "Ollama":
-            col_url, col_status = st.columns([3, 1])
-            with col_url:
-                llm_url = st.text_input("Ollama URL", defaults.get("llm_url_ollama") or "http://localhost:11434", key="config_ollama_url")
+
+    # --- 2. 根据选中的 Key 渲染对应的配置卡片 ---
+    with st.container(border=True):
+        if selected_key == "ADD_CUSTOM":
+            st.markdown("##### ➕ 新增自定义服务商")
+            c1, c2 = st.columns(2)
+            with c1:
+                custom_name = st.text_input("厂商名称", placeholder="MyAI", key="new_custom_name")
+                custom_url = st.text_input("Base URL", placeholder="https://api.domain.com/v1", key="new_custom_url")
+            with c2:
+                custom_key = st.text_input("API Key", type="password", key="new_custom_key")
+                custom_model = _render_remote_model_selector(custom_url, custom_key, "", "custom_new")
             
-            from src.utils.model_utils import check_ollama_status
-            ollama_ok = check_ollama_status(llm_url)
-            
-            with col_status:
-                st.write("")
-                if ollama_ok:
-                    st.caption("✅ 已连接")
+            if st.button("✨ 立即创建并保存", type="primary", use_container_width=True):
+                if custom_name and custom_url:
+                    cp_id = f"custom_{hash(custom_name + custom_url) % 10000}"
+                    new_cp_info = {"name": custom_name, "url": custom_url, "key": custom_key, "model": custom_model}
+                    existing_custom = defaults.get("custom_llm_providers", {})
+                    existing_custom[cp_id] = new_cp_info
+                    config_data = {
+                        "custom_llm_providers": existing_custom,
+                        "llm_provider": cp_id,
+                        "llm_provider_label": f"🎨 {custom_name}",
+                        f"llm_url_{cp_id}": custom_url,
+                        f"llm_key_{cp_id}": custom_key,
+                        f"llm_model_{cp_id}": custom_model
+                    }
+                    _save_and_apply_config(config_data, cp_id, custom_model, custom_key, custom_url, defaults)
+                    st.rerun()
                 else:
-                    st.caption("⚠️ 未运行")
-            
-            saved_model = defaults.get("llm_model_ollama", "gpt-oss:20b")
-            llm_model, _ = render_ollama_model_selector(llm_url, saved_model, ollama_ok)
-            
-            # 按钮区域
-            if st.button("💾 保存 Ollama 配置", key="save_ollama_config", type="primary"):
-                config_data = {
-                    "llm_provider": "Ollama",
-                    "llm_url_ollama": llm_url,
-                    "llm_model_ollama": llm_model,
-                    "llm_provider_label": PROVIDERS["Ollama"]
-                }
-                _save_and_apply_config(config_data, "Ollama", llm_model, "", llm_url, defaults)
+                    st.error("请填写完整信息")
 
-        # 2. OpenAI
-        elif selected_key == "OpenAI":
+        elif selected_key in custom_providers:
+            # 渲染已有的自定义服务商 (严格锚定数据)
+            cp = custom_providers[selected_key]
+            st.markdown(f"##### {PROVIDERS[selected_key]} 配置")
             col1, col2 = st.columns([2, 1])
             with col1:
-                llm_url = st.text_input("Base URL", defaults.get("llm_url_openai", "https://api.openai.com/v1"), key="config_openai_url")
+                llm_url = st.text_input("Base URL", defaults.get(f"llm_url_{selected_key}") or cp.get('url', ""), key=f"config_{selected_key}_url")
             with col2:
-                llm_key = st.text_input("API Key", defaults.get("llm_key", ""), type="password", key="config_openai_key")
+                llm_key = st.text_input("API Key", defaults.get(f"llm_key_{selected_key}") or cp.get('key', ""), type="password", key=f"config_{selected_key}_key")
             
-            # 模型选择逻辑
-            saved_model = defaults.get("llm_model_openai", "gpt-3.5-turbo")
-            llm_model = _render_remote_model_selector(llm_url, llm_key, saved_model, "openai")
+            saved_model = defaults.get(f"llm_model_{selected_key}") or cp.get('model', "")
+            llm_model = _render_remote_model_selector(llm_url, llm_key, saved_model, selected_key)
             
-            if st.button("💾 保存 OpenAI 配置", key="save_openai_config", type="primary"):
-                config_data = {
-                    "llm_provider": "OpenAI",
-                    "llm_url_openai": llm_url,
-                    "llm_key": llm_key,
-                    "llm_model_openai": llm_model,
-                    "llm_provider_label": PROVIDERS["OpenAI"]
-                }
-                _save_and_apply_config(config_data, "OpenAI", llm_model, llm_key, llm_url, defaults)
+            b1, b2 = st.columns([4, 1])
+            with b1:
+                if st.button(f"💾 保存 {cp['name']} 修改", type="primary", use_container_width=True, key=f"save_{selected_key}"):
+                    cp.update({"url": llm_url, "key": llm_key, "model": llm_model})
+                    custom_providers[selected_key] = cp
+                    _save_and_apply_config({"custom_llm_providers": custom_providers, "llm_provider": selected_key, f"llm_url_{selected_key}": llm_url, f"llm_key_{selected_key}": llm_key, f"llm_model_{selected_key}": llm_model}, selected_key, llm_model, llm_key, llm_url, defaults)
+            with b2:
+                if st.button("🗑️ 删除", key=f"del_{selected_key}", use_container_width=True):
+                    del custom_providers[selected_key]
+                    _save_and_apply_config({"custom_llm_providers": custom_providers}, "Ollama", "gpt-oss:20b", "", "http://localhost:11434", defaults)
+                    st.rerun()
 
-        # 3. OpenAI-Compatible (Other)
-        elif selected_key == "OpenAI-Compatible":
-            st.caption("💡 适用于 DeepSeek, Yi, ChatGLM, vLLM 等兼容 OpenAI 协议的服务")
-            col1, col2 = st.columns([2, 1])
-            with col1:
-                def_url = defaults.get("llm_url_other") or defaults.get("llm_url") or "https://api.deepseek.com/v1"
-                llm_url = st.text_input("Base URL", def_url, key="config_other_url")
-            with col2:
-                def_key = defaults.get("llm_key_other") or defaults.get("llm_key", "")
-                llm_key = st.text_input("API Key", def_key, type="password", key="config_other_key")
+        else:
+            # 内置服务商逻辑 (严格读取 defaults)
+            st.markdown(f"##### {PROVIDERS[selected_key]} 设置")
             
-            saved_model = defaults.get("llm_model_other", "")
-            llm_model = _render_remote_model_selector(llm_url, llm_key, saved_model, "other")
-            
-            if st.button("💾 保存自定义配置", key="save_other_config", type="primary"):
-                config_data = {
-                    "llm_provider": "OpenAI-Compatible",
-                    "llm_url_other": llm_url,
-                    "llm_key_other": llm_key,
-                    "llm_model_other": llm_model,
-                    "llm_provider_label": PROVIDERS["OpenAI-Compatible"],
-                    # 兼容字段
-                    "llm_url": llm_url,
-                    "llm_key": llm_key,
-                    "llm_model": llm_model
-                }
-                _save_and_apply_config(config_data, "OpenAI-Compatible", llm_model, llm_key, llm_url, defaults)
+            if selected_key == "Ollama":
+                c1, c2 = st.columns([3, 1])
+                with c1:
+                    cur_ollama_url = st.text_input("Ollama URL", defaults.get("llm_url_ollama") or "http://localhost:11434", key="config_ollama_url")
+                from src.utils.model_utils import check_ollama_status
+                ollama_ok = check_ollama_status(cur_ollama_url)
+                with c2:
+                    st.write("")
+                    st.caption("✅ 已连接" if ollama_ok else "⚠️ 未运行")
+                
+                saved_ollama_model = defaults.get("llm_model_ollama", "gpt-oss:20b")
+                sel_ollama_model, _ = render_ollama_model_selector(cur_ollama_url, saved_ollama_model, ollama_ok)
+                if st.button("💾 保存 Ollama 配置", type="primary", use_container_width=True, key="save_ollama"):
+                    _save_and_apply_config({"llm_provider": "Ollama", "llm_url_ollama": cur_ollama_url, "llm_model_ollama": sel_ollama_model, "llm_provider_label": PROVIDERS["Ollama"]}, "Ollama", sel_ollama_model, "", cur_ollama_url, defaults)
+                
+                # 赋值给返回变量
+                llm_url, llm_model, llm_key = cur_ollama_url, sel_ollama_model, ""
 
-        # 4. Azure OpenAI
-        elif selected_key == "Azure OpenAI":
-            llm_url = st.text_input("Azure Endpoint", defaults.get("azure_endpoint", ""), placeholder="https://{resource}.openai.azure.com/", key="config_azure_endpoint")
-            llm_key = st.text_input("API Key", defaults.get("azure_key", ""), type="password", key="config_azure_key")
-            llm_model = st.text_input("Deployment Name", defaults.get("azure_deployment", ""), help="在Azure控制台中部署的模型名称", key="config_azure_deployment")
-            api_version = st.text_input("API Version", defaults.get("azure_api_version", "2023-05-15"), help="例如: 2023-05-15", key="config_azure_api_version")
-            extra_params = {"api_version": api_version}
-            
-            if st.button("💾 保存 Azure 配置", key="save_azure_config", type="primary"):
-                config_data = {
-                    "llm_provider": "Azure OpenAI",
-                    "azure_endpoint": llm_url,
-                    "azure_key": llm_key,
-                    "azure_deployment": llm_model,
-                    "azure_api_version": api_version,
-                    "llm_provider_label": PROVIDERS["Azure OpenAI"],
-                    "llm_url": llm_url,
-                    "llm_key": llm_key,
-                    "llm_model": llm_model
-                }
-                _save_and_apply_config(config_data, "Azure OpenAI", llm_model, llm_key, llm_url, defaults, api_version=api_version)
+            elif selected_key == "OpenAI":
+                c1, c2 = st.columns([2, 1])
+                with c1: cur_openai_url = st.text_input("Base URL", defaults.get("llm_url_openai") or "https://api.openai.com/v1", key="config_openai_url")
+                with c2: cur_openai_key = st.text_input("API Key", defaults.get("llm_key") or "", type="password", key="config_openai_key")
+                
+                saved_openai_model = defaults.get("llm_model_openai", "gpt-3.5-turbo")
+                sel_openai_model = _render_remote_model_selector(cur_openai_url, cur_openai_key, saved_openai_model, "openai")
+                if st.button("💾 保存 OpenAI 配置", type="primary", use_container_width=True, key="save_openai"):
+                    _save_and_apply_config({"llm_provider": "OpenAI", "llm_url_openai": cur_openai_url, "llm_key": cur_openai_key, "llm_model_openai": sel_openai_model, "llm_provider_label": PROVIDERS["OpenAI"]}, "OpenAI", sel_openai_model, cur_openai_key, cur_openai_url, defaults)
+                
+                # 赋值给返回变量
+                llm_url, llm_model, llm_key = cur_openai_url, sel_openai_model, cur_openai_key
 
-        # 5. Anthropic
-        elif selected_key == "Anthropic":
-            llm_key = st.text_input("API Key", defaults.get("anthropic_key", ""), type="password", key="config_anthropic_key")
-            llm_model = st.selectbox("模型", ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"], index=0, key="config_anthropic_model")
-            
-            if st.button("💾 保存 Anthropic 配置", key="save_anthropic_config", type="primary"):
-                config_data = {
-                    "llm_provider": "Anthropic",
-                    "anthropic_key": llm_key,
-                    "config_anthropic_model": llm_model,
-                    "llm_provider_label": PROVIDERS["Anthropic"],
-                    "llm_key": llm_key,
-                    "llm_model": llm_model
-                }
-                _save_and_apply_config(config_data, "Anthropic", llm_model, llm_key, "", defaults)
+            elif selected_key == "OpenAI-Compatible":
+                c1, c2 = st.columns([2, 1])
+                with c1: cur_other_url = st.text_input("Base URL", defaults.get("llm_url_other") or "https://api.deepseek.com/v1", key="config_other_url")
+                with c2: cur_other_key = st.text_input("API Key", defaults.get("llm_key_other") or "", type="password", key="config_other_key")
+                
+                saved_other_model = defaults.get("llm_model_other", "")
+                sel_other_model = _render_remote_model_selector(cur_other_url, cur_other_key, saved_other_model, "other")
+                if st.button("💾 保存自定义配置", type="primary", use_container_width=True, key="save_other"):
+                    _save_and_apply_config({"llm_provider": "OpenAI-Compatible", "llm_url_other": cur_other_url, "llm_key_other": cur_other_key, "llm_model_other": sel_other_model, "llm_provider_label": PROVIDERS["OpenAI-Compatible"]}, "OpenAI-Compatible", sel_other_model, cur_other_key, cur_other_url, defaults)
+                
+                llm_url, llm_model, llm_key = cur_other_url, sel_other_model, cur_other_key
 
-        # 6. Moonshot
-        elif selected_key == "Moonshot":
-            llm_url = "https://api.moonshot.cn/v1"
-            st.text_input("Base URL", llm_url, disabled=True, key="config_moonshot_url")
-            llm_key = st.text_input("API Key", defaults.get("moonshot_key", ""), type="password", key="config_moonshot_key")
-            llm_model = st.selectbox("模型", ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"], index=0, key="config_moonshot_model")
-            
-            if st.button("💾 保存 Moonshot 配置", key="save_moonshot_config", type="primary"):
-                config_data = {
-                    "llm_provider": "Moonshot",
-                    "moonshot_key": llm_key,
-                    "config_moonshot_model": llm_model,
-                    "llm_provider_label": PROVIDERS["Moonshot"],
-                    "llm_key": llm_key,
-                    "llm_model": llm_model,
-                    "llm_url": llm_url
-                }
-                _save_and_apply_config(config_data, "Moonshot", llm_model, llm_key, llm_url, defaults)
-        
-        # 7. Gemini
-        elif selected_key == "Gemini":
-            llm_key = st.text_input("API Key", defaults.get("gemini_key", ""), type="password", key="config_gemini_key")
-            llm_model = st.selectbox("模型", ["gemini-pro", "gemini-pro-vision"], index=0, key="config_gemini_model")
-            
-            if st.button("💾 保存 Gemini 配置", key="save_gemini_config", type="primary"):
-                config_data = {
-                    "llm_provider": "Gemini",
-                    "gemini_key": llm_key,
-                    "config_gemini_model": llm_model,
-                    "llm_provider_label": PROVIDERS["Gemini"],
-                    "llm_key": llm_key,
-                    "llm_model": llm_model
-                }
-                _save_and_apply_config(config_data, "Gemini", llm_model, llm_key, "", defaults)
-        
-        # 8. Groq
-        elif selected_key == "Groq":
-            llm_url = "https://api.groq.com/openai/v1"
-            st.text_input("Base URL", llm_url, disabled=True, key="config_groq_url")
-            llm_key = st.text_input("API Key", defaults.get("groq_key", ""), type="password", key="config_groq_key")
-            llm_model = st.selectbox("模型", ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768"], index=0, key="config_groq_model")
+            elif selected_key == "Azure OpenAI":
+                c1, c2 = st.columns(2)
+                with c1:
+                    cur_az_url = st.text_input("Azure Endpoint", defaults.get("azure_endpoint", ""), key="config_azure_endpoint")
+                    cur_az_model = st.text_input("Deployment Name", defaults.get("azure_deployment", ""), key="config_azure_deployment")
+                with c2:
+                    cur_az_key = st.text_input("API Key", defaults.get("azure_key", ""), type="password", key="config_azure_key")
+                    cur_az_ver = st.text_input("API Version", defaults.get("azure_api_version", "2023-05-15"), key="config_azure_api_version")
+                if st.button("💾 保存 Azure 配置", type="primary", use_container_width=True, key="save_azure"):
+                    _save_and_apply_config({"llm_provider": "Azure OpenAI", "azure_endpoint": cur_az_url, "azure_key": cur_az_key, "azure_deployment": cur_az_model, "azure_api_version": cur_az_ver}, "Azure OpenAI", cur_az_model, cur_az_key, cur_az_url, defaults, api_version=cur_az_ver)
+                
+                llm_url, llm_model, llm_key = cur_az_url, cur_az_model, cur_az_key
 
-            if st.button("💾 保存 Groq 配置", key="save_groq_config", type="primary"):
-                config_data = {
-                    "llm_provider": "Groq",
-                    "groq_key": llm_key,
-                    "config_groq_model": llm_model,
-                    "llm_provider_label": PROVIDERS["Groq"],
-                    "llm_key": llm_key,
-                    "llm_model": llm_model,
-                    "llm_url": llm_url
-                }
-                _save_and_apply_config(config_data, "Groq", llm_model, llm_key, llm_url, defaults)
+            elif selected_key == "Anthropic":
+                cur_ant_key = st.text_input("API Key", defaults.get("anthropic_key", ""), type="password", key="config_anthropic_key")
+                cur_ant_model = st.selectbox("模型", ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"], key="config_anthropic_model_sel")
+                if st.button("💾 保存 Anthropic 配置", type="primary", use_container_width=True, key="save_anthropic"):
+                    _save_and_apply_config({"anthropic_key": cur_ant_key, "config_anthropic_model": cur_ant_model}, "Anthropic", cur_ant_model, cur_ant_key, "", defaults)
+                
+                llm_url, llm_model, llm_key = "", cur_ant_model, cur_ant_key
 
-        # --- 通用对话设置 (仿 Screenshot) ---
-        st.divider()
-        st.markdown("##### 💬 对话设置")
-        
-        # 1. 附带消息条数 (Context Window)
+            elif selected_key == "Moonshot":
+                ms_url = "https://api.moonshot.cn/v1"
+                st.text_input("Base URL", ms_url, disabled=True, key="config_moonshot_url")
+                cur_ms_key = st.text_input("API Key", defaults.get("moonshot_key", ""), type="password", key="config_moonshot_key")
+                cur_ms_model = st.selectbox("模型", ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"], key="config_moonshot_model_sel")
+                if st.button("💾 保存 Moonshot 配置", type="primary", use_container_width=True, key="save_moonshot"):
+                    _save_and_apply_config({"moonshot_key": cur_ms_key, "config_moonshot_model": cur_ms_model, "llm_url": ms_url}, "Moonshot", cur_ms_model, cur_ms_key, ms_url, defaults)
+                
+                llm_url, llm_model, llm_key = ms_url, cur_ms_model, cur_ms_key
+            
+            elif selected_key == "Gemini":
+                cur_gem_key = st.text_input("API Key", defaults.get("gemini_key", ""), type="password", key="config_gemini_key")
+                cur_gem_model = st.selectbox("模型", ["gemini-pro", "gemini-pro-vision"], key="config_gemini_model_sel")
+                if st.button("💾 保存 Gemini 配置", type="primary", use_container_width=True, key="save_gemini"):
+                    _save_and_apply_config({"gemini_key": cur_gem_key, "config_gemini_model": cur_gem_model}, "Gemini", cur_gem_model, cur_gem_key, "", defaults)
+                
+                llm_url, llm_model, llm_key = "", cur_gem_model, cur_gem_key
+            
+            elif selected_key == "Groq":
+                groq_url = "https://api.groq.com/openai/v1"
+                st.text_input("Base URL", groq_url, disabled=True, key="config_groq_url")
+                cur_groq_key = st.text_input("API Key", defaults.get("groq_key", ""), type="password", key="config_groq_key")
+                cur_groq_model = st.selectbox("模型", ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768"], key="config_groq_model_sel")
+                if st.button("💾 保存 Groq 配置", type="primary", use_container_width=True, key="save_groq"):
+                    _save_and_apply_config({"groq_key": cur_groq_key, "config_groq_model": cur_groq_model, "llm_url": groq_url}, "Groq", cur_groq_model, cur_groq_key, groq_url, defaults)
+                
+                llm_url, llm_model, llm_key = groq_url, cur_groq_model, cur_groq_key
+
+    # 3. 底部通用设置
+    st.markdown("##### 💬 全局增强设置")
+    with st.container(border=True):
         current_limit = defaults.get("chat_history_limit", 10)
-        history_limit = st.slider(
-            "附带历史消息数 (Context Window)", 
-            min_value=1, 
-            max_value=50, 
-            value=current_limit,
-            help="每次对话发送给模型的历史消息数量 (+1 表示加上当前问题)"
-        )
-
-        # 保存逻辑 (仅针对 Context Window)
-        has_changes = (history_limit != current_limit)
-        
-        if has_changes:
-            if st.button("💾 保存对话设置", key="save_chat_settings", type="primary"):
-                config_data = {
-                    "chat_history_limit": history_limit
-                }
-                _save_and_apply_config(config_data, selected_key, llm_model, llm_key, llm_url, defaults, only_chat_settings=True)
-
+        history_limit = st.slider("上下文窗口 (Context Window)", 1, 50, current_limit, key="global_history_slider")
+        if st.button("💾 应用全局设置", type="secondary", use_container_width=True, key="save_global_settings"):
+            _save_and_apply_config({"chat_history_limit": history_limit}, defaults.get("llm_provider", "Ollama"), defaults.get("llm_model", ""), defaults.get("llm_key", ""), defaults.get("llm_url", ""), defaults, only_chat_settings=True)
         extra_params['chat_history_limit'] = history_limit
-        # 兼容性保留
+        extra_params['system_prompt'] = defaults.get("system_prompt", "")
+
+    return llm_provider, llm_url, llm_model, llm_key, extra_params
+
+    # 4. 底部通用设置
+    st.markdown("##### 💬 全局增强设置")
+    with st.container(border=True):
+        current_limit = defaults.get("chat_history_limit", 10)
+        history_limit = st.slider("上下文窗口 (Context Window)", 1, 50, current_limit)
+        if st.button("💾 应用全局设置", type="secondary", use_container_width=True):
+            _save_and_apply_config({"chat_history_limit": history_limit}, defaults.get("llm_provider", "Ollama"), defaults.get("llm_model", ""), defaults.get("llm_key", ""), defaults.get("llm_url", ""), defaults, only_chat_settings=True)
+        extra_params['chat_history_limit'] = history_limit
         extra_params['system_prompt'] = defaults.get("system_prompt", "")
 
     return llm_provider, llm_url, llm_model, llm_key, extra_params

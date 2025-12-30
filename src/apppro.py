@@ -3674,6 +3674,11 @@ with st.container():
             "Groq": "⚡ Groq (极速)"
         }
         
+        # 动态补充自定义供应商 (v2.9.6)
+        custom_providers_info = config.get("custom_llm_providers", {})
+        for cp_id, cp_info in custom_providers_info.items():
+            ALL_PROVIDERS[cp_id] = f"🎨 {cp_info.get('name', cp_id)}"
+        
         # 动态筛选：仅显示已配置（有 Key 或 URL）的供应商
         configured_providers = []
         
@@ -3730,7 +3735,7 @@ with st.container():
         # --- 核心改进：工具栏模型自动同步 (v2.9.6) ---
         from src.utils.model_utils import fetch_remote_models
         
-        # 获取当前供应商的连接参数
+        # 获取当前供应商的连接参数 (v2.9.6 支持自定义供应商)
         provider_params = {
             "Ollama": (config.get('llm_url_ollama', "http://localhost:11434"), ""),
             "OpenAI": (config.get('llm_url_openai', "https://api.openai.com/v1"), config.get('llm_key', "")),
@@ -3741,6 +3746,11 @@ with st.container():
             "Gemini": ("", config.get('gemini_key', "")),
             "Groq": ("https://api.groq.com/openai/v1", config.get('groq_key', ""))
         }
+        
+        # 动态补充自定义供应商参数
+        custom_providers = config.get("custom_llm_providers", {})
+        for cp_id, cp_info in custom_providers.items():
+            provider_params[cp_id] = (cp_info.get('url', ""), cp_info.get('key', ""))
         
         url, key = provider_params.get(selected_provider, ("", ""))
         cache_key = f"models_{selected_provider}_{url}_{key}"
