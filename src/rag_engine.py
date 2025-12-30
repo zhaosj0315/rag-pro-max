@@ -242,7 +242,7 @@ class RAGEngine:
             }
     
     def delete(self):
-        ""删除知识库"""
+        """删除知识库"""
         if os.path.exists(self.persist_dir):
             shutil.rmtree(self.persist_dir)
             if self.logger:
@@ -253,6 +253,7 @@ class RAGEngine:
     def __repr__(self):
         stats = self.get_stats()
         return f"RAGEngine(kb_name='{self.kb_name}', status='{stats['status']}')"
+
 
 def create_rag_engine(kb_name: str, logger=None) -> Optional['RAGEngine']:
     """
