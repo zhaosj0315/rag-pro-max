@@ -914,7 +914,7 @@ with st.sidebar:
             # 管理模式 - 使用一行化布局
             manage_title_col1, manage_title_col2, manage_title_col3 = st.columns([2, 2, 1])
             with manage_title_col1:
-                st.caption(f"🛠️ 管理: {current_kb_name}")
+                pass # 移除冗余的知识库名称显示
             with manage_title_col2:
                 st.markdown("📤 **添加文档**")
             with manage_title_col3:
@@ -1341,21 +1341,7 @@ with st.sidebar:
         # --- 现有库的管理 (卡片式布局) ---
         if not is_create_mode:
             with st.container(border=True):
-                # 顶部：信息栏
-                col_info, col_stats = st.columns([2, 3])
-                with col_info:
-                    st.markdown(f"#### 📂 {current_kb_name}")
-                
-                with col_stats:
-                    # 获取并显示统计信息
-                    try:
-                        stats = kb_manager.get_stats(current_kb_name)
-                        if stats:
-                            pass  # 移除统计信息显示
-                    except Exception:
-                        pass
-                
-                st.divider()
+                # 顶部信息栏已移除（用户反馈冗余）
                 
                 # 底部：操作栏 (优化为 2*3 布局)
                 op_row1_col1, op_row1_col2 = st.columns(2)
