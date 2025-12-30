@@ -3967,6 +3967,24 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             
             # 执行多知识库查询
             start_time = time.time()
+            
+            # --- 多库模式下的智能研究注入 (v2.9.2) ---
+            if st.session_state.get('enable_deep_research', False):
+                with st.status("🔬 多库智能研究：专家组会审中...", expanded=False) as status:
+                    try:
+                        from llama_index.core import Settings
+                        llm = Settings.llm
+                        st.write("🎭 正在召集跨领域专家分析多库问题...")
+                        role_res = llm.complete(f"针对多知识库问题：'{final_prompt}'，列出3个专业角色。")
+                        roles = role_res.text.strip()
+                        st.write(f"💬 征询专家意见: {roles}...")
+                        syn_res = llm.complete(f"以【{roles}】视角分析问题：{final_prompt}")
+                        final_prompt = f"【多库研究视角】:\n{syn_res.text}\n\n【原始问题】: {final_prompt}"
+                        status.update(label="✅ 多库会审完成", state="complete")
+                        logger.log("INFO", f"🔬 多库研究开启: {roles}", stage="多库查询")
+                    except Exception as e:
+                        logger.error(f"多库研究模式异常: {e}")
+            
             results = {}
             max_workers = min(mp.cpu_count(), len(selected_kbs), 3)
             
@@ -4079,7 +4097,6 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             else:
                 logger.info(f"🧠 深度思考: 查询清晰，无需改写 ({reason})")
 
-        # 联网搜索集成 (v2.8)
         user_display_prompt = final_prompt  # 保存原始提问用于 UI 显示
         if st.session_state.get('enable_web_search', False):
             try:
@@ -4087,37 +4104,122 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                 from src.utils.search_quality import search_quality_analyzer
                 from urllib.parse import urlparse
                 
-                logger.info(f"🌐 正在执行联网搜索: {final_prompt[:50]}...")
+                logger.info(f"🌐 启动联网搜索规划...")
                 search_start_time = time.time()
                 
-                with st.status("🌐 正在联网搜索最新信息...", expanded=False) as status:
-                    with DDGS() as ddgs:
-                        results = list(ddgs.text(final_prompt, max_results=5))
+                # 恢复为默认收起，用户可根据需要点开查看过程 (v2.9.2)
+                with st.status("🌐 正在规划搜索关键词并联网...", expanded=False) as status:
+                    # --- 搜索意图拆解 (v2.9.2 新增) ---
+                    from llama_index.core import Settings
+                    llm = Settings.llm
                     
+                    st.write("🧠 正在分析问题意图并拆解中英文关键词...")
+                    planning_prompt = (
+                        f"用户问题：'{final_prompt}'\n"
+                        "请将该问题拆解为最精准的搜索关键词或短语，以便搜到具体案例或深度解释。\n"
+                        "要求：\n"
+                        "1. 提取核心名词和动作。如果问题涉及'如何定位'，请搜索'定位工具'或'查找技巧'。\n"
+                        "2. 输出 2 个中文关键词，1 个英文关键词。\n"
+                        "3. 不要用对话句式，每个词控制在 15 字以内。\n"
+                        "只需输出关键词，用英文逗号分隔，不要包含任何其他说明文字。"
+                    )
+                    planning_res = llm.complete(planning_prompt)
+                    # 鲁棒性改进：处理多种分隔符并过滤说明性文字
+                    raw_text = planning_res.text.strip()
+                    # 尝试拆分：先统一分隔符为英文逗号
+                    norm_text = raw_text.replace('，', ',').replace('\n', ',').replace('、', ',')
+                    keyword_list = [k.strip() for k in norm_text.split(',') if k.strip() and len(k.strip()) > 1]
+                    
+                    # 限制关键词数量，防止过长
+                    keyword_list = keyword_list[:4]
+                    optimized_query = " | ".join(keyword_list)
+                    
+                    logger.log("INFO", f"🎯 中英双语规划完成: {keyword_list}", stage="联网搜索")
+                    
+                    all_raw_results = []
+                    with DDGS() as ddgs:
+                        for kw in keyword_list:
+                            st.write(f"🔎 正在检索: {kw}...")
+                            try:
+                                # 智能判断语言并选择 Region (v2.9.2)
+                                is_english = any(c.isalpha() for c in kw) and not any('\u4e00' <= c <= '\u9fff' for c in kw)
+                                target_region = 'us-en' if is_english else 'cn-zh'
+                                
+                                # 尝试 1：带区域锁定检索
+                                kw_results = list(ddgs.text(kw, max_results=10, region=target_region))
+                                
+                                # 尝试 2：降级策略 (v2.9.2 补强)
+                                # 如果区域锁定搜不到，自动切换到全局模式 (wt-wt)
+                                if not kw_results:
+                                    logger.info(f"   - 关键词 '{kw}' 区域 [{target_region}] 无结果，尝试全局检索...")
+                                    kw_results = list(ddgs.text(kw, max_results=10))
+                                
+                                all_raw_results.extend(kw_results)
+                                logger.info(f"   - 关键词 '{kw}' 最终命中 {len(kw_results)} 条")
+                            except Exception as e:
+                                logger.warning(f"   - 关键词 '{kw}' 检索异常: {e}")
+                    
+                    # 去重处理
+                    unique_results = []
+                    seen_urls = set()
+                    for r in all_raw_results:
+                        if r['href'] not in seen_urls:
+                            unique_results.append(r)
+                            seen_urls.add(r['href'])
+                    
+                    results = unique_results
                     search_duration = round(time.time() - search_start_time, 2)
                     
                     if results:
-                        # 质量分析和排序
+                        # 质量分析和排序 (v2.9.3 语义对照版)
                         analyzed_results = []
                         for res in results:
-                            quality_info = search_quality_analyzer.analyze_result_quality(res)
+                            # 传递 user_display_prompt 进行相关性校验
+                            quality_info = search_quality_analyzer.analyze_result_quality(res, user_display_prompt)
                             res.update(quality_info)
-                            analyzed_results.append(res)
+                            
+                            # 噪音硬过滤：直接剔除被判定为噪音的内容
+                            if not res.get('is_noise', False):
+                                analyzed_results.append(res)
                         
-                        # 按质量评分排序
+                        # 按相关性 + 质量综合评分排序
                         analyzed_results.sort(key=lambda x: x['quality_score'], reverse=True)
+                        
+                        logger.log("INFO", f"📊 检索到 20 条结果，正在执行质量评估与多样性过滤...", stage="联网搜索")
+                        
+                        # 策略优化：域名多样性过滤 (v2.9.2)
+                        diverse_results = []
+                        domain_counts = {}
+                        
+                        for res in analyzed_results:
+                            domain = urlparse(res.get('href', '')).netloc.lower()
+                            count = domain_counts.get(domain, 0)
+                            if count < 3:
+                                diverse_results.append(res)
+                                domain_counts[domain] = count + 1
+                            if len(diverse_results) >= 12:
+                                break
+                        
+                        top_results = diverse_results
+                        
+                        # 终端详细日志输出 (Top 5 评分展示)
+                        logger.info("🏆 联网搜索质量排行 (Top 5):")
+                        for idx, res in enumerate(top_results[:5], 1):
+                            domain = urlparse(res['href']).netloc
+                            logger.info(f"   [{idx}] {res['quality_score']} | {domain} | {res['title'][:40]}...")
                         
                         # 生成增强的搜索结果展示
                         web_context_parts = []
                         quality_summary = []
                         
                         # 在状态栏内部渲染结果详情，默认折叠
-                        st.markdown("#### 🔍 联网搜索结果详情")
-                        for i, res in enumerate(analyzed_results, 1):
+                        st.markdown(f"#### 🔍 联网搜索精选结果 (Top {len(top_results)})")
+                        st.caption(f"🎯 搜索关键词：{optimized_query}")
+                        for i, res in enumerate(top_results, 1):
                             emoji, label = res['quality_label']
                             quality_summary.append(f"{emoji} {label}")
                             
-                            # 构建结果内容
+                            # 构建结果内容 (用于注入 Prompt)
                             result_content = f"[{i}] {emoji} {res['title']}\n"
                             result_content += f"📝 摘要: {res['summary']}\n"
                             if res['key_points']:
@@ -4131,20 +4233,17 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                                 st.markdown(f"**{i}. {emoji} {res['title']}**")
                                 st.caption(f"{res['summary'][:150]}...")
                                 st.markdown(f"🔗 [{urlparse(res['href']).netloc}]({res['href']})")
-                                if i < len(analyzed_results): st.divider()
+                                if i < len(top_results): st.divider()
                         
                         # 生成搜索统计信息
-                        stats_info = f"⏱️ 搜索耗时: {search_duration}秒 | 📊 结果数量: {len(results)}条 | 🏆 质量分布: {', '.join(quality_summary)}"
+                        stats_info = f"⏱️ 搜索耗时: {search_duration}秒 | 📊 检索量: 20条 | 🏆 精选注入: {len(top_results)}条 | 📈 质量分布: {', '.join(quality_summary[:3])}..."
                         
                         web_context = f"\n\n#### 联网搜索实时信息\n{stats_info}\n\n" + "\n\n".join(web_context_parts) + "\n\n"
-                        final_prompt = f"{web_context}\n用户原始问题：{final_prompt}\n\n请结合以上联网搜索到的实时信息和你的知识库内容来回答。"
+                        # 核心：将联网信息注入上下文
+                        final_prompt = f"{web_context}\n用户原始问题：{user_display_prompt}"
                         
-                        logger.info(f"✅ 联网搜索完成，获得 {len(results)} 条结果 (耗时 {search_duration}s):")
-                        for idx, res in enumerate(analyzed_results, 1):
-                            emoji, label = res['quality_label']
-                            logger.info(f"   [{idx}] {emoji} {res['title']} (评分: {res['quality_score']}) - {res['href']}")
-                        
-                        status.update(label=f"✅ 已获取 {len(results)} 条联网搜索结果 (耗时 {search_duration}s)", state="complete")
+                        logger.info(f"✅ 联网搜索完成，已将信息注入上下文")
+                        status.update(label=f"✅ 已精选 {len(top_results)} 条高分联网结果 (检索 20 条, 耗时 {search_duration}s)", state="complete")
                     else:
                         logger.warning("⚠️ 联网搜索未返回结果")
                         status.update(label="⚠️ 联网搜索未找到相关结果", state="error")
@@ -4165,7 +4264,7 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             
             # 构建包含引用的 prompt
             original_prompt_temp = final_prompt
-            final_prompt = f"基于以下引用内容：\n> {quoted_text}\n\n我的问题是：{original_prompt_temp}"
+            final_prompt = f"基于以下引用内容：\n> {quoted_text}\n\n{original_prompt_temp}"
             # 更新显示用的 prompt，加入引用样式
             user_display_prompt = f"📌 **引用内容**:\n> {quoted_text[:100]}...\n\n{user_display_prompt}"
             
@@ -4173,18 +4272,62 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             st.session_state.quote_content = None
             logger.info("📌 已应用引用内容")
         
-        # --- 智能研究 (Deep Research) 核心逻辑注入 (v2.9) ---
+        # --- 智能研究 (Deep Research) 进阶模式 (v2.9.2) - 专家会审与多维合成 ---
+        research_critique = ""
+        expert_perspectives = ""
         if st.session_state.get('enable_deep_research', False):
-            research_instructions = (
-                "\n\n【🔬 深度研究模式指令】\n"
-                "作为一名专业研究员，请对上述问题执行以下深度分析：\n"
-                "1. **多维拆解**：请从技术实现、核心原理、应用场景等多个维度剖析。\n"
-                "2. **事实核查**：对比检索到的不同参考资料，确保逻辑自洽，指出潜在的矛盾点。\n"
-                "3. **专业表达**：使用结构化的列表和严谨的术语，提供具有深度和洞察力的总结。\n"
-                "4. **边界识别**：如果知识库信息不足，请明确指出研究的局限性。"
-            )
-            final_prompt += research_instructions
-            logger.info("🔬 已向 Prompt 注入深度研究增强指令")
+            # 专家会审必须在检索之前完成，因为其结果要作为检索的增强背景
+            with st.status("🔬 智能研究：专家组会审中...", expanded=False) as status:
+                try:
+                    from llama_index.core import Settings
+                    llm = Settings.llm
+                    
+                    if st.session_state.get('stop_generation'): raise InterruptedError("User stopped")
+
+                    # 1. 角色判定 (基于原始问题，避免受网页噪音干扰)
+                    st.write("🎭 正在召集相关领域专家...")
+                    role_response = llm.complete(f"针对问题：'{user_display_prompt}'，列出3个最专业的角色名称，逗号分隔。")
+                    roles = role_response.text.strip()
+                    logger.log("INFO", f"🎭 智能研究：识别到专家角色 - {roles}", stage="智能研究")
+                    
+                    if st.session_state.get('stop_generation'): raise InterruptedError("User stopped")
+
+                    # 2. 专家视角碰撞 (专家们需要参考联网信息！)
+                    st.write(f"💬 正在征询专家意见: {roles}...")
+                    synthesis_prompt = (
+                        f"作为【{roles}】，请结合以下参考信息和用户问题，提供深度专业洞察：\n"
+                        f"{final_prompt}\n\n"
+                        "要求：每个视角约 100 字，侧重于技术可行性、潜在风险或前瞻性建议。"
+                    )
+                    synthesis_response = llm.complete(synthesis_prompt)
+                    expert_perspectives = synthesis_response.text
+                    
+                    if st.session_state.get('stop_generation'): raise InterruptedError("User stopped")
+
+                    # 3. 逻辑审计
+                    st.write("🧠 正在执行逻辑审计与一致性检查...")
+                    critique_prompt = f"请审计以下专家观点是否存在逻辑矛盾或信息偏差：\n{expert_perspectives}"
+                    critique_response = llm.complete(critique_prompt)
+                    research_critique = critique_response.text
+                    
+                    # 4. 最终合成全景研究 Prompt
+                    final_prompt = (
+                        f"【研究背景 (联网信息)】:\n{final_prompt}\n\n"
+                        f"【专家会审视角】:\n{expert_perspectives}\n\n"
+                        f"【审计修正意见】: {research_critique}\n\n"
+                        f"【指令】: 请结合上述联网背景、多维视角和审计意见，并去你的本地知识库中检索进一步的事实，为用户提供一份最终的、极具深度的专业全景研究报告。"
+                    )
+                    status.update(label="✅ 专家会审完成，正在汇总全景报告", state="complete")
+                    st.write(f"👥 **专家组**: {roles}")
+                    with st.expander("🧐 查看审计细节"):
+                        st.write(research_critique)
+                    logger.log("SUCCESS", "✅ 专家会审全流程完成", stage="智能研究", details={"experts": roles})
+                
+                except InterruptedError:
+                    status.update(label="⏹ 研究进程已停止", state="error")
+                except Exception as e:
+                    status.update(label="⚠️ 专家会审降级", state="error")
+                    logger.error(f"🔬 智能研究异常: {e}")
         
         logger.log("INFO", f"用户提问: {final_prompt}", stage="查询对话", details={"kb_name": active_kb_name})
         
@@ -4207,17 +4350,65 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             # 使用一个连贯的spinner包装整个问答流程
             with st.spinner("🤖 正在思考并准备完整回答..."):
                 try:
-                    # 智能研究 (Deep Research) 模式处理 (v2.9)
+                    # 智能研究 (Deep Research) 进阶模式 (v2.9.2) - 专家会审与多维合成
+                    research_critique = ""
+                    expert_perspectives = ""
                     if st.session_state.get('enable_deep_research', False):
-                        with st.status("🔬 正在执行智能研究 (Deep Research)...", expanded=True) as status:
-                            st.write("🔍 正在多维度分析问题...")
-                            time.sleep(0.5)
-                            st.write("📖 正在检索跨领域知识...")
-                            time.sleep(0.5)
-                            st.write("⚖️ 正在验证事实准确性...")
-                            time.sleep(0.5)
-                            status.update(label="✅ 智能研究完成，正在汇总结论", state="complete")
-                            logger.info("🔬 智能研究模式已启用，已执行深度增强步骤")
+                        # 恢复为默认收起 (v2.9.2)
+                        with st.status("🔬 智能研究：专家组会审中...", expanded=False) as status:
+                            try:
+                                from llama_index.core import Settings
+                                llm = Settings.llm
+                                
+                                # 检查停止信号
+                                if st.session_state.get('stop_generation'): raise InterruptedError("User stopped")
+
+                                # 1. 角色判定
+                                st.write("🎭 正在召集相关领域专家...")
+                                role_response = llm.complete(f"针对问题：'{final_prompt}'，列出3个最专业角色名称，逗号分隔。")
+                                roles = role_response.text.strip()
+                                logger.log("INFO", f"🎭 智能研究：识别到专家角色 - {roles}", stage="智能研究")
+                                
+                                if st.session_state.get('stop_generation'): raise InterruptedError("User stopped")
+
+                                # 2. 专家视角碰撞
+                                st.write(f"💬 正在征询专家意见: {roles}...")
+                                synthesis_prompt = f"分别以【{roles}】视角对以下问题提供核心洞察（每个100字）：\n问题：{final_prompt}"
+                                synthesis_response = llm.complete(synthesis_prompt)
+                                expert_perspectives = synthesis_response.text
+                                
+                                if st.session_state.get('stop_generation'): raise InterruptedError("User stopped")
+
+                                # 3. 逻辑审计
+                                st.write("🧠 正在执行逻辑审计与一致性检查...")
+                                critique_prompt = f"审计以下观点是否存在矛盾：\n{expert_perspectives}"
+                                critique_response = llm.complete(critique_prompt)
+                                research_critique = critique_response.text
+                                
+                                # 4. 最终合成 Prompt
+                                st.write("✨ 正在汇总结论，生成多维研究报告...")
+                                final_prompt = (
+                                    f"【原始问题】: {final_prompt}\n\n"
+                                    f"【专家会审视角】:\n{expert_perspectives}\n\n"
+                                    f"【逻辑审计意见】: {research_critique}\n\n"
+                                    "请结合以上视角和知识库内容，提供一份最终的专业研究报告。"
+                                )
+                                status.update(label="✅ 专家会审完成", state="complete")
+                                
+                                # 补强：在状态栏内部保留研究痕迹，增强用户体感
+                                st.write(f"👥 **专家组**: {roles}")
+                                with st.expander("🧐 查看审计细节"):
+                                    st.write(research_critique)
+                                
+                                logger.log("SUCCESS", "✅ 专家会审全流程完成", stage="智能研究", details={"experts": roles})
+                            
+                            except InterruptedError:
+                                status.update(label="⏹ 研究进程已停止", state="error")
+                                logger.warning("🔬 智能研究：用户中断了研究进程")
+                            except Exception as e:
+                                status.update(label="⚠️ 专家会审暂时不可用 (已降级)", state="error")
+                                logger.error(f"🔬 智能研究异常: {e}")
+                                # 发生异常时不做 prompt 修改，保持原样输出
 
                     # 开始计时
                     start_time = time.time()

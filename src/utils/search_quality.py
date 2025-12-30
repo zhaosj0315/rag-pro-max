@@ -11,52 +11,105 @@ class SearchQualityAnalyzer:
     """搜索结果质量分析器"""
     
     def __init__(self):
-        # 权威域名列表
+        # 权威域名列表 (v2.9.2 扩充)
         self.authority_domains = {
-            'gov.cn', 'edu.cn', 'org.cn', 'gov', 'edu', 'org',
-            'wikipedia.org', 'baidu.com', 'zhihu.com', 'cnki.net'
+            # 技术与开发
+            'github.com', 'stackoverflow.com', 'github.io', 'pypi.org', 'npmjs.com', 
+            'mdn.io', 'mozilla.org', 'w3schools.com', 'dev.to', 'medium.com',
+            # 官方文档
+            'docs.python.org', 'docs.microsoft.com', 'developer.apple.com', 'cloud.google.com',
+            'aws.amazon.com', 'react.dev', 'vuejs.org', 'kubernetes.io', 'docker.com',
+            # 综合与百科
+            'wikipedia.org', 'zhihu.com', 'quora.com', 'arxiv.org', 'researchgate.net',
+            # 权威媒体与政务
+            'gov.cn', 'edu.cn', 'org.cn', 'gov', 'edu', 'org', 'reuters.com', 'bloomberg.com',
+            'news.ycombinator.com', 'techcrunch.com'
         }
         
-        # 专业术语关键词
+        # 专业术语关键词 (v2.9.2 扩充 - 中英双语)
         self.professional_keywords = [
-            '定义', '概念', '原理', '方法', '标准', '规范', '指标',
-            '分析', '研究', '报告', '数据', '统计', '调查'
+            '定义', '概念', '原理', '方法', '标准', '规范', '指标', '部署', '架构',
+            '分析', '研究', '报告', '数据', '统计', '调查', '实战', '教程', '指南',
+            'API', 'SDK', '算法', '逻辑', '方案', '解决', '性能', '优化', '安全',
+            'definition', 'concept', 'principle', 'method', 'standard', 'specification',
+            'metrics', 'deployment', 'architecture', 'analysis', 'research', 'report',
+            'data', 'statistics', 'survey', 'tutorial', 'guide', 'algorithm', 'logic',
+            'solution', 'performance', 'optimization', 'security', 'implementation'
         ]
     
-    def analyze_result_quality(self, result: Dict) -> Dict:
-        """分析单个搜索结果的质量"""
+    def analyze_result_quality(self, result: Dict, user_query: str = "") -> Dict:
+        """
+        分析单个搜索结果的质量 (v2.9.3 增强版)
+        增加了基于用户意图的语义相关性分析
+        """
         title = result.get('title', '')
         body = result.get('body', '')
         url = result.get('href', '')
         
-        # 计算各项质量指标
+        # 1. 核心改进：计算语义相关性评分 (Semantic Relevance)
+        relevance_score = self._calculate_relevance_score(title, body, user_query)
+        
+        # 2. 基础质量指标
         authority_score = self._calculate_authority_score(url)
         content_score = self._calculate_content_score(title, body)
-        completeness_score = self._calculate_completeness_score(body)
         professional_score = self._calculate_professional_score(title, body)
         
-        # 综合质量评分
-        total_score = (authority_score * 0.3 + 
-                      content_score * 0.3 + 
-                      completeness_score * 0.2 + 
-                      professional_score * 0.2)
+        # 3. 噪音判定 (Noise Filter)
+        noise_penalty = self._identify_noise(title, body, user_query)
+        
+        # 综合质量评分 (大幅增加相关性权重)
+        total_score = (relevance_score * 0.4 + 
+                      authority_score * 0.2 + 
+                      content_score * 0.2 + 
+                      professional_score * 0.2) - noise_penalty
+        
+        total_score = max(0.0, min(1.0, total_score))
         
         # 生成质量标签
         quality_label = self._get_quality_label(total_score)
         
-        # 提取关键信息
-        key_points = self._extract_key_points(body)
-        
         return {
             'quality_score': round(total_score, 2),
             'quality_label': quality_label,
-            'authority_score': authority_score,
-            'content_score': content_score,
-            'completeness_score': completeness_score,
-            'professional_score': professional_score,
-            'key_points': key_points,
-            'summary': self._generate_summary(title, body)
+            'relevance_score': relevance_score,
+            'is_noise': noise_penalty > 0.3,
+            'summary': self._generate_summary(title, body),
+            'key_points': self._extract_key_points(body)
         }
+
+    def _calculate_relevance_score(self, title: str, body: str, query: str) -> float:
+        """计算内容与用户查询的相关性"""
+        if not query: return 0.5
+        
+        # 提取核心词 (简单分词)
+        text = f"{title} {body}".lower()
+        query_words = [w for k in re.split(r'[ \-,，]', query.lower()) if (w := k.strip()) and len(w) > 1]
+        
+        if not query_words: return 0.5
+        
+        # 统计匹配度
+        hit_count = 0
+        for word in query_words:
+            if word in text:
+                hit_count += 1
+        
+        ratio = hit_count / len(query_words)
+        return min(ratio * 1.5, 1.0) # 只要匹配一半以上的词，相关性就很高
+
+    def _identify_noise(self, title: str, body: str, query: str) -> float:
+        """识别行业无关噪音 (v2.9.3)"""
+        text = f"{title} {body}".lower()
+        penalty = 0.0
+        
+        # 如果是 AI 相关问题，但出现了无关硬件/文件格式词汇
+        if 'ai' in query.lower() or '大模型' in query:
+            # 噪音词库
+            noise_words = ['铁板', '钢板', '铝板', '规格尺寸', 'illustrator', 'photoshop', '军力报告', '五角大楼']
+            for word in noise_words:
+                if word in text:
+                    penalty += 0.5
+        
+        return penalty
     
     def _calculate_authority_score(self, url: str) -> float:
         """计算来源权威性评分"""

@@ -1,27 +1,14 @@
 # RAG Pro Max - 智能文档问答系统
 
-<div align="center">
-
-![Version](https://img.shields.io/badge/version-v2.9.0-brightgreen)
+![Version](https://img.shields.io/badge/version-v2.9.3-brightgreen)
 ![Status](https://img.shields.io/badge/status-Stable-blue)
-![Last Update](https://img.shields.io/badge/last%20update-2025--12--29-orange)
+![Last Update](https://img.shields.io/badge/last%20update-2025--12--30-orange)
 
-# 🚀 RAG Pro Max v2.9.0
+# 🚀 RAG Pro Max v2.9.3
 
 > **企业级 RAG 知识库系统 - 智能推荐与极速检索的终极进化**
-![Python](https://img.shields.io/badge/python-3.8+-green.svg)
-![License](https://img.shields.io/badge/license-MIT-orange.svg)
-![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Docker-lightgrey.svg)
-![Test Coverage](https://img.shields.io/badge/test%20coverage-93%25-brightgreen.svg)
-![Code Quality](https://img.shields.io/badge/code%20quality-企业级-blue.svg)
-
-**🔥 开源免费的企业级RAG应用 | 支持本地部署 | 极致交互体验 | 生产就绪**
-
-基于 Streamlit + LlamaIndex 的智能文档问答系统，支持多格式文档上传，提供语义检索、实时联网增强、智能查询优化和 macOS 原生预览功能。
-
-**🎯 核心优势**: 智能研究(Deep Research) • 联网实时增强 • 智能查询改写 • 极简紧凑 UI • 统一架构 • 生产就绪
-
-</div>
+...
+**🎯 核心优势**: 语义防火墙(Semantic Guard) • 智能研究(Deep Research) • 搜索意图拆解 • 中英双语检索
 
 ---
 
