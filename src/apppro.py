@@ -75,6 +75,7 @@ import requests
 import ollama
 import re
 import subprocess
+from urllib.parse import urlparse
 
 # 🧹 启动时自动清理临时文件
 from src.common.utils import cleanup_temp_files
@@ -3481,6 +3482,40 @@ for msg_idx, msg in enumerate(state.get_messages()):
     role = msg["role"]
     avatar = "🤖" if role == "assistant" else "🧑‍💻"
     with st.chat_message(role, avatar=avatar):
+        # --- 渲染持久化研究详情 (v2.9.4) ---
+        if role == "assistant":
+            # 1. 联网搜索历史结果
+            if msg.get("search_results"):
+                search_meta = msg["search_results"]
+                # 兼容旧版本格式 (如果 search_results 直接是列表)
+                if isinstance(search_meta, list):
+                    results_list = search_meta
+                    opt_query = msg.get('optimized_query', '未知')
+                    status_label = f"✅ 已获取 {len(results_list)} 条联网结果"
+                else:
+                    results_list = search_meta.get('results', [])
+                    opt_query = search_meta.get('optimized_query', '未知')
+                    status_label = f"✅ 已精选 {search_meta.get('selected')} 条高分联网结果 (检索 {search_meta.get('total_raw')} 条, 耗时 {search_meta.get('duration')}s)"
+                
+                with st.status(status_label, expanded=False, state="complete"):
+                    st.caption(f"🎯 搜索关键词：{opt_query}")
+                    for i, res in enumerate(results_list, 1):
+                        emoji, label = res.get('quality_label', ("⭐", "中等质量"))
+                        st.markdown(f"**{i}. {emoji} {res.get('title')}**")
+                        st.caption(f"{res.get('summary', '')[:150]}...")
+                        st.markdown(f"🔗 [{urlparse(res.get('href', '')).netloc}]({res.get('href')})")
+                        if i < len(results_list): st.divider()
+            
+            # 2. 专家会审历史详情
+            if msg.get("research_details"):
+                res_meta = msg["research_details"]
+                with st.status(f"✅ 专家会审已完成 (专家组: {res_meta.get('roles')})", expanded=False, state="complete"):
+                    st.write(f"👥 **专家组**: {res_meta.get('roles')}")
+                    st.markdown("**💡 专业洞察视角:**")
+                    st.write(res_meta.get('perspectives'))
+                    with st.expander("🧐 查看审计细节"):
+                        st.write(res_meta.get('critique'))
+
         # 显示角色标签 (v2.7.4)
         if role == "assistant" and msg.get("prompt_role"):
             st.markdown(f"""
@@ -4202,6 +4237,15 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         
                         top_results = diverse_results
                         
+                        # 记录搜索结果元数据 (v2.9.4)
+                        st.session_state.last_search_results = {
+                            'results': top_results,
+                            'optimized_query': optimized_query,
+                            'duration': search_duration,
+                            'total_raw': 20,
+                            'selected': len(top_results)
+                        }
+                        
                         # 终端详细日志输出 (Top 5 评分展示)
                         logger.info("🏆 联网搜索质量排行 (Top 5):")
                         for idx, res in enumerate(top_results[:5], 1):
@@ -4321,6 +4365,14 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     st.write(f"👥 **专家组**: {roles}")
                     with st.expander("🧐 查看审计细节"):
                         st.write(research_critique)
+                    
+                    # 记录专家会审元数据 (v2.9.4)
+                    st.session_state.last_research_details = {
+                        'roles': roles,
+                        'perspectives': expert_perspectives,
+                        'critique': research_critique
+                    }
+                    
                     logger.log("SUCCESS", "✅ 专家会审全流程完成", stage="智能研究", details={"experts": roles})
                 
                 except InterruptedError:
@@ -4350,66 +4402,6 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             # 使用一个连贯的spinner包装整个问答流程
             with st.spinner("🤖 正在思考并准备完整回答..."):
                 try:
-                    # 智能研究 (Deep Research) 进阶模式 (v2.9.2) - 专家会审与多维合成
-                    research_critique = ""
-                    expert_perspectives = ""
-                    if st.session_state.get('enable_deep_research', False):
-                        # 恢复为默认收起 (v2.9.2)
-                        with st.status("🔬 智能研究：专家组会审中...", expanded=False) as status:
-                            try:
-                                from llama_index.core import Settings
-                                llm = Settings.llm
-                                
-                                # 检查停止信号
-                                if st.session_state.get('stop_generation'): raise InterruptedError("User stopped")
-
-                                # 1. 角色判定
-                                st.write("🎭 正在召集相关领域专家...")
-                                role_response = llm.complete(f"针对问题：'{final_prompt}'，列出3个最专业角色名称，逗号分隔。")
-                                roles = role_response.text.strip()
-                                logger.log("INFO", f"🎭 智能研究：识别到专家角色 - {roles}", stage="智能研究")
-                                
-                                if st.session_state.get('stop_generation'): raise InterruptedError("User stopped")
-
-                                # 2. 专家视角碰撞
-                                st.write(f"💬 正在征询专家意见: {roles}...")
-                                synthesis_prompt = f"分别以【{roles}】视角对以下问题提供核心洞察（每个100字）：\n问题：{final_prompt}"
-                                synthesis_response = llm.complete(synthesis_prompt)
-                                expert_perspectives = synthesis_response.text
-                                
-                                if st.session_state.get('stop_generation'): raise InterruptedError("User stopped")
-
-                                # 3. 逻辑审计
-                                st.write("🧠 正在执行逻辑审计与一致性检查...")
-                                critique_prompt = f"审计以下观点是否存在矛盾：\n{expert_perspectives}"
-                                critique_response = llm.complete(critique_prompt)
-                                research_critique = critique_response.text
-                                
-                                # 4. 最终合成 Prompt
-                                st.write("✨ 正在汇总结论，生成多维研究报告...")
-                                final_prompt = (
-                                    f"【原始问题】: {final_prompt}\n\n"
-                                    f"【专家会审视角】:\n{expert_perspectives}\n\n"
-                                    f"【逻辑审计意见】: {research_critique}\n\n"
-                                    "请结合以上视角和知识库内容，提供一份最终的专业研究报告。"
-                                )
-                                status.update(label="✅ 专家会审完成", state="complete")
-                                
-                                # 补强：在状态栏内部保留研究痕迹，增强用户体感
-                                st.write(f"👥 **专家组**: {roles}")
-                                with st.expander("🧐 查看审计细节"):
-                                    st.write(research_critique)
-                                
-                                logger.log("SUCCESS", "✅ 专家会审全流程完成", stage="智能研究", details={"experts": roles})
-                            
-                            except InterruptedError:
-                                status.update(label="⏹ 研究进程已停止", state="error")
-                                logger.warning("🔬 智能研究：用户中断了研究进程")
-                            except Exception as e:
-                                status.update(label="⚠️ 专家会审暂时不可用 (已降级)", state="error")
-                                logger.error(f"🔬 智能研究异常: {e}")
-                                # 发生异常时不做 prompt 修改，保持原样输出
-
                     # 开始计时
                     start_time = time.time()
                     
@@ -4562,8 +4554,15 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         "content": full_text, 
                         "sources": srcs,
                         "stats": stats,
-                        "prompt_role": role_name
+                        "prompt_role": role_name,
+                        "search_results": st.session_state.get('last_search_results'),
+                        "research_details": st.session_state.get('last_research_details')
                     })
+                    
+                    # 清理单次会话临时变量
+                    st.session_state.last_search_results = None
+                    st.session_state.last_optimized_query = None
+                    st.session_state.last_research_details = None
                     
                     # 生成推荐问题（在spinner内完成）
                     # 组合上下文：用户问题 + AI回答

@@ -86,7 +86,10 @@ def initialize_session_state():
         "question_queue": [],
         "enable_query_optimization": False,
         "enable_web_search": False,
-        "enable_deep_research": False
+        "enable_deep_research": False,
+        "last_search_results": None,
+        "last_research_details": None,
+        "last_optimized_query": None
     }
     
     for key, default_value in defaults.items():
