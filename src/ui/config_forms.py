@@ -275,33 +275,65 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
 
 
 def _render_remote_model_selector(url: str, key: str, saved_model: str, prefix: str) -> str:
-    """辅助函数：渲染远程模型选择器"""
+    """辅助函数：渲染远程模型选择器 (v2.9.5 自动加载优化)"""
+    from src.utils.model_utils import fetch_remote_models
+    
     cache_key = f"models_{prefix}_{url}_{key}"
     available_models = st.session_state.get(cache_key, [])
     
-    if not available_models and url:
-        if st.button("🔄 刷新模型列表", key=f"refresh_{prefix}"):
-            with st.spinner("🔄 正在加载模型列表..."):
+    # --- 核心改进：自动加载逻辑 (v2.9.5) ---
+    # 如果有 URL (且非本地 prefix 时有 Key)，且缓存为空，则尝试自动加载一次
+    # 为了避免无限重试，我们记录一个自动加载尝试标记
+    auto_load_flag = f"auto_load_{prefix}_{hash(url + key)}"
+    
+    if url and not available_models and auto_load_flag not in st.session_state:
+        # 只有 OpenAI 类的需要 Key，其它的（如 Ollama 在其它地方处理）视情况而定
+        # 这里统一逻辑：有 URL 且缓存空，尝试拉取
+        can_try = True
+        if prefix in ["openai", "other"] and not key:
+            can_try = False
+            
+        if can_try:
+            with st.spinner("🔄 自动同步模型列表..."):
+                models, err = fetch_remote_models(url, key)
+                if models:
+                    available_models = models
+                    st.session_state[cache_key] = models
+                    # 标记已尝试过，避免失败时反复触发
+                    st.session_state[auto_load_flag] = True
+                else:
+                    # 即使失败也标记，防止阻塞 UI
+                    st.session_state[auto_load_flag] = False
+
+    # 刷新按钮 (保留手动刷新)
+    col_select, col_refresh = st.columns([4, 1])
+    
+    with col_refresh:
+        if st.button("🔄", key=f"refresh_{prefix}", help="刷新模型列表"):
+            with st.spinner("🔄"):
                 models, err = fetch_remote_models(url, key)
                 if models:
                     available_models = models
                     st.session_state[cache_key] = models
                     st.toast(f"✅ 已加载 {len(models)} 个模型")
+                    st.rerun()
                 else:
                     st.warning(f"加载失败: {err}")
 
-    if available_models:
-        if saved_model and saved_model not in available_models:
-            available_models.insert(0, saved_model)
-        
-        return st.selectbox(
-            "选择模型", 
-            available_models, 
-            index=available_models.index(saved_model) if saved_model in available_models else 0,
-            key=f"config_{prefix}_model_select"
-        )
-    else:
-        return st.text_input("模型名称", saved_model, placeholder="例如: gpt-3.5-turbo", key=f"config_{prefix}_model_input")
+    with col_select:
+        if available_models:
+            if saved_model and saved_model not in available_models:
+                available_models.insert(0, saved_model)
+            
+            return st.selectbox(
+                "选择模型", 
+                available_models, 
+                index=available_models.index(saved_model) if saved_model in available_models else 0,
+                key=f"config_{prefix}_model_select",
+                label_visibility="collapsed"
+            )
+        else:
+            return st.text_input("模型名称", saved_model, placeholder="例如: gpt-3.5-turbo", key=f"config_{prefix}_model_input", label_visibility="collapsed")
 
 
 def _save_and_apply_config(config_data: dict, provider: str, model: str, key: str, url: str, defaults: dict, only_chat_settings: bool = False, **kwargs):

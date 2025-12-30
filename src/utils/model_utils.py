@@ -37,7 +37,7 @@ def check_ollama_status(url):
 
 def fetch_remote_models(base_url, api_key):
     """
-    获取远程模型列表
+    获取远程模型列表 (OpenAI 兼容接口)
     
     Args:
         base_url: API Base URL
@@ -48,6 +48,10 @@ def fetch_remote_models(base_url, api_key):
     """
     if not base_url:
         return None, "请填写 Base URL"
+    
+    # 自动识别 Ollama 地址
+    if "localhost:11434" in base_url or "127.0.0.1:11434" in base_url:
+        return fetch_ollama_models(base_url)
     
     clean_url = base_url.rstrip('/')
     endpoints = [f"{clean_url}/models", f"{clean_url}/v1/models"]
@@ -61,9 +65,34 @@ def fetch_remote_models(base_url, api_key):
                 if "data" in data and isinstance(data['data'], list):
                     return [item['id'] for item in data['data']], None
         except Exception as e:
-            return None, f"连接失败或API错误: {e}"
+            continue # 尝试下一个 endpoint
     
     return None, "未找到模型列表或路径错误"
+
+
+def fetch_ollama_models(url):
+    """
+    获取 Ollama 模型列表
+    
+    Args:
+        url: Ollama API URL
+        
+    Returns:
+        tuple: (模型列表, 错误信息)
+    """
+    try:
+        clean = url.replace("/api/chat", "").replace("/v1", "").rstrip('/')
+        response = requests.get(f"{clean}/api/tags", timeout=3.0)
+        if response.status_code == 200:
+            data = response.json()
+            models = []
+            if "models" in data:
+                for m in data["models"]:
+                    models.append(m.get("name") or m.get("model", ""))
+            return [m for m in models if m], None
+    except Exception as e:
+        return None, f"Ollama 连接失败: {e}"
+    return None, "未找到 Ollama 模型"
 
 
 def check_hf_model_exists(model_name):

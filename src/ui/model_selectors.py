@@ -16,20 +16,11 @@ def render_ollama_model_selector(
 ) -> Tuple[str, bool]:
     """
     渲染 Ollama 模型选择器
-    
-    Args:
-        llm_url: Ollama API URL
-        saved_model: 保存的默认模型
-        ollama_ok: Ollama 连接状态
-        
-    Returns:
-        Tuple[str, bool]: (选中的模型, 是否需要保存为默认)
     """
     save_as_default = False
     
-    # 使用统一的默认模型
     if not saved_model:
-        saved_model = "gpt-oss:20b"  # 统一默认模型
+        saved_model = "gpt-oss:20b"
     
     # 刷新按钮
     col_refresh = st.columns([3, 1])[1]
@@ -40,6 +31,8 @@ def render_ollama_model_selector(
                 if models:
                     st.session_state.ollama_models = models
                     st.toast(f"✅ 找到 {len(models)} 个模型")
+                    import time
+                    time.sleep(1)
                     st.rerun()
                 else:
                     st.warning("未找到模型")
@@ -47,10 +40,15 @@ def render_ollama_model_selector(
             else:
                 st.warning("请先启动 Ollama")
     
-    # 自动加载模型列表（首次）
-    if ollama_ok and ("ollama_models" not in st.session_state or not st.session_state.ollama_models):
-        models = _fetch_ollama_models(llm_url)
-        st.session_state.ollama_models = models if models else []
+    # 自动加载模型列表 (v2.9.5 优化)
+    # 如果 URL 改变了，也重新加载
+    current_url_key = f"last_ollama_url"
+    if ollama_ok:
+        url_changed = st.session_state.get(current_url_key) != llm_url
+        if url_changed or "ollama_models" not in st.session_state or not st.session_state.ollama_models:
+            models = _fetch_ollama_models(llm_url)
+            st.session_state.ollama_models = models if models else []
+            st.session_state[current_url_key] = llm_url
     
     if not ollama_ok:
         st.session_state.ollama_models = []
@@ -87,31 +85,45 @@ def render_openai_model_selector(
     saved_model: str
 ) -> str:
     """
-    渲染 OpenAI 兼容模型选择器
-    
-    Args:
-        llm_url: API Base URL
-        llm_key: API Key
-        saved_model: 保存的默认模型
-        
-    Returns:
-        str: 选中的模型
+    渲染 OpenAI 兼容模型选择器 (v2.9.5 自动加载优化)
     """
     from src.utils.model_utils import fetch_remote_models
     
-    if st.button("🔄 刷新列表", use_container_width=True):
-        with st.spinner("正在连接模型列表..."):
-            mods, err = fetch_remote_models(llm_url, llm_key)
-            if mods:
-                st.session_state.model_list = mods
-            else:
-                st.error(err)
+    # 使用缓存键
+    cache_key = f"model_list_{hash(llm_url + llm_key)}"
     
-    if st.session_state.model_list:
-        idx = st.session_state.model_list.index(saved_model) if saved_model in st.session_state.model_list else 0
-        llm_model = st.selectbox("选择模型", st.session_state.model_list, index=idx)
-    else:
-        llm_model = st.text_input("输入模型名", saved_model, key="llm_openai_1")
+    # 刷新逻辑
+    col_select, col_refresh = st.columns([4, 1])
+    
+    with col_refresh:
+        if st.button("🔄", key=f"refresh_openai_direct", use_container_width=True):
+            with st.spinner(""):
+                mods, err = fetch_remote_models(llm_url, llm_key)
+                if mods:
+                    st.session_state[cache_key] = mods
+                    st.toast(f"✅ 已加载 {len(mods)} 个模型")
+                    import time
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error(err)
+    
+    # 自动加载
+    if llm_url and llm_key and cache_key not in st.session_state:
+        mods, err = fetch_remote_models(llm_url, llm_key)
+        if mods:
+            st.session_state[cache_key] = mods
+    
+    model_list = st.session_state.get(cache_key, [])
+    
+    with col_select:
+        if model_list:
+            if saved_model and saved_model not in model_list:
+                model_list.insert(0, saved_model)
+            idx = model_list.index(saved_model) if saved_model in model_list else 0
+            llm_model = st.selectbox("选择模型", model_list, index=idx, label_visibility="collapsed", key="openai_model_selectbox")
+        else:
+            llm_model = st.text_input("输入模型名", saved_model, key="llm_openai_1", label_visibility="collapsed")
     
     return llm_model
 

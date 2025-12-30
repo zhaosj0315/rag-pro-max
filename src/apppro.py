@@ -3727,27 +3727,41 @@ with st.container():
         current_model = saved_models.get(selected_provider, "")
         available_models = []
         
-        # 动态加载或显示已保存模型
-        if selected_provider == "Ollama":
-            try:
-                ollama_url = config.get('llm_url_ollama', "http://localhost:11434")
-                from src.utils.model_utils import fetch_remote_models
-                models, error = fetch_remote_models(ollama_url, "")
-                available_models = models if models else ([current_model] if current_model else ["gpt-oss:20b"])
-            except:
-                available_models = [current_model] if current_model else ["gpt-oss:20b"]
+        # --- 核心改进：工具栏模型自动同步 (v2.9.6) ---
+        from src.utils.model_utils import fetch_remote_models
+        
+        # 获取当前供应商的连接参数
+        provider_params = {
+            "Ollama": (config.get('llm_url_ollama', "http://localhost:11434"), ""),
+            "OpenAI": (config.get('llm_url_openai', "https://api.openai.com/v1"), config.get('llm_key', "")),
+            "OpenAI-Compatible": (config.get('llm_url_other', ""), config.get('llm_key_other', "")),
+            "Azure OpenAI": (config.get('azure_endpoint', ""), config.get('azure_key', "")),
+            "Anthropic": ("", config.get('anthropic_key', "")),
+            "Moonshot": ("https://api.moonshot.cn/v1", config.get('moonshot_key', "")),
+            "Gemini": ("", config.get('gemini_key', "")),
+            "Groq": ("https://api.groq.com/openai/v1", config.get('groq_key', ""))
+        }
+        
+        url, key = provider_params.get(selected_provider, ("", ""))
+        cache_key = f"models_{selected_provider}_{url}_{key}"
+        
+        # 尝试从缓存获取
+        if cache_key in st.session_state:
+            available_models = st.session_state[cache_key]
         else:
-            # 对于云端供应商，直接显示已保存的模型，或提供刷新（如果已配置）
-            # 这里优先保证 UI 显示用户在“模型配置”页保存的那个模型
-            available_models = [current_model] if current_model else ["未配置模型"]
+            # 如果缓存中没有，且参数完整，尝试自动加载一次
+            if (url or selected_provider in ["Anthropic", "Gemini"]) and not st.session_state.get(f"auto_load_{selected_provider}"):
+                with st.spinner(""):
+                    models, err = fetch_remote_models(url, key)
+                    if models:
+                        available_models = models
+                        st.session_state[cache_key] = models
+                        st.session_state[f"auto_load_{selected_provider}"] = True
             
-            # 如果是 OpenAI 且有缓存，则合并
-            if selected_provider == "OpenAI":
-                cache_key = f"models_openai_{config.get('llm_url_openai')}_{config.get('llm_key')}"
-                if cache_key in st.session_state:
-                    available_models = list(set(available_models + st.session_state[cache_key]))
-
-        if current_model and current_model not in available_models:
+        # 确保当前模型在列表中
+        if not available_models:
+            available_models = [current_model] if current_model else ["未配置模型"]
+        elif current_model and current_model not in available_models:
             available_models.insert(0, current_model)
             
         idx = available_models.index(current_model) if current_model in available_models else 0
@@ -3770,14 +3784,27 @@ with st.container():
                     ConfigLoader.save(config)
                     st.toast(f"✅ 已切换为: {new_model}", icon="🤖")
 
-        st.selectbox(
-            "选择模型",
-            options=available_models,
-            index=idx,
-            key="toolbar_model_selector",
-            on_change=on_model_change,
-            label_visibility="collapsed"
-        )
+        # 增加刷新小图标，紧凑布局 (v2.9.6)
+        col_select, col_refresh = st.columns([0.85, 0.15])
+        with col_select:
+            st.selectbox(
+                "选择模型",
+                options=available_models,
+                index=idx,
+                key="toolbar_model_selector",
+                on_change=on_model_change,
+                label_visibility="collapsed"
+            )
+        with col_refresh:
+            if st.button("🔄", key="toolbar_model_refresh", help="刷新模型列表"):
+                with st.spinner(""):
+                    models, err = fetch_remote_models(url, key)
+                    if models:
+                        st.session_state[cache_key] = models
+                        st.toast(f"✅ 已同步 {len(models)} 个模型")
+                        st.rerun()
+                    else:
+                        st.error("同步失败")
 
     # --- 3. 功能开关 (Toggle) ---
     with c_deep:
