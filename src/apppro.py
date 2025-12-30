@@ -689,48 +689,55 @@ with st.sidebar:
             if st.button("🔄", help="刷新知识库列表", use_container_width=True, key="refresh_kb_list"):
                 st.rerun()
 
-        # 启动系统按钮（当选择了知识库或纯对话模式时显示）
+        # 自动启动系统逻辑 (替代原有的启动按钮)
+        # 纯对话模式已在上方 selectbox 处理，此处处理知识库模式
         is_pure_chat = (selected_nav == "💬 纯对话模式 (Pure Chat)")
         
-        if len(st.session_state.get('selected_kbs', [])) > 0 or is_pure_chat:
-            btn_text = "🚀 启动纯对话" if is_pure_chat else "🚀 启动系统"
-            if st.button(btn_text, type="primary", use_container_width=True, key="start_system"):
-                if is_pure_chat:
-                    try:
-                        from llama_index.core.chat_engine import SimpleChatEngine
-                        from src.config.prompt_manager import PromptManager
-                        
-                        # 获取当前角色提示词
-                        current_role_id = st.session_state.get('current_prompt_id', 'default')
-                        system_prompt = PromptManager.get_content(current_role_id)
-                        
-                        st.session_state.chat_engine = SimpleChatEngine.from_defaults(
-                            system_prompt=system_prompt
-                        )
-                        st.session_state.current_kb_id = "pure_chat"
-                        st.success("✅ 纯对话模式已启动")
-                    except Exception as e:
-                        st.error(f"❌ 启动失败: {str(e)}")
-                # 初始化聊天引擎
-                elif len(st.session_state.get('selected_kbs', [])) == 1:
-                    # 单知识库模式
-                    kb_name = st.session_state.selected_kbs[0]
-                    try:
-                        from src.rag_engine import create_rag_engine
-                        rag_engine = create_rag_engine(kb_name)
-                        if rag_engine:
-                            st.session_state.chat_engine = rag_engine.get_query_engine()
-                            st.session_state.current_kb_id = kb_name
-                            st.success(f"✅ 知识库 '{kb_name}' 已启动")
-                        else:
-                            st.error(f"❌ 无法启动知识库 '{kb_name}'")
-                    except Exception as e:
-                        st.error(f"❌ 启动失败: {str(e)}")
+        # 仅在非创建模式且非纯对话模式下执行自动启动
+        if not is_pure_chat and selected_nav != "➕ 新建知识库...":
+            target_kb_id = None
+            selected_kbs = st.session_state.get('selected_kbs', [])
+            
+            if len(selected_kbs) == 1:
+                target_kb_id = selected_kbs[0]
+            elif len(selected_kbs) > 1:
+                target_kb_id = "multi_kb_mode"
+            
+            # 如果目标ID有效，且与当前运行的ID不一致，则触发启动
+            if target_kb_id and target_kb_id != st.session_state.get('current_kb_id'):
+                # 显示加载状态 (仅在初次加载或切换时)
+                if st.session_state.get('current_kb_id') is None:
+                     status_text = f"正在启动: {target_kb_id}..."
+                     spinner_ctx = st.spinner(status_text)
                 else:
-                    # 多知识库模式
-                    st.session_state.chat_engine = "multi_kb_mode"  # 标记为多知识库模式
-                    st.success(f"✅ 多知识库模式已启动，共 {len(st.session_state.selected_kbs)} 个知识库")
-                st.rerun()
+                     # 切换时使用 toast 以减少干扰
+                     status_text = None
+                     spinner_ctx = st.empty()
+
+                with spinner_ctx:
+                    try:
+                        if target_kb_id == "multi_kb_mode":
+                            st.session_state.chat_engine = "multi_kb_mode"
+                            st.session_state.current_kb_id = "multi_kb_mode"
+                            st.toast(f"✅ 多知识库模式已启动 ({len(selected_kbs)}个)")
+                        else:
+                            # 单知识库
+                            kb_name = target_kb_id
+                            from src.rag_engine import create_rag_engine
+                            rag_engine = create_rag_engine(kb_name)
+                            if rag_engine:
+                                st.session_state.chat_engine = rag_engine.get_query_engine()
+                                st.session_state.current_kb_id = kb_name
+                                st.toast(f"✅ 知识库 '{kb_name}' 已启动")
+                            else:
+                                st.error(f"❌ 无法启动知识库 '{kb_name}'")
+                                st.session_state.current_kb_id = None
+                        
+                        # 只有在引擎变化时才 rerun，确保界面刷新
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ 启动失败: {str(e)}")
+                        logger.error(f"Auto-start failed: {e}")
 
         # 知识库搜索/过滤已按用户要求移除
 
