@@ -1,6 +1,6 @@
-# RAG Pro Max v3.2.1 系统架构文档
+# RAG Pro Max v3.2.2 系统架构文档
 
-**版本: v3.2.1**  
+**版本: v3.2.2**  
 **更新日期**: 2025-12-30  
 **架构层级**: 4层  
 **新增特性**: 现代化配置中心 (Tabs UI)、插件式自定义厂商系统、变量物理隔离架构
@@ -247,8 +247,8 @@ RetrievalSystem
 ```
 
 ### 5. 智能推荐系统 (Suggestion Engine)
-v3.2.1 进一步强化了多维同步能力：
-- **Dual-Interface Sync (v3.2.1)**: 
+v3.2.2 进一步强化了多维同步能力：
+- **Dual-Interface Sync (v3.2.2)**: 
     - **Global State Awareness**: 聊天工具栏与模型配置页实时双向同步。
     - **Custom Provider Registry**: 支持通过插件机制动态发现自定义厂商及其模型。
 - **状态感知层**: 

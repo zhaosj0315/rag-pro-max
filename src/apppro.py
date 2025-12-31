@@ -547,7 +547,7 @@ from src.common.business import generate_doc_summary
 
 with st.sidebar:
     # 横向标签页布局
-    tab_main, tab_roles, tab_config, tab_monitor, tab_tools, tab_help = st.tabs(["🏠 主页", "🎭 角色", "⚙️ 配置", "📊 监控", "🔧 工具", "❓ 帮助"])
+    tab_main, tab_roles, tab_config, tab_monitor, tab_help = st.tabs(["🏠 主页", "🎭 角色", "⚙️ 配置", "📊 监控", "❓ 帮助"])
     
     with tab_main:
 
@@ -1483,10 +1483,6 @@ with st.sidebar:
         except ImportError:
             # 降级到v1.5.1性能监控面板
             perf_monitor.render_panel()
-    
-    with tab_tools:
-        from src.ui.tools_ui import ToolsUI
-        ToolsUI.render()
     
     with tab_help:
         st.markdown("##### 📖 帮助")
