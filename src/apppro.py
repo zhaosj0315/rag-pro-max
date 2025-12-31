@@ -3896,7 +3896,11 @@ if active_kb_name and active_kb_name != "multi_kb_mode":
         for i, template in enumerate(question_templates):
             col = cols[i % 2]
             if col.button(f"📝 {template[:12]}...", key=f"template_{i}", help=template):
-                # 直接将问题加入处理队列，而不是只设置模板
+                # 确保question_queue已初始化
+                if 'question_queue' not in st.session_state:
+                    st.session_state.question_queue = []
+                
+                # 直接将问题加入处理队列
                 st.session_state.question_queue.append(template)
                 st.success(f"✅ 已提交问题: {template}")
                 st.rerun()
