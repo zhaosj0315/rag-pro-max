@@ -199,6 +199,31 @@ class TaskStarter:
         branch_name = task["branch_name"]
         
         if success:
+            # 现有功能保护检查
+            print("🛡️ 执行现有功能保护检查...")
+            try:
+                from existing_feature_protector import ExistingFeatureProtector
+                protector = ExistingFeatureProtector(str(self.project_root))
+                check_result = protector.check_changes(branch_name)
+                
+                if check_result['status'] == 'warning':
+                    print("⚠️ 发现潜在的现有功能修改")
+                    for warning in check_result['warnings']:
+                        print(f"   - {warning}")
+                    
+                    confirm = input("\n这些更改是否已获得用户同意？(y/n): ")
+                    if confirm.lower() != 'y':
+                        print("❌ 未获得用户同意，取消合并")
+                        return False
+                else:
+                    print("✅ 现有功能保护检查通过")
+                    
+            except Exception as e:
+                print(f"⚠️ 功能保护检查失败: {e}")
+                confirm = input("是否继续合并？(y/n): ")
+                if confirm.lower() != 'y':
+                    return False
+            
             # 6️⃣ 验证与合并 - 成功路径
             print("✅ 用户验证通过，合并到主分支")
             
