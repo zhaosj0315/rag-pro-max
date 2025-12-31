@@ -182,6 +182,8 @@ async def incremental_update(request: IncrementalUpdateRequest):
             skipped_files = changes['unchanged']
         
         # TODO: 集成实际的文档处理逻辑
+        # ⚠️ MOCK IMPLEMENTATION: This is a placeholder. Real processing logic needs to be connected to KBManager.
+        logger.warning("Executing MOCK incremental update - no actual files are processed", stage="API")
         for file_path in files_to_process:
             try:
                 processed_files.append(file_path)

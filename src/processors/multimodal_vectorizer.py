@@ -9,7 +9,9 @@ from PIL import Image
 import pandas as pd
 from typing import Dict, List, Optional, Union, Any
 import cv2
-import logging
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
 
 # 尝试导入CLIP相关模块
 try:
@@ -17,14 +19,14 @@ try:
     CLIP_AVAILABLE = True
 except ImportError:
     CLIP_AVAILABLE = False
-    logging.warning("CLIP模型不可用，图片向量化功能将被禁用")
+    logger.warning("CLIP模型不可用，图片向量化功能将被禁用")
 
 try:
     from sentence_transformers import SentenceTransformer
     SENTENCE_TRANSFORMERS_AVAILABLE = True
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
-    logging.warning("SentenceTransformers不可用，文本向量化功能将被禁用")
+    logger.warning("SentenceTransformers不可用，文本向量化功能将被禁用")
 
 class MultiModalVectorizer:
     """多模态向量化器"""
@@ -33,13 +35,14 @@ class MultiModalVectorizer:
                  text_model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
                  vision_model_name: str = "openai/clip-vit-base-patch32"):
         
+        self.logger = LogManager()
         # 文本嵌入模型
         self.text_model = None
         if SENTENCE_TRANSFORMERS_AVAILABLE:
             try:
                 self.text_model = SentenceTransformer(text_model_name)
             except Exception as e:
-                logging.warning(f"文本模型加载失败: {e}")
+                self.logger.warning(f"文本模型加载失败: {e}")
         
         # 视觉嵌入模型
         self.vision_model = None
@@ -51,7 +54,7 @@ class MultiModalVectorizer:
                 self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
                 self.vision_model.to(self.device)
             except Exception as e:
-                logging.warning(f"视觉模型加载失败: {e}")
+                self.logger.warning(f"视觉模型加载失败: {e}")
         
         # 向量维度
         self.text_dim = 512  # bge-small-zh-v1.5
@@ -67,7 +70,7 @@ class MultiModalVectorizer:
             vector = self.text_model.encode(text, normalize_embeddings=True)
             return vector.astype(np.float32)
         except Exception as e:
-            logging.error(f"文本向量化失败: {e}")
+            self.logger.error(f"文本向量化失败: {e}")
             return None
     
     def encode_image(self, image_path: str) -> Optional[np.ndarray]:
@@ -91,7 +94,7 @@ class MultiModalVectorizer:
             return image_features.cpu().numpy().flatten().astype(np.float32)
             
         except Exception as e:
-            logging.error(f"图片向量化失败: {e}")
+            self.logger.error(f"图片向量化失败: {e}")
             return None
     
     def encode_table_structure(self, table_structure: Dict) -> Optional[np.ndarray]:
@@ -101,7 +104,7 @@ class MultiModalVectorizer:
             structure_text = self._structure_to_text(table_structure)
             return self.encode_text(structure_text)
         except Exception as e:
-            logging.error(f"表格结构向量化失败: {e}")
+            self.logger.error(f"表格结构向量化失败: {e}")
             return None
     
     def encode_table_content(self, table_data: pd.DataFrame, 
@@ -128,7 +131,7 @@ class MultiModalVectorizer:
                     })
         
         except Exception as e:
-            logging.error(f"表格内容向量化失败: {e}")
+            self.logger.error(f"表格内容向量化失败: {e}")
         
         return content_vectors
     
@@ -179,7 +182,7 @@ class MultiModalVectorizer:
                 return self._normalize_vector(fused_vector)
             
         except Exception as e:
-            logging.error(f"多模态向量融合失败: {e}")
+            self.logger.error(f"多模态向量融合失败: {e}")
         
         return None
     
@@ -214,7 +217,7 @@ class MultiModalVectorizer:
             results.sort(key=lambda x: x['similarity'], reverse=True)
             
         except Exception as e:
-            logging.error(f"跨模态相似度计算失败: {e}")
+            self.logger.error(f"跨模态相似度计算失败: {e}")
         
         return results
     

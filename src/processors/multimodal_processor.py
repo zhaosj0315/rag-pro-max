@@ -193,6 +193,9 @@ class MultimodalProcessor:
                    include_tables: bool = True, top_k: int = 5) -> Dict[str, Any]:
         """多模态查询"""
         # TODO: 实现多模态查询逻辑
+        # ⚠️ MOCK IMPLEMENTATION: Real multimodal retrieval (images/tables) is pending integration.
+        logger.log_warning("Executing MOCK multimodal query", "Feature not yet implemented in v3.2.2")
+        
         # 这里需要集成向量检索，支持文本、图片、表格的混合检索
         
         result = {

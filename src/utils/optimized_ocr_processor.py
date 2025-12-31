@@ -9,8 +9,9 @@ import psutil
 import threading
 from typing import List, Dict, Optional, Callable
 from concurrent.futures import ThreadPoolExecutor
-import logging
 from datetime import datetime
+
+from src.app_logging.log_manager import LogManager
 
 # 设置环境变量，禁用PaddleOCR详细日志
 os.environ['GLOG_minloglevel'] = '3'
@@ -18,16 +19,6 @@ os.environ['FLAGS_logtostderr'] = '0'
 os.environ['PADDLE_LOG_LEVEL'] = '50'
 
 from .cpu_monitor import get_resource_limiter
-
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('app_logs/ocr_processing.log'),
-        logging.StreamHandler()
-    ]
-)
 
 class OptimizedOCRProcessor:
     """优化的OCR处理器 - 单例模式"""
@@ -50,23 +41,24 @@ class OptimizedOCRProcessor:
         self.ocr_engine = None
         self.resource_limiter = get_resource_limiter(max_cpu_percent=75.0, max_memory_percent=85.0)
         self.max_workers = 3  # 降低最大进程数，避免过载
+        self.logger = LogManager()
         
         # 统计信息
         self.total_files_processed = 0
         self.total_processing_time = 0
         self.session_start_time = datetime.now()
         
-        logging.info("🚀 OCR处理器初始化开始")
+        self.logger.info("🚀 OCR处理器初始化开始")
         
     def initialize(self) -> bool:
         """初始化OCR引擎（只执行一次）"""
         if self.initialized:
-            logging.info("✅ OCR引擎已初始化，跳过重复加载")
+            self.logger.info("✅ OCR引擎已初始化，跳过重复加载")
             return True
             
         try:
             print("🚀 初始化优化OCR处理器...")
-            logging.info("🚀 开始初始化OCR引擎")
+            self.logger.info("🚀 开始初始化OCR引擎")
             start_time = time.time()
             
             # 导入PaddleOCR
@@ -89,14 +81,13 @@ class OptimizedOCRProcessor:
             self.initialized = True
             
             print("✅ OCR引擎初始化完成")
-            logging.info(f"✅ OCR引擎初始化成功，耗时: {init_time:.2f}秒")
+            self.logger.info(f"✅ OCR引擎初始化成功，耗时: {init_time:.2f}秒")
             return True
             
         except Exception as e:
             error_msg = f"❌ OCR引擎初始化失败: {str(e)}"
             print(error_msg)
-            logging.error(error_msg)
-            return False
+            self.logger.error(error_msg)
             return False
     
     def process_images(self, image_paths: List[str], progress_callback: Optional[Callable] = None) -> List[Dict]:
