@@ -1,0 +1,100 @@
+# RAG Pro Max 持续优化配置文件
+
+# 优化循环配置
+optimization:
+  # 巡查频率 (小时)
+  patrol_interval: 24
+  
+  # 优化阈值
+  thresholds:
+    code_quality:
+      max_lines_per_file: 300
+      max_complexity: 10
+      min_test_coverage: 80
+    
+    performance:
+      max_cache_size_mb: 1000
+      max_log_size_mb: 100
+      max_startup_time_sec: 5
+    
+    security:
+      max_sensitive_files: 0
+      require_gitignore: true
+    
+    documentation:
+      required_docs:
+        - "README.md"
+        - "CHANGELOG.md" 
+        - "FAQ.md"
+        - "DEPLOYMENT.md"
+        - "API_DOCUMENTATION.md"
+
+# 优化策略
+strategies:
+  code_quality:
+    - name: "重构大文件"
+      trigger: "lines > 500"
+      actions:
+        - "分析函数复杂度"
+        - "提取公共模块"
+        - "拆分业务逻辑"
+    
+    - name: "优化复杂函数"
+      trigger: "complexity > 10"
+      actions:
+        - "简化条件逻辑"
+        - "提取子函数"
+        - "使用设计模式"
+  
+  performance:
+    - name: "缓存清理"
+      trigger: "cache_size > 1000MB"
+      actions:
+        - "清理临时文件"
+        - "压缩历史数据"
+        - "实施LRU策略"
+    
+    - name: "日志管理"
+      trigger: "log_size > 100MB"
+      actions:
+        - "日志轮转"
+        - "压缩旧日志"
+        - "调整日志级别"
+  
+  documentation:
+    - name: "文档补全"
+      trigger: "missing_docs > 0"
+      actions:
+        - "创建缺失文档"
+        - "更新过期内容"
+        - "添加代码示例"
+
+# 报告配置
+reporting:
+  # 报告保留天数
+  retention_days: 30
+  
+  # 报告格式
+  formats:
+    - "json"
+    - "html"
+  
+  # 通知配置
+  notifications:
+    enabled: false
+    email: ""
+    webhook: ""
+
+# 调度配置
+scheduler:
+  # 运行模式: manual, cron, daemon
+  mode: "cron"
+  
+  # Cron表达式 (每天凌晨2点)
+  cron_expression: "0 2 * * *"
+  
+  # 并发限制
+  max_concurrent: 1
+  
+  # 超时设置 (分钟)
+  timeout: 60

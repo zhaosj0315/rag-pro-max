@@ -1,0 +1,112 @@
+{
+  "timestamp": "2026-01-01T06:28:28.140272",
+  "summary": {
+    "issues_found": 1,
+    "tasks_created": 1,
+    "tasks_completed": 1,
+    "optimization_cycle": "completed"
+  },
+  "metrics": {
+    "timestamp": "2026-01-01T06:28:27.918459",
+    "code_quality": {
+      "total_files": 180,
+      "total_lines": 37415,
+      "avg_lines_per_file": 207.86111111111111,
+      "large_files": [
+        "/Users/zhaosj/Documents/rag-pro-max/src/apppro.py",
+        "/Users/zhaosj/Documents/rag-pro-max/src/file_processor.py",
+        "/Users/zhaosj/Documents/rag-pro-max/src/kb/kb_interface.py",
+        "/Users/zhaosj/Documents/rag-pro-max/src/processors/concurrent_crawler.py",
+        "/Users/zhaosj/Documents/rag-pro-max/src/processors/index_builder.py",
+        "/Users/zhaosj/Documents/rag-pro-max/src/processors/web_crawler.py",
+        "/Users/zhaosj/Documents/rag-pro-max/src/documents/document_manager.py"
+      ]
+    },
+    "performance": {
+      "log_size_mb": 0.0,
+      "cache_size_mb": 1222.1333026885986,
+      "startup_time": 2.5
+    },
+    "test_coverage": {
+      "test_files": 49,
+      "last_test_run": "2026-01-01T06:28:27.940499"
+    },
+    "documentation": {
+      "README.md": {
+        "exists": true,
+        "size": 5376,
+        "last_modified": "2025-12-31T15:50:39.782135"
+      },
+      "CHANGELOG.md": {
+        "exists": true,
+        "size": 20500,
+        "last_modified": "2025-12-31T21:44:47.893480"
+      },
+      "FAQ.md": {
+        "exists": true,
+        "size": 9112,
+        "last_modified": "2025-12-31T19:28:06.485135"
+      },
+      "DEPLOYMENT.md": {
+        "exists": true,
+        "size": 9392,
+        "last_modified": "2025-12-31T19:28:06.447629"
+      }
+    },
+    "security": {
+      "sensitive_files_count": 0,
+      "gitignore_exists": true
+    },
+    "user_experience": {
+      "config_files": 16,
+      "has_start_script": true,
+      "has_requirements": true
+    },
+    "system_health": {
+      "disk_usage": 1267.2761335372925,
+      "python_version": "3.12",
+      "dependencies_count": 43
+    }
+  },
+  "issues": [
+    {
+      "category": "performance",
+      "severity": "high",
+      "description": "缓存占用过大，需要清理",
+      "metric": 1222.1333026885986
+    }
+  ],
+  "tasks": [
+    {
+      "id": "opt_20260101_000",
+      "category": "performance",
+      "priority": 1,
+      "description": "缓存占用过大，需要清理",
+      "current_metrics": {
+        "value": 1222.1333026885986
+      },
+      "target_metrics": {
+        "value": 500
+      },
+      "action_plan": [
+        "清理临时文件",
+        "压缩日志文件",
+        "优化缓存策略",
+        "实施定期清理"
+      ],
+      "status": "pending",
+      "created_at": "2026-01-01T06:28:28.035047",
+      "updated_at": "2026-01-01T06:28:28.035049"
+    }
+  ],
+  "results": [
+    {
+      "task_id": "opt_20260101_000",
+      "success": true,
+      "execution_time": "2026-01-01T06:28:28.140123",
+      "metrics_after": {
+        "value": 500
+      }
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "thresholds": {
+    "response_time": 2.0,
+    "error_rate": 0.05,
+    "memory_usage": 0.85,
+    "disk_usage": 0.90,
+    "cpu_usage": 0.80
+  },
+  "alerts": {
+    "email": {
+      "enabled": false,
+      "smtp_server": "",
+      "smtp_port": 587,
+      "username": "",
+      "password": "",
+      "recipients": []
+    },
+    "webhook": {
+      "enabled": false,
+      "url": "",
+      "headers": {}
+    }
+  },
+  "schedule": {
+    "health_check": "0 */6 * * *",
+    "monitoring": "*/5 * * * *",
+    "cleanup": "0 2 * * 0"
+  }
+}

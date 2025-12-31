@@ -1,0 +1,113 @@
+{
+  "analysis_time": "2026-01-01T06:46:11.115113",
+  "current_state": {
+    "total_issues": 2,
+    "issues": [
+      {
+        "problem": "错误提示多于成功提示",
+        "impact": "用户体验偏负面",
+        "location": "错误处理逻辑"
+      },
+      {
+        "problem": "配置文件过多且分散",
+        "impact": "配置管理复杂",
+        "location": "config目录"
+      }
+    ],
+    "project_size": 254
+  },
+  "action_plans": [
+    {
+      "title": "平衡用户反馈体验",
+      "what_to_do": "增加成功操作的正面反馈提示",
+      "why_important": "让用户感受到操作成功，提升使用信心",
+      "how_to_implement": [
+        "1. 在文件上传成功后添加st.success('文件上传成功！')",
+        "2. 在知识库创建后添加st.success('知识库创建完成！')",
+        "3. 在查询完成后添加st.success('查询结果已生成')",
+        "4. 为每个主要操作添加进度提示"
+      ],
+      "expected_result": "用户满意度提升，操作更有成就感",
+      "files_to_change": [
+        "src/apppro.py",
+        "src/ui/*.py"
+      ],
+      "estimated_time": "1小时",
+      "priority": "medium"
+    },
+    {
+      "title": "统一配置管理",
+      "what_to_do": "将分散的配置文件合并为一个主配置文件",
+      "why_important": "简化配置管理，减少维护成本",
+      "how_to_implement": [
+        "1. 创建config/main_config.json作为主配置",
+        "2. 将app_config.json和rag_config.json内容合并",
+        "3. 修改代码中的配置读取逻辑",
+        "4. 保留原文件作为备份"
+      ],
+      "expected_result": "配置管理更简单，减少配置错误",
+      "files_to_change": [
+        "config/*.json",
+        "src/services/config_service.py"
+      ],
+      "estimated_time": "2小时",
+      "priority": "low"
+    },
+    {
+      "title": "添加常用问题模板",
+      "what_to_do": "创建一个问题模板选择器，让用户快速选择常见问题类型",
+      "why_important": "新用户不知道该问什么，模板可以引导用户更好地使用系统",
+      "how_to_implement": [
+        "1. 在侧边栏添加'常用问题'选择框",
+        "2. 预设5-10个常见问题模板，如：",
+        "   - '请总结这个文档的主要内容'",
+        "   - '这个文档中有哪些重要的数据或结论？'",
+        "   - '基于文档内容，给我一些实用建议'",
+        "3. 用户选择模板后自动填入输入框",
+        "4. 允许用户修改模板内容"
+      ],
+      "expected_result": "新用户上手更快，提问质量提升30%",
+      "files_to_change": [
+        "src/apppro.py"
+      ],
+      "estimated_time": "1.5小时",
+      "priority": "high"
+    },
+    {
+      "title": "添加文档处理进度显示",
+      "what_to_do": "在文档上传和处理时显示详细的进度条和状态信息",
+      "why_important": "用户上传大文件时不知道处理进度，容易以为系统卡死",
+      "how_to_implement": [
+        "1. 使用st.progress()显示处理进度",
+        "2. 添加状态文本：'正在读取文件...'、'正在分析内容...'、'正在构建索引...'",
+        "3. 显示处理时间估计",
+        "4. 处理完成后显示文档统计信息（页数、字数等）"
+      ],
+      "expected_result": "用户等待体验更好，减少90%的中途放弃",
+      "files_to_change": [
+        "src/file_processor.py",
+        "src/apppro.py"
+      ],
+      "estimated_time": "2小时",
+      "priority": "high"
+    },
+    {
+      "title": "添加对话历史快速访问",
+      "what_to_do": "在侧边栏显示最近的对话记录，支持快速切换",
+      "why_important": "用户想回看之前的对话内容，现在只能重新提问",
+      "how_to_implement": [
+        "1. 在侧边栏添加'历史对话'折叠面板",
+        "2. 显示最近10次对话的标题（取问题前20字）",
+        "3. 点击历史记录可以查看完整对话",
+        "4. 支持删除和收藏功能"
+      ],
+      "expected_result": "用户可以轻松回顾历史对话，提升使用效率",
+      "files_to_change": [
+        "src/apppro.py",
+        "src/chat_history.py"
+      ],
+      "estimated_time": "3小时",
+      "priority": "medium"
+    }
+  ]
+}
