@@ -164,11 +164,9 @@ def render_hf_embedding_selector(
             if st.button("✅ ⭐", key="config_set_default_embed", use_container_width=True, help="模型已就绪，点击设为默认"):
                 # 返回信号，让调用者保存配置
                 st.session_state.save_embed_model = embed_model
-            st.caption("已就绪")
         else:
-            if st.button("📥", key="download_hf_model", type="primary", use_container_width=True, help="立即下载模型"):
+            if st.button("📥 下载", key="download_hf_model", type="primary", use_container_width=True, help="点击立即下载模型"):
                 _download_hf_model(embed_model)
-            st.caption("未下载")
     
     return embed_model
 
