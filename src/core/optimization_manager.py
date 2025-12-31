@@ -121,7 +121,7 @@ class OptimizationManager:
         return {
             "enabled": self.optimizations_enabled,
             "stats": self.stats,
-            "version": "1.7.2"
+            "version": "3.2.2"
         }
     
     def toggle_optimization(self, optimization_type: str, enabled: bool):

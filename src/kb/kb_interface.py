@@ -173,7 +173,7 @@ class KBInterface:
             target_path = st.text_input(
                 "文件/文件夹路径",
                 value=st.session_state.get('path_input', ''),
-                placeholder="📁 /Users/username/docs 或上传后自动生成",
+                placeholder="📁 ~/Documents/docs 或上传后自动生成",
                 label_visibility="collapsed"
             )
             

@@ -90,7 +90,7 @@ class ManifestManager:
                 'embed_model': embed_model or 'Unknown',
                 'created_time': datetime.now().isoformat(),
                 'total_size': total_size,
-                'version': '2.3.1'
+                'version': '3.2.2'
             }
             
             with open(manifest_file, 'w', encoding='utf-8') as f:

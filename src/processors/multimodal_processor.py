@@ -192,9 +192,12 @@ class MultimodalProcessor:
     async def query(self, kb_name: str, query: str, include_images: bool = True, 
                    include_tables: bool = True, top_k: int = 5) -> Dict[str, Any]:
         """多模态查询"""
+        from src.app_logging.log_manager import LogManager
+        logger = LogManager()
+        
         # TODO: 实现多模态查询逻辑
         # ⚠️ MOCK IMPLEMENTATION: Real multimodal retrieval (images/tables) is pending integration.
-        logger.log_warning("Executing MOCK multimodal query", "Feature not yet implemented in v3.2.2")
+        logger.warning("执行 MOCK 多模态查询 - v3.2.2 版本功能未完整实现", stage="多模态处理")
         
         # 这里需要集成向量检索，支持文本、图片、表格的混合检索
         
