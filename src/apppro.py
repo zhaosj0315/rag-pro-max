@@ -726,7 +726,7 @@ with st.sidebar:
                             from src.rag_engine import create_rag_engine
                             rag_engine = create_rag_engine(kb_name)
                             if rag_engine:
-                                st.session_state.chat_engine = rag_engine.get_query_engine()
+                                st.session_state.chat_engine = rag_engine.get_chat_engine()
                                 st.session_state.current_kb_id = kb_name
                                 st.toast(f"✅ 知识库 '{kb_name}' 已启动")
                             else:

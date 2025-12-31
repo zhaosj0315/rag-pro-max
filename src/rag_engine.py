@@ -173,6 +173,36 @@ class RAGEngine:
             streaming=streaming,
             text_qa_template=qa_prompt_tmpl
         )
+
+    def get_chat_engine(
+        self,
+        chat_mode: str = "context",
+        similarity_top_k: int = 5,
+        streaming: bool = True
+    ):
+        """
+        获取聊天引擎
+        
+        Args:
+            chat_mode: 聊天模式 ("context", "condense_question", "simple")
+            similarity_top_k: 返回的相似文档数量
+            streaming: 是否启用流式输出
+            
+        Returns:
+            聊天引擎对象
+        """
+        if not self.index:
+            raise ValueError("索引未加载，请先创建或加载索引")
+            
+        from llama_index.core.memory import ChatMemoryBuffer
+        
+        return self.index.as_chat_engine(
+            chat_mode=chat_mode,
+            memory=ChatMemoryBuffer.from_defaults(token_limit=2000),
+            similarity_top_k=similarity_top_k,
+            streaming=streaming,
+            system_prompt="你是一个精准的知识库助手，请务必仅基于提供的上下文和知识回答问题。如果知识库中没有相关信息，请明确指出。回答应清晰、简洁、专业。"
+        )
     
     def query(
         self, 
