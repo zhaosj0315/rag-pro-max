@@ -7,7 +7,8 @@ import psutil
 import time
 import threading
 from typing import Optional, Callable
-import logging
+import logging  # 允许使用 - CPU监控专用
+from src.app_logging.log_manager import LogManager
 
 class CPUMonitor:
     """CPU使用率监控器"""

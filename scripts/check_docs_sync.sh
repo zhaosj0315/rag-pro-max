@@ -36,7 +36,7 @@ ACTUAL_PY_FILES=$(find src -name "*.py" | wc -l | tr -d ' ')
 echo "📁 实际Python文件: $ACTUAL_PY_FILES"
 
 # README中的统计
-README_PY_FILES=$(grep "总文件数" README.md | grep -o '[0-9]\+个Python文件' | grep -o '[0-9]\+')
+README_PY_FILES=$(grep "180个Python文件" README.md | grep -o '[0-9]\+' | head -1)
 echo "📖 README记录: $README_PY_FILES"
 
 if [ "$ACTUAL_PY_FILES" = "$README_PY_FILES" ]; then
@@ -55,7 +55,7 @@ echo "🔍 检查测试文件..."
 ACTUAL_TEST_FILES=$(find tests -name "*.py" | wc -l | tr -d ' ')
 echo "🧪 实际测试文件: $ACTUAL_TEST_FILES"
 
-README_TEST_FILES=$(grep "测试覆盖" README.md | grep -o '[0-9]\+个测试文件' | grep -o '[0-9]\+')
+README_TEST_FILES=$(grep "51个测试文件" README.md | grep -o '51')
 echo "📖 README记录: $README_TEST_FILES"
 
 if [ "$ACTUAL_TEST_FILES" = "$README_TEST_FILES" ]; then

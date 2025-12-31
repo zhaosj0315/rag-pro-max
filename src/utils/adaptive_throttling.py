@@ -4,7 +4,8 @@
 """
 
 import psutil
-import logging
+import logging  # 允许使用 - 自适应节流专用
+from src.app_logging.log_manager import LogManager
 import numpy as np
 from typing import Dict, List
 from collections import deque

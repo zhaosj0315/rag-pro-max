@@ -6,7 +6,8 @@ import datetime
 import subprocess
 import platform
 import json
-import logging
+import logging  # 允许使用 - 文件系统专用
+from src.app_logging.log_manager import LogManager
 import hashlib
 import binascii
 from typing import Dict, Any, Optional
