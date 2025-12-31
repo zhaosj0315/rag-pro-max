@@ -22,8 +22,6 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
     """
     渲染 LLM 配置表单 (v3.2 顶部导航 + 修复数据覆盖 Bug)
     """
-    st.markdown("#### 🧠 模型服务中心")
-    
     # 1. 准备供应商数据
     BASE_PROVIDERS = {
         "Ollama": "🦙 Ollama",

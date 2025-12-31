@@ -1451,7 +1451,6 @@ with st.sidebar:
 
     with tab_config:
         st.session_state.current_tab = "config"
-        st.markdown("##### ⚙️ 模型配置")
         
         # P0改进3: 侧边栏分组 - 基础配置（默认展开）- 使用新组件 (Stage 3.2.2)
         config_values = render_basic_config(defaults)
