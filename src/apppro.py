@@ -1376,12 +1376,11 @@ with st.sidebar:
             with st.container(border=True):
                 # 顶部信息栏已移除（用户反馈冗余）
                 
-                # 底部：操作栏 (优化为 2x2 + 1 的三行布局)
-                op_row1 = st.columns(2)
-                op_row2 = st.columns(2)
-                op_row3 = st.columns(1)
+                # 底部：操作栏 (优化为 4 + 1 布局)
+                op_row1 = st.columns(4)
+                op_row2 = st.columns(1)
                 
-                # 第一行：对话操作
+                # 第一行：常用操作
                 with op_row1[0]:
                     if st.button("🔄 撤销", use_container_width=True, disabled=len(state.get_messages()) < 2, help="撤销最近一轮对话"):
                         if len(state.get_messages()) >= 2:
@@ -1403,8 +1402,7 @@ with st.sidebar:
                         time.sleep(0.5)
                         st.rerun()
                 
-                # 第二行：导出与视图
-                with op_row2[0]:
+                with op_row1[2]:
                     export_content = ""
                     if len(state.get_messages()) > 0:
                         export_content = f"# 对话记录 - {current_kb_name}\n\n**导出时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n\n"
@@ -1414,14 +1412,14 @@ with st.sidebar:
                     
                     st.download_button("📥 导出", export_content, file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d')}.md", mime="text/markdown", use_container_width=True, disabled=len(state.get_messages()) == 0)
 
-                with op_row2[1]:
-                    st.link_button("🔀 新窗口", "http://localhost:8501", use_container_width=True, help="打开新窗口")
-
-                # 第三行：危险操作
-                with op_row3[0]:
+                with op_row1[3]:
                     if st.button("🗑️ 删除", use_container_width=True, type="primary", disabled=not current_kb_name, help="永久删除该知识库"):
                         st.session_state.confirm_delete = True
                         st.rerun()
+
+                # 第二行：视图与窗口
+                with op_row2[0]:
+                    st.link_button("🔀 打开新窗口", "http://localhost:8501", use_container_width=True, help="在浏览器新标签页打开")
             
             # 删除确认对话框 (放在卡片外，避免嵌套问题)
             if st.session_state.get('confirm_delete', False):

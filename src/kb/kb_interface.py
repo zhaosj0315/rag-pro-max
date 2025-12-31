@@ -370,33 +370,29 @@ class KBInterface:
     
     def render_kb_operations(self, kb_name: str):
         """渲染知识库操作按钮"""
-        # 第一行：撤销、清空
-        r1_c1, r1_c2 = st.columns(2)
+        # 第一行：常用操作 (4列)
+        r1_c1, r1_c2, r1_c3, r1_c4 = st.columns(4)
         
         with r1_c1:
-            if st.button("🔄 撤销", use_container_width=True):
+            if st.button("🔄 撤销", use_container_width=True, key=f"undo_{kb_name}"):
                 self.undo_last_action(kb_name)
         
         with r1_c2:
-            if st.button("🧹 清空", use_container_width=True):
+            if st.button("🧹 清空", use_container_width=True, key=f"clear_{kb_name}"):
                 self.clear_chat_history(kb_name)
         
-        # 第二行：导出、新窗口
-        st.write("")
-        r2_c1, r2_c2 = st.columns(2)
-        
-        with r2_c1:
-            if st.button("📥 导出", use_container_width=True):
+        with r1_c3:
+            if st.button("📥 导出", use_container_width=True, key=f"export_{kb_name}"):
                 self.export_chat_history(kb_name)
         
-        with r2_c2:
-            st.link_button("🔀 新窗口", "http://localhost:8501", use_container_width=True)
+        with r1_c4:
+            if st.button("🗑️ 删除", use_container_width=True, type="primary", key=f"delete_{kb_name}"):
+                st.session_state.confirm_delete = True
+                st.rerun()
         
-        # 第三行：删除
+        # 第二行：视图与窗口 (1列)
         st.write("")
-        if st.button("🗑️ 删除", use_container_width=True, type="primary"):
-            st.session_state.confirm_delete = True
-            st.rerun()
+        st.link_button("🔀 打开新窗口", "http://localhost:8501", use_container_width=True, key=f"new_win_{kb_name}")
     
     def create_knowledge_base(self, path: str, name: str, options: dict):
         """创建知识库"""
