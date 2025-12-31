@@ -55,8 +55,6 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
         key="top_provider_selector"
     )
     
-    st.divider()
-
     # 初始返回变量 (核心修复 2: 确保只从选中的厂商提取数据)
     llm_provider = selected_key
     llm_url = ""
@@ -67,7 +65,6 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
     # --- 2. 根据选中的 Key 渲染对应的配置卡片 ---
     with st.container(border=True):
         if selected_key == "ADD_CUSTOM":
-            st.markdown("##### ➕ 新增自定义服务商")
             c1, c2 = st.columns(2)
             with c1:
                 custom_name = st.text_input("厂商名称", placeholder="MyAI", key="new_custom_name")
@@ -98,7 +95,6 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
         elif selected_key in custom_providers:
             # 渲染已有的自定义服务商 (严格锚定数据)
             cp = custom_providers[selected_key]
-            st.markdown(f"##### {PROVIDERS[selected_key]} 配置")
             col1, col2 = st.columns([2, 1])
             with col1:
                 llm_url = st.text_input("Base URL", defaults.get(f"llm_url_{selected_key}") or cp.get('url', ""), key=f"config_{selected_key}_url")
@@ -122,7 +118,6 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
 
         else:
             # 内置服务商逻辑 (严格读取 defaults)
-            st.markdown(f"##### {PROVIDERS[selected_key]} 设置")
             
             if selected_key == "Ollama":
                 # URL, 刷新, 状态 一行化
