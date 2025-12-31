@@ -28,8 +28,11 @@
 在执行同步前，必须明确以下三个基准：
 
 - **🔒 代码锁定 (Code Freeze)**: 确认所有功能分支已合并，本地工作区干净 (`git status` clean)，不再进行逻辑变更。
-- **🏷️ 版本确立 (Versioning)**: 严格遵循 [SemVer 2.0](https://semver.org/) 规范确定版本号 (e.g., `v2.8.0`)。
-- **📝 变更范围 (Scope)**: 明确本次迭代的核心逻辑变更点（Core Changes），区分 "Feature", "Fix", "Refactor"。
+- **🛠️ 工具自检 (Tooling Check)**: **[新增]** 检查 `scripts/` 下的检查脚本是否适配当前主版本（避免用 v2 的脚本测 v3 的代码）。
+- **🏷️ 版本确立 (Versioning)**: 
+    - 严格遵循 [SemVer 2.0](https://semver.org/)。
+    - **全域扫描**: 执行 `grep -r "version" src/`，确保代码深处（如 API 定义、UA 字符串）无旧版本号残留。
+- **📝 变更范围 (Scope)**: 明确本次迭代的核心逻辑变更点（Core Changes）。
 
 ------
 
@@ -210,11 +213,11 @@
 #### 第五轮：红队批判性审计 (Round 5: Red Team / Critical Audit)
 - **参与专家**: 🕵️‍♂️ 红队审计员 (Red Teamer), 🧹 代码洁癖者
 - **关注点**: 
-  - **虚假合规**: 检查脚本是否只是"跑通"但逻辑过时？(e.g., 检查旧版本文件)
-  - **功能空壳**: 是否存在 `TODO` 或 Mock 实现被伪装成已完成功能？(e.g., API接口返回假数据)
-  - **深度污染**: `__pycache__` 或硬编码路径是否彻底清理？
-  - **标准妥协**: 是否有核心模块"偷偷"豁免了新标准？(e.g., 仍使用 print/logging 而非 LogManager)
-- **动作**: 执行 `grep` 暴力搜索 TODO, FIXME, import logging, 硬编码路径。
+  - **虚假合规**: 检查脚本是否只是"跑通"但逻辑过时？
+  - **功能空壳 (Silent Mock)**: 严查 `TODO`、`pass` 或仅返回硬编码数据的接口。**规则**: Mock 必须打 `logger.warning`，否则视为 Bug。
+  - **标准逃逸 (Standard Drift)**: 检查是否有核心模块使用了"被禁止"的原生写法（如 `import logging`, `print()`）而绕过了新标准（如 `LogManager`）。
+  - **全域版本一致性**: 再次确认 `API`, `Swagger`, `CLI` 输出的版本号是否统一。
+- **动作**: 执行 `grep` 暴力搜索，并人工走查核心接口的实现逻辑。
 
 #### 第六轮：终局验收 (Round 6: Final Sign-off)
 - **参与专家**: 🏗️ 架构师 (回归), 💼 产品经理 (回归)
