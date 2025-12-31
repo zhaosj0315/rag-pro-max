@@ -992,6 +992,9 @@ with st.sidebar:
             
             # 添加更新知识库按钮
             if uploaded_files:
+                # 添加文件上传成功提示
+                st.success(f"✅ 文件上传成功！共选择了 {len(uploaded_files)} 个文件")
+                
                 # 导入进度显示组件
                 from src.ui.document_progress import doc_progress
                 
@@ -4178,6 +4181,9 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                 with st.chat_message("assistant", avatar="🤖"):
                     st.markdown(integrated_answer)
                     
+                    # 添加查询成功提示
+                    st.success(f"✅ 查询完成！从 {len(successful_results)} 个知识库获得答案，耗时 {total_time:.2f} 秒")
+                    
                     # 详细结果
                     with st.expander("📋 详细结果"):
                         for kb_name, result in results.items():
@@ -4710,6 +4716,10 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     
                     # 整体处理完成反馈
                     st.toast("✅ 回答生成完毕", icon="🎉")
+                    
+                    # 添加详细的成功提示
+                    st.success(f"✅ 查询处理完成！生成 {token_count} 个token，耗时 {total_time:.2f} 秒，速度 {tokens_per_sec:.1f} token/秒")
+                    
                     st.rerun()
                 
                 except Exception as e: 

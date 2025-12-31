@@ -157,6 +157,12 @@ class TaskStarter:
         else:
             log_data = {"tasks": [], "history": []}
         
+        # 确保tasks键存在
+        if "tasks" not in log_data:
+            log_data["tasks"] = []
+        if "history" not in log_data:
+            log_data["history"] = []
+        
         # 添加新任务
         log_data["tasks"].append(task_data)
         

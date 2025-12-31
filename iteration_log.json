@@ -1,72 +1,21 @@
 {
-  "current_iteration": {
-    "id": "20260101_070623",
-    "feature": {
-      "title": "增加操作成功反馈",
-      "problem": "负面反馈过多，缺少成功提示",
-      "solution": {
-        "what": "在关键操作成功后添加st.success提示",
-        "why": "让用户感受到操作成功，提升使用信心",
-        "how": [
-          "1. 在文件上传成功后添加成功提示",
-          "2. 在知识库创建后添加成功提示",
-          "3. 在查询完成后添加成功提示",
-          "4. 测试所有成功提示的显示"
-        ],
-        "files": [
-          "src/apppro.py"
-        ],
-        "time": "45分钟"
-      },
-      "priority": "medium",
-      "effort": "small",
-      "category": "用户体验"
-    },
-    "plan": {
-      "phase_1_implement": {
-        "description": "实现功能代码",
-        "tasks": [
-          "1. 在文件上传成功后添加成功提示",
-          "2. 在知识库创建后添加成功提示",
-          "3. 在查询完成后添加成功提示",
-          "4. 测试所有成功提示的显示"
-        ],
-        "files": [
-          "src/apppro.py"
-        ],
-        "estimated_time": "45分钟"
-      },
-      "phase_2_test": {
-        "description": "自动测试验证",
-        "tasks": [
-          "运行功能测试脚本",
-          "检查代码语法错误",
-          "验证功能正常工作",
-          "测试边界情况"
-        ]
-      },
-      "phase_3_document": {
-        "description": "更新相关文档",
-        "tasks": [
-          "更新README.md功能说明",
-          "更新CHANGELOG.md版本记录",
-          "添加功能使用说明",
-          "更新API文档（如需要）"
-        ]
-      },
-      "phase_4_approval": {
-        "description": "等待用户验证确认",
-        "tasks": [
-          "提交功能演示",
-          "说明改进效果",
-          "等待用户确认",
-          "收集反馈意见"
-        ]
-      }
-    },
-    "status": "planning",
-    "started_at": "2026-01-01T07:06:23.725093",
-    "phase": "phase_1_implement"
-  },
+  "tasks": [
+    {
+      "id": "task_20260101_070700",
+      "feature_name": "success_feedback",
+      "description": "在关键操作成功后添加st.success提示",
+      "branch_name": "feature/success_feedback_20260101",
+      "status": "completed",
+      "phase": "user_verification",
+      "created_at": "2026-01-01T07:07:00",
+      "definition_of_done": [
+        "功能代码实现完成",
+        "技术测试通过（无报错、无崩溃）",
+        "效果测试通过（性能不下降）",
+        "文档更新完成",
+        "用户验证通过"
+      ]
+    }
+  ],
   "history": []
 }
