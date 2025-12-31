@@ -207,9 +207,18 @@
 - **关注点**: 代码风格是否统一？TODO 是否已清理？引用是否合规？
 - **动作**: 深度 Code Review，查阅 `DEVELOPMENT_STANDARD.md` 对齐情况。
 
-#### 第五轮：终局验收 (Round 5: Final Sign-off)
+#### 第五轮：红队批判性审计 (Round 5: Red Team / Critical Audit)
+- **参与专家**: 🕵️‍♂️ 红队审计员 (Red Teamer), 🧹 代码洁癖者
+- **关注点**: 
+  - **虚假合规**: 检查脚本是否只是"跑通"但逻辑过时？(e.g., 检查旧版本文件)
+  - **功能空壳**: 是否存在 `TODO` 或 Mock 实现被伪装成已完成功能？(e.g., API接口返回假数据)
+  - **深度污染**: `__pycache__` 或硬编码路径是否彻底清理？
+  - **标准妥协**: 是否有核心模块"偷偷"豁免了新标准？(e.g., 仍使用 print/logging 而非 LogManager)
+- **动作**: 执行 `grep` 暴力搜索 TODO, FIXME, import logging, 硬编码路径。
+
+#### 第六轮：终局验收 (Round 6: Final Sign-off)
 - **参与专家**: 🏗️ 架构师 (回归), 💼 产品经理 (回归)
-- **关注点**: 前四轮发现的问题是否已修正？是否准备好发布？
+- **关注点**: 前五轮（含红队审计）发现的问题是否已全部修正（或显性化为 Known Debt）？
 - **动作**: 签署发布确认，打 Tag。
 
 ------
@@ -223,29 +232,31 @@
 ```
 ### ✅ 全量同步与清理报告 (Expert Reviewed)
 
-**版本**: [vX.Y.Z] (当前: v2.8.0)
+**版本**: [vX.Y.Z] (当前: v3.2.2)
 **执行人**: [Role/Name]
 
 #### 1. 变更摘要 (Summary)
 - **核心变更**: [一句话描述]
 - **文档同步**: [已完成]
 
-#### 2. 五轮审查概览 (5-Round Review Status)
+#### 2. 六轮审查概览 (6-Round Review Status)
 - [ ] Round 1 (Static/Sec): Pass
 - [ ] Round 2 (Logic/Func): Pass
 - [ ] Round 3 (UI/Doc): Pass
 - [ ] Round 4 (Code/Std): Pass
-- [ ] Round 5 (Final): Pass
+- [ ] Round 5 (Red Team): Pass (无致命假象)
+- [ ] Round 6 (Final): Pass
 
 #### 3. 核心一致性检查 (Consistency Checklist)
 - [ ] 术语一致性 (UI vs Doc vs Code)
 - [ ] 敏感信息零残留 (Security)
 - [ ] 临时文件全清理 (Zero Noise)
+- [ ] 真实性审计 (No Mock/TODO traps)
 
 #### 4. 遗留风险 (Risks)
 - [None / Describe Risk]
 
-**结论**: 项目已通过 10 角色 5 轮次审查，准予发布。
+**结论**: 项目已通过 10 角色 6 轮次审查（含红队批判），准予发布。
 ```
 
 ------
