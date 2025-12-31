@@ -160,18 +160,15 @@ def render_hf_embedding_selector(
     model_exists = check_hf_model_exists(embed_model)
     
     with col2:
-        button_label = "✅ ⭐" if model_exists else "⭐"
-        if st.button(button_label, key="config_set_default_embed", use_container_width=True, help="设为默认模型"):
-            # 返回信号，让调用者保存配置
-            st.session_state.save_embed_model = embed_model
-    
-    # 显示模型状态
-    if not model_exists:
-        st.warning("⚠️ 模型未下载")
-        if st.button("📥 下载模型", key="download_hf_model", type="primary", use_container_width=True):
-            _download_hf_model(embed_model)
-    else:
-        st.success("✅ 模型已就绪")
+        if model_exists:
+            if st.button("✅ ⭐", key="config_set_default_embed", use_container_width=True, help="模型已就绪，点击设为默认"):
+                # 返回信号，让调用者保存配置
+                st.session_state.save_embed_model = embed_model
+            st.caption("已就绪")
+        else:
+            if st.button("📥", key="download_hf_model", type="primary", use_container_width=True, help="立即下载模型"):
+                _download_hf_model(embed_model)
+            st.caption("未下载")
     
     return embed_model
 
