@@ -421,6 +421,9 @@ def render_basic_config(defaults: dict) -> dict:
     # LLM 配置 (接收 5 个返回值)
     llm_provider, llm_url, llm_model, llm_key, extra_params = render_llm_config(defaults)
     
+    # 增加间距，防止视觉拥挤
+    st.write("")
+    
     # Embedding 配置
     embed_provider, embed_model, embed_url, embed_key = render_embedding_config(defaults)
     
