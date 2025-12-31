@@ -10,16 +10,18 @@ echo "================================"
 echo "🔍 检查版本信息..."
 
 # 从README获取版本
-README_VERSION=$(grep -o 'version-[0-9]\+\.[0-9]\+\.[0-9]\+' README.md | head -1 | cut -d'-' -f2)
+README_VERSION=$(grep -o 'version-v\?[0-9]\+\.[0-9]\+\.[0-9]\+' README.md | head -1 | cut -d'-' -f2)
 echo "📖 README版本: $README_VERSION"
 
 # 从API获取版本
 API_VERSION=$(grep 'version=' src/api/fastapi_server.py | grep -o '"[0-9]\+\.[0-9]\+\.[0-9]\+"' | tr -d '"')
+# 统一格式（移除v前缀以便比较）
+README_VERSION_CLEAN=${README_VERSION#v}
 echo "🔌 API版本: $API_VERSION"
 
 # 检查版本是否一致
-if [ "$README_VERSION" = "$API_VERSION" ]; then
-    echo "✅ 版本信息一致: $README_VERSION"
+if [ "$README_VERSION_CLEAN" = "$API_VERSION" ]; then
+    echo "✅ 版本信息一致: $API_VERSION"
 else
     echo "❌ 版本信息不一致!"
     echo "   README: $README_VERSION"
@@ -35,8 +37,8 @@ echo "🔍 检查文件统计..."
 ACTUAL_PY_FILES=$(find src -name "*.py" | wc -l | tr -d ' ')
 echo "📁 实际Python文件: $ACTUAL_PY_FILES"
 
-# README中的统计
-README_PY_FILES=$(grep "180个Python文件" README.md | grep -o '[0-9]\+' | head -1)
+# README中的统计 (查找格式如 "180个Python文件")
+README_PY_FILES=$(grep -o '[0-9]\+个Python文件' README.md | grep -o '[0-9]\+' | head -1)
 echo "📖 README记录: $README_PY_FILES"
 
 if [ "$ACTUAL_PY_FILES" = "$README_PY_FILES" ]; then
@@ -55,7 +57,7 @@ echo "🔍 检查测试文件..."
 ACTUAL_TEST_FILES=$(find tests -name "*.py" | wc -l | tr -d ' ')
 echo "🧪 实际测试文件: $ACTUAL_TEST_FILES"
 
-README_TEST_FILES=$(grep "51个测试文件" README.md | grep -o '51')
+README_TEST_FILES=$(grep -o '[0-9]\+个测试文件' README.md | grep -o '[0-9]\+' | head -1)
 echo "📖 README记录: $README_TEST_FILES"
 
 if [ "$ACTUAL_TEST_FILES" = "$README_TEST_FILES" ]; then
@@ -68,19 +70,19 @@ fi
 
 echo ""
 
-# 检查v2.0功能模块
-echo "🔍 检查v2.0功能模块..."
+# 检查核心功能模块
+echo "🔍 检查v3.0核心功能模块..."
 
-V2_MODULES=(
-    "src/kb/incremental_updater.py"
-    "src/processors/multimodal_processor.py"
-    "src/core/v2_integration.py"
-    "tests/test_v2_features.py"
-    "docs/V2.0_FEATURES.md"
+CORE_MODULES=(
+    "src/apppro.py"
+    "src/services/unified_config_service.py"
+    "src/app_logging/log_manager.py"
+    "LOGGING_AND_NOTIFICATION_STANDARD.md"
+    "POST_DEVELOPMENT_SYNC_STANDARD.md"
 )
 
 MISSING_MODULES=0
-for module in "${V2_MODULES[@]}"; do
+for module in "${CORE_MODULES[@]}"; do
     if [ -f "$module" ]; then
         echo "✅ $module"
     else
@@ -90,9 +92,9 @@ for module in "${V2_MODULES[@]}"; do
 done
 
 if [ $MISSING_MODULES -eq 0 ]; then
-    echo "✅ 所有v2.0模块存在"
+    echo "✅ 所有核心模块存在"
 else
-    echo "⚠️  缺失 $MISSING_MODULES 个v2.0模块"
+    echo "⚠️  缺失 $MISSING_MODULES 个核心模块"
 fi
 
 echo ""
@@ -100,10 +102,10 @@ echo ""
 # 检查启动脚本
 echo "🔍 检查启动脚本..."
 
-if grep -q "v2.0" scripts/start.sh; then
-    echo "✅ start.sh 包含v2.0支持"
+if [ -f "scripts/start.sh" ]; then
+    echo "✅ start.sh 存在"
 else
-    echo "⚠️  start.sh 可能需要更新v2.0支持"
+    echo "⚠️  start.sh 缺失"
 fi
 
 echo ""
@@ -114,7 +116,7 @@ echo "================================"
 
 ISSUES=0
 
-if [ "$README_VERSION" != "$API_VERSION" ]; then
+if [ "$README_VERSION_CLEAN" != "$API_VERSION" ]; then
     ISSUES=$((ISSUES + 1))
 fi
 

@@ -61,8 +61,10 @@ class MultimodalQueryRequest(BaseModel):
 # FastAPI应用
 app = FastAPI(
     title="RAG Pro Max API",
-    description="RAG Pro Max RESTful API接口 - v2.0 增量更新和多模态支持",
-    version="2.0.0"
+    description="Enterprise RAG System API Interface",
+    version="3.2.2",
+    docs_url="/docs",
+    redoc_url="/redoc"
 )
 
 # CORS中间件
