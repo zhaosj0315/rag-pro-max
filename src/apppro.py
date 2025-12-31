@@ -649,42 +649,6 @@ with st.sidebar:
         select_col1, select_col2, select_col3 = st.columns([0.6, 5.9, 0.5])
         with select_col1:
             st.markdown("**选择:**")
-        
-        # 添加常用问题模板功能
-        st.markdown("---")
-        st.markdown("**💡 常用问题模板**")
-        
-        # 预设问题模板
-        question_templates = [
-            "请选择问题模板...",
-            "请总结这个文档的主要内容",
-            "这个文档中有哪些重要的数据或结论？",
-            "基于文档内容，给我一些实用建议",
-            "请解释文档中的核心概念",
-            "这个文档的优缺点有哪些？",
-            "如何实际应用文档中的方法？",
-            "文档中提到的关键问题是什么？",
-            "请提取文档中的要点清单",
-            "这个文档与其他相关资料有什么区别？"
-        ]
-        
-        selected_template = st.selectbox(
-            "选择模板",
-            question_templates,
-            help="选择常用问题模板，快速开始对话",
-            label_visibility="collapsed"
-        )
-        
-        # 如果选择了模板，将其存储到session state中
-        if selected_template != "请选择问题模板...":
-            st.session_state.selected_question_template = selected_template
-            # 显示选中的模板
-            st.info(f"已选择: {selected_template}")
-            if st.button("📝 使用此模板", use_container_width=True):
-                st.session_state.template_to_use = selected_template
-                st.success("✅ 模板已应用到输入框")
-        
-        st.markdown("---")
         with select_col1:
             st.markdown("**选择:**")
         with select_col2:
@@ -3912,6 +3876,32 @@ if st.session_state.get("quote_content"):
             st.rerun()
 
 # 处理输入
+# 添加问题模板选择器（在输入框上方）
+if active_kb_name and active_kb_name != "multi_kb_mode":
+    with st.expander("💡 常用问题模板", expanded=False):
+        st.markdown("选择模板快速开始对话：")
+        
+        # 预设问题模板
+        question_templates = [
+            "请总结这个文档的主要内容",
+            "这个文档中有哪些重要的数据或结论？",
+            "基于文档内容，给我一些实用建议",
+            "请解释文档中的核心概念",
+            "这个文档的优缺点有哪些？",
+            "如何实际应用文档中的方法？",
+            "文档中提到的关键问题是什么？",
+            "请提取文档中的要点清单"
+        ]
+        
+        # 使用按钮而不是选择框，更直观
+        cols = st.columns(2)
+        for i, template in enumerate(question_templates):
+            col = cols[i % 2]
+            if col.button(f"📝 {template[:15]}...", key=f"template_{i}", help=template):
+                st.session_state.template_to_use = template
+                st.success(f"✅ 已选择模板: {template}")
+                st.rerun()
+
 # 保持输入框形态一致，避免布局跳动
 if st.session_state.get('is_processing'):
     st.chat_input("正在生成回答中...", disabled=True)
