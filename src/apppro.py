@@ -3879,25 +3879,26 @@ if active_kb_name and active_kb_name != "multi_kb_mode":
     with st.expander("💡 常用问题模板", expanded=False):
         st.markdown("选择模板快速开始对话：")
         
-        # 预设问题模板
+        # 针对知识库的问题模板（而不是单个文档）
         question_templates = [
-            "请总结这个文档的主要内容",
-            "这个文档中有哪些重要的数据或结论？",
-            "基于文档内容，给我一些实用建议",
-            "请解释文档中的核心概念",
-            "这个文档的优缺点有哪些？",
-            "如何实际应用文档中的方法？",
-            "文档中提到的关键问题是什么？",
-            "请提取文档中的要点清单"
+            "这个知识库主要包含哪些内容？",
+            "帮我总结一下知识库中的核心观点",
+            "知识库中有哪些实用的方法或建议？",
+            "请介绍知识库涉及的主要概念",
+            "知识库中提到了哪些重要数据？",
+            "基于知识库内容，给我一些行动建议",
+            "知识库中有哪些值得注意的要点？",
+            "请帮我梳理知识库的知识框架"
         ]
         
-        # 使用按钮而不是选择框，更直观
+        # 使用按钮，点击后直接提交问题
         cols = st.columns(2)
         for i, template in enumerate(question_templates):
             col = cols[i % 2]
-            if col.button(f"📝 {template[:15]}...", key=f"template_{i}", help=template):
-                st.session_state.template_to_use = template
-                st.success(f"✅ 已选择模板: {template}")
+            if col.button(f"📝 {template[:12]}...", key=f"template_{i}", help=template):
+                # 直接将问题加入处理队列，而不是只设置模板
+                st.session_state.question_queue.append(template)
+                st.success(f"✅ 已提交问题: {template}")
                 st.rerun()
 
 # 保持输入框形态一致，避免布局跳动
