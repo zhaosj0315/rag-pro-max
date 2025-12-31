@@ -649,8 +649,6 @@ with st.sidebar:
         select_col1, select_col2, select_col3 = st.columns([0.6, 5.9, 0.5])
         with select_col1:
             st.markdown("**选择:**")
-        with select_col1:
-            st.markdown("**选择:**")
         with select_col2:
             selected_nav = st.selectbox("", nav_options, index=default_idx, label_visibility="collapsed")
             
