@@ -127,13 +127,26 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
             st.markdown(f"##### {PROVIDERS[selected_key]} 设置")
             
             if selected_key == "Ollama":
-                c1, c2 = st.columns([3, 1])
+                # URL, 刷新, 状态 一行化
+                c1, c2, c3 = st.columns([3, 0.8, 1.2])
                 with c1:
-                    cur_ollama_url = st.text_input("Ollama URL", defaults.get("llm_url_ollama") or "http://localhost:11434", key="config_ollama_url")
-                from src.utils.model_utils import check_ollama_status
+                    cur_ollama_url = st.text_input("Ollama URL", defaults.get("llm_url_ollama") or "http://localhost:11434", key="config_ollama_url", label_visibility="collapsed")
+                
+                from src.utils.model_utils import check_ollama_status, fetch_remote_models
                 ollama_ok = check_ollama_status(cur_ollama_url)
+                
                 with c2:
-                    st.write("")
+                    if st.button("🔄", key="refresh_ollama_btn", help="刷新 Ollama 模型列表"):
+                        if ollama_ok:
+                            from src.ui.model_selectors import _fetch_ollama_models
+                            models = _fetch_ollama_models(cur_ollama_url)
+                            if models:
+                                st.session_state.ollama_models = models
+                                st.toast(f"✅ 已加载 {len(models)} 个模型")
+                                st.rerun()
+                        else: st.warning("未运行")
+                
+                with c3:
                     st.caption("✅ 已连接" if ollama_ok else "⚠️ 未运行")
                 
                 saved_ollama_model = defaults.get("llm_model_ollama", "gpt-oss:20b")
@@ -145,10 +158,23 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
                 llm_url, llm_model, llm_key = cur_ollama_url, sel_ollama_model, ""
 
             elif selected_key == "OpenAI":
-                c1, c2 = st.columns([2, 1])
-                with c1: cur_openai_url = st.text_input("Base URL", defaults.get("llm_url_openai") or "https://api.openai.com/v1", key="config_openai_url")
-                with c2: cur_openai_key = st.text_input("API Key", defaults.get("llm_key") or "", type="password", key="config_openai_key")
+                # URL 与 刷新 一行化
+                c1, c2 = st.columns([4, 1])
+                with c1: cur_openai_url = st.text_input("Base URL", defaults.get("llm_url_openai") or "https://api.openai.com/v1", key="config_openai_url", help="API 基础地址")
+                cur_openai_key = st.text_input("API Key", defaults.get("llm_key") or "", type="password", key="config_openai_key")
                 
+                with c2:
+                    st.write("") # 间距对齐
+                    if st.button("🔄", key="refresh_openai_btn", help="刷新 OpenAI 模型列表"):
+                        from src.utils.model_utils import fetch_remote_models
+                        models, err = fetch_remote_models(cur_openai_url, cur_openai_key)
+                        if models:
+                            cache_key = f"models_openai_{cur_openai_url}_{cur_openai_key}"
+                            st.session_state[cache_key] = models
+                            st.toast(f"✅ 已加载 {len(models)} 个模型")
+                            st.rerun()
+                        else: st.error(f"失败: {err}")
+
                 saved_openai_model = defaults.get("llm_model_openai", "gpt-3.5-turbo")
                 sel_openai_model = _render_remote_model_selector(cur_openai_url, cur_openai_key, saved_openai_model, "openai")
                 if st.button("💾 保存 OpenAI 配置", type="primary", use_container_width=True, key="save_openai"):
@@ -158,10 +184,23 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
                 llm_url, llm_model, llm_key = cur_openai_url, sel_openai_model, cur_openai_key
 
             elif selected_key == "OpenAI-Compatible":
-                c1, c2 = st.columns([2, 1])
+                # URL 与 刷新 一行化
+                c1, c2 = st.columns([4, 1])
                 with c1: cur_other_url = st.text_input("Base URL", defaults.get("llm_url_other") or "https://api.deepseek.com/v1", key="config_other_url")
-                with c2: cur_other_key = st.text_input("API Key", defaults.get("llm_key_other") or "", type="password", key="config_other_key")
+                cur_other_key = st.text_input("API Key", defaults.get("llm_key_other") or "", type="password", key="config_other_key")
                 
+                with c2:
+                    st.write("") # 间距对齐
+                    if st.button("🔄", key="refresh_other_btn", help="刷新模型列表"):
+                        from src.utils.model_utils import fetch_remote_models
+                        models, err = fetch_remote_models(cur_other_url, cur_other_key)
+                        if models:
+                            cache_key = f"models_other_{cur_other_url}_{cur_other_key}"
+                            st.session_state[cache_key] = models
+                            st.toast(f"✅ 已加载 {len(models)} 个模型")
+                            st.rerun()
+                        else: st.error(f"失败: {err}")
+
                 saved_other_model = defaults.get("llm_model_other", "")
                 sel_other_model = _render_remote_model_selector(cur_other_url, cur_other_key, saved_other_model, "other")
                 if st.button("💾 保存自定义配置", type="primary", use_container_width=True, key="save_other"):
@@ -251,58 +290,37 @@ def _render_remote_model_selector(url: str, key: str, saved_model: str, prefix: 
     available_models = st.session_state.get(cache_key, [])
     
     # --- 核心改进：自动加载逻辑 (v2.9.5) ---
-    # 如果有 URL (且非本地 prefix 时有 Key)，且缓存为空，则尝试自动加载一次
-    # 为了避免无限重试，我们记录一个自动加载尝试标记
     auto_load_flag = f"auto_load_{prefix}_{hash(url + key)}"
     
     if url and not available_models and auto_load_flag not in st.session_state:
-        # 只有 OpenAI 类的需要 Key，其它的（如 Ollama 在其它地方处理）视情况而定
-        # 这里统一逻辑：有 URL 且缓存空，尝试拉取
         can_try = True
         if prefix in ["openai", "other"] and not key:
             can_try = False
             
         if can_try:
-            with st.spinner("🔄 自动同步模型列表..."):
-                models, err = fetch_remote_models(url, key)
-                if models:
-                    available_models = models
-                    st.session_state[cache_key] = models
-                    # 标记已尝试过，避免失败时反复触发
-                    st.session_state[auto_load_flag] = True
-                else:
-                    # 即使失败也标记，防止阻塞 UI
-                    st.session_state[auto_load_flag] = False
-
-    # 刷新按钮 (保留手动刷新)
-    col_select, col_refresh = st.columns([4, 1])
-    
-    with col_refresh:
-        if st.button("🔄", key=f"refresh_{prefix}", help="刷新模型列表"):
             with st.spinner("🔄"):
                 models, err = fetch_remote_models(url, key)
                 if models:
                     available_models = models
                     st.session_state[cache_key] = models
-                    st.toast(f"✅ 已加载 {len(models)} 个模型")
-                    st.rerun()
+                    st.session_state[auto_load_flag] = True
                 else:
-                    st.warning(f"加载失败: {err}")
+                    st.session_state[auto_load_flag] = False
 
-    with col_select:
-        if available_models:
-            if saved_model and saved_model not in available_models:
-                available_models.insert(0, saved_model)
-            
-            return st.selectbox(
-                "选择模型", 
-                available_models, 
-                index=available_models.index(saved_model) if saved_model in available_models else 0,
-                key=f"config_{prefix}_model_select",
-                label_visibility="collapsed"
-            )
-        else:
-            return st.text_input("模型名称", saved_model, placeholder="例如: gpt-3.5-turbo", key=f"config_{prefix}_model_input", label_visibility="collapsed")
+    # 模型选择
+    if available_models:
+        if saved_model and saved_model not in available_models:
+            available_models.insert(0, saved_model)
+        
+        return st.selectbox(
+            "选择模型", 
+            available_models, 
+            index=available_models.index(saved_model) if saved_model in available_models else 0,
+            key=f"config_{prefix}_model_select",
+            label_visibility="collapsed"
+        )
+    else:
+        return st.text_input("模型名称", saved_model, placeholder="例如: gpt-3.5-turbo", key=f"config_{prefix}_model_input", label_visibility="collapsed")
 
 
 def _save_and_apply_config(config_data: dict, provider: str, model: str, key: str, url: str, defaults: dict, only_chat_settings: bool = False, **kwargs):
@@ -397,12 +415,14 @@ def render_embedding_config(defaults: dict) -> Tuple[str, str, str, str]:
                     time.sleep(1)
                     st.rerun()
             elif embed_provider.startswith("OpenAI"):
-                embed_model = st.text_input("模型名", defaults.get("embed_model_openai", "text-embedding-3-small"))
-                embed_url = st.text_input("Base URL", defaults.get("embed_url_openai", "https://api.openai.com/v1"))
-                embed_key = st.text_input("API Key", defaults.get("embed_key", ""), type="password")
+                c1, c2 = st.columns(2)
+                with c1: embed_model = st.text_input("模型名", defaults.get("embed_model_openai", "text-embedding-3-small"), key="embed_openai_model")
+                with c2: embed_url = st.text_input("Base URL", defaults.get("embed_url_openai", "https://api.openai.com/v1"), key="embed_openai_url")
+                embed_key = st.text_input("API Key", defaults.get("embed_key", ""), type="password", key="embed_openai_key")
             else:  # Ollama
-                embed_model = st.text_input("模型名", defaults.get("embed_model_ollama", "nomic-embed-text"))
-                embed_url = st.text_input("URL", defaults.get("embed_url_ollama", "http://localhost:11434"))
+                c1, c2 = st.columns(2)
+                with c1: embed_model = st.text_input("模型名", defaults.get("embed_model_ollama", "nomic-embed-text"), key="embed_ollama_model")
+                with c2: embed_url = st.text_input("URL", defaults.get("embed_url_ollama", "http://localhost:11434"), key="embed_ollama_url")
                 embed_key = ""
                 
     return embed_provider, embed_model, embed_url, embed_key

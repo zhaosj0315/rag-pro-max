@@ -15,30 +15,12 @@ def render_ollama_model_selector(
     ollama_ok: bool
 ) -> Tuple[str, bool]:
     """
-    渲染 Ollama 模型选择器
+    渲染 Ollama 模型选择器 (不包含刷新按钮，由外部容器提供)
     """
     save_as_default = False
     
     if not saved_model:
         saved_model = "gpt-oss:20b"
-    
-    # 刷新按钮
-    col_refresh = st.columns([3, 1])[1]
-    with col_refresh:
-        if st.button("🔄", key="config_refresh_ollama", help="刷新模型列表", use_container_width=True):
-            if ollama_ok:
-                models = _fetch_ollama_models(llm_url)
-                if models:
-                    st.session_state.ollama_models = models
-                    st.toast(f"✅ 找到 {len(models)} 个模型")
-                    import time
-                    time.sleep(1)
-                    st.rerun()
-                else:
-                    st.warning("未找到模型")
-                    st.session_state.ollama_models = []
-            else:
-                st.warning("请先启动 Ollama")
     
     # 自动加载模型列表 (v2.9.5 优化)
     # 如果 URL 改变了，也重新加载
@@ -54,27 +36,19 @@ def render_ollama_model_selector(
         st.session_state.ollama_models = []
     
     # 模型选择/输入
-    if st.session_state.ollama_models:
+    if st.session_state.get("ollama_models"):
         # 如果有模型列表，添加一个"手动输入"选项
         options = st.session_state.ollama_models + ["✏️ 手动输入..."]
         idx = st.session_state.ollama_models.index(saved_model) if saved_model in st.session_state.ollama_models else 0
         
-        col1, col2 = st.columns([4, 1])
-        with col1:
-            selected = st.selectbox("选择/输入模型", options, index=idx, label_visibility="collapsed", key="config_model_selectbox")
-        with col2:
-            if st.button("⭐ 默认", key="config_set_default_llm", use_container_width=True):
-                if selected != "✏️ 手动输入...":
-                    save_as_default = True
-                else:
-                    st.warning("请先输入模型名")
+        selected = st.selectbox("选择模型", options, index=idx, label_visibility="collapsed", key="config_model_selectbox")
         
         if selected == "✏️ 手动输入...":
             llm_model = st.text_input("模型名", saved_model, label_visibility="collapsed", key="llm_manual_1")
         else:
             llm_model = selected
     else:
-        llm_model = st.text_input("输入模型名", saved_model, key="llm_direct_1")
+        llm_model = st.text_input("输入模型名", saved_model, key="llm_direct_1", label_visibility="collapsed")
     
     return llm_model, save_as_default
 
@@ -85,28 +59,12 @@ def render_openai_model_selector(
     saved_model: str
 ) -> str:
     """
-    渲染 OpenAI 兼容模型选择器 (v2.9.5 自动加载优化)
+    渲染 OpenAI 兼容模型选择器 (不包含刷新按钮，由外部容器提供)
     """
     from src.utils.model_utils import fetch_remote_models
     
     # 使用缓存键
     cache_key = f"model_list_{hash(llm_url + llm_key)}"
-    
-    # 刷新逻辑
-    col_select, col_refresh = st.columns([4, 1])
-    
-    with col_refresh:
-        if st.button("🔄", key=f"refresh_openai_direct", use_container_width=True):
-            with st.spinner(""):
-                mods, err = fetch_remote_models(llm_url, llm_key)
-                if mods:
-                    st.session_state[cache_key] = mods
-                    st.toast(f"✅ 已加载 {len(mods)} 个模型")
-                    import time
-                    time.sleep(1)
-                    st.rerun()
-                else:
-                    st.error(err)
     
     # 自动加载
     if llm_url and llm_key and cache_key not in st.session_state:
@@ -116,14 +74,13 @@ def render_openai_model_selector(
     
     model_list = st.session_state.get(cache_key, [])
     
-    with col_select:
-        if model_list:
-            if saved_model and saved_model not in model_list:
-                model_list.insert(0, saved_model)
-            idx = model_list.index(saved_model) if saved_model in model_list else 0
-            llm_model = st.selectbox("选择模型", model_list, index=idx, label_visibility="collapsed", key="openai_model_selectbox")
-        else:
-            llm_model = st.text_input("输入模型名", saved_model, key="llm_openai_1", label_visibility="collapsed")
+    if model_list:
+        if saved_model and saved_model not in model_list:
+            model_list.insert(0, saved_model)
+        idx = model_list.index(saved_model) if saved_model in model_list else 0
+        llm_model = st.selectbox("选择模型", model_list, index=idx, label_visibility="collapsed", key="openai_model_selectbox")
+    else:
+        llm_model = st.text_input("输入模型名", saved_model, key="llm_openai_1", label_visibility="collapsed")
     
     return llm_model
 
