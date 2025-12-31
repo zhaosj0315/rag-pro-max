@@ -3,7 +3,8 @@
 """
 
 import traceback
-import logging
+import logging  # 允许使用 - 错误处理专用
+from src.app_logging.log_manager import LogManager
 import streamlit as st
 from typing import Any, Callable, Optional
 from functools import wraps

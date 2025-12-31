@@ -64,9 +64,15 @@ class IndexBuilder:
     def build(self, source_path: str, force_reindex: bool = False, 
               action_mode: str = "NEW", status_callback=None) -> BuildResult:
         """构建索引"""
+        import streamlit as st
+        
         start_time = time.time()
         # 初始化详细进度记录器
         progress = ProgressLogger(total_steps=6, logger=self.logger)
+        
+        # 前端状态显示
+        status_placeholder = st.empty()
+        progress_bar = st.progress(0, text="⏳ 准备构建索引...")
         
         try:
             # 设置嵌入模型
@@ -74,21 +80,29 @@ class IndexBuilder:
             
             # 步骤1: 检查现有索引
             progress.start_step(1, "检查现有索引")
+            status_placeholder.info("🔍 **检查现有索引**: 正在验证索引状态...")
+            progress_bar.progress(0.17, text="🔍 检查现有索引...")
             index = self._load_existing_index(force_reindex, action_mode, status_callback)
             progress.end_step("索引检查完成")
             
             # 步骤2: 扫描文件
             progress.start_step(2, f"扫描文件夹: {os.path.basename(source_path)}")
+            status_placeholder.info(f"📁 **扫描文件**: 正在扫描 {os.path.basename(source_path)}...")
+            progress_bar.progress(0.33, text="📁 扫描文件...")
             total_files = self._scan_files(source_path, status_callback)
             progress.end_step(f"发现 {total_files} 个文件")
             
             # 步骤3: 读取文档
             progress.start_step(3, f"读取文档内容 (共 {total_files} 个文件)")
+            status_placeholder.info(f"📄 **读取文档**: 正在处理 {total_files} 个文件...")
+            progress_bar.progress(0.50, text=f"📄 读取文档 (0/{total_files})...")
             docs, summary = self._read_documents(source_path, total_files, status_callback)
             progress.end_step(f"成功读取 {summary['success']} 个文件")
             
             # 步骤4: 构建清单
             progress.start_step(4, "构建文件清单")
+            status_placeholder.info("📋 **构建清单**: 正在生成文件索引...")
+            progress_bar.progress(0.67, text="📋 构建文件清单...")
             file_map = self._build_manifest(source_path, status_callback)
 
             # --- 合并清单逻辑 (APPEND 模式) ---

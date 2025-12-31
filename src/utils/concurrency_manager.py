@@ -47,6 +47,16 @@ class ConcurrencyManager:
         start_time = time.time()
         doc_count = len(documents)
         
+        # 前端进度显示
+        try:
+            import streamlit as st
+            progress_container = st.container()
+            with progress_container:
+                st.info(f"🔄 **并发处理**: 正在处理 {doc_count} 个文档...")
+                progress_bar = st.progress(0, text="⏳ 准备并发处理...")
+        except:
+            progress_bar = None
+        
         # 获取最优配置
         config = self.batch_optimizer.get_optimal_config(doc_count)
         

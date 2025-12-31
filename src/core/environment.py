@@ -6,7 +6,8 @@
 import os
 import sys
 import warnings
-import logging
+import logging  # 允许使用 - 环境配置专用
+from src.app_logging.log_manager import LogManager
 import llama_index.core.schema as schema_module
 
 

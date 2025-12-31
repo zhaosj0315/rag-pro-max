@@ -52,6 +52,14 @@ def load_embedding_model(provider: str, model_name: str, api_key: str = "", api_
             
             logger.info("📥 正在加载模型...")
             
+            # 前端用户提醒
+            try:
+                import streamlit as st
+                model_status = st.empty()
+                model_status.info(f"🤖 **模型加载**: 正在加载 {model_name}，请稍候...")
+            except:
+                model_status = None
+            
             # 检测GPU支持
             device = "cpu"
             try:
@@ -73,6 +81,8 @@ def load_embedding_model(provider: str, model_name: str, api_key: str = "", api_
                     os.environ['OMP_NUM_THREADS'] = '10'
                     os.environ['MKL_NUM_THREADS'] = '10'
                     logger.success("🚀 Apple M4 Max GPU (MPS) + CPU 加速已启用")
+                    if model_status:
+                        model_status.success("✅ **GPU加速**: Apple M4 Max GPU (MPS) 已启用")
                     
                 elif torch.cuda.is_available():
                     device = "cuda"
