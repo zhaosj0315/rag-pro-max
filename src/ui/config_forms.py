@@ -257,27 +257,9 @@ def render_llm_config(defaults: dict) -> Tuple[str, str, str, str, dict]:
                 
                 llm_url, llm_model, llm_key = groq_url, cur_groq_model, cur_groq_key
 
-    # 3. 底部通用设置
-    st.markdown("##### 💬 全局增强设置")
-    with st.container(border=True):
-        current_limit = defaults.get("chat_history_limit", 10)
-        history_limit = st.slider("上下文窗口 (Context Window)", 1, 50, current_limit, key="global_history_slider")
-        if st.button("💾 应用全局设置", type="secondary", use_container_width=True, key="save_global_settings"):
-            _save_and_apply_config({"chat_history_limit": history_limit}, defaults.get("llm_provider", "Ollama"), defaults.get("llm_model", ""), defaults.get("llm_key", ""), defaults.get("llm_url", ""), defaults, only_chat_settings=True)
-        extra_params['chat_history_limit'] = history_limit
-        extra_params['system_prompt'] = defaults.get("system_prompt", "")
-
-    return llm_provider, llm_url, llm_model, llm_key, extra_params
-
-    # 4. 底部通用设置
-    st.markdown("##### 💬 全局增强设置")
-    with st.container(border=True):
-        current_limit = defaults.get("chat_history_limit", 10)
-        history_limit = st.slider("上下文窗口 (Context Window)", 1, 50, current_limit)
-        if st.button("💾 应用全局设置", type="secondary", use_container_width=True):
-            _save_and_apply_config({"chat_history_limit": history_limit}, defaults.get("llm_provider", "Ollama"), defaults.get("llm_model", ""), defaults.get("llm_key", ""), defaults.get("llm_url", ""), defaults, only_chat_settings=True)
-        extra_params['chat_history_limit'] = history_limit
-        extra_params['system_prompt'] = defaults.get("system_prompt", "")
+    # 3. 底部通用设置 (已移至对话界面，此处仅保留参数占位)
+    extra_params['chat_history_limit'] = defaults.get("chat_history_limit", 10)
+    extra_params['system_prompt'] = defaults.get("system_prompt", "")
 
     return llm_provider, llm_url, llm_model, llm_key, extra_params
 
