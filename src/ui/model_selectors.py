@@ -161,7 +161,7 @@ def render_hf_embedding_selector(
     
     with col2:
         if model_exists:
-            if st.button("✅ ⭐", key="config_set_default_embed", use_container_width=True, help="模型已就绪，点击设为默认"):
+            if st.button("⭐", key="config_set_default_embed", use_container_width=True, help="模型已就绪，点击设为默认"):
                 # 返回信号，让调用者保存配置
                 st.session_state.save_embed_model = embed_model
         else:
