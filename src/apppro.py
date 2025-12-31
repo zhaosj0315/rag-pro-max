@@ -3876,34 +3876,51 @@ if st.session_state.get("quote_content"):
 # 处理输入
 # 添加问题模板选择器（在输入框上方）
 if active_kb_name and active_kb_name != "multi_kb_mode":
-    with st.expander("💡 常用问题模板", expanded=False):
-        st.markdown("选择模板快速开始对话：")
-        
-        # 针对知识库的问题模板（而不是单个文档）
-        question_templates = [
-            "这个知识库主要包含哪些内容？",
-            "帮我总结一下知识库中的核心观点",
-            "知识库中有哪些实用的方法或建议？",
-            "请介绍知识库涉及的主要概念",
-            "知识库中提到了哪些重要数据？",
-            "基于知识库内容，给我一些行动建议",
-            "知识库中有哪些值得注意的要点？",
-            "请帮我梳理知识库的知识框架"
-        ]
-        
-        # 使用按钮，点击后直接提交问题
-        cols = st.columns(2)
-        for i, template in enumerate(question_templates):
-            col = cols[i % 2]
-            if col.button(f"📝 {template[:12]}...", key=f"template_{i}", help=template):
-                # 确保question_queue已初始化
-                if 'question_queue' not in st.session_state:
-                    st.session_state.question_queue = []
-                
-                # 直接将问题加入处理队列
-                st.session_state.question_queue.append(template)
-                st.success(f"✅ 已提交问题: {template}")
-                st.rerun()
+    try:
+        with st.expander("💡 常用问题模板", expanded=False):
+            st.markdown("选择模板快速开始对话：")
+            
+            # 针对知识库的问题模板（而不是单个文档）
+            question_templates = [
+                "这个知识库主要包含哪些内容？",
+                "帮我总结一下知识库中的核心观点",
+                "知识库中有哪些实用的方法或建议？",
+                "请介绍知识库涉及的主要概念",
+                "知识库中提到了哪些重要数据？",
+                "基于知识库内容，给我一些行动建议",
+                "知识库中有哪些值得注意的要点？",
+                "请帮我梳理知识库的知识框架"
+            ]
+            
+            # 使用按钮，点击后直接提交问题
+            cols = st.columns(2)
+            for i, template in enumerate(question_templates):
+                col = cols[i % 2]
+                if col.button(f"📝 {template[:12]}...", key=f"template_{i}", help=template):
+                    try:
+                        # 确保question_queue已初始化
+                        if 'question_queue' not in st.session_state:
+                            st.session_state.question_queue = []
+                        
+                        # 检查知识库是否可用
+                        if not active_kb_name or active_kb_name == "multi_kb_mode":
+                            st.error("❌ 请先选择一个知识库")
+                            continue
+                        
+                        # 直接将问题加入处理队列
+                        st.session_state.question_queue.append(template)
+                        st.success(f"✅ 已提交问题: {template}")
+                        st.rerun()
+                        
+                    except Exception as e:
+                        # 绝不能因为点击问题而崩溃应用
+                        st.error(f"❌ 提交问题时出错: {str(e)}")
+                        st.warning("💡 请尝试手动输入问题，或刷新页面后重试")
+                        
+    except Exception as e:
+        # 问题模板区域出错时的降级处理
+        st.warning("⚠️ 问题模板功能暂时不可用，请直接在下方输入框中提问")
+        st.caption(f"错误详情: {str(e)}")
 
 # 保持输入框形态一致，避免布局跳动
 if st.session_state.get('is_processing'):
