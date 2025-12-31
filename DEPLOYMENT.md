@@ -1,8 +1,6 @@
-# RAG Pro Max v2.6.1 部署指南
+# RAG Pro Max v3.2.2 部署指南
 
-## 🎯 部署概述
-
-RAG Pro Max v2.6.1 界面重构版支持多种部署方式，从本地开发到生产环境，提供完整的部署解决方案。
+RAG Pro Max v3.2.2 企业级版本支持多种部署方式，从本地开发到生产环境，提供完整的部署解决方案。
 
 **🔥 v2.6.1 新特性**:
 - 4x1 扁平布局 - 重构数据源选择界面，操作更直观
@@ -78,14 +76,14 @@ streamlit run src/apppro.py --server.port 8501
 ### 1. 使用预构建镜像
 ```bash
 # 拉取镜像
-docker pull ragpromax/rag-pro-max:v2.6.1
+docker pull ragpromax/rag-pro-max:v3.2.2
 
 # 运行容器
 docker run -d \
   --name rag-pro-max \
   -p 8501:8501 \
   -v $(pwd)/data:/app/data \
-  ragpromax/rag-pro-max:v2.6.1
+  ragpromax/rag-pro-max:v3.2.2
 ```
 
 ### 2. 本地构建镜像
@@ -322,7 +320,7 @@ spec:
     spec:
       containers:
       - name: rag-pro-max
-        image: ragpromax/rag-pro-max:v2.6.1
+        image: ragpromax/rag-pro-max:v3.2.2
         ports:
         - containerPort: 8501
         env:
@@ -356,7 +354,7 @@ spec:
 version: '3.8'
 services:
   rag-pro-max:
-    image: ragpromax/rag-pro-max:v2.6.1
+    image: ragpromax/rag-pro-max:v3.2.2
     ports:
       - "8501:8501"
     deploy:

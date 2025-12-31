@@ -58,12 +58,12 @@ def check_api_documentation():
         print("✅ 没有发现API端点")
         return True
     
-    # 检查API.md是否存在
-    if not os.path.exists('API.md'):
-        print("❌ 发现API端点但缺少 API.md 文档")
+    # 检查API_DOCUMENTATION.md是否存在
+    if not os.path.exists('API_DOCUMENTATION.md'):
+        print("❌ 发现API端点但缺少 API_DOCUMENTATION.md 文档")
         return False
     
-    print(f"✅ 发现 {len(api_endpoints)} 个API端点，API.md 存在")
+    print(f"✅ 发现 {len(api_endpoints)} 个API端点，API_DOCUMENTATION.md 存在")
     return True
 
 def check_config_documentation():
