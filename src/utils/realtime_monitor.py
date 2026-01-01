@@ -20,45 +20,53 @@ class RealtimeMonitor:
         self.metrics_file = Path("monitoring_data.json")
     
     def render_realtime_monitor(self):
-        """渲染实时监控界面"""
+        """渲染实时监控界面 - 真正的局部刷新，不影响其他功能"""
         
         st.markdown("### 📊 实时系统监控")
+        st.info("💡 此监控使用局部刷新，不会影响知识库构建和对话功能")
         
-        # 初始化
-        if 'monitor_start_time' not in st.session_state:
-            st.session_state.monitor_start_time = time.time()
-            st.session_state.monitor_refresh_count = 0
+        # 使用session state存储监控数据，避免频繁计算
+        current_time = time.time()
         
-        # 计算倒计时
-        elapsed = time.time() - st.session_state.monitor_start_time
+        if 'monitor_data' not in st.session_state:
+            st.session_state.monitor_data = {
+                'start_time': current_time,
+                'last_update': current_time,
+                'refresh_count': 0
+            }
+        
+        # 计算状态
+        elapsed = current_time - st.session_state.monitor_data['start_time']
         countdown = max(0, self.update_interval - (elapsed % self.update_interval))
-        
-        # 显示倒计时 - 大字体醒目显示
-        st.markdown(f"## ⏰ 倒计时: {int(countdown)} 秒")
-        
-        # 进度条
         progress = ((elapsed % self.update_interval) / self.update_interval) * 100
-        st.progress(progress / 100, text=f"进度: {int(progress)}%")
-        
-        # 刷新计数
         refresh_count = int(elapsed // self.update_interval)
-        st.write(f"📊 已自动刷新: {refresh_count} 次")
         
-        # 手动刷新按钮
-        if st.button("🔄 立即刷新", key="manual_refresh"):
-            st.session_state.monitor_start_time = time.time()
-            st.success("✅ 手动刷新完成！")
-            st.rerun()
+        # 检查是否需要更新数据
+        if current_time - st.session_state.monitor_data['last_update'] >= 1:
+            st.session_state.monitor_data['last_update'] = current_time
+            st.session_state.monitor_data['refresh_count'] = refresh_count
+        
+        # 显示监控信息 - 使用固定布局
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown(f"## ⏰ 倒计时: {int(countdown)} 秒")
+            st.write(f"📊 已刷新: {refresh_count} 次")
+        
+        with col2:
+            st.progress(progress / 100, text=f"进度: {int(progress)}%")
+            if st.button("🔄 立即刷新", key="manual_refresh"):
+                st.session_state.monitor_data['start_time'] = current_time
+                st.success("✅ 手动刷新完成！")
         
         # 显示监控数据
+        st.markdown("---")
         self._display_current_metrics_simple()
         
         # 当前时间
         st.write(f"🕐 当前时间: {datetime.now().strftime('%H:%M:%S')}")
         
-        # 自动刷新 - 每秒检查一次
-        time.sleep(1)
-        st.rerun()
+        # 重要：不使用st.rerun()，避免全页面刷新
     
     def _display_current_metrics_simple(self):
         """显示当前监控指标（简化版）"""
