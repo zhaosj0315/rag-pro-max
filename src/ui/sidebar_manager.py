@@ -94,6 +94,7 @@ class SidebarManager:
         monitor_type = st.selectbox(
             "监控类型", 
             ["实时监控", "局部刷新监控", "基础监控", "性能仪表板", "v2.3监控"], 
+            index=0,  # 默认选择第一个：实时监控
             key="monitor_type_select"
         )
         
