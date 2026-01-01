@@ -89,33 +89,71 @@ class LocalRefreshMonitor:
     def render_non_intrusive_monitor(self):
         """渲染非侵入式监控 - 使用session state避免全页面刷新"""
         
+        # 初始化监控数据
+        if 'monitor_metrics' not in st.session_state:
+            st.session_state.monitor_metrics = self._get_current_metrics()
+            st.session_state.monitor_last_update = time.time()
+        
         # 检查是否需要更新监控数据
         current_time = time.time()
         last_update = st.session_state.get('monitor_last_update', 0)
         
-        # 每30秒更新一次监控数据
-        if current_time - last_update > 30:
+        # 每10秒更新一次监控数据（更频繁的更新）
+        if current_time - last_update > 10:
             st.session_state.monitor_metrics = self._get_current_metrics()
             st.session_state.monitor_last_update = current_time
         
         # 从session state获取数据，避免重复计算
         metrics = st.session_state.get('monitor_metrics', {})
         
-        # 使用固定的容器ID，只更新内容
-        with st.container():
-            st.markdown("### 📊 系统监控")
+        # 使用固定的容器，只更新内容
+        st.markdown("### 📊 实时监控 (局部刷新)")
+        
+        # 添加自动刷新按钮
+        col_refresh, col_status = st.columns([1, 3])
+        with col_refresh:
+            if st.button("🔄 刷新", key="local_refresh_btn"):
+                st.session_state.monitor_metrics = self._get_current_metrics()
+                st.session_state.monitor_last_update = time.time()
+                st.rerun()
+        
+        with col_status:
+            st.caption(f"最后更新: {datetime.fromtimestamp(st.session_state.monitor_last_update).strftime('%H:%M:%S')}")
+        
+        # 紧凑的监控显示
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.metric(
+                "⚡ 响应时间", 
+                f"{metrics.get('response_time', 0):.2f}s",
+                delta=f"{metrics.get('response_time_delta', 0):+.2f}s"
+            )
+            st.metric(
+                "📊 查询次数",
+                metrics.get('query_count', 0),
+                delta=metrics.get('query_count_delta', 0)
+            )
+        
+        with col2:
+            st.metric(
+                "✅ 成功率",
+                f"{metrics.get('success_rate', 0):.1f}%",
+                delta=f"{metrics.get('success_rate_delta', 0):+.1f}%"
+            )
             
-            # 紧凑的监控显示
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.write(f"⚡ 响应: {metrics.get('response_time', 0):.2f}s")
-                st.write(f"📊 查询: {metrics.get('query_count', 0)} 次")
-            
-            with col2:
-                st.write(f"✅ 成功率: {metrics.get('success_rate', 0):.1f}%")
-                status = "🟢 正常" if metrics.get('system_status') == 'healthy' else "🟡 注意"
-                st.write(f"🔍 状态: {status}")
+            # 状态指示器
+            status = metrics.get('system_status', 'unknown')
+            if status == 'healthy':
+                st.success("🟢 系统正常")
+            elif status == 'warning':
+                st.warning("🟡 需要注意")
+            else:
+                st.error("🔴 异常状态")
+        
+        # 简单的趋势图
+        if st.checkbox("显示趋势图", key="show_trend_chart"):
+            self._render_simple_trend_chart(metrics)
     
     def create_monitoring_widget(self):
         """创建监控小部件 - 最小化影响"""
@@ -152,6 +190,34 @@ class LocalRefreshMonitor:
             "success_rate": 95.0,  # 可以从session state获取
             "system_status": "healthy"
         }
+    
+    def _render_simple_trend_chart(self, metrics):
+        """渲染简单的趋势图"""
+        import plotly.graph_objects as go
+        import random
+        
+        # 模拟历史数据
+        times = [f"{i:02d}:00" for i in range(24)]
+        response_times = [metrics.get('response_time', 1.2) + random.uniform(-0.5, 0.5) for _ in times]
+        
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=times,
+            y=response_times,
+            mode='lines+markers',
+            name='响应时间',
+            line=dict(color='#1f77b4', width=2)
+        ))
+        
+        fig.update_layout(
+            title="24小时响应时间趋势",
+            xaxis_title="时间",
+            yaxis_title="响应时间 (秒)",
+            height=300,
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
 
 # 全局监控实例
 local_monitor = LocalRefreshMonitor("/Users/zhaosj/Documents/rag-pro-max")
