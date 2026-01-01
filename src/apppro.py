@@ -731,6 +731,11 @@ with st.sidebar:
                                 st.toast(f"✅ 知识库 '{kb_name}' 已启动")
                             else:
                                 st.error(f"❌ 无法启动知识库 '{kb_name}'")
+                                # 添加友好的错误引导
+                                from src.utils.friendly_error_handler import friendly_error
+                                friendly_error("知识库未加载", 
+                                             f"知识库 '{kb_name}' 启动失败",
+                                             ["检查知识库文件是否完整", "尝试重新创建知识库", "查看系统日志获取详细信息"])
                                 st.session_state.current_kb_id = None
                         
                         # 只有在引擎变化时才 rerun，确保界面刷新
@@ -854,6 +859,10 @@ with st.sidebar:
             )
             
             if source_mode == "📂 文件上传":
+                # 添加上传引导
+                from src.utils.user_guidance import show_guidance
+                show_guidance("upload")
+                
                 # 双模式：支持上传和手动输入路径
                 uploaded_files = st.file_uploader(
                     "拖入文件", 
@@ -1280,6 +1289,11 @@ with st.sidebar:
                         st.caption(f"📊 {type_text} · 源: {display_name}")
                 else:
                     st.error("❌ 路径不存在，请检查路径是否正确")
+                    # 添加友好的错误引导
+                    from src.utils.friendly_error_handler import friendly_error
+                    friendly_error("文件上传", 
+                                 "指定的路径不存在或无法访问",
+                                 ["检查路径拼写是否正确", "确认您有访问该路径的权限", "尝试使用文件上传功能代替手动路径"])
                     final_kb_name = current_kb_name if not is_create_mode else ""
             else:
                 final_kb_name = current_kb_name if not is_create_mode else ""
@@ -1696,6 +1710,11 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
             else:
                 logger.error(f"❌ 离线模式也失败，无法加载嵌入模型")
                 st.error("❌ 嵌入模型加载失败，请检查网络连接或模型配置")
+                # 添加友好的错误引导
+                from src.utils.friendly_error_handler import friendly_error
+                friendly_error("配置错误", 
+                             "嵌入模型无法正常加载",
+                             ["检查网络连接是否正常", "确认模型配置是否正确", "尝试使用'⚡ 一键配置'重置设置", "如果使用本地模型，确认模型文件存在"])
                 return
         except Exception as e:
             logger.error(f"❌ 离线模式异常: {e}")
@@ -2423,6 +2442,9 @@ if btn_start:
 
     if not final_kb_name:
         st.error("请输入知识库名称")
+        # 添加友好的输入验证提示
+        from src.utils.friendly_error_handler import validation_error
+        validation_error("知识库名称", "名称不能为空", "请输入一个有意义的知识库名称，例如：'技术文档'、'产品手册'等")
     else:
         try:
             # 使用优化器生成唯一名称，避免重复和时间戳冲突
@@ -3876,6 +3898,10 @@ if st.session_state.get("quote_content"):
 # 处理输入
 # 添加问题模板选择器（在输入框上方）
 if active_kb_name and active_kb_name != "multi_kb_mode":
+    # 添加查询引导
+    from src.utils.user_guidance import show_guidance
+    show_guidance("query")
+    
     try:
         with st.expander("💡 常用问题模板", expanded=False):
             st.markdown("选择模板快速开始对话：")
