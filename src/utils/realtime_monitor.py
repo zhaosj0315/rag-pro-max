@@ -20,12 +20,12 @@ class RealtimeMonitor:
         self.metrics_file = Path("monitoring_data.json")
     
     def render_realtime_monitor(self):
-        """渲染实时监控界面 - 真正的局部刷新，不影响其他功能"""
+        """渲染实时监控界面 - 使用JavaScript实现倒计时每秒更新"""
         
         st.markdown("### 📊 实时系统监控")
-        st.info("💡 此监控使用局部刷新，不会影响知识库构建和对话功能")
+        st.info("💡 此监控使用JavaScript倒计时，不会影响知识库构建和对话功能")
         
-        # 使用session state存储监控数据，避免频繁计算
+        # 使用session state存储监控数据
         current_time = time.time()
         
         if 'monitor_data' not in st.session_state:
@@ -35,22 +35,23 @@ class RealtimeMonitor:
                 'refresh_count': 0
             }
         
-        # 计算状态
+        # 计算初始状态
         elapsed = current_time - st.session_state.monitor_data['start_time']
         countdown = max(0, self.update_interval - (elapsed % self.update_interval))
         progress = ((elapsed % self.update_interval) / self.update_interval) * 100
         refresh_count = int(elapsed // self.update_interval)
         
-        # 检查是否需要更新数据
-        if current_time - st.session_state.monitor_data['last_update'] >= 1:
-            st.session_state.monitor_data['last_update'] = current_time
-            st.session_state.monitor_data['refresh_count'] = refresh_count
+        # 显示倒计时 - 使用JavaScript更新
+        st.markdown(f"""
+        <div id="countdown-display">
+            <h2>⏰ 倒计时: <span id="countdown-value">{int(countdown)}</span> 秒</h2>
+        </div>
+        """, unsafe_allow_html=True)
         
-        # 显示监控信息 - 使用固定布局
+        # 显示其他信息
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown(f"## ⏰ 倒计时: {int(countdown)} 秒")
             st.write(f"📊 已刷新: {refresh_count} 次")
         
         with col2:
@@ -66,7 +67,39 @@ class RealtimeMonitor:
         # 当前时间
         st.write(f"🕐 当前时间: {datetime.now().strftime('%H:%M:%S')}")
         
-        # 重要：不使用st.rerun()，避免全页面刷新
+        # JavaScript倒计时脚本
+        st.markdown(f"""
+        <script>
+        // 倒计时JavaScript实现
+        if (!window.countdownInterval) {{
+            let startTime = {st.session_state.monitor_data['start_time'] * 1000}; // 转换为毫秒
+            let interval = {self.update_interval * 1000}; // 5秒间隔
+            
+            function updateCountdown() {{
+                let now = Date.now();
+                let elapsed = now - startTime;
+                let cycleTime = elapsed % interval;
+                let countdown = Math.max(0, Math.floor((interval - cycleTime) / 1000));
+                
+                let countdownElement = document.getElementById('countdown-value');
+                if (countdownElement) {{
+                    countdownElement.textContent = countdown;
+                }}
+                
+                // 如果倒计时到0，重置开始时间
+                if (countdown === 0) {{
+                    startTime = now;
+                }}
+            }}
+            
+            // 每秒更新倒计时
+            window.countdownInterval = setInterval(updateCountdown, 1000);
+            
+            // 立即执行一次
+            updateCountdown();
+        }}
+        </script>
+        """, unsafe_allow_html=True)
     
     def _display_current_metrics_simple(self):
         """显示当前监控指标（简化版）"""
