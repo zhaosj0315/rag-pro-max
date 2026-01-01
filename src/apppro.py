@@ -4369,33 +4369,48 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             logger.start_operation("查询", f"知识库: {active_kb_name}")
         
         # 查询改写 (v1.6) - 在处理引用内容之前
+        print(f"🔍 DEBUG: 开始查询优化检查")
+        print(f"🔍 DEBUG: enable_query_optimization = {st.session_state.get('enable_query_optimization', False)}")
+        print(f"🔍 DEBUG: use_optimized_query = {st.session_state.get('use_optimized_query')}")
+        print(f"🔍 DEBUG: is_processing = {st.session_state.get('is_processing', False)}")
+        print(f"🔍 DEBUG: current final_prompt = '{final_prompt}'")
+        
         # 首先检查用户是否已经做出选择
         if st.session_state.get('use_optimized_query') is True:
             final_prompt = st.session_state.get('optimized_query', final_prompt)
+            print(f"✅ DEBUG: 使用优化后的查询: {final_prompt}")
             logger.info(f"✅ 使用优化后的查询: {final_prompt}")
             # 清除选择状态，避免重复使用
             st.session_state.use_optimized_query = None
             st.session_state.optimized_query = None
             # 重要：重置处理状态，允许继续执行
             st.session_state.is_processing = True
+            print(f"✅ DEBUG: 已重置is_processing=True，准备继续执行查询")
         elif st.session_state.get('use_optimized_query') is False:
+            print(f"📝 DEBUG: 使用原问题: {final_prompt}")
             logger.info(f"📝 使用原问题: {final_prompt}")
             # 使用原问题，清除选择状态
             st.session_state.use_optimized_query = None
             # 重要：重置处理状态，允许继续执行
             st.session_state.is_processing = True
+            print(f"📝 DEBUG: 已重置is_processing=True，准备继续执行查询")
         
         # 只有在用户启用查询优化且还没有做出选择时才显示建议
         elif st.session_state.get('enable_query_optimization', False):
+            print(f"🧠 DEBUG: 深度思考功能已启用，开始分析查询")
             logger.info("🧠 深度思考(查询优化)已激活")
             query_rewriter = QueryRewriter(Settings.llm)
             should_rewrite, reason = query_rewriter.should_rewrite(final_prompt)
+            print(f"🧠 DEBUG: should_rewrite={should_rewrite}, reason={reason}")
             
             if should_rewrite:
+                print(f"💡 DEBUG: 检测到需要改写查询")
                 logger.info(f"💡 深度思考: 检测到需要改写查询 - {reason}")
                 rewritten_query = query_rewriter.suggest_rewrite(final_prompt)
+                print(f"💡 DEBUG: 优化后的查询: {rewritten_query}")
                 
                 if rewritten_query and rewritten_query != final_prompt:
+                    print(f"💡 DEBUG: 显示优化建议给用户选择")
                     # 显示优化建议，让用户选择
                     with st.chat_message("assistant", avatar="🤖"):
                         st.info(f"💡 **查询优化建议**\n\n原问题：{final_prompt}\n\n优化后：{rewritten_query}")
@@ -4403,23 +4418,33 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.button("✅ 使用优化后的查询", key=f"use_optimized_{len(st.session_state.messages)}"):
+                                print(f"✅ DEBUG: 用户点击了'使用优化后的查询'按钮")
                                 # 将优化后的查询保存到session_state，并标记继续处理
                                 st.session_state.optimized_query = rewritten_query
                                 st.session_state.use_optimized_query = True
+                                print(f"✅ DEBUG: 已保存优化查询到session_state: {rewritten_query}")
                                 logger.info(f"✅ 深度思考: 用户选择使用优化后的查询 - {rewritten_query}")
                                 st.rerun()
                         with col2:
                             if st.button("📝 使用原问题", key=f"use_original_{len(st.session_state.messages)}"):
+                                print(f"📝 DEBUG: 用户点击了'使用原问题'按钮")
                                 # 标记使用原问题继续处理
                                 st.session_state.use_optimized_query = False
+                                print(f"📝 DEBUG: 已标记使用原问题")
                                 logger.info(f"📝 深度思考: 用户选择使用原问题 - {final_prompt}")
                                 st.rerun()
                         
+                        print(f"⏸️ DEBUG: 等待用户选择，设置is_processing=False并停止")
                         # 等待用户选择
                         st.session_state.is_processing = False
                         st.stop()
             else:
+                print(f"🧠 DEBUG: 查询清晰，无需改写")
                 logger.info(f"🧠 深度思考: 查询清晰，无需改写 ({reason})")
+        else:
+            print(f"🧠 DEBUG: 深度思考功能未启用")
+        
+        print(f"🔍 DEBUG: 查询优化检查完成，final_prompt = '{final_prompt}'")
 
         user_display_prompt = final_prompt  # 保存原始提问用于 UI 显示
         if st.session_state.get('enable_web_search', False):
