@@ -242,5 +242,22 @@
       "completed_at": "2026-01-01T11:21:24.616943"
     }
   ],
-  "tasks": []
+  "tasks": [
+    {
+      "id": "task_20260101_112313",
+      "feature_name": "disable_quality_assessment_default",
+      "description": "将文档质量评估功能默认设置为不开启",
+      "branch_name": "feature/disable_quality_assessment_default_20260101",
+      "status": "in_progress",
+      "phase": "implement",
+      "created_at": "2026-01-01T11:23:13.865268",
+      "definition_of_done": [
+        "功能代码实现完成",
+        "技术测试通过（无报错、无崩溃）",
+        "效果测试通过（性能不下降）",
+        "文档更新完成",
+        "用户验证通过"
+      ]
+    }
+  ]
 }

@@ -974,7 +974,7 @@ with st.sidebar:
                 doc_progress.start_processing(uploaded_files)
                 
                 # 文档质量评估
-                if st.checkbox("📊 启用文档质量评估", value=True, key="enable_quality_assessment"):
+                if st.checkbox("📊 启用文档质量评估", value=False, key="enable_quality_assessment"):
                     st.markdown("### 📋 文档质量评估")
                     from src.utils.document_quality_assessor import show_quality_assessment, quality_assessor
                     
@@ -1252,7 +1252,7 @@ with st.sidebar:
                         st.toast(f"✅ 成功上传 {result.success_count} 个文件")
                         
                         # 文档质量评估
-                        if st.checkbox("📊 启用文档质量评估", value=True, key="enable_quality_assessment_new"):
+                        if st.checkbox("📊 启用文档质量评估", value=False, key="enable_quality_assessment_new"):
                             st.markdown("### 📋 文档质量评估")
                             from src.utils.document_quality_assessor import show_quality_assessment, quality_assessor
                             
