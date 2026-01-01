@@ -81,7 +81,26 @@ class V23Integration:
         tab1, tab2, tab3 = st.tabs(["📊 系统监控", "📈 进度追踪", "⚙️ 智能调度"])
         
         with tab1:
-            render_monitoring_dashboard()
+            # 添加实时监控选择
+            st.info("💡 要查看5秒倒计时，请选择'实时监控'")
+            
+            monitor_type = st.selectbox(
+                "🔽 请选择监控类型", 
+                ["实时监控", "基础监控"], 
+                index=0,
+                key="v23_monitor_type_select",
+                help="选择'实时监控'可以看到5秒倒计时功能"
+            )
+            
+            st.write(f"当前选择: **{monitor_type}**")
+            
+            if monitor_type == "实时监控":
+                st.success("✅ 您选择了实时监控，下面应该显示5秒倒计时")
+                from src.utils.realtime_monitor import RealtimeMonitor
+                realtime_monitor = RealtimeMonitor()
+                realtime_monitor.render_realtime_monitor()
+            else:
+                render_monitoring_dashboard()
         
         with tab2:
             render_progress_panel()
