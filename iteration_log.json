@@ -410,15 +410,13 @@
         "用户验证通过"
       ],
       "completed_at": "2026-01-01T12:05:53.274260"
-    }
-  ],
-  "tasks": [
+    },
     {
       "id": "task_20260101_120833",
       "feature_name": "fix_query_execution",
       "description": "修复查询优化后的执行问题，确保能正常回复",
       "branch_name": "feature/fix_query_execution_20260101",
-      "status": "in_progress",
+      "status": "completed",
       "phase": "implement",
       "created_at": "2026-01-01T12:08:33.531128",
       "definition_of_done": [
@@ -427,7 +425,9 @@
         "效果测试通过（性能不下降）",
         "文档更新完成",
         "用户验证通过"
-      ]
+      ],
+      "completed_at": "2026-01-01T12:09:01.270552"
     }
-  ]
+  ],
+  "tasks": []
 }
