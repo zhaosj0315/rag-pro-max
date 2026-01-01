@@ -21,7 +21,7 @@ class SingleFeatureIterationPlanner:
         # 检查当前迭代状态
         current_iteration = self._get_current_iteration_status()
         
-        if current_iteration["status"] == "pending_user_approval":
+        if current_iteration.get("status") == "pending_user_approval":
             return self._generate_approval_request(current_iteration)
         
         # 分析项目现状
@@ -76,7 +76,14 @@ class SingleFeatureIterationPlanner:
                 "effort": "small"
             })
         
-        if "st.error" in content and content.count("st.success") < content.count("st.error") * 0.5:
+        # 检查是否缺少成功提示
+        success_count = content.count("st.success")
+        error_count = content.count("st.error")
+        
+        if success_count > 0 and success_count >= error_count * 0.3:
+            # 已经有足够的成功提示，不需要再添加
+            pass
+        else:
             issues.append({
                 "category": "用户体验", 
                 "problem": "负面反馈过多，缺少成功提示",
