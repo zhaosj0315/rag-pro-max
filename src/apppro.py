@@ -992,13 +992,13 @@ with st.sidebar:
                         elif uploaded_file.name.endswith('.pdf'):
                             try:
                                 with st.expander(f"📄 {uploaded_file.name} - PDF质量评估"):
-                                    result = quality_assessor.assess_pdf_file(uploaded_file)
+                                    assessment_result = quality_assessor.assess_pdf_file(uploaded_file)
                                     
                                     # 显示评估结果
                                     col1, col2, col3 = st.columns(3)
                                     
                                     with col1:
-                                        score = result['scores']['overall']
+                                        score = assessment_result['scores']['overall']
                                         if score >= 80:
                                             st.success(f"📊 总体评分: {score:.1f}")
                                         elif score >= 60:
@@ -1007,27 +1007,28 @@ with st.sidebar:
                                             st.error(f"📊 总体评分: {score:.1f}")
                                     
                                     with col2:
-                                        st.info(f"🏆 质量等级: {result['grade']}")
+                                        st.info(f"🏆 质量等级: {assessment_result['grade']}")
                                     
                                     with col3:
-                                        st.info(f"📄 字数: {result['word_count']}")
+                                        st.info(f"📄 字数: {assessment_result['word_count']}")
                                     
                                     # 详细评分
                                     st.markdown("**📋 详细评分**")
                                     col1, col2 = st.columns(2)
                                     
                                     with col1:
-                                        st.metric("📖 可读性", f"{result['scores']['readability']:.1f}")
-                                        st.metric("💡 内容密度", f"{result['scores']['content_density']:.1f}")
+                                        st.metric("📖 可读性", f"{assessment_result['scores']['readability']:.1f}")
+                                        st.metric("💡 内容密度", f"{assessment_result['scores']['content_density']:.1f}")
                                     
                                     with col2:
-                                        st.metric("🏗️ 结构性", f"{result['scores']['structure']:.1f}")
-                                        st.metric("✏️ 语言质量", f"{result['scores']['language_quality']:.1f}")
+                                        st.metric("🏗️ 结构性", f"{assessment_result['scores']['structure']:.1f}")
+                                        st.metric("✏️ 语言质量", f"{assessment_result['scores']['language_quality']:.1f}")
                                     
                                     # 改进建议
-                                    if result['suggestions']:
+                                    if assessment_result['suggestions']:
                                         st.markdown("**💡 改进建议**")
-                                        for suggestion in result['suggestions']:
+                                        for suggestion in assessment_result['suggestions']:
+                                            st.write(f"• {suggestion}")
                                             st.write(f"• {suggestion}")
                                             
                             except Exception as e:
@@ -1269,13 +1270,13 @@ with st.sidebar:
                                 elif uploaded_file.name.endswith('.pdf'):
                                     try:
                                         with st.expander(f"📄 {uploaded_file.name} - PDF质量评估"):
-                                            result = quality_assessor.assess_pdf_file(uploaded_file)
+                                            assessment_result = quality_assessor.assess_pdf_file(uploaded_file)
                                             
                                             # 显示评估结果
                                             col1, col2, col3 = st.columns(3)
                                             
                                             with col1:
-                                                score = result['scores']['overall']
+                                                score = assessment_result['scores']['overall']
                                                 if score >= 80:
                                                     st.success(f"📊 总体评分: {score:.1f}")
                                                 elif score >= 60:
@@ -1284,27 +1285,27 @@ with st.sidebar:
                                                     st.error(f"📊 总体评分: {score:.1f}")
                                             
                                             with col2:
-                                                st.info(f"🏆 质量等级: {result['grade']}")
+                                                st.info(f"🏆 质量等级: {assessment_result['grade']}")
                                             
                                             with col3:
-                                                st.info(f"📄 字数: {result['word_count']}")
+                                                st.info(f"📄 字数: {assessment_result['word_count']}")
                                             
                                             # 详细评分
                                             st.markdown("**📋 详细评分**")
                                             col1, col2 = st.columns(2)
                                             
                                             with col1:
-                                                st.metric("📖 可读性", f"{result['scores']['readability']:.1f}")
-                                                st.metric("💡 内容密度", f"{result['scores']['content_density']:.1f}")
+                                                st.metric("📖 可读性", f"{assessment_result['scores']['readability']:.1f}")
+                                                st.metric("💡 内容密度", f"{assessment_result['scores']['content_density']:.1f}")
                                             
                                             with col2:
-                                                st.metric("🏗️ 结构性", f"{result['scores']['structure']:.1f}")
-                                                st.metric("✏️ 语言质量", f"{result['scores']['language_quality']:.1f}")
+                                                st.metric("🏗️ 结构性", f"{assessment_result['scores']['structure']:.1f}")
+                                                st.metric("✏️ 语言质量", f"{assessment_result['scores']['language_quality']:.1f}")
                                             
                                             # 改进建议
-                                            if result['suggestions']:
+                                            if assessment_result['suggestions']:
                                                 st.markdown("**💡 改进建议**")
-                                                for suggestion in result['suggestions']:
+                                                for suggestion in assessment_result['suggestions']:
                                                     st.write(f"• {suggestion}")
                                                     
                                     except Exception as e:
