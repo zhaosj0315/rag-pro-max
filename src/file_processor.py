@@ -347,7 +347,6 @@ def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'Fi
     """
     from llama_index.core import SimpleDirectoryReader
     from concurrent.futures import ThreadPoolExecutor, as_completed
-    import multiprocessing as mp
     
     result = FileProcessResult()
     all_docs = []
@@ -424,7 +423,6 @@ def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'Fi
         print(f"📦 [第 3 步] 批量大小: {batch_size} 个/批")
         
         # 使用多进程（突破GIL限制）
-        import multiprocessing as mp
         import time as time_module
         
         # 移除强制 set_start_method('fork')，使用默认设置

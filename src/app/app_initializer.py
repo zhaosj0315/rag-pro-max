@@ -3,7 +3,6 @@
 """
 
 import os
-import time
 import warnings
 import streamlit as st
 
@@ -100,7 +99,6 @@ class AppInitializer:
         
         # 初始化核心环境
         import sys
-        import time
         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
         
         from src.core.environment import initialize_environment

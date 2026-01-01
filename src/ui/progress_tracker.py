@@ -8,8 +8,6 @@ import time
 import threading
 from datetime import datetime
 from typing import Dict, List, Optional, Callable
-import json
-import os
 
 class ProgressTracker:
     def __init__(self):

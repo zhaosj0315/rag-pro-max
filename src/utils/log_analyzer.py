@@ -3,9 +3,7 @@
 """
 
 import re
-from datetime import datetime, timedelta
 from collections import defaultdict
-import json
 
 class LogAnalyzer:
     def __init__(self):

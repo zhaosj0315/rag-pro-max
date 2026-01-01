@@ -4,7 +4,6 @@
 """
 
 import gc
-import sys
 import weakref
 from functools import wraps
 import streamlit as st

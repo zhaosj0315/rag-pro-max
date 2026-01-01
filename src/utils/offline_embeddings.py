@@ -3,7 +3,6 @@
 当网络不可用时使用本地模型
 """
 
-import os
 import torch
 from sentence_transformers import SentenceTransformer
 from typing import List, Optional

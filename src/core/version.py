@@ -3,7 +3,6 @@
 确保所有文件使用一致的版本信息
 """
 
-import os
 import json
 from pathlib import Path
 

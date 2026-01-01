@@ -5,7 +5,6 @@
 import time
 from datetime import datetime
 from collections import defaultdict
-import sys
 
 class EnhancedLogger:
     def __init__(self):

@@ -5,7 +5,6 @@
 
 import streamlit as st
 import time
-import os
 from pathlib import Path
 
 class DocumentProcessingProgress:

@@ -10,7 +10,6 @@ import shutil
 import time
 from dataclasses import dataclass
 from typing import List, Dict, Optional
-from datetime import datetime
 
 from llama_index.core import VectorStoreIndex, StorageContext, load_index_from_storage, Settings
 from llama_index.core.node_parser import SentenceSplitter

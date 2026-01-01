@@ -4,7 +4,6 @@
 """
 
 import streamlit as st
-import time
 from typing import Optional
 
 class StatusBar:

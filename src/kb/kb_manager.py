@@ -1,7 +1,6 @@
 """知识库管理器 - 高级管理功能"""
 
 import os
-import json
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 from .kb_operations import KBOperations

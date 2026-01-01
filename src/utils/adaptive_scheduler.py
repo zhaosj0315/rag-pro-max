@@ -100,7 +100,6 @@ class AdaptiveScheduler:
     
     def _get_basic_strategy(self, cpu_usage: float, pages: int) -> Tuple[int, str, float]:
         """基础策略 - 目标95%CPU使用率"""
-        import multiprocessing as mp
         cpu_cores = mp.cpu_count()  # 14核
         
         if cpu_usage > 90:

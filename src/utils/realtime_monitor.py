@@ -9,7 +9,6 @@ import json
 import time
 from datetime import datetime
 import psutil
-import os
 from pathlib import Path
 
 class RealtimeMonitor:

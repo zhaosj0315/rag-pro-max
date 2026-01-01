@@ -1,8 +1,6 @@
 """网页抓取到知识库构建的完整流程处理器"""
 
 import os
-import json
-import requests
 from typing import List, Dict, Optional, Callable
 from datetime import datetime
 from .web_crawler import WebCrawler

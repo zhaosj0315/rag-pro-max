@@ -3,7 +3,6 @@ OCR性能优化器 - 带CPU保护
 动态调整OCR进程数，确保CPU使用率不超过95%
 """
 
-import multiprocessing as mp
 import time
 import threading
 from typing import Tuple

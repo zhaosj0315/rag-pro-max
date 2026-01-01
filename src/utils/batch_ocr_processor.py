@@ -3,7 +3,6 @@
 将所有扫描版PDF的OCR任务统一处理，避免重复创建进程池
 """
 
-import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor
 from typing import List, Dict, Tuple
 import time

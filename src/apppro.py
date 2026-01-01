@@ -69,9 +69,7 @@ st.set_page_config(
 # 设置不截断HTML显示
 import streamlit.components.v1 as components
 
-import shutil
 import time
-import requests
 import ollama
 import re
 import subprocess
@@ -86,11 +84,9 @@ if cleaned_count > 0:
     print(f"🧹 已清理 {cleaned_count} 个临时文件")
 
 import json
-import zipfile
 import platform
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import multiprocessing as mp
 
 # 引入新工具
 from src.utils.file_system_utils import get_deep_file_attributes, reveal_in_file_manager, NotesManager, set_where_from_metadata
@@ -4266,7 +4262,6 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             # 导入多知识库查询引擎
             from src.query.multi_kb_query_engine import query_single_kb_worker
             from concurrent.futures import ProcessPoolExecutor, as_completed
-            import multiprocessing as mp
             
             # 执行多知识库查询
             start_time = time.time()

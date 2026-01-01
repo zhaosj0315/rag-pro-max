@@ -1,6 +1,5 @@
 
 # 强制OCR配置
-import multiprocessing as mp
 import psutil
 
 def get_aggressive_ocr_workers():

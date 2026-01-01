@@ -3,7 +3,6 @@
 """
 
 import streamlit as st
-from datetime import datetime, date
 from src.utils.search_engine import search_engine
 
 def render_search_interface():

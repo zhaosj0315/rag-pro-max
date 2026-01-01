@@ -6,7 +6,6 @@
 
 import streamlit as st
 import psutil
-import os
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 

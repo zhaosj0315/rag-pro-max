@@ -8,11 +8,9 @@
 
 import os
 import json
-import shutil
 import threading
 import time
 import re
-from datetime import datetime
 from pathlib import Path
 from collections import Counter
 from llama_index.core import Settings

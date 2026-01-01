@@ -3,7 +3,6 @@
 真正的多进程OCR处理，充分利用CPU资源
 """
 
-import multiprocessing as mp
 import time
 from typing import List, Tuple
 from PIL import Image
