@@ -530,6 +530,7 @@ if 'app_initialized' not in st.session_state:
 # ==========================================
 CONFIG_FILE = "rag_config.json"
 HISTORY_DIR = "chat_histories"
+UPLOAD_DIR = "temp_uploads"
 
 # 确保目录存在
 for d in [HISTORY_DIR, UPLOAD_DIR]:
