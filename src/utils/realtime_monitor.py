@@ -23,24 +23,55 @@ class RealtimeMonitor:
         """渲染实时监控界面"""
         
         st.markdown("### 📊 实时系统监控")
-        st.caption("🔄 每5秒自动更新，不影响对话功能")
         
-        # 使用st.rerun()实现自动刷新
-        if 'last_monitor_update' not in st.session_state:
-            st.session_state.last_monitor_update = time.time()
-        
+        # 显示刷新状态
         current_time = time.time()
-        if current_time - st.session_state.last_monitor_update > self.update_interval:
+        if 'last_monitor_update' not in st.session_state:
             st.session_state.last_monitor_update = current_time
+            st.session_state.monitor_refresh_count = 0
+        
+        # 计算下次刷新倒计时
+        time_since_update = current_time - st.session_state.last_monitor_update
+        next_refresh_in = max(0, self.update_interval - time_since_update)
+        
+        # 显示刷新状态和倒计时
+        col1, col2, col3 = st.columns([2, 1, 1])
+        with col1:
+            if next_refresh_in > 0:
+                st.caption(f"🔄 下次自动刷新: {next_refresh_in:.0f}秒")
+            else:
+                st.caption("🔄 正在刷新...")
+        
+        with col2:
+            refresh_count = st.session_state.get('monitor_refresh_count', 0)
+            st.caption(f"📊 已刷新: {refresh_count}次")
+        
+        with col3:
+            if st.button("🔄 立即刷新", key="manual_refresh_monitor"):
+                st.session_state.last_monitor_update = current_time
+                st.session_state.monitor_refresh_count += 1
+                st.rerun()
+        
+        # 自动刷新逻辑
+        if time_since_update >= self.update_interval:
+            st.session_state.last_monitor_update = current_time
+            st.session_state.monitor_refresh_count += 1
+            # 显示刷新提示
+            st.success("✅ 监控数据已自动更新！")
+            time.sleep(0.5)  # 短暂显示提示
             st.rerun()
         
         # 显示监控数据
         self._display_current_metrics_simple()
         
-        # 添加手动刷新按钮
-        if st.button("🔄 立即刷新", key="manual_refresh_monitor"):
-            st.session_state.last_monitor_update = time.time()
-            st.rerun()
+        # 添加实时时钟显示
+        st.markdown("---")
+        current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        st.write(f"🕐 当前时间: {current_timestamp}")
+        
+        # 添加刷新进度条
+        progress = (time_since_update / self.update_interval) * 100
+        st.progress(min(progress / 100, 1.0), text=f"刷新进度: {progress:.0f}%")
     
     def _display_current_metrics_simple(self):
         """显示当前监控指标（简化版）"""
@@ -108,7 +139,7 @@ class RealtimeMonitor:
         """获取系统监控指标"""
         try:
             # CPU使用率
-            cpu_percent = psutil.cpu_percent(interval=1)
+            cpu_percent = psutil.cpu_percent(interval=0.1)
             
             # 内存使用率
             memory = psutil.virtual_memory()
@@ -118,34 +149,58 @@ class RealtimeMonitor:
             disk = psutil.disk_usage('/')
             disk_usage = (disk.used / disk.total) * 100
             
-            # 模拟应用指标
+            # 获取历史数据用于计算变化量
+            if 'monitor_history' not in st.session_state:
+                st.session_state.monitor_history = []
+            
+            # 模拟应用指标（增加变化幅度让效果更明显）
             import random
-            response_time = 1.0 + random.uniform(0, 1.0)
-            active_sessions = random.randint(1, 5)
-            total_queries = random.randint(100, 1000)
-            error_rate = random.uniform(0, 2)
+            base_response = 1.0
+            response_time = base_response + random.uniform(0, 2.0)  # 增加变化范围
+            active_sessions = random.randint(1, 8)  # 增加变化范围
+            total_queries = random.randint(50, 500)  # 增加变化范围
+            error_rate = random.uniform(0, 5)  # 增加变化范围
             
-            # 计算变化量（模拟）
-            cpu_delta = random.uniform(-5, 5)
-            memory_delta = random.uniform(-3, 3)
-            response_delta = random.uniform(-0.2, 0.2)
-            session_delta = random.randint(-1, 2)
-            
-            return {
+            # 计算变化量
+            current_metrics = {
                 'cpu_percent': cpu_percent,
-                'cpu_delta': cpu_delta,
                 'memory_percent': memory_percent,
-                'memory_delta': memory_delta,
                 'disk_usage': disk_usage,
                 'response_time': response_time,
-                'response_delta': response_delta,
                 'active_sessions': active_sessions,
-                'session_delta': session_delta,
                 'total_queries': total_queries,
                 'error_rate': error_rate,
-                'network_ok': True,
                 'timestamp': time.time()
             }
+            
+            # 计算与上次的差值
+            if st.session_state.monitor_history:
+                last_metrics = st.session_state.monitor_history[-1]
+                cpu_delta = cpu_percent - last_metrics.get('cpu_percent', cpu_percent)
+                memory_delta = memory_percent - last_metrics.get('memory_percent', memory_percent)
+                response_delta = response_time - last_metrics.get('response_time', response_time)
+                session_delta = active_sessions - last_metrics.get('active_sessions', active_sessions)
+            else:
+                cpu_delta = 0
+                memory_delta = 0
+                response_delta = 0
+                session_delta = 0
+            
+            # 添加变化量到结果
+            current_metrics.update({
+                'cpu_delta': cpu_delta,
+                'memory_delta': memory_delta,
+                'response_delta': response_delta,
+                'session_delta': session_delta,
+                'network_ok': True
+            })
+            
+            # 保存历史数据（只保留最近10次）
+            st.session_state.monitor_history.append(current_metrics)
+            if len(st.session_state.monitor_history) > 10:
+                st.session_state.monitor_history.pop(0)
+            
+            return current_metrics
             
         except Exception as e:
             # 降级处理
@@ -158,7 +213,11 @@ class RealtimeMonitor:
                 'total_queries': 0,
                 'error_rate': 0,
                 'network_ok': False,
-                'error': str(e)
+                'error': str(e),
+                'cpu_delta': 0,
+                'memory_delta': 0,
+                'response_delta': 0,
+                'session_delta': 0
             }
     
     def _get_knowledge_bases(self):
