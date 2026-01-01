@@ -123,5 +123,22 @@
       "completed_at": "2026-01-01T08:38:34.565471"
     }
   ],
-  "tasks": []
+  "tasks": [
+    {
+      "id": "task_20260101_090615",
+      "feature_name": "document_quality_assessment",
+      "description": "实现文档质量评估功能，自动评估上传文档的质量并提供改进建议",
+      "branch_name": "feature/document_quality_assessment_20260101",
+      "status": "in_progress",
+      "phase": "implement",
+      "created_at": "2026-01-01T09:06:15.776909",
+      "definition_of_done": [
+        "功能代码实现完成",
+        "技术测试通过（无报错、无崩溃）",
+        "效果测试通过（性能不下降）",
+        "文档更新完成",
+        "用户验证通过"
+      ]
+    }
+  ]
 }

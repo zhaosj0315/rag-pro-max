@@ -973,6 +973,25 @@ with st.sidebar:
                 st.markdown("### 📄 文件处理进度")
                 doc_progress.start_processing(uploaded_files)
                 
+                # 文档质量评估
+                if st.checkbox("📊 启用文档质量评估", value=True, key="enable_quality_assessment"):
+                    st.markdown("### 📋 文档质量评估")
+                    from src.utils.document_quality_assessor import show_quality_assessment
+                    
+                    # 对每个上传的文件进行质量评估
+                    for uploaded_file in uploaded_files:
+                        if uploaded_file.type.startswith('text/') or uploaded_file.name.endswith(('.txt', '.md')):
+                            try:
+                                content = str(uploaded_file.read(), "utf-8")
+                                uploaded_file.seek(0)  # 重置文件指针
+                                
+                                with st.expander(f"📄 {uploaded_file.name} - 质量评估"):
+                                    show_quality_assessment(content, uploaded_file.name)
+                            except Exception as e:
+                                st.warning(f"⚠️ 无法评估 {uploaded_file.name}: {str(e)}")
+                        else:
+                            st.info(f"📄 {uploaded_file.name} - 非文本文件，跳过质量评估")
+                
                 # 高级选项 (复用新建模式的逻辑)
                 with st.expander("🔧 高级选项 (本次更新有效)", expanded=False):
                     # 布局优化：全选 + 状态提示在一行
@@ -1187,6 +1206,25 @@ with st.sidebar:
                     # 显示上传结果
                     if result.success_count > 0:
                         st.toast(f"✅ 成功上传 {result.success_count} 个文件")
+                        
+                        # 文档质量评估
+                        if st.checkbox("📊 启用文档质量评估", value=True, key="enable_quality_assessment_new"):
+                            st.markdown("### 📋 文档质量评估")
+                            from src.utils.document_quality_assessor import show_quality_assessment
+                            
+                            # 对每个上传的文件进行质量评估
+                            for uploaded_file in uploaded_files:
+                                if uploaded_file.type.startswith('text/') or uploaded_file.name.endswith(('.txt', '.md')):
+                                    try:
+                                        content = str(uploaded_file.read(), "utf-8")
+                                        uploaded_file.seek(0)  # 重置文件指针
+                                        
+                                        with st.expander(f"📄 {uploaded_file.name} - 质量评估"):
+                                            show_quality_assessment(content, uploaded_file.name)
+                                    except Exception as e:
+                                        st.warning(f"⚠️ 无法评估 {uploaded_file.name}: {str(e)}")
+                                else:
+                                    st.info(f"📄 {uploaded_file.name} - 非文本文件，跳过质量评估")
 
                     if result.skipped_count > 0:
                         st.warning(f"⚠️ 跳过 {result.skipped_count} 个文件")
