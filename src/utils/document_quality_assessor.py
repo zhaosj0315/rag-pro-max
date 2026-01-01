@@ -52,6 +52,65 @@ class DocumentQualityAssessor:
             'char_count': len(content)
         }
     
+    def assess_pdf_file(self, uploaded_file) -> Dict:
+        """评估PDF文件质量"""
+        try:
+            # 提取PDF文本内容
+            content = self._extract_pdf_content(uploaded_file)
+            if not content:
+                return self._create_low_quality_result("PDF文件无法提取文本内容")
+            
+            # 使用提取的内容进行评估
+            return self.assess_document(content, uploaded_file.name)
+            
+        except Exception as e:
+            return self._create_low_quality_result(f"PDF处理失败: {str(e)}")
+    
+    def _extract_pdf_content(self, uploaded_file) -> str:
+        """提取PDF文件的文本内容"""
+        try:
+            import PyPDF2
+            import io
+            
+            # 重置文件指针
+            uploaded_file.seek(0)
+            
+            # 读取PDF内容
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(uploaded_file.read()))
+            
+            # 提取所有页面的文本
+            text_content = ""
+            for page in pdf_reader.pages:
+                text_content += page.extract_text() + "\n"
+            
+            # 重置文件指针供其他用途
+            uploaded_file.seek(0)
+            
+            return text_content.strip()
+            
+        except ImportError:
+            # 如果PyPDF2不可用，尝试使用fitz (PyMuPDF)
+            try:
+                import fitz
+                
+                uploaded_file.seek(0)
+                pdf_bytes = uploaded_file.read()
+                uploaded_file.seek(0)
+                
+                doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+                text_content = ""
+                
+                for page in doc:
+                    text_content += page.get_text() + "\n"
+                
+                doc.close()
+                return text_content.strip()
+                
+            except ImportError:
+                raise Exception("需要安装PyPDF2或PyMuPDF来处理PDF文件")
+        except Exception as e:
+            raise Exception(f"PDF文本提取失败: {str(e)}")
+    
     def _assess_readability(self, content: str) -> float:
         """评估可读性"""
         sentences = re.split(r'[.!?。！？]', content)

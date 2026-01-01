@@ -976,7 +976,7 @@ with st.sidebar:
                 # 文档质量评估
                 if st.checkbox("📊 启用文档质量评估", value=True, key="enable_quality_assessment"):
                     st.markdown("### 📋 文档质量评估")
-                    from src.utils.document_quality_assessor import show_quality_assessment
+                    from src.utils.document_quality_assessor import show_quality_assessment, quality_assessor
                     
                     # 对每个上传的文件进行质量评估
                     for uploaded_file in uploaded_files:
@@ -989,8 +989,51 @@ with st.sidebar:
                                     show_quality_assessment(content, uploaded_file.name)
                             except Exception as e:
                                 st.warning(f"⚠️ 无法评估 {uploaded_file.name}: {str(e)}")
+                        elif uploaded_file.name.endswith('.pdf'):
+                            try:
+                                with st.expander(f"📄 {uploaded_file.name} - PDF质量评估"):
+                                    result = quality_assessor.assess_pdf_file(uploaded_file)
+                                    
+                                    # 显示评估结果
+                                    col1, col2, col3 = st.columns(3)
+                                    
+                                    with col1:
+                                        score = result['scores']['overall']
+                                        if score >= 80:
+                                            st.success(f"📊 总体评分: {score:.1f}")
+                                        elif score >= 60:
+                                            st.warning(f"📊 总体评分: {score:.1f}")
+                                        else:
+                                            st.error(f"📊 总体评分: {score:.1f}")
+                                    
+                                    with col2:
+                                        st.info(f"🏆 质量等级: {result['grade']}")
+                                    
+                                    with col3:
+                                        st.info(f"📄 字数: {result['word_count']}")
+                                    
+                                    # 详细评分
+                                    st.markdown("**📋 详细评分**")
+                                    col1, col2 = st.columns(2)
+                                    
+                                    with col1:
+                                        st.metric("📖 可读性", f"{result['scores']['readability']:.1f}")
+                                        st.metric("💡 内容密度", f"{result['scores']['content_density']:.1f}")
+                                    
+                                    with col2:
+                                        st.metric("🏗️ 结构性", f"{result['scores']['structure']:.1f}")
+                                        st.metric("✏️ 语言质量", f"{result['scores']['language_quality']:.1f}")
+                                    
+                                    # 改进建议
+                                    if result['suggestions']:
+                                        st.markdown("**💡 改进建议**")
+                                        for suggestion in result['suggestions']:
+                                            st.write(f"• {suggestion}")
+                                            
+                            except Exception as e:
+                                st.error(f"❌ PDF评估失败 {uploaded_file.name}: {str(e)}")
                         else:
-                            st.info(f"📄 {uploaded_file.name} - 非文本文件，跳过质量评估")
+                            st.info(f"📄 {uploaded_file.name} - 暂不支持此文件类型的质量评估")
                 
                 # 高级选项 (复用新建模式的逻辑)
                 with st.expander("🔧 高级选项 (本次更新有效)", expanded=False):
@@ -1210,7 +1253,7 @@ with st.sidebar:
                         # 文档质量评估
                         if st.checkbox("📊 启用文档质量评估", value=True, key="enable_quality_assessment_new"):
                             st.markdown("### 📋 文档质量评估")
-                            from src.utils.document_quality_assessor import show_quality_assessment
+                            from src.utils.document_quality_assessor import show_quality_assessment, quality_assessor
                             
                             # 对每个上传的文件进行质量评估
                             for uploaded_file in uploaded_files:
@@ -1223,8 +1266,51 @@ with st.sidebar:
                                             show_quality_assessment(content, uploaded_file.name)
                                     except Exception as e:
                                         st.warning(f"⚠️ 无法评估 {uploaded_file.name}: {str(e)}")
+                                elif uploaded_file.name.endswith('.pdf'):
+                                    try:
+                                        with st.expander(f"📄 {uploaded_file.name} - PDF质量评估"):
+                                            result = quality_assessor.assess_pdf_file(uploaded_file)
+                                            
+                                            # 显示评估结果
+                                            col1, col2, col3 = st.columns(3)
+                                            
+                                            with col1:
+                                                score = result['scores']['overall']
+                                                if score >= 80:
+                                                    st.success(f"📊 总体评分: {score:.1f}")
+                                                elif score >= 60:
+                                                    st.warning(f"📊 总体评分: {score:.1f}")
+                                                else:
+                                                    st.error(f"📊 总体评分: {score:.1f}")
+                                            
+                                            with col2:
+                                                st.info(f"🏆 质量等级: {result['grade']}")
+                                            
+                                            with col3:
+                                                st.info(f"📄 字数: {result['word_count']}")
+                                            
+                                            # 详细评分
+                                            st.markdown("**📋 详细评分**")
+                                            col1, col2 = st.columns(2)
+                                            
+                                            with col1:
+                                                st.metric("📖 可读性", f"{result['scores']['readability']:.1f}")
+                                                st.metric("💡 内容密度", f"{result['scores']['content_density']:.1f}")
+                                            
+                                            with col2:
+                                                st.metric("🏗️ 结构性", f"{result['scores']['structure']:.1f}")
+                                                st.metric("✏️ 语言质量", f"{result['scores']['language_quality']:.1f}")
+                                            
+                                            # 改进建议
+                                            if result['suggestions']:
+                                                st.markdown("**💡 改进建议**")
+                                                for suggestion in result['suggestions']:
+                                                    st.write(f"• {suggestion}")
+                                                    
+                                    except Exception as e:
+                                        st.error(f"❌ PDF评估失败 {uploaded_file.name}: {str(e)}")
                                 else:
-                                    st.info(f"📄 {uploaded_file.name} - 非文本文件，跳过质量评估")
+                                    st.info(f"📄 {uploaded_file.name} - 暂不支持此文件类型的质量评估")
 
                     if result.skipped_count > 0:
                         st.warning(f"⚠️ 跳过 {result.skipped_count} 个文件")
