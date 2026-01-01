@@ -4387,17 +4387,31 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.button("✅ 使用优化后的查询", key=f"use_optimized_{len(st.session_state.messages)}"):
-                                final_prompt = rewritten_query
+                                # 将优化后的查询保存到session_state，并标记继续处理
+                                st.session_state.optimized_query = rewritten_query
+                                st.session_state.use_optimized_query = True
                                 logger.info(f"✅ 深度思考: 用户选择使用优化后的查询 - {rewritten_query}")
                                 st.rerun()
                         with col2:
                             if st.button("📝 使用原问题", key=f"use_original_{len(st.session_state.messages)}"):
+                                # 标记使用原问题继续处理
+                                st.session_state.use_optimized_query = False
                                 logger.info(f"📝 深度思考: 用户选择使用原问题 - {final_prompt}")
                                 st.rerun()
                         
-                        # 核心修复：停止前释放处理锁，但标记当前问题，避免丢失或重入
+                        # 等待用户选择
                         st.session_state.is_processing = False
-                        st.stop()  # 等待用户选择
+                        st.stop()
+                        
+                # 检查用户是否已经做出选择
+                if st.session_state.get('use_optimized_query') is True:
+                    final_prompt = st.session_state.get('optimized_query', final_prompt)
+                    # 清除选择状态，避免重复使用
+                    st.session_state.use_optimized_query = None
+                    st.session_state.optimized_query = None
+                elif st.session_state.get('use_optimized_query') is False:
+                    # 使用原问题，清除选择状态
+                    st.session_state.use_optimized_query = None
             else:
                 logger.info(f"🧠 深度思考: 查询清晰，无需改写 ({reason})")
 
