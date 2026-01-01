@@ -128,36 +128,11 @@ class UnifiedMonitoringSystem:
             st.write(f"• **{key}**: {value}")
     
     def _render_log_viewer(self):
-        """渲染日志查看器"""
-        st.write("**📝 系统日志**")
+        """渲染紧凑的日志查看器"""
+        from src.utils.compact_log_display import compact_log_display
         
-        # 日志级别选择
-        log_level = st.selectbox(
-            "日志级别",
-            ["ALL", "ERROR", "WARNING", "INFO", "DEBUG"],
-            key="log_level_filter"
-        )
-        
-        # 日志文件选择
-        log_files = list(self.log_dir.glob("*.log"))
-        if log_files:
-            selected_log = st.selectbox(
-                "日志文件",
-                [f.name for f in log_files],
-                key="log_file_select"
-            )
-            
-            # 显示日志内容
-            if selected_log:
-                log_content = self._read_log_file(selected_log, log_level)
-                st.text_area(
-                    "日志内容",
-                    log_content,
-                    height=300,
-                    key="log_content_display"
-                )
-        else:
-            st.info("暂无日志文件")
+        # 使用紧凑日志显示组件
+        compact_log_display.render_compact_logs()
     
     def _get_cpu_delta(self) -> Optional[str]:
         """获取CPU使用率变化"""

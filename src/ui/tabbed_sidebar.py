@@ -232,7 +232,10 @@ class TabbedSidebar:
                 st.warning("重启服务中...")
             
             if st.button("📋 查看日志", key="view_logs", use_container_width=True):
-                st.info("打开日志查看器...")
+                # 使用紧凑日志显示
+                from src.utils.compact_log_display import render_compact_log_management
+                with st.container():
+                    render_compact_log_management()
         
         with col2:
             if st.button("⚡ 一键配置", key="quick_config", use_container_width=True):
