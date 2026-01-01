@@ -4376,10 +4376,14 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             # 清除选择状态，避免重复使用
             st.session_state.use_optimized_query = None
             st.session_state.optimized_query = None
+            # 重要：重置处理状态，允许继续执行
+            st.session_state.is_processing = True
         elif st.session_state.get('use_optimized_query') is False:
             logger.info(f"📝 使用原问题: {final_prompt}")
             # 使用原问题，清除选择状态
             st.session_state.use_optimized_query = None
+            # 重要：重置处理状态，允许继续执行
+            st.session_state.is_processing = True
         
         # 只有在用户启用查询优化且还没有做出选择时才显示建议
         elif st.session_state.get('enable_query_optimization', False):
