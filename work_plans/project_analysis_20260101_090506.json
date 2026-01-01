@@ -1,0 +1,679 @@
+{
+  "context": {
+    "project_type": "RAG知识库系统",
+    "current_features": [
+      "其他",
+      "高级选项",
+      "DuckDuckGo 集成",
+      "utils/",
+      "自动 |",
+      "OpenAI",
+      "多轮对话",
+      "Python",
+      "services/",
+      "文档上传和处理",
+      "追问卡片化",
+      "内存",
+      "极速追问推荐",
+      "openpyxl",
+      "Deep Research 模式",
+      "状态指示横条",
+      "操作成功反馈",
+      "transformers",
+      "# 功能",
+      "2-5x |",
+      "streamlit",
+      "功能",
+      "质量评估系统",
+      "磁盘",
+      "paddleocr",
+      "ollama",
+      "Ollama",
+      "向量检索",
+      "折叠展示",
+      "自动优化",
+      "✨ 核心功能",
+      "单文件/文件夹",
+      "总计",
+      "ui/",
+      "可视化仪表板",
+      "友好错误处理",
+      "研究指令注入",
+      "聊天对话",
+      "PyMuPDF",
+      "llama-index",
+      "知识库构建",
+      "语义检索",
+      "良性循环机制",
+      "并行 |",
+      "python-docx",
+      "chromadb",
+      "processors/",
+      "GPU",
+      "侧边栏导航",
+      "网页抓取",
+      "apppro.py",
+      "torch",
+      "文件上传",
+      "智能监控",
+      "sentence-transformers"
+    ],
+    "user_pain_points": [
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "smart_project_analyzer.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "document_cleanup_analyzer.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "monitoring_system.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "intelligent_planner.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "tests/test_logging_module.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "tests/test_v2.3.1_integration.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "tests/test_documentation_feasibility.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "tests/test_kb_modules.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "tests/test_e2e.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "tests/test_deployment.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "scripts/check_documentation_sync.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "scripts/daily_health_check.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/system_monitor.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/metadata_manager.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/chat_utils_improved.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/apppro.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/logger.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/file_processor.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/rag_engine.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/custom_embeddings.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/ui/performance_dashboard_enhanced.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/ui/unified_config_components.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/ui/tools_ui.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/ui/kb_management_ui.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/ui/sidebar_config.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/ui/model_selectors.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/ui/complete_sidebar.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/monitor/system_monitor_ui.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/core/main_controller.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/kb/kb_processor.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/kb/kb_interface.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/kb/document_viewer.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/kb/kb_manager.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/kb/kb_loader.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/kb/incremental_updater.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/chat/unified_suggestion_engine.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/chat/chat_interface.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/chat/history_manager.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/chat/chat_engine.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/config/manifest_manager.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/config/prompt_manager.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/model_utils.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/kb_name_optimizer.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/task_scheduler.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/gpu_ocr_accelerator.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/alert_system.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/kb_utils.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/directory_selector.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/performance_monitor.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/gpu_optimizer.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/export_manager.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/model_manager.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/memory_manager_enhanced.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/file_system_utils.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/smart_scheduler.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/adaptive_throttling.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/concurrency_manager.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/resource_monitor.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/cpu_throttle.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/parallel_executor.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/app_utils.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/batch_ocr_processor.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/enhanced_ocr_optimizer.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/memory_optimizer.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/dynamic_batch.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/parallel_ocr_processor.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/utils/parallel_tasks.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/document/document_manager_ui.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/processors/web_to_kb_processor.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/processors/crawl_optimizer.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/processors/enhanced_web_crawler.py",
+        "priority": "low"
+      },
+      {
+        "type": "技术债务",
+        "description": "实现多模态查询逻辑",
+        "file": "src/processors/multimodal_processor.py",
+        "priority": "medium"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/processors/unified_document_processor.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/processors/index_builder.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/processors/upload_handler.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/processors/async_web_crawler.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/common/business.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/common/utils.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/app_logging/log_manager.py",
+        "priority": "low"
+      },
+      {
+        "type": "技术债务",
+        "description": "集成实际的文档处理逻辑",
+        "file": "src/api/fastapi_server.py",
+        "priority": "medium"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/documents/document_manager.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/monitoring/unified_monitoring_system.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/query/multi_kb_query_engine.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/query/query_handler.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/query/query_processor.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/services/knowledge_base_service.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/services/unified_config_service.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/services/config_service.py",
+        "priority": "low"
+      },
+      {
+        "type": "错误处理",
+        "description": "存在过于宽泛的异常捕获",
+        "file": "src/upload/upload_interface.py",
+        "priority": "low"
+      },
+      {
+        "type": "用户体验",
+        "description": "需要更好的错误提示和用户引导",
+        "priority": "high"
+      }
+    ],
+    "missing_capabilities": [],
+    "improvement_opportunities": [
+      {
+        "area": "配置管理",
+        "opportunity": "动态配置热更新",
+        "description": "支持不重启应用更新配置",
+        "impact": "提升运维效率"
+      },
+      {
+        "area": "用户界面",
+        "opportunity": "响应式设计优化",
+        "description": "优化移动端和小屏幕显示",
+        "impact": "扩大用户群体"
+      },
+      {
+        "area": "智能化",
+        "opportunity": "自动问题推荐",
+        "description": "基于文档内容智能推荐相关问题",
+        "impact": "提升用户探索体验"
+      },
+      {
+        "area": "智能化",
+        "opportunity": "文档质量评估",
+        "description": "自动评估上传文档的质量和完整性",
+        "impact": "提升知识库质量"
+      }
+    ]
+  },
+  "sprint_plan": {
+    "sprint_name": "Sprint 20260101",
+    "duration": "2周",
+    "focus_areas": [
+      "用户体验优化",
+      "代码质量提升"
+    ],
+    "user_stories": [],
+    "technical_tasks": [
+      {
+        "title": "修复: 需要更好的错误提示和用户引导",
+        "type": "bugfix",
+        "priority": "high",
+        "estimated_hours": 4
+      },
+      {
+        "title": "实现: 动态配置热更新",
+        "type": "enhancement",
+        "priority": "medium",
+        "estimated_hours": 8
+      },
+      {
+        "title": "实现: 响应式设计优化",
+        "type": "enhancement",
+        "priority": "medium",
+        "estimated_hours": 8
+      },
+      {
+        "title": "实现: 自动问题推荐",
+        "type": "enhancement",
+        "priority": "medium",
+        "estimated_hours": 8
+      },
+      {
+        "title": "实现: 文档质量评估",
+        "type": "enhancement",
+        "priority": "medium",
+        "estimated_hours": 8
+      }
+    ],
+    "success_metrics": [
+      "用户满意度 > 4.0/5",
+      "系统响应时间 < 2秒",
+      "错误率 < 1%",
+      "功能使用率提升 > 20%",
+      "检索准确率 > 85%",
+      "文档处理成功率 > 95%"
+    ]
+  }
+}
