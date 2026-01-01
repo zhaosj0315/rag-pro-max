@@ -257,15 +257,13 @@
         "用户验证通过"
       ],
       "completed_at": "2026-01-01T11:23:38.800655"
-    }
-  ],
-  "tasks": [
+    },
     {
       "id": "task_20260101_112429",
       "feature_name": "fix_visible_countdown",
       "description": "修复倒计时显示，确保用户能看到5秒倒计时",
       "branch_name": "feature/fix_visible_countdown_20260101",
-      "status": "in_progress",
+      "status": "completed",
       "phase": "implement",
       "created_at": "2026-01-01T11:24:29.790157",
       "definition_of_done": [
@@ -274,7 +272,9 @@
         "效果测试通过（性能不下降）",
         "文档更新完成",
         "用户验证通过"
-      ]
+      ],
+      "completed_at": "2026-01-01T11:31:21.928625"
     }
-  ]
+  ],
+  "tasks": []
 }
