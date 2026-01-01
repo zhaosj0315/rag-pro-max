@@ -90,15 +90,23 @@ class SidebarManager:
         
         monitor_ui = SystemMonitorUI()
         
+        # 添加醒目提示
+        st.info("💡 要查看5秒倒计时，请在下方选择'实时监控'")
+        
         # 选择监控类型
         monitor_type = st.selectbox(
-            "监控类型", 
+            "🔽 请选择监控类型", 
             ["实时监控", "局部刷新监控", "基础监控", "性能仪表板", "v2.3监控"], 
             index=0,  # 默认选择第一个：实时监控
-            key="monitor_type_select"
+            key="monitor_type_select",
+            help="选择'实时监控'可以看到5秒倒计时功能"
         )
         
+        # 显示当前选择
+        st.write(f"当前选择: **{monitor_type}**")
+        
         if monitor_type == "实时监控":
+            st.success("✅ 您选择了实时监控，下面应该显示5秒倒计时")
             # 直接创建实时监控实例并渲染
             from src.utils.realtime_monitor import RealtimeMonitor
             realtime_monitor = RealtimeMonitor()
