@@ -237,6 +237,7 @@ from src.core.state_manager import state
 from src.processors import UploadHandler, IndexBuilder
 
 # ⚠️ 关键修复：强制使用本地模型，避免 OpenAI 默认
+# 临时设置环境变量，让 LlamaIndex 使用本地模型
 os.environ['LLAMA_INDEX_EMBED_MODEL'] = 'local'
 
 # 兼容旧代码的包装函数
@@ -530,6 +531,7 @@ if 'app_initialized' not in st.session_state:
 # ==========================================
 CONFIG_FILE = "rag_config.json"
 HISTORY_DIR = "chat_histories"
+UPLOAD_DIR = "temp_uploads" # 临时上传目录
 
 # 确保目录存在
 for d in [HISTORY_DIR, UPLOAD_DIR]:
@@ -2582,6 +2584,7 @@ if btn_start:
                 # 使用优化后的名称
                 final_kb_name = optimized_name
             
+            # DEBUG: Check parameters
             print(f"DEBUG: Calling process_knowledge_base_logic with: kb={final_kb_name}, ocr={current_use_ocr}, meta={current_extract_metadata}, summary={current_generate_summary}")
             print(f"DEBUG: st.session_state.uploaded_path = {st.session_state.get('uploaded_path')}")
             print(f"DEBUG: uploaded_files present? = {bool(uploaded_files) if 'uploaded_files' in locals() else 'Not in locals'}")
