@@ -4369,8 +4369,20 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             logger.start_operation("查询", f"知识库: {active_kb_name}")
         
         # 查询改写 (v1.6) - 在处理引用内容之前
-        # 只有在用户启用查询优化时才进行
-        if st.session_state.get('enable_query_optimization', False):
+        # 首先检查用户是否已经做出选择
+        if st.session_state.get('use_optimized_query') is True:
+            final_prompt = st.session_state.get('optimized_query', final_prompt)
+            logger.info(f"✅ 使用优化后的查询: {final_prompt}")
+            # 清除选择状态，避免重复使用
+            st.session_state.use_optimized_query = None
+            st.session_state.optimized_query = None
+        elif st.session_state.get('use_optimized_query') is False:
+            logger.info(f"📝 使用原问题: {final_prompt}")
+            # 使用原问题，清除选择状态
+            st.session_state.use_optimized_query = None
+        
+        # 只有在用户启用查询优化且还没有做出选择时才显示建议
+        elif st.session_state.get('enable_query_optimization', False):
             logger.info("🧠 深度思考(查询优化)已激活")
             query_rewriter = QueryRewriter(Settings.llm)
             should_rewrite, reason = query_rewriter.should_rewrite(final_prompt)
@@ -4402,16 +4414,6 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         # 等待用户选择
                         st.session_state.is_processing = False
                         st.stop()
-                        
-                # 检查用户是否已经做出选择
-                if st.session_state.get('use_optimized_query') is True:
-                    final_prompt = st.session_state.get('optimized_query', final_prompt)
-                    # 清除选择状态，避免重复使用
-                    st.session_state.use_optimized_query = None
-                    st.session_state.optimized_query = None
-                elif st.session_state.get('use_optimized_query') is False:
-                    # 使用原问题，清除选择状态
-                    st.session_state.use_optimized_query = None
             else:
                 logger.info(f"🧠 深度思考: 查询清晰，无需改写 ({reason})")
 
