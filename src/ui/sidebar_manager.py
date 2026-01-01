@@ -99,9 +99,10 @@ class SidebarManager:
         )
         
         if monitor_type == "实时监控":
-            # 使用实时监控，自动刷新不影响对话
-            from src.utils.realtime_monitor import render_realtime_monitoring
-            render_realtime_monitoring()
+            # 直接创建实时监控实例并渲染
+            from src.utils.realtime_monitor import RealtimeMonitor
+            realtime_monitor = RealtimeMonitor()
+            realtime_monitor.render_realtime_monitor()
         elif monitor_type == "局部刷新监控":
             # 使用局部刷新监控，不影响对话区域
             show_local_monitor()
