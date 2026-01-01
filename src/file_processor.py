@@ -60,6 +60,7 @@ class FileProcessResult:
 from typing import List, Tuple
 from pathlib import Path
 import os
+import multiprocessing as mp
 
 # 支持的文件格式
 SUPPORTED_FORMATS = {'.pdf', '.txt', '.docx', '.md', '.xlsx', '.xls', '.csv', '.json'}

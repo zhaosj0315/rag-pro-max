@@ -1,6 +1,7 @@
 
 # 强制OCR配置
 import psutil
+import multiprocessing as mp
 
 def get_aggressive_ocr_workers():
     cpu_count = mp.cpu_count()

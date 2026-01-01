@@ -4,6 +4,7 @@
 """
 
 import time
+import multiprocessing as mp
 from typing import List, Tuple
 from PIL import Image
 import numpy as np

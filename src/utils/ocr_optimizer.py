@@ -5,6 +5,7 @@ OCR性能优化器 - 带CPU保护
 
 import time
 import threading
+import multiprocessing as mp
 from typing import Tuple
 
 class OCROptimizer:

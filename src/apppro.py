@@ -87,6 +87,7 @@ import json
 import platform
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import multiprocessing as mp
 
 # 引入新工具
 from src.utils.file_system_utils import get_deep_file_attributes, reveal_in_file_manager, NotesManager, set_where_from_metadata
