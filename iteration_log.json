@@ -463,5 +463,22 @@
       "completed_at": "2026-01-01T12:20:16.843475"
     }
   ],
-  "tasks": []
+  "tasks": [
+    {
+      "id": "task_20260101_122728",
+      "feature_name": "fix_final_prompt_scope",
+      "description": "修复final_prompt作用域问题，确保优化后的查询被正确使用",
+      "branch_name": "feature/fix_final_prompt_scope_20260101",
+      "status": "in_progress",
+      "phase": "implement",
+      "created_at": "2026-01-01T12:27:28.711840",
+      "definition_of_done": [
+        "功能代码实现完成",
+        "技术测试通过（无报错、无崩溃）",
+        "效果测试通过（性能不下降）",
+        "文档更新完成",
+        "用户验证通过"
+      ]
+    }
+  ]
 }

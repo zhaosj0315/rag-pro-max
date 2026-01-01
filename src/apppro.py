@@ -4198,7 +4198,9 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             with st.spinner("🔍 正在从多个知识库中检索信息..."):
                 try:
                     # 执行多知识库查询
+                    print(f"🔍 DEBUG: 开始执行多知识库查询，使用查询: '{final_prompt}'")
                     response = multi_engine.query(final_prompt, selected_kbs, embed_provider, embed_model, embed_key, embed_url)
+                    print(f"✅ DEBUG: 多知识库查询完成")
                     
                 except Exception as e:
                     error_msg = f"查询失败: {str(e)}"
@@ -4383,14 +4385,22 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                 print(f"💡 DEBUG: 优化后的查询: {rewritten_query}")
                 
                 if rewritten_query and rewritten_query != final_prompt:
+                    # 保存原问题
+                    original_prompt = final_prompt
+                    
                     # 显示优化信息并自动使用优化后的查询
                     with st.chat_message("assistant", avatar="🤖"):
                         st.info(f"💡 **深度思考优化**\n\n原问题：{final_prompt}\n\n优化后：{rewritten_query}\n\n✅ 自动使用优化后的查询进行回答")
                     
                     # 直接使用优化后的查询
                     final_prompt = rewritten_query
-                    print(f"✅ DEBUG: 已自动使用优化后的查询: {final_prompt}")
+                    print(f"✅ DEBUG: 已自动使用优化后的查询: '{final_prompt}'")
+                    print(f"✅ DEBUG: 原问题: '{original_prompt}'")
+                    print(f"✅ DEBUG: 优化后: '{final_prompt}'")
                     logger.info(f"✅ 深度思考: 自动使用优化后的查询 - {rewritten_query}")
+                    
+                    # 确保后续所有地方都使用优化后的查询
+                    st.session_state.current_optimized_query = final_prompt
             else:
                 print(f"🧠 DEBUG: 查询清晰，无需改写")
                 logger.info(f"🧠 深度思考: 查询清晰，无需改写 ({reason})")
@@ -4399,7 +4409,10 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
         
         print(f"🔍 DEBUG: 查询优化完成，final_prompt = '{final_prompt}'")
 
-        user_display_prompt = final_prompt  # 保存原始提问用于 UI 显示
+        # 保存用于显示和查询的提示词
+        user_display_prompt = final_prompt  # 用于UI显示
+        query_prompt = final_prompt  # 用于实际查询
+        print(f"🔍 DEBUG: 准备执行查询，query_prompt = '{query_prompt}'")
         if st.session_state.get('enable_web_search', False):
             try:
                 from duckduckgo_search import DDGS
