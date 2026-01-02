@@ -1034,29 +1034,17 @@ with st.sidebar:
                     """, unsafe_allow_html=True)
                     st.session_state.paste_css_injected = True
                 
-                # 使用更大的高度，但对超大文本进行优化处理
-                text_input_content = st.text_area(
-                    "文本内容", 
-                    height=200,
-                    placeholder="在此粘贴文本，点击下方按钮保存...", 
-                    label_visibility="collapsed",
-                    key="paste_text_content"
-                )
-                
-                # 显示字符统计，超大文本自动处理
-                if text_input_content:
-                    char_count = len(text_input_content)
-                    
-                    # 超大文本自动保存并清空
-                    if char_count > 500000 and 'auto_saved_large_text' not in st.session_state:
+                # 自动保存逻辑 - 失焦时触发
+                def auto_save_text():
+                    content = st.session_state.paste_text_content
+                    if content and content.strip():
                         try:
-                            # 自动保存
                             save_dir = os.path.join(UPLOAD_DIR, f"text_{int(time.time())}")
                             if not os.path.exists(save_dir): 
                                 os.makedirs(save_dir)
-                            safe_name = "large_text_auto_saved.txt"
+                            safe_name = "manual_input.txt"
                             with open(os.path.join(save_dir, safe_name), 'w', encoding='utf-8') as f:
-                                f.write(text_input_content)
+                                f.write(content)
                             
                             # 设置路径
                             abs_path = os.path.abspath(save_dir)
@@ -1064,80 +1052,52 @@ with st.sidebar:
                             st.session_state.path_input = abs_path
                             
                             # 生成名称
-                            preview = "".join(c for c in text_input_content[:15] if c.isalnum() or c.isspace()).strip()
-                            st.session_state.upload_auto_name = f"LargeText_{preview}"
+                            preview = "".join(c for c in content[:15] if c.isalnum() or c.isspace()).strip()
+                            st.session_state.upload_auto_name = f"Text_{preview}"
                             
-                            # 标记已自动保存，避免重复
-                            st.session_state.auto_saved_large_text = True
-                            
-                            st.success(f"✅ 超大文本已自动保存: {st.session_state.upload_auto_name}")
-                            st.info("💡 文本框将在下次刷新时清空，减少页面卡顿")
+                            # 标记已保存
+                            st.session_state.text_auto_saved = True
+                            st.session_state.saved_text_length = len(content)
                             
                         except Exception as e:
                             st.error(f"自动保存失败: {e}")
-                    
-                    elif char_count > 100000:
-                        st.info(f"📊 大文本处理中 ({char_count:,} 字符)")
+                
+                # 获取当前文本，如果超过10万字符则截断显示
+                current_text = st.session_state.get('paste_text_content', '')
+                display_text = current_text
+                is_truncated = False
+                
+                if len(current_text) > 100000:
+                    display_text = current_text[:10000] + "\n\n... [文本过长，已截断显示，完整内容已保存] ..."
+                    is_truncated = True
+                
+                # 文本输入框 - 显示截断后的文本
+                text_input_content = st.text_area(
+                    "文本内容", 
+                    value=display_text,
+                    height=200,
+                    placeholder="在此粘贴文本，失焦时自动保存...", 
+                    label_visibility="collapsed",
+                    key="paste_text_display",
+                    on_change=auto_save_text
+                )
+                
+                # 隐藏的完整文本存储
+                if not is_truncated:
+                    st.session_state.paste_text_content = text_input_content
+                
+                # 显示状态信息
+                if st.session_state.get('text_auto_saved'):
+                    saved_length = st.session_state.get('saved_text_length', 0)
+                    st.success(f"✅ 文本已自动保存 ({saved_length:,} 字符) - {st.session_state.get('upload_auto_name', '')}")
+                elif current_text:
+                    char_count = len(current_text)
+                    if is_truncated:
+                        st.info(f"📊 大文本 ({char_count:,} 字符) - 前端仅显示前10,000字符，完整内容将自动保存")
                     else:
                         st.caption(f"📊 字符数: {char_count:,}")
                 
-                # 如果已自动保存，提供清空选项
-                if st.session_state.get('auto_saved_large_text'):
-                    if st.button("🗑️ 清空文本框", help="减少页面卡顿"):
-                        # 通过删除key来清空
-                        if 'paste_text_content' in st.session_state:
-                            del st.session_state.paste_text_content
-                        del st.session_state.auto_saved_large_text
-                        st.rerun()
-                
-                # 添加保存按钮，避免实时触发
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    save_button = st.button("💾 保存文本", disabled=not text_input_content.strip())
-                with col2:
-                    if text_input_content and len(text_input_content) > 500000:
-                        if st.button("📁 另存为文件", help="超大文本建议保存为文件上传"):
-                            # 直接保存为文件并切换到文件上传模式
-                            try:
-                                import tempfile
-                                with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
-                                    f.write(text_input_content)
-                                    temp_path = f.name
-                                
-                                st.session_state.paste_text_content = ""  # 清空文本框
-                                st.success(f"✅ 已保存为临时文件，请切换到文件上传模式选择: {temp_path}")
-                            except Exception as e:
-                                st.error(f"保存失败: {e}")
-                
-                if save_button:
-                    content = text_input_content
-                    if content.strip():
-                        try:
-                            # 使用进度条显示保存过程
-                            with st.spinner("正在保存文本..."):
-                                save_dir = os.path.join(UPLOAD_DIR, f"text_{int(time.time())}")
-                                if not os.path.exists(save_dir): 
-                                    os.makedirs(save_dir)
-                                safe_name = "manual_input.txt"
-                                with open(os.path.join(save_dir, safe_name), 'w', encoding='utf-8') as f:
-                                    f.write(content)
-                                
-                                # 核心：设置上传路径和自动名称，触发下方输入框显示
-                                abs_path = os.path.abspath(save_dir)
-                                st.session_state.uploaded_path = abs_path
-                                st.session_state.path_input = abs_path
-                                
-                                # 自动生成更具识别度的名称：取前15个字符
-                                preview = "".join(c for c in content[:15] if c.isalnum() or c.isspace()).strip()
-                                st.session_state.upload_auto_name = f"Text_{preview}"
-                            
-                            st.success(f"✅ 文本已保存: {st.session_state.upload_auto_name}")
-                            # 延迟rerun，避免立即重渲染
-                            import time
-                            time.sleep(0.1)
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"保存失败: {e}")
+                # 不需要手动保存按钮了，失焦自动保存
         else:
             # 管理模式 - 使用一行化布局 (1x2 紧凑布局)
             manage_title_col1, manage_title_col2 = st.columns([4, 1])
