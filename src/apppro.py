@@ -1036,36 +1036,43 @@ with st.sidebar:
                 
                 # 自动保存逻辑 - 失焦时触发
                 def auto_save_text():
-                    content = st.session_state.paste_text_content
+                    content = st.session_state.paste_text_display
                     if content and content.strip():
                         try:
                             save_dir = os.path.join(UPLOAD_DIR, f"text_{int(time.time())}")
                             if not os.path.exists(save_dir): 
                                 os.makedirs(save_dir)
                             safe_name = "manual_input.txt"
-                            with open(os.path.join(save_dir, safe_name), 'w', encoding='utf-8') as f:
-                                f.write(content)
                             
-                            # 设置路径
+                            # 如果是截断显示，使用完整内容保存
+                            full_content = st.session_state.get('paste_text_content', content)
+                            with open(os.path.join(save_dir, safe_name), 'w', encoding='utf-8') as f:
+                                f.write(full_content)
+                            
+                            # 设置路径 - 复用原来的逻辑
                             abs_path = os.path.abspath(save_dir)
                             st.session_state.uploaded_path = abs_path
                             st.session_state.path_input = abs_path
                             
-                            # 生成名称
-                            preview = "".join(c for c in content[:15] if c.isalnum() or c.isspace()).strip()
+                            # 生成名称 - 复用原来的逻辑
+                            preview = "".join(c for c in full_content[:15] if c.isalnum() or c.isspace()).strip()
                             st.session_state.upload_auto_name = f"Text_{preview}"
                             
                             # 标记已保存
                             st.session_state.text_auto_saved = True
-                            st.session_state.saved_text_length = len(content)
+                            st.session_state.saved_text_length = len(full_content)
                             
                         except Exception as e:
                             st.error(f"自动保存失败: {e}")
                 
                 # 获取当前文本，如果超过10万字符则截断显示
-                current_text = st.session_state.get('paste_text_content', '')
+                current_text = st.session_state.get('paste_text_display', '')
                 display_text = current_text
                 is_truncated = False
+                
+                # 存储完整文本
+                if current_text:
+                    st.session_state.paste_text_content = current_text
                 
                 if len(current_text) > 100000:
                     display_text = current_text[:10000] + "\n\n... [文本过长，已截断显示，完整内容已保存] ..."
@@ -1082,7 +1089,7 @@ with st.sidebar:
                     on_change=auto_save_text
                 )
                 
-                # 隐藏的完整文本存储
+                # 更新完整文本存储
                 if not is_truncated:
                     st.session_state.paste_text_content = text_input_content
                 
