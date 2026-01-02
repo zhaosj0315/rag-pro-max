@@ -98,6 +98,121 @@ from src.utils.enhanced_ocr_optimizer import enhanced_ocr_optimizer
 from src.ui.progress_monitor import progress_monitor
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings, StorageContext, load_index_from_storage
 from llama_index.core.memory import ChatMemoryBuffer
+
+def enhanced_web_search(final_prompt, logger):
+    """增强的联网搜索功能"""
+    import time
+    import re
+    from urllib.parse import urlparse
+    
+    try:
+        # 使用新版ddgs
+        from ddgs import DDGS
+        
+        logger.info(f"🌐 启动增强联网搜索...")
+        search_start_time = time.time()
+        
+        # 智能关键词提取
+        def extract_keywords(query):
+            # 移除疑问词
+            remove_words = ['什么是', '哪些', '如何', '怎么', '为什么', '是什么', '有哪些']
+            cleaned = query
+            for word in remove_words:
+                cleaned = cleaned.replace(word, ' ')
+            
+            # 特殊处理
+            if '发射场' in query:
+                return ['航天发射场', '发射基地', 'launch site', 'spaceport']
+            elif '文件位置' in query or '定位文件' in query:
+                return ['文件定位', '查找文件', 'find file location']
+            elif '机器学习' in query and 'Python' in query:
+                return ['Python机器学习', 'Python ML', 'machine learning python']
+            elif '人工智能' in query:
+                return ['人工智能', 'AI', 'artificial intelligence']
+            elif 'OpenAI' in query and 'Deep Research' in query:
+                return ['OpenAI Deep Research', 'AI research jobs', '人工智能研究岗位']
+            else:
+                # 提取中文词汇
+                chinese_words = re.findall(r'[\u4e00-\u9fff]{2,}', cleaned)
+                english_words = re.findall(r'[a-zA-Z]{3,}', cleaned)
+                return (chinese_words + english_words)[:3]
+        
+        keywords = extract_keywords(final_prompt)
+        logger.info(f"🔑 提取关键词: {keywords}")
+        
+        all_results = []
+        
+        # 搜索每个关键词
+        with DDGS() as ddgs:
+            for keyword in keywords[:3]:  # 最多搜索3个关键词
+                try:
+                    logger.info(f"🔍 搜索: {keyword}")
+                    
+                    # 根据语言选择区域
+                    if re.search(r'[\u4e00-\u9fff]', keyword):
+                        # 中文关键词
+                        results = list(ddgs.text(keyword, max_results=5, region='cn-zh'))
+                        if not results:
+                            results = list(ddgs.text(keyword, max_results=5))
+                    else:
+                        # 英文关键词
+                        results = list(ddgs.text(keyword, max_results=5, region='us-en'))
+                        if not results:
+                            results = list(ddgs.text(keyword, max_results=5))
+                    
+                    if results:
+                        logger.info(f"  ✅ 找到 {len(results)} 条结果")
+                        all_results.extend(results)
+                    else:
+                        logger.info(f"  ❌ 无结果")
+                        
+                except Exception as e:
+                    logger.warning(f"  ❌ 搜索失败: {e}")
+                    continue
+        
+        # 去重
+        unique_results = []
+        seen_urls = set()
+        for result in all_results:
+            url = result.get('href', '')
+            if url and url not in seen_urls:
+                seen_urls.add(url)
+                unique_results.append(result)
+        
+        # 质量过滤
+        quality_results = []
+        for result in unique_results:
+            title = result.get('title', '').lower()
+            body = result.get('body', '').lower()
+            
+            # 过滤垃圾内容
+            if not any(spam in title + body for spam in ['广告', '推广', 'ad', 'advertisement']):
+                # 计算相关性得分
+                score = 0
+                for kw in keywords:
+                    if kw.lower() in title:
+                        score += 3
+                    if kw.lower() in body:
+                        score += 1
+                
+                result['quality_score'] = score
+                quality_results.append(result)
+        
+        # 按质量排序
+        quality_results.sort(key=lambda x: x.get('quality_score', 0), reverse=True)
+        
+        search_duration = round(time.time() - search_start_time, 2)
+        
+        logger.info(f"📊 搜索完成: {len(quality_results)} 条高质量结果，耗时 {search_duration}s")
+        
+        return quality_results[:8]  # 返回前8个结果
+        
+    except ImportError:
+        logger.error("❌ 未安装 ddgs 库，请运行: pip install ddgs")
+        return []
+    except Exception as e:
+        logger.error(f"❌ 联网搜索失败: {e}")
+        return []
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.llms.ollama import Ollama
 from llama_index.llms.openai import OpenAI
