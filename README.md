@@ -2,11 +2,11 @@
 
 ![Version](https://img.shields.io/badge/version-v3.2.2-brightgreen)
 ![Status](https://img.shields.io/badge/status-Stable-blue)
-![Last Update](https://img.shields.io/badge/last%20update-2026--01--02orange)
+![Last Update](https://img.shields.io/badge/last%20update-2026--01--03-orange)
 
 # 🚀 RAG Pro Max v3.2.2
 
-> **企业级 RAG 知识库系统 - 智能推荐与极速检索的终极进化**
+> **企业级 RAG (Retrieval Augmented Generation) 知识库系统 - 智能推荐与极速检索的终极进化**
 ...
 **🎯 核心优势**: 现代化配置中心 • 插件式自定义厂商 • 语义防火墙 • 专家级智能研究
 
