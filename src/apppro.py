@@ -1040,15 +1040,15 @@ with st.sidebar:
                     height=200,  # 增加高度，减少滚动
                     placeholder="在此粘贴文本，点击下方按钮保存...", 
                     label_visibility="collapsed",
-                    key="paste_text_content",
-                    max_chars=50000  # 限制最大字符数，防止过大文本
+                    key="paste_text_content"
+                    # 移除字符限制，M4 Max性能足够处理大文本
                 )
                 
-                # 显示字符统计
+                # 显示字符统计，但不限制
                 if text_input_content:
                     char_count = len(text_input_content)
-                    if char_count > 40000:
-                        st.warning(f"⚠️ 文本较大 ({char_count:,} 字符)，建议分段处理")
+                    if char_count > 100000:
+                        st.info(f"📊 大文本处理中 ({char_count:,} 字符) - M4 Max性能足够")
                     else:
                         st.caption(f"📊 字符数: {char_count:,}")
                 
