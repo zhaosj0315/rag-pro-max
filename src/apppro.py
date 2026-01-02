@@ -4482,6 +4482,16 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     'keywords': extract_display_keywords(final_prompt)  # 保存搜索关键词
                 }
                 
+                # 将搜索结果整合到查询中
+                web_context = "以下是联网搜索到的相关信息：\n\n"
+                for i, result in enumerate(search_results[:5], 1):
+                    web_context += f"{i}. {result.get('title', 'No Title')}\n"
+                    web_context += f"   {result.get('body', 'No content')[:200]}...\n"
+                    web_context += f"   来源: {result.get('href', 'No URL')}\n\n"
+                
+                # 将联网信息添加到查询中
+                final_prompt = f"{final_prompt}\n\n{web_context}请结合以上联网搜索信息和知识库内容进行回答。"
+                
             else:
                 st.write("❌ 未找到相关结果，请尝试其他关键词")
     
