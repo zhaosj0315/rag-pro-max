@@ -115,12 +115,12 @@ def enhanced_web_search(final_prompt, logger):
         # 智能关键词提取
         def extract_keywords(query):
             # 移除疑问词
-            remove_words = ['什么是', '哪些', '如何', '怎么', '为什么', '是什么', '有哪些']
+            remove_words = ['什么是', '哪些', '如何', '怎么', '为什么', '是什么', '有哪些', '具体', '到底']
             cleaned = query
             for word in remove_words:
                 cleaned = cleaned.replace(word, ' ')
             
-            # 特殊处理
+            # 特殊处理 - 更精准的关键词映射
             if '发射场' in query:
                 return ['航天发射场', '发射基地', 'launch site', 'spaceport']
             elif '文件位置' in query or '定位文件' in query:
@@ -130,16 +130,23 @@ def enhanced_web_search(final_prompt, logger):
             elif '人工智能' in query:
                 return ['人工智能', 'AI', 'artificial intelligence']
             elif 'OpenAI' in query and 'Deep Research' in query:
-                return ['OpenAI Deep Research', 'AI research jobs', '人工智能研究岗位']
+                return ['OpenAI Deep Research', 'AI research jobs', '人工智能研究岗位', 'knowledge work automation']
             elif 'AI' in query and ('岗位' in query or '工作' in query or 'job' in query):
-                return ['AI工作岗位', 'AI jobs', 'artificial intelligence careers']
+                return ['AI工作岗位', 'AI jobs', 'artificial intelligence careers', 'AI替代工作']
             elif '研究生' in query and 'AI' in query:
                 return ['研究生AI应用', 'graduate AI research', 'AI学术研究']
+            elif '知识密集型' in query or 'knowledge intensive' in query:
+                return ['知识密集型工作', 'knowledge work', 'cognitive jobs', 'AI automation jobs']
             else:
-                # 提取中文词汇
+                # 提取中文词汇 (改进：更好的分词)
                 chinese_words = re.findall(r'[\u4e00-\u9fff]{2,}', cleaned)
                 english_words = re.findall(r'[a-zA-Z]{3,}', cleaned)
-                return (chinese_words + english_words)[:3]
+                
+                # 过滤常见词
+                filtered_chinese = [w for w in chinese_words if w not in ['可以', '能够', '应该', '需要', '进行']]
+                filtered_english = [w for w in english_words if w.lower() not in ['can', 'should', 'need', 'will', 'have']]
+                
+                return (filtered_chinese + filtered_english)[:3]
         
         keywords = extract_keywords(final_prompt)
         logger.info(f"🔑 提取关键词: {keywords}")
@@ -190,7 +197,7 @@ def enhanced_web_search(final_prompt, logger):
             body = result.get('body', '').lower()
             
             # 过滤垃圾内容
-            if not any(spam in title + body for spam in ['广告', '推广', 'ad', 'advertisement']):
+            if not any(spam in title + body for spam in ['广告', '推广', 'ad', 'advertisement', '购买', '下载', 'buy', 'download']):
                 # 计算相关性得分
                 score = 0
                 for kw in keywords:
@@ -199,7 +206,22 @@ def enhanced_web_search(final_prompt, logger):
                     if kw.lower() in body:
                         score += 1
                 
-                result['quality_score'] = score
+                # 权威性加分
+                url = result.get('href', '')
+                if any(domain in url for domain in [
+                    'wikipedia.org', 'baidu.com', 'zhihu.com', 'github.com',
+                    'stackoverflow.com', 'csdn.net', 'edu.cn', '.gov.cn',
+                    'nature.com', 'science.org', 'arxiv.org', 'ieee.org',
+                    'openai.com', 'anthropic.com', 'deepmind.com', 'mit.edu',
+                    'stanford.edu', 'harvard.edu', 'tsinghua.edu.cn', 'pku.edu.cn'
+                ]):
+                    score += 2
+                
+                # 内容长度合理性
+                if 50 <= len(body) <= 500:
+                    score += 1
+                
+                result['quality_score'] = max(0, score)
                 quality_results.append(result)
         
         # 按质量排序
@@ -4538,18 +4560,39 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                 if search_results:
                     st.write(f"✅ 找到 {len(search_results)} 条相关结果")
                     
-                    # 显示搜索结果
-                    for i, result in enumerate(search_results[:5], 1):
-                        with st.expander(f"🔗 {i}. {result.get('title', 'No Title')}", expanded=False):
-                            st.write(f"**链接**: {result.get('href', 'No URL')}")
-                            st.write(f"**摘要**: {result.get('body', 'No content')[:200]}...")
-                            if result.get('quality_score', 0) > 0:
-                                st.write(f"**相关性**: {result['quality_score']} 分")
+                    # 保存搜索结果到session_state，确保持久显示
+                    st.session_state.last_web_search_results = {
+                        'query': final_prompt,
+                        'results': search_results,
+                        'timestamp': __import__('time').strftime('%H:%M:%S')
+                    }
                     
                     status.update(label="🌐 联网搜索完成", state="complete")
                 else:
                     st.write("❌ 未找到相关结果，请尝试其他关键词")
                     status.update(label="🌐 联网搜索无结果", state="error")
+        
+        # 持久显示联网搜索结果
+        if st.session_state.get('last_web_search_results'):
+            search_data = st.session_state.last_web_search_results
+            
+            with st.expander(f"🌐 联网搜索参考信息 ({search_data['timestamp']}) - {len(search_data['results'])} 条结果", expanded=False):
+                st.caption(f"🔍 查询: {search_data['query']}")
+                
+                for i, result in enumerate(search_data['results'][:8], 1):
+                    col1, col2 = st.columns([3, 1])
+                    
+                    with col1:
+                        st.markdown(f"**{i}. {result.get('title', 'No Title')}**")
+                        st.caption(f"{result.get('body', 'No content')[:150]}...")
+                        st.markdown(f"🔗 [{result.get('href', 'No URL')}]({result.get('href', '#')})")
+                    
+                    with col2:
+                        if result.get('quality_score', 0) > 0:
+                            st.metric("相关性", f"{result['quality_score']} 分")
+                    
+                    if i < len(search_data['results'][:8]):
+                        st.divider()
         
         # 处理引用内容
         if st.session_state.get("quote_content"):
