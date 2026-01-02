@@ -4596,26 +4596,43 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     def extract_display_keywords(query):
                         import re
                         # 移除疑问词和连接词
-                        remove_words = ['什么是', '哪些', '如何', '怎么', '为什么', '是什么', '有哪些', '会导致', '导致', '的', '了', '吗', '呢']
+                        remove_words = ['什么是', '哪些', '如何', '怎么', '为什么', '是什么', '有哪些', '会导致', '导致', '的', '了', '吗', '呢', '能否', '可以', '一份', '包含', '提供']
                         cleaned = query
                         for word in remove_words:
                             cleaned = cleaned.replace(word, ' ')
                         
+                        # 特殊查询模式识别
                         if '数仓' in query or '数据仓库' in query:
                             return ['数据仓库', '数仓集群', 'data warehouse']
                         elif '缓存' in query and '元数据' in query:
                             return ['缓存失效', '元数据缺失', 'cache metadata']
+                        elif 'DS' in query and '术语表' in query:
+                            return ['数据科学术语', 'DS术语表', 'data science glossary']
+                        elif '术语表' in query and ('专业' in query or '通俗' in query):
+                            return ['行业术语表', '专业术语', 'technical glossary']
                         elif 'AI' in query and ('岗位' in query or '工作' in query):
                             return ['AI工作岗位', 'AI jobs', 'artificial intelligence careers']
                         else:
                             # 提取中文词汇 (2-4个字)
                             chinese_words = re.findall(r'[\u4e00-\u9fff]{2,4}', cleaned)
-                            # 提取英文词汇 (3个字母以上)
-                            english_words = re.findall(r'[a-zA-Z]{3,}', cleaned)
+                            # 提取英文词汇 (2个字母以上，包含DS这样的缩写)
+                            english_words = re.findall(r'[a-zA-Z]{2,}', cleaned)
+                            
                             # 过滤常见词
-                            filtered_chinese = [w for w in chinese_words if w not in ['可以', '能够', '应该', '需要', '进行', '问题', '方法']]
-                            filtered_english = [w for w in english_words if w.lower() not in ['can', 'should', 'need', 'will', 'have', 'what', 'how']]
-                            return (filtered_chinese + filtered_english)[:3]
+                            filtered_chinese = [w for w in chinese_words if w not in [
+                                '可以', '能够', '应该', '需要', '进行', '问题', '方法', '情况', '时候', '地方', '方面', '内容', '系统', '功能'
+                            ]]
+                            filtered_english = [w for w in english_words if w.lower() not in [
+                                'can', 'should', 'need', 'will', 'have', 'what', 'how', 'the', 'and', 'for', 'are', 'with'
+                            ]]
+                            
+                            # 合并并去重，保持顺序
+                            all_keywords = []
+                            for word in filtered_chinese + filtered_english:
+                                if word not in all_keywords:
+                                    all_keywords.append(word)
+                            
+                            return all_keywords[:3]
                     
                     # 保存搜索结果到session_state，确保持久显示
                     st.session_state.last_web_search_results = {
