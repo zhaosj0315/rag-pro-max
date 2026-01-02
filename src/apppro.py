@@ -1021,49 +1021,67 @@ with st.sidebar:
                     st.session_state.uploaded_path = manual_path
             
             elif source_mode == "📝 粘贴文本":
-                # 注入 CSS 模仿上传框样式 (虚线边框 + 灰色背景)
-                st.markdown("""
-                <style>
-                .stTextArea textarea {
-                    border: 2px dashed rgba(49, 51, 63, 0.2) !important;
-                    background-color: rgba(240, 242, 246, 0.5) !important;
-                    border-radius: 0.5rem !important;
-                }
-                </style>
-                """, unsafe_allow_html=True)
+                # 只在首次加载时注入CSS，避免重复注入
+                if 'paste_css_injected' not in st.session_state:
+                    st.markdown("""
+                    <style>
+                    .stTextArea textarea {
+                        border: 2px dashed rgba(49, 51, 63, 0.2) !important;
+                        background-color: rgba(240, 242, 246, 0.5) !important;
+                        border-radius: 0.5rem !important;
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
+                    st.session_state.paste_css_injected = True
                 
-                # 高度 68，这是 Streamlit 支持的最小值，完美对齐两行视觉
+                # 使用更大的高度，减少滚动卡顿
                 text_input_content = st.text_area(
                     "文本内容", 
-                    height=68, 
+                    height=200,  # 增加高度，减少滚动
                     placeholder="在此粘贴文本，点击下方按钮保存...", 
                     label_visibility="collapsed",
-                    key="paste_text_content"
+                    key="paste_text_content",
+                    max_chars=50000  # 限制最大字符数，防止过大文本
                 )
+                
+                # 显示字符统计
+                if text_input_content:
+                    char_count = len(text_input_content)
+                    if char_count > 40000:
+                        st.warning(f"⚠️ 文本较大 ({char_count:,} 字符)，建议分段处理")
+                    else:
+                        st.caption(f"📊 字符数: {char_count:,}")
                 
                 # 添加保存按钮，避免实时触发
                 if st.button("💾 保存文本", disabled=not text_input_content.strip()):
                     content = text_input_content
                     if content.strip():
                         try:
-                            save_dir = os.path.join(UPLOAD_DIR, f"text_{int(time.time())}")
-                            if not os.path.exists(save_dir): os.makedirs(save_dir)
-                            safe_name = "manual_input.txt"
-                            with open(os.path.join(save_dir, safe_name), 'w', encoding='utf-8') as f:
-                                f.write(content)
+                            # 使用进度条显示保存过程
+                            with st.spinner("正在保存文本..."):
+                                save_dir = os.path.join(UPLOAD_DIR, f"text_{int(time.time())}")
+                                if not os.path.exists(save_dir): 
+                                    os.makedirs(save_dir)
+                                safe_name = "manual_input.txt"
+                                with open(os.path.join(save_dir, safe_name), 'w', encoding='utf-8') as f:
+                                    f.write(content)
+                                
+                                # 核心：设置上传路径和自动名称，触发下方输入框显示
+                                abs_path = os.path.abspath(save_dir)
+                                st.session_state.uploaded_path = abs_path
+                                st.session_state.path_input = abs_path
+                                
+                                # 自动生成更具识别度的名称：取前15个字符
+                                preview = "".join(c for c in content[:15] if c.isalnum() or c.isspace()).strip()
+                                st.session_state.upload_auto_name = f"Text_{preview}"
                             
-                            # 核心：设置上传路径和自动名称，触发下方输入框显示
-                            abs_path = os.path.abspath(save_dir)
-                            st.session_state.uploaded_path = abs_path
-                            st.session_state.path_input = abs_path
-                            
-                            # 自动生成更具识别度的名称：取前15个字符
-                            preview = "".join(c for c in content[:15] if c.isalnum() or c.isspace()).strip()
-                            st.session_state.upload_auto_name = f"Text_{preview}"
-                            st.toast(f"✅ 已自动识别: {st.session_state.upload_auto_name}", icon="📝")
+                            st.success(f"✅ 文本已保存: {st.session_state.upload_auto_name}")
+                            # 延迟rerun，避免立即重渲染
+                            import time
+                            time.sleep(0.1)
                             st.rerun()
                         except Exception as e:
-                            st.error(f"自动保存失败: {e}")
+                            st.error(f"保存失败: {e}")
         else:
             # 管理模式 - 使用一行化布局 (1x2 紧凑布局)
             manage_title_col1, manage_title_col2 = st.columns([4, 1])
