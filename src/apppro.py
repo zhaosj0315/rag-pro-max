@@ -1032,8 +1032,18 @@ with st.sidebar:
                 </style>
                 """, unsafe_allow_html=True)
                 
-                def on_text_paste():
-                    content = st.session_state.paste_text_content
+                # 高度 68，这是 Streamlit 支持的最小值，完美对齐两行视觉
+                text_input_content = st.text_area(
+                    "文本内容", 
+                    height=68, 
+                    placeholder="在此粘贴文本，点击下方按钮保存...", 
+                    label_visibility="collapsed",
+                    key="paste_text_content"
+                )
+                
+                # 添加保存按钮，避免实时触发
+                if st.button("💾 保存文本", disabled=not text_input_content.strip()):
+                    content = text_input_content
                     if content.strip():
                         try:
                             save_dir = os.path.join(UPLOAD_DIR, f"text_{int(time.time())}")
@@ -1051,18 +1061,9 @@ with st.sidebar:
                             preview = "".join(c for c in content[:15] if c.isalnum() or c.isspace()).strip()
                             st.session_state.upload_auto_name = f"Text_{preview}"
                             st.toast(f"✅ 已自动识别: {st.session_state.upload_auto_name}", icon="📝")
+                            st.rerun()
                         except Exception as e:
                             st.error(f"自动保存失败: {e}")
-
-                # 高度 68，这是 Streamlit 支持的最小值，完美对齐两行视觉
-                text_input_content = st.text_area(
-                    "文本内容", 
-                    height=68, 
-                    placeholder="在此粘贴文本，自动保存...", 
-                    label_visibility="collapsed",
-                    key="paste_text_content",
-                    on_change=on_text_paste
-                )
         else:
             # 管理模式 - 使用一行化布局 (1x2 紧凑布局)
             manage_title_col1, manage_title_col2 = st.columns([4, 1])
