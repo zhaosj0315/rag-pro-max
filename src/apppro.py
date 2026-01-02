@@ -4596,6 +4596,17 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     # 简单关键词提取用于显示
                     def extract_display_keywords(query):
                         import re
+                        
+                        # 如果查询过长（超过100字符），尝试提取核心概念
+                        if len(query) > 100:
+                            # 查找专有名词和关键概念
+                            if 'AnalyticDB' in query:
+                                return ['阿里云AnalyticDB', '云原生数据仓库', 'Alibaba Cloud AnalyticDB']
+                            elif '数据技术' in query and '发展趋势' in query:
+                                return ['数据技术趋势', '实时数据处理', 'big data trends']
+                            elif '知识库' in query and '数据' in query:
+                                return ['企业知识库', '数据治理', 'enterprise data management']
+                        
                         # 移除疑问词和连接词
                         remove_words = ['什么是', '哪些', '如何', '怎么', '为什么', '是什么', '有哪些', '会导致', '导致', '的', '了', '吗', '呢', '能否', '可以', '一份', '包含', '提供', '具体会', '会产生', '产生']
                         cleaned = query
@@ -4616,6 +4627,14 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                                 return ['OpenAI Deep Research', '中国科研就业', 'AI research jobs China']
                             else:
                                 return ['OpenAI Deep Research', 'AI research automation', 'knowledge work AI']
+                        elif 'DeepSeek' in query and ('o1' in query or 'OpenAI' in query):
+                            # AI模型对比查询
+                            if '准确率' in query or 'accuracy' in query:
+                                return ['DeepSeek vs OpenAI o1', '模型性能对比', 'AI model benchmark']
+                            else:
+                                return ['DeepSeek R1', 'OpenAI o1', 'AI model comparison']
+                        elif 'AnalyticDB' in query or ('阿里云' in query and '数据仓库' in query):
+                            return ['阿里云AnalyticDB', '云原生数据仓库', 'Alibaba Cloud AnalyticDB']
                         elif 'AI' in query and ('岗位' in query or '工作' in query or '就业' in query):
                             return ['AI工作岗位', 'AI jobs', 'artificial intelligence careers']
                         else:
