@@ -4212,9 +4212,19 @@ if active_kb_name and active_kb_name != "multi_kb_mode":
 # 持久显示联网搜索结果 - 放在输入框之前
 if st.session_state.get('last_web_search_results'):
     search_data = st.session_state.last_web_search_results
+    keywords = search_data.get('keywords', [])
     
     with st.expander(f"🌐 联网搜索参考信息 ({search_data['timestamp']}) - {len(search_data['results'])} 条结果", expanded=False):
-        st.caption(f"🔍 查询: {search_data['query']}")
+        # 显示搜索详情
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            st.caption(f"🔍 **原始查询**: {search_data['query']}")
+            if keywords:
+                st.caption(f"🔑 **搜索关键词**: {', '.join(keywords)}")
+        with col2:
+            st.caption("📡 **搜索引擎**: DuckDuckGo")
+        
+        st.divider()
         
         for i, result in enumerate(search_data['results'][:8], 1):
             col1, col2 = st.columns([3, 1])
@@ -4582,17 +4592,29 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                 if search_results:
                     st.write(f"✅ 找到 {len(search_results)} 条相关结果")
                     
+                    # 简单关键词提取用于显示
+                    def extract_display_keywords(query):
+                        import re
+                        if '数仓' in query or '数据仓库' in query:
+                            return ['数据仓库', '数仓集群', 'data warehouse']
+                        elif 'AI' in query and ('岗位' in query or '工作' in query):
+                            return ['AI工作岗位', 'AI jobs', 'artificial intelligence careers']
+                        else:
+                            chinese_words = re.findall(r'[\u4e00-\u9fff]{2,}', query)
+                            english_words = re.findall(r'[a-zA-Z]{3,}', query)
+                            return (chinese_words + english_words)[:3]
+                    
                     # 保存搜索结果到session_state，确保持久显示
                     st.session_state.last_web_search_results = {
                         'query': final_prompt,
                         'results': search_results,
-                        'timestamp': __import__('time').strftime('%H:%M:%S')
+                        'timestamp': __import__('time').strftime('%H:%M:%S'),
+                        'keywords': extract_display_keywords(final_prompt)  # 保存搜索关键词
                     }
                     
-                    status.update(label="🌐 联网搜索完成", state="complete")
+                    # 不再显示状态完成信息，避免重复
                 else:
                     st.write("❌ 未找到相关结果，请尝试其他关键词")
-                    status.update(label="🌐 联网搜索无结果", state="error")
         
         # 处理引用内容
         if st.session_state.get("quote_content"):
