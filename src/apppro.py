@@ -1043,19 +1043,52 @@ with st.sidebar:
                     key="paste_text_content"
                 )
                 
-                # 显示字符统计和性能优化提示
+                # 显示字符统计，超大文本自动处理
                 if text_input_content:
                     char_count = len(text_input_content)
-                    if char_count > 500000:  # 50万字符以上
-                        st.warning(f"⚠️ 超大文本 ({char_count:,} 字符) - 浏览器渲染可能卡顿，建议保存后清空文本框")
-                        # 提供清空按钮
-                        if st.button("🗑️ 保存后清空文本框", help="减少页面卡顿"):
-                            st.session_state.paste_text_content = ""
-                            st.rerun()
+                    
+                    # 超大文本自动保存并清空
+                    if char_count > 500000 and 'auto_saved_large_text' not in st.session_state:
+                        try:
+                            # 自动保存
+                            save_dir = os.path.join(UPLOAD_DIR, f"text_{int(time.time())}")
+                            if not os.path.exists(save_dir): 
+                                os.makedirs(save_dir)
+                            safe_name = "large_text_auto_saved.txt"
+                            with open(os.path.join(save_dir, safe_name), 'w', encoding='utf-8') as f:
+                                f.write(text_input_content)
+                            
+                            # 设置路径
+                            abs_path = os.path.abspath(save_dir)
+                            st.session_state.uploaded_path = abs_path
+                            st.session_state.path_input = abs_path
+                            
+                            # 生成名称
+                            preview = "".join(c for c in text_input_content[:15] if c.isalnum() or c.isspace()).strip()
+                            st.session_state.upload_auto_name = f"LargeText_{preview}"
+                            
+                            # 标记已自动保存，避免重复
+                            st.session_state.auto_saved_large_text = True
+                            
+                            st.success(f"✅ 超大文本已自动保存: {st.session_state.upload_auto_name}")
+                            st.info("💡 文本框将在下次刷新时清空，减少页面卡顿")
+                            
+                        except Exception as e:
+                            st.error(f"自动保存失败: {e}")
+                    
                     elif char_count > 100000:
                         st.info(f"📊 大文本处理中 ({char_count:,} 字符)")
                     else:
                         st.caption(f"📊 字符数: {char_count:,}")
+                
+                # 如果已自动保存，提供清空选项
+                if st.session_state.get('auto_saved_large_text'):
+                    if st.button("🗑️ 清空文本框", help="减少页面卡顿"):
+                        # 通过删除key来清空
+                        if 'paste_text_content' in st.session_state:
+                            del st.session_state.paste_text_content
+                        del st.session_state.auto_saved_large_text
+                        st.rerun()
                 
                 # 添加保存按钮，避免实时触发
                 col1, col2 = st.columns([3, 1])
