@@ -1036,16 +1036,27 @@ with st.sidebar:
                 
                 # 自动保存逻辑 - 失焦时触发
                 def auto_save_text():
-                    content = st.session_state.paste_text_display
+                    # 获取当前输入的文本
+                    content = st.session_state.get('paste_text_display', '')
                     if content and content.strip():
                         try:
+                            # 如果是截断显示的文本，需要获取完整内容
+                            if "... [文本过长，已截断显示，完整内容已保存] ..." in content:
+                                # 从完整文本存储中获取
+                                full_content = st.session_state.get('paste_text_content', content)
+                            else:
+                                full_content = content
+                            
+                            # 确保有实际内容
+                            if not full_content or not full_content.strip():
+                                return
+                                
                             save_dir = os.path.join(UPLOAD_DIR, f"text_{int(time.time())}")
                             if not os.path.exists(save_dir): 
                                 os.makedirs(save_dir)
                             safe_name = "manual_input.txt"
                             
-                            # 如果是截断显示，使用完整内容保存
-                            full_content = st.session_state.get('paste_text_content', content)
+                            # 保存完整内容
                             with open(os.path.join(save_dir, safe_name), 'w', encoding='utf-8') as f:
                                 f.write(full_content)
                             
