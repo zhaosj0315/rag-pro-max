@@ -4209,6 +4209,28 @@ if active_kb_name and active_kb_name != "multi_kb_mode":
         st.warning("⚠️ 问题模板功能暂时不可用，请直接在下方输入框中提问")
         st.caption(f"错误详情: {str(e)}")
 
+# 持久显示联网搜索结果 - 放在输入框之前
+if st.session_state.get('last_web_search_results'):
+    search_data = st.session_state.last_web_search_results
+    
+    with st.expander(f"🌐 联网搜索参考信息 ({search_data['timestamp']}) - {len(search_data['results'])} 条结果", expanded=False):
+        st.caption(f"🔍 查询: {search_data['query']}")
+        
+        for i, result in enumerate(search_data['results'][:8], 1):
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                st.markdown(f"**{i}. {result.get('title', 'No Title')}**")
+                st.caption(f"{result.get('body', 'No content')[:150]}...")
+                st.markdown(f"🔗 [{result.get('href', 'No URL')}]({result.get('href', '#')})")
+            
+            with col2:
+                if result.get('quality_score', 0) > 0:
+                    st.metric("相关性", f"{result['quality_score']} 分")
+            
+            if i < len(search_data['results'][:8]):
+                st.divider()
+
 # 保持输入框形态一致，避免布局跳动
 if st.session_state.get('is_processing'):
     st.chat_input("正在生成回答中...", disabled=True)
@@ -4571,28 +4593,6 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                 else:
                     st.write("❌ 未找到相关结果，请尝试其他关键词")
                     status.update(label="🌐 联网搜索无结果", state="error")
-        
-        # 持久显示联网搜索结果
-        if st.session_state.get('last_web_search_results'):
-            search_data = st.session_state.last_web_search_results
-            
-            with st.expander(f"🌐 联网搜索参考信息 ({search_data['timestamp']}) - {len(search_data['results'])} 条结果", expanded=False):
-                st.caption(f"🔍 查询: {search_data['query']}")
-                
-                for i, result in enumerate(search_data['results'][:8], 1):
-                    col1, col2 = st.columns([3, 1])
-                    
-                    with col1:
-                        st.markdown(f"**{i}. {result.get('title', 'No Title')}**")
-                        st.caption(f"{result.get('body', 'No content')[:150]}...")
-                        st.markdown(f"🔗 [{result.get('href', 'No URL')}]({result.get('href', '#')})")
-                    
-                    with col2:
-                        if result.get('quality_score', 0) > 0:
-                            st.metric("相关性", f"{result['quality_score']} 分")
-                    
-                    if i < len(search_data['results'][:8]):
-                        st.divider()
         
         # 处理引用内容
         if st.session_state.get("quote_content"):
