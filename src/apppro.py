@@ -4596,7 +4596,7 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     def extract_display_keywords(query):
                         import re
                         # 移除疑问词和连接词
-                        remove_words = ['什么是', '哪些', '如何', '怎么', '为什么', '是什么', '有哪些', '会导致', '导致', '的', '了', '吗', '呢', '能否', '可以', '一份', '包含', '提供']
+                        remove_words = ['什么是', '哪些', '如何', '怎么', '为什么', '是什么', '有哪些', '会导致', '导致', '的', '了', '吗', '呢', '能否', '可以', '一份', '包含', '提供', '具体会', '会产生', '产生']
                         cleaned = query
                         for word in remove_words:
                             cleaned = cleaned.replace(word, ' ')
@@ -4610,25 +4610,35 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                             return ['数据科学术语', 'DS术语表', 'data science glossary']
                         elif '术语表' in query and ('专业' in query or '通俗' in query):
                             return ['行业术语表', '专业术语', 'technical glossary']
-                        elif 'AI' in query and ('岗位' in query or '工作' in query):
+                        elif 'OpenAI' in query and 'Deep Research' in query:
+                            if '中国' in query and ('科研' in query or '就业' in query):
+                                return ['OpenAI Deep Research', '中国科研就业', 'AI research jobs China']
+                            else:
+                                return ['OpenAI Deep Research', 'AI research automation', 'knowledge work AI']
+                        elif 'AI' in query and ('岗位' in query or '工作' in query or '就业' in query):
                             return ['AI工作岗位', 'AI jobs', 'artificial intelligence careers']
                         else:
-                            # 提取中文词汇 (2-4个字)
-                            chinese_words = re.findall(r'[\u4e00-\u9fff]{2,4}', cleaned)
-                            # 提取英文词汇 (2个字母以上，包含DS这样的缩写)
-                            english_words = re.findall(r'[a-zA-Z]{2,}', cleaned)
+                            # 先提取英文词汇和缩写
+                            english_words = re.findall(r'[a-zA-Z]+', query)
+                            # 提取中文词汇 (2-5个字，避免截断)
+                            chinese_words = re.findall(r'[\u4e00-\u9fff]{2,5}', cleaned)
                             
                             # 过滤常见词
                             filtered_chinese = [w for w in chinese_words if w not in [
-                                '可以', '能够', '应该', '需要', '进行', '问题', '方法', '情况', '时候', '地方', '方面', '内容', '系统', '功能'
+                                '可以', '能够', '应该', '需要', '进行', '问题', '方法', '情况', '时候', '地方', '方面', '内容', '系统', '功能', '影响', '作用', '效果'
                             ]]
                             filtered_english = [w for w in english_words if w.lower() not in [
-                                'can', 'should', 'need', 'will', 'have', 'what', 'how', 'the', 'and', 'for', 'are', 'with'
+                                'can', 'should', 'need', 'will', 'have', 'what', 'how', 'the', 'and', 'for', 'are', 'with', 'that', 'this'
                             ]]
                             
-                            # 合并并去重，保持顺序
+                            # 合并并去重，保持顺序，优先保留英文专有名词
                             all_keywords = []
-                            for word in filtered_chinese + filtered_english:
+                            # 先加入英文词汇（通常是专有名词）
+                            for word in filtered_english:
+                                if len(word) >= 2 and word not in all_keywords:
+                                    all_keywords.append(word)
+                            # 再加入中文词汇
+                            for word in filtered_chinese:
                                 if word not in all_keywords:
                                     all_keywords.append(word)
                             
