@@ -9,8 +9,8 @@ RAG Pro Max 提供完整的RESTful API接口，支持程序化调用。
 - **Base URL**: `http://localhost:8501`
 # RAG Pro Max API 文档
 
-**版本**: v3.2.2
-**最后更新**: 2025-12-31
+**版本: v3.2.2
+**最后更新: 2026-01-02
 - **认证**: 暂无（本地部署）
 
 ## API 端点
