@@ -4407,7 +4407,30 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
         user_display_prompt = final_prompt  # 用于UI显示
         query_prompt = final_prompt  # 用于实际查询
         print(f"🔍 DEBUG: 准备执行查询，query_prompt = '{query_prompt}'")
+        
         if st.session_state.get('enable_web_search', False):
+            # 使用增强的联网搜索功能
+            with st.status("🌐 正在联网搜索...", expanded=False) as status:
+                st.write("🔍 智能分析搜索关键词...")
+                
+                # 调用增强搜索函数
+                search_results = enhanced_web_search(final_prompt, logger)
+                
+                if search_results:
+                    st.write(f"✅ 找到 {len(search_results)} 条相关结果")
+                    
+                    # 显示搜索结果
+                    for i, result in enumerate(search_results[:5], 1):
+                        with st.expander(f"🔗 {i}. {result.get('title', 'No Title')}", expanded=False):
+                            st.write(f"**链接**: {result.get('href', 'No URL')}")
+                            st.write(f"**摘要**: {result.get('body', 'No content')[:200]}...")
+                            if result.get('quality_score', 0) > 0:
+                                st.write(f"**相关性**: {result['quality_score']} 分")
+                    
+                    status.update(label="🌐 联网搜索完成", state="complete")
+                else:
+                    st.write("❌ 未找到相关结果，请尝试其他关键词")
+                    status.update(label="🌐 联网搜索无结果", state="error")
             try:
                 from duckduckgo_search import DDGS
                 from src.utils.search_quality import search_quality_analyzer
