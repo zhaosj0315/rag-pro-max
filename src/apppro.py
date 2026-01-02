@@ -10,7 +10,6 @@ os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 import warnings
 warnings.filterwarnings("ignore", message=".*UnsupportedFieldAttributeWarning.*")
 
-
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -81,1339 +80,11 @@ from src.common.utils import cleanup_temp_files
 # 执行启动清理（使用一周=168小时）
 cleaned_count = cleanup_temp_files("temp_uploads", 168)
 if cleaned_count > 0:
-    print(f"🧹 已清理 {cleaned_count} 个临时文件")
-
-import json
-import platform
-from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import multiprocessing as mp
-
-# 引入新工具
-from src.utils.file_system_utils import get_deep_file_attributes, reveal_in_file_manager, NotesManager, set_where_from_metadata
-notes_manager = NotesManager()
-
-# 引入新的优化组件
-from src.utils.enhanced_ocr_optimizer import enhanced_ocr_optimizer
-from src.ui.progress_monitor import progress_monitor
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings, StorageContext, load_index_from_storage
-from llama_index.core.memory import ChatMemoryBuffer
-
-def enhanced_web_search(final_prompt, logger):
-    """增强的联网搜索功能"""
-    import time
-    import re
-    from urllib.parse import urlparse
-    
-    try:
-        # 使用新版ddgs
-        from ddgs import DDGS
-        
-        logger.info(f"🌐 启动增强联网搜索...")
-        search_start_time = time.time()
-        
-        # 智能关键词提取
-        def extract_keywords(query):
-            # 移除疑问词
-            remove_words = ['什么是', '哪些', '如何', '怎么', '为什么', '是什么', '有哪些', '具体', '到底']
-            cleaned = query
-            for word in remove_words:
-                cleaned = cleaned.replace(word, ' ')
-            
-            # 特殊处理 - 更精准的关键词映射
-            if '发射场' in query:
-                return ['航天发射场', '发射基地', 'launch site', 'spaceport']
-            elif '文件位置' in query or '定位文件' in query:
-                return ['文件定位', '查找文件', 'find file location']
-            elif '机器学习' in query and 'Python' in query:
-                return ['Python机器学习', 'Python ML', 'machine learning python']
-            elif '人工智能' in query:
-                return ['人工智能', 'AI', 'artificial intelligence']
-            elif 'OpenAI' in query and 'Deep Research' in query:
-                return ['OpenAI Deep Research', 'AI research jobs', '人工智能研究岗位', 'knowledge work automation']
-            elif 'AI' in query and ('岗位' in query or '工作' in query or 'job' in query):
-                return ['AI工作岗位', 'AI jobs', 'artificial intelligence careers', 'AI替代工作']
-            elif '研究生' in query and 'AI' in query:
-                return ['研究生AI应用', 'graduate AI research', 'AI学术研究']
-            elif '知识密集型' in query or 'knowledge intensive' in query:
-                return ['知识密集型工作', 'knowledge work', 'cognitive jobs', 'AI automation jobs']
-            else:
-                # 提取中文词汇 (改进：更好的分词)
-                chinese_words = re.findall(r'[\u4e00-\u9fff]{2,}', cleaned)
-                english_words = re.findall(r'[a-zA-Z]{3,}', cleaned)
-                
-                # 过滤常见词
-                filtered_chinese = [w for w in chinese_words if w not in ['可以', '能够', '应该', '需要', '进行']]
-                filtered_english = [w for w in english_words if w.lower() not in ['can', 'should', 'need', 'will', 'have']]
-                
-                return (filtered_chinese + filtered_english)[:3]
-        
-        keywords = extract_keywords(final_prompt)
-        logger.info(f"🔑 提取关键词: {keywords}")
-        
-        all_results = []
-        
-        # 搜索每个关键词
-        with DDGS() as ddgs:
-            for keyword in keywords[:3]:  # 最多搜索3个关键词
-                try:
-                    logger.info(f"🔍 搜索: {keyword}")
-                    
-                    # 根据语言选择区域
-                    if re.search(r'[\u4e00-\u9fff]', keyword):
-                        # 中文关键词
-                        results = list(ddgs.text(keyword, max_results=5, region='cn-zh'))
-                        if not results:
-                            results = list(ddgs.text(keyword, max_results=5))
-                    else:
-                        # 英文关键词
-                        results = list(ddgs.text(keyword, max_results=5, region='us-en'))
-                        if not results:
-                            results = list(ddgs.text(keyword, max_results=5))
-                    
-                    if results:
-                        logger.info(f"  ✅ 找到 {len(results)} 条结果")
-                        all_results.extend(results)
-                    else:
-                        logger.info(f"  ❌ 无结果")
-                        
-                except Exception as e:
-                    logger.warning(f"  ❌ 搜索失败: {e}")
-                    continue
-        
-        # 去重
-        unique_results = []
-        seen_urls = set()
-        for result in all_results:
-            url = result.get('href', '')
-            if url and url not in seen_urls:
-                seen_urls.add(url)
-                unique_results.append(result)
-        
-        # 质量过滤
-        quality_results = []
-        for result in unique_results:
-            title = result.get('title', '').lower()
-            body = result.get('body', '').lower()
-            
-            # 过滤垃圾内容
-            if not any(spam in title + body for spam in ['广告', '推广', 'ad', 'advertisement', '购买', '下载', 'buy', 'download']):
-                # 计算相关性得分
-                score = 0
-                for kw in keywords:
-                    if kw.lower() in title:
-                        score += 3
-                    if kw.lower() in body:
-                        score += 1
-                
-                # 权威性加分
-                url = result.get('href', '')
-                if any(domain in url for domain in [
-                    'wikipedia.org', 'baidu.com', 'zhihu.com', 'github.com',
-                    'stackoverflow.com', 'csdn.net', 'edu.cn', '.gov.cn',
-                    'nature.com', 'science.org', 'arxiv.org', 'ieee.org',
-                    'openai.com', 'anthropic.com', 'deepmind.com', 'mit.edu',
-                    'stanford.edu', 'harvard.edu', 'tsinghua.edu.cn', 'pku.edu.cn'
-                ]):
-                    score += 2
-                
-                # 内容长度合理性
-                if 50 <= len(body) <= 500:
-                    score += 1
-                
-                result['quality_score'] = max(0, score)
-                quality_results.append(result)
-        
-        # 按质量排序
-        quality_results.sort(key=lambda x: x.get('quality_score', 0), reverse=True)
-        
-        search_duration = round(time.time() - search_start_time, 2)
-        
-        logger.info(f"📊 搜索完成: {len(quality_results)} 条高质量结果，耗时 {search_duration}s")
-        
-        return quality_results[:8]  # 返回前8个结果
-        
-    except ImportError:
-        logger.error("❌ 未安装 ddgs 库，请运行: pip install ddgs")
-        return []
-    except Exception as e:
-        logger.error(f"❌ 联网搜索失败: {e}")
-        return []
-from llama_index.core.node_parser import SentenceSplitter
-from llama_index.llms.ollama import Ollama
-from llama_index.llms.openai import OpenAI
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.embeddings.ollama import OllamaEmbedding
-from llama_index.embeddings.openai import OpenAIEmbedding
-from llama_index.core.schema import Document
-
-# 导入自定义嵌入
-from src.custom_embeddings import create_custom_embedding
-
-# 引入日志模块
-from src.app_logging import LogManager
-logger = LogManager()
-# terminal_logger 已被 logger 替代
-from src.chat_utils_improved import generate_follow_up_questions_safe as generate_follow_up_questions
-from src.chat.unified_suggestion_engine import get_unified_suggestion_engine
-
-# 引入元数据管理
-from src.metadata_manager import MetadataManager
-
-# 引入工具模块
-from src.utils.memory import cleanup_memory, get_memory_stats
-from src.utils.model_manager import (
-    load_embedding_model,
-    load_llm_model,
-    set_global_embedding_model,
-    set_global_llm_model
-)
-from src.utils.document_processor import (
-    sanitize_filename,
-    get_file_size_str,
-    get_file_type,
-    get_file_info,
-    get_relevance_label,
-    load_pptx_file
-)
-
-# 引入配置管理
-from src.config import ConfigLoader, ManifestManager
-
-# 引入聊天管理
-from src.chat.unified_suggestion_engine import get_unified_suggestion_engine
-from src.chat import HistoryManager
-
-# 引入 UI 模块
-from src.ui.page_style import PageStyle
-from src.ui.sidebar_config import SidebarConfig
-
-# 引入工具函数
-from src.utils.app_utils import (
-    get_kb_embedding_dim,
-    remove_file_from_manifest,
-    show_first_time_guide,
-    open_file_native,
-    handle_kb_switching
-)
-
-# 引入主控制器
-from src.core.main_controller import MainController
-
-# 引入知识库处理器
-from src.kb.kb_processor import KBProcessor
-
-# 引入文档解析器
-from src.processors.document_parser import _parse_single_doc, _parse_batch_docs
-
-# 引入资源保护
-from src.utils.adaptive_throttling import get_resource_guard
-import psutil as psutil_main
-
-# 初始化资源保护
-resource_guard = get_resource_guard()
-
-# 引入知识库管理
-from src.kb import KBManager
-kb_manager = KBManager()
-
-# 性能监控 (v1.5.1)
-from src.ui.performance_monitor import get_monitor
-perf_monitor = get_monitor()
-
-# 查询改写 (v1.6)
-from src.query.query_rewriter import QueryRewriter
-
-# 知识库名称优化器
-from src.utils.kb_name_optimizer import KBNameOptimizer, sanitize_filename
-
-# 文档预览 (v1.6)
-from src.kb.document_viewer import DocumentViewer
-from src.ui.document_preview import show_upload_preview, show_kb_documents
-
-# 引入统一UI组件
-from src.ui.unified_dialogs import show_document_detail_dialog
-
-from src.utils.kb_utils import generate_smart_kb_name
-from src.utils.app_utils import initialize_session_state
-
-
-# 引入 RAG 引擎
-from src.rag_engine import RAGEngine
-
-# 引入资源监控和模型工具
-from src.utils.resource_monitor import check_resource_usage, get_system_stats
-from src.utils.model_utils import (
-    check_ollama_status,
-    fetch_remote_models,
-    check_hf_model_exists,
-    get_kb_embedding_dim,
-    auto_switch_model,
-    get_model_dimension
-)
-
-# 引入 UI 展示组件 (Stage 3.1)
-from src.ui.display_components import (
-    render_message_stats,
-    render_source_references,
-    get_relevance_label
-)
-
-# 引入 UI 模型选择器 (Stage 3.2.1)
-from src.ui.model_selectors import (
-    render_ollama_model_selector,
-    render_openai_model_selector,
-    render_hf_embedding_selector
-)
-
-# 引入 UI 高级配置 (Stage 3.2.3)
-
-# 引入 UI 配置表单 (Stage 3.2.2)
-from src.ui.config_forms import render_basic_config
-
-# 引入状态管理器 (Stage 3.3)
-from src.core.state_manager import state
-
-# 引入文档处理器 (Stage 4.1)
-from src.processors import UploadHandler, IndexBuilder
-
-# ⚠️ 关键修复：强制使用本地模型，避免 OpenAI 默认
-os.environ['LLAMA_INDEX_EMBED_MODEL'] = 'local'
-
-# 兼容旧代码的包装函数
-def get_embed(provider, model, key, url):
-    """兼容旧代码的包装函数"""
-    return load_embedding_model(provider, model, key, url)
-
-def get_llm(provider, model, key, url, temp):
-    """兼容旧代码的包装函数"""
-    return load_llm_model(provider, model, key, url, temp)
-
-# 引入文件处理模块
-from src.file_processor import scan_directory_safe
-
-
-# from src.ui.compact_sidebar import render_compact_sidebar  # 已删除冗余模块
-# 增强功能模块 (v1.7.4)
-from src.utils.error_handler_enhanced import error_handler
-from src.utils.memory_manager_enhanced import memory_manager
-from src.ui.performance_dashboard_enhanced import performance_dashboard
-from src.ui.user_experience_enhanced import ux_enhancer
-
-# 引入并行执行模块
-from src.utils.parallel_executor import ParallelExecutor
-from src.utils.safe_parallel_tasks import safe_process_node_worker as process_node_worker, extract_metadata_task
-
-# 引入聊天模块 (Stage 7)
-from src.chat import ChatEngine
-
-# 引入配置模块 (Stage 8)
-from src.config import ConfigLoader, ConfigValidator
-
-# 多进程函数：文档分块解析（移到模块级别）
-# 引入文档解析器
-from src.processors.document_parser import _parse_single_doc, _parse_batch_docs
-
-# ==========================================
-# 1. 页面配置与样式
-# ==========================================
-PageStyle.setup_page()
-
-# 注入 CSS
-st.markdown("""
-<style>
-    /* 彻底禁止横向滚动和左右拖动手势 - 强制锁定布局 */
-    html, body, [data-testid="stAppViewContainer"], .stApp, [data-testid="stApp"] {
-        overflow-x: hidden !important;
-        max-width: 100vw !important;
-        overscroll-behavior-x: none !important;
-        position: relative !important;
-    }
-    
-    /* 强制禁止任何容器产生横向位移 */
-    [data-testid="stMain"], [data-testid="stSidebar"] {
-        overflow-x: hidden !important;
-        max-width: 100% !important;
-    }
-
-    /* 极致压缩侧边栏间距 */
-    section[data-testid="stSidebar"] .stSelectbox > div {
-        margin-bottom: 1px !important;
-    }
-    
-    section[data-testid="stSidebar"] .stTextInput > div {
-        margin-bottom: 1px !important;
-    }
-    
-    section[data-testid="stSidebar"] .stCaption {
-        margin-bottom: 1px !important;
-        margin-top: 1px !important;
-    }
-    
-    section[data-testid="stSidebar"] .stContainer {
-        margin-bottom: 1px !important;
-        margin-top: 1px !important;
-    }
-
-    /* 增加侧边栏宽度，固定大小并禁止拖动缩放 */
-    section[data-testid="stSidebar"] {
-        min-width: 850px !important;
-        width: 850px !important;
-        max-width: 850px !important;
-    }
-
-    /* 隐藏并禁用侧边栏缩放手柄（彻底解决左下角左右拖动问题） */
-    [data-testid="stSidebarResizer"] {
-        display: none !important;
-        pointer-events: none !important;
-    }
-
-    
-    /* 统计区域容器 */
-    .stats-container {
-        background: white !important;
-        border-radius: 10px !important;
-        padding: 1rem !important;
-        margin: 1rem 0 !important;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
-    }
-    
-
-    /* 文档详情折叠优化 */
-    .document-details {
-        background: #f8f9fa !important;
-        border-radius: 6px !important;
-        padding: 0.75rem !important;
-        margin: 0.5rem 0 !important;
-        border-left: 3px solid #1f77b4 !important;
-    }
-    
-    .document-summary {
-        background: white !important;
-        padding: 0.5rem !important;
-        border-radius: 4px !important;
-        margin-top: 0.5rem !important;
-        border: 1px solid #dee2e6 !important;
-        font-size: 0.85rem !important;
-        line-height: 1.4 !important;
-    }
-    
-    /* 批量操作按钮 */
-    .batch-operations {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 6px !important;
-        padding: 0.5rem 1rem !important;
-        font-weight: 500 !important;
-        transition: all 0.3s ease !important;
-    }
-    
-    .batch-operations:hover {
-        transform: translateY(-1px) !important;
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3) !important;
-    }
-    
-    /* 快速预览提示 */
-    .preview-tooltip {
-        position: absolute !important;
-        background: rgba(0,0,0,0.9) !important;
-        color: white !important;
-        padding: 0.5rem !important;
-        border-radius: 4px !important;
-        font-size: 0.8rem !important;
-        max-width: 300px !important;
-        z-index: 1000 !important;
-        pointer-events: none !important;
-    }
-    
-
-        /* 完全修复参考片段显示 */
-    .reference-snippet {
-        background-color: #f8f9fa !important;
-        border-left: 3px solid #1f77b4 !important;
-        padding: 12px !important;
-        margin: 10px 0 !important;
-        border-radius: 6px !important;
-        font-size: 0.9rem !important;
-        line-height: 1.5 !important;
-        word-wrap: break-word !important;
-        overflow-wrap: break-word !important;
-        white-space: pre-wrap !important;
-        max-width: 100% !important;
-    }
-    
-    .reference-header {
-        font-size: 0.85rem !important;
-        color: #666 !important;
-        margin-bottom: 8px !important;
-        font-weight: 500 !important;
-    }
-    
-    .reference-content {
-        color: #333 !important;
-        background: white !important;
-        padding: 8px 12px !important;
-        border-radius: 4px !important;
-        border: 1px solid #dee2e6 !important;
-        max-height: none !important;
-        overflow: visible !important;
-        word-break: break-word !important;
-    }
-    
-    /* 确保Streamlit不截断HTML */
-    .stMarkdown > div {
-        max-width: none !important;
-        overflow: visible !important;
-    }
-    
-    .stMarkdown div[style*="border-left"] {
-        max-width: 100% !important;
-        overflow: visible !important;
-        word-wrap: break-word !important;
-    }
-    
-
-    /* 减少间距 */
-    .block-container {
-        padding-top: 0.75rem !important;
-        padding-bottom: 1rem !important;
-    }
-
-    .element-container {
-        margin-bottom: 0.2rem !important;
-    }
-    
-    h1, h2, h3 {
-        margin: 0.2rem 0 !important;
-    }
-    
-    [data-testid="column"] {
-        padding: 0 0.3rem !important;
-    }
-    
-    /* 文件列表 */
-    .file-item {
-        font-size: 0.8rem !important;
-        padding: 0.5rem !important;
-        background: rgba(0,0,0,0.02) !important;
-        border-radius: 6px !important;
-        margin-bottom: 0.3rem !important;
-        border: 1px solid rgba(0,0,0,0.05) !important;
-    }
-    
-    /* 欢迎页面 */
-    .welcome-box {
-        padding: 1.5rem !important;
-        border-radius: 10px !important;
-        background: rgba(255,75,75,0.02) !important;
-        border: 1px solid rgba(255,75,75,0.1) !important;
-        text-align: center !important;
-        margin: 1rem 0 !important;
-    }
-    
-    /* 进度条 */
-    .stProgress > div > div {
-        border-radius: 4px !important;
-        height: 6px !important;
-    }
-    
-    /* 响应式 */
-    @media (max-width: 768px) {
-        .main .block-container {
-            padding: 0.5rem !important;
-        }
-    }
-</style>""", unsafe_allow_html=True)
-
-# 应用启动日志
-if 'app_initialized' not in st.session_state:
-    logger.separator("RAG Pro Max 启动")
-    logger.info("应用初始化中...")
-    
-    # 立即设置全局LLM（确保摘要生成等功能可用）
-    try:
-        # 使用统一配置加载器 (读取 rag_config.json)
-        config = ConfigLoader.load()
-        
-        llm_provider = config.get('llm_provider', 'Ollama')
-        
-        # 提取配置
-        if llm_provider == 'OpenAI-Compatible':
-            llm_model = config.get('llm_model_other', '')
-            llm_url = config.get('llm_url_other', '')
-            llm_key = config.get('llm_key_other', '')
-        elif llm_provider == 'OpenAI':
-            llm_model = config.get('llm_model_openai', 'gpt-3.5-turbo')
-            llm_url = config.get('llm_url_openai', 'https://api.openai.com/v1')
-            llm_key = config.get('llm_key', '')
-        else:  # Ollama & Default
-            llm_model = config.get('llm_model_ollama', 'gpt-oss:20b')
-            llm_url = config.get('llm_url_ollama', 'http://localhost:11434')
-            llm_key = ""
-        
-        system_prompt = config.get('system_prompt', None)
-        
-        # 设置全局LLM
-        if llm_model:
-            set_global_llm_model(llm_provider, llm_model, llm_key, llm_url, system_prompt=system_prompt)
-            
-    except Exception as e:
-        logger.warning(f"全局LLM初始化失败: {e}")
-    
-    st.session_state.app_initialized = True
-    if 'current_session_id' not in st.session_state:
-        st.session_state.current_session_id = None
-    logger.success("应用初始化完成")
-
-# ==========================================
-# 2. 本地持久化与工具函数
-# ==========================================
-CONFIG_FILE = "rag_config.json"
-HISTORY_DIR = "chat_histories"
-UPLOAD_DIR = "temp_uploads"
-
-# 确保目录存在
-for d in [HISTORY_DIR, UPLOAD_DIR]:
-    if not os.path.exists(d): os.makedirs(d)
-
-# 使用新的配置加载器 (Stage 8)
-defaults = ConfigLoader.load()
-
-from src.common.business import generate_doc_summary
-
-with st.sidebar:
-    # 横向标签页布局
-    tab_main, tab_roles, tab_config, tab_monitor, tab_help = st.tabs(["🏠 主页", "🎭 角色", "⚙️ 配置", "📊 监控", "❓ 帮助"])
-    
-    with tab_main:
-
-        # 知识库控制台标题与一键配置完全一行化
-        console_col1, console_col2, console_col3 = st.columns([4, 1, 0.5])
-        with console_col1:
-            st.markdown("**💠 知识库控制台**")
-        with console_col2:
-            if st.button("⚡ 一键配置", use_container_width=True, key="quick_config_inline"):
-                ConfigLoader.quick_setup()
-                st.success("✅ 已使用默认配置！")
-                time.sleep(1)
-                st.rerun()
-        with console_col3:
-            st.markdown("❓", help="可手动配置，适合高级用户")
-        
-        if "model_list" not in st.session_state: st.session_state.model_list = []
-
-        # 存储根目录完全一行化
-        storage_col1, storage_col2, storage_col3 = st.columns([0.6, 5.9, 0.5])
-        with storage_col1:
-            st.markdown("**路径:**")
-        with storage_col2:
-            default_output_path = os.path.join(os.getcwd(), "vector_db_storage")
-            output_base = st.text_input("", value=default_output_path, help="知识库文件的保存位置", label_visibility="collapsed")
-        with storage_col3:
-            if st.button("📂", help="打开存储目录", use_container_width=True, key="open_storage_dir"):
-                if output_base and os.path.exists(output_base):
-                    import webbrowser, urllib.parse
-                    try:
-                        file_url = 'file://' + urllib.parse.quote(os.path.abspath(output_base))
-                        webbrowser.open(file_url)
-                        st.toast("✅ 已打开")
-                    except: pass
-        if not output_base: output_base = default_output_path
-            
-        existing_kbs = (setattr(kb_manager, "base_path", output_base), kb_manager.list_all())[1]
-
-        # --- 核心导航 ---
-        base_kbs = kb_manager.list_all()
-        
-        # 为每个知识库创建带复选框的选项
-        from src.config.manifest_manager import ManifestManager
-        nav_options = ["➕ 新建知识库...", "💬 纯对话模式 (Pure Chat)"]
-        for kb in base_kbs:
-            # 获取统计信息 (v2.7.6: 增强信息展示)
-            try:
-                kb_path = os.path.join(output_base, kb)
-                stats = ManifestManager.get_stats(kb_path)
-                doc_count = stats.get('file_count', 0)
-                size_str = ManifestManager.format_size(stats.get('total_size', 0))
-                date_str = stats.get('created_time', '').split('T')[0] if stats.get('created_time') else 'N/A'
-                info_str = f" (📄{doc_count} | 💾{size_str} | 🕒{date_str})"
-            except Exception:
-                info_str = " (N/A)"
-
-            # 检查是否被选中
-            is_selected = st.session_state.get(f"kb_check_{kb}", False)
-            checkbox_symbol = "☑️" if is_selected else "☐"
-            nav_options.append(f"{checkbox_symbol} 📂 {kb}{info_str}")
-        
-        # 保存选中的知识库列表
-        selected_kbs = [kb for kb in base_kbs if st.session_state.get(f"kb_check_{kb}", False)]
-        st.session_state.selected_kbs = selected_kbs
-
-        # 检查是否要显示配置页面
-        if st.session_state.get('show_industry_config'):
-            from src.ui.industry_config_interface import render_industry_config_interface
-            
-            # 返回按钮
-            if st.button("← 返回主页"):
-                st.session_state.show_industry_config = False
-                st.rerun()
-            
-            # 渲染配置界面
-            render_industry_config_interface()
-            st.stop()  # 停止执行后续代码
-
-        default_idx = 0
-        if "current_nav" in st.session_state:
-            # 强化匹配逻辑 (v2.7.6): 兼容带统计信息和复选框图标的情况
-            # 1. 移除图标
-            current_nav_clean = st.session_state.current_nav.replace("☑️ ", "").replace("☐ ", "")
-            # 2. 移除统计信息 (📄... | 💾... | 🕒...)
-            current_nav_clean = current_nav_clean.split(" (")[0].strip()
-            
-            for i, opt in enumerate(nav_options):
-                # 对待匹配项执行同样的清理
-                opt_clean = opt.replace("☑️ ", "").replace("☐ ", "").split(" (")[0].strip()
-                if opt_clean == current_nav_clean:
-                    default_idx = i
-                    break
-            
-            # 兜底：如果清理后匹配到了，更新 session_state 确保同步最新格式
-            if default_idx > 0 and nav_options[default_idx] != st.session_state.current_nav:
-                st.session_state.current_nav = nav_options[default_idx]
-
-        # 知识库选择 - 直接复选框模式
-        select_col1, select_col2, select_col3 = st.columns([0.6, 5.9, 0.5])
-        with select_col1:
-            st.markdown("**选择:**")
-        with select_col2:
-            selected_nav = st.selectbox("", nav_options, index=default_idx, label_visibility="collapsed")
-            
-            # 自动启动纯对话模式 (v2.7.6)
-            if selected_nav == "💬 纯对话模式 (Pure Chat)" and st.session_state.get('current_kb_id') != "pure_chat":
-                try:
-                    from llama_index.core.chat_engine import SimpleChatEngine
-                    from src.config.prompt_manager import PromptManager
-                    
-                    # 获取当前角色提示词
-                    current_role_id = st.session_state.get('current_prompt_id', 'default')
-                    system_prompt = PromptManager.get_content(current_role_id)
-                    
-                    st.session_state.chat_engine = SimpleChatEngine.from_defaults(
-                        system_prompt=system_prompt
-                    )
-                    st.session_state.current_kb_id = "pure_chat"
-                    st.toast("✅ 纯对话模式已自动启动")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"启动失败: {e}")
-
-            # 处理复选框点击逻辑 - 只有当用户手动更改选择时才触发
-            if selected_nav != st.session_state.get('current_nav') and (selected_nav.startswith("☐") or selected_nav.startswith("☑️")):
-                # 提取知识库名称 (支持带统计信息的格式)
-                kb_name = selected_nav.split("📂 ")[1].split(" (")[0].strip() if "📂 " in selected_nav else ""
-                if kb_name:
-                    # 切换复选框状态
-                    current_state = st.session_state.get(f"kb_check_{kb_name}", False)
-                    new_state = not current_state
-                    st.session_state[f"kb_check_{kb_name}"] = new_state
-                    
-                    # 关键修复：立即更新 current_nav 字符串，确保下次 rerun 时 index 匹配正确
-                    new_symbol = "☑️" if new_state else "☐"
-                    st.session_state.current_nav = f"{new_symbol} 📂 {kb_name}"
-                    st.rerun()
-        with select_col3:
-            if st.button("🔄", help="刷新知识库列表", use_container_width=True, key="refresh_kb_list"):
-                st.rerun()
-
-        # 自动启动系统逻辑 (替代原有的启动按钮)
-        # 纯对话模式已在上方 selectbox 处理，此处处理知识库模式
-        is_pure_chat = (selected_nav == "💬 纯对话模式 (Pure Chat)")
-        
-        # 仅在非创建模式且非纯对话模式下执行自动启动
-        if not is_pure_chat and selected_nav != "➕ 新建知识库...":
-            target_kb_id = None
-            selected_kbs = st.session_state.get('selected_kbs', [])
-            
-            if len(selected_kbs) == 1:
-                target_kb_id = selected_kbs[0]
-            elif len(selected_kbs) > 1:
-                target_kb_id = "multi_kb_mode"
-            
-            # 如果目标ID有效，且与当前运行的ID不一致，则触发启动
-            if target_kb_id and target_kb_id != st.session_state.get('current_kb_id'):
-                # 显示加载状态 (仅在初次加载或切换时)
-                if st.session_state.get('current_kb_id') is None:
-                     status_text = f"正在启动: {target_kb_id}..."
-                     spinner_ctx = st.spinner(status_text)
-                else:
-                     # 切换时使用 toast 以减少干扰
-                     status_text = None
-                     spinner_ctx = st.empty()
-
-                with spinner_ctx:
-                    try:
-                        if target_kb_id == "multi_kb_mode":
-                            st.session_state.chat_engine = "multi_kb_mode"
-                            st.session_state.current_kb_id = "multi_kb_mode"
-                            st.toast(f"✅ 多知识库模式已启动 ({len(selected_kbs)}个)")
-                        else:
-                            # 单知识库
-                            kb_name = target_kb_id
-                            from src.rag_engine import create_rag_engine
-                            rag_engine = create_rag_engine(kb_name)
-                            if rag_engine:
-                                st.session_state.chat_engine = rag_engine.get_chat_engine()
-                                st.session_state.current_kb_id = kb_name
-                                st.toast(f"✅ 知识库 '{kb_name}' 已启动")
-                            else:
-                                st.error(f"❌ 无法启动知识库 '{kb_name}'")
-                                # 添加友好的错误引导
-                                from src.utils.friendly_error_handler import friendly_error
-                                friendly_error("知识库未加载", 
-                                             f"知识库 '{kb_name}' 启动失败",
-                                             ["检查知识库文件是否完整", "尝试重新创建知识库", "查看系统日志获取详细信息"])
-                                st.session_state.current_kb_id = None
-                        
-                        # 只有在引擎变化时才 rerun，确保界面刷新
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ 启动失败: {str(e)}")
-                        logger.error(f"Auto-start failed: {e}")
-
-        # 知识库搜索/过滤已按用户要求移除
-
-        # 卸载知识库按钮（释放内存）
-        if not (selected_nav == "➕ 新建知识库...") and st.session_state.get('chat_engine') is not None:
-            if st.button("🔓 卸载知识库（释放内存）", use_container_width=True, help="释放当前知识库占用的内存资源"):
-                st.session_state.chat_engine = None
-                st.session_state.current_kb_id = None
-                cleanup_memory()
-                st.toast("✅ 知识库已卸载，内存已释放")
-                st.rerun()
-
-        # --- 会话历史 (Session History) v2.7.3 ---
-        # 提取当前的 active_kb_name (如果已选择)
-        current_active_kb = None
-        # 局部判断是否为创建模式，避免 NameError
-        _is_creating = (selected_nav == "➕ 新建知识库...")
-        if not _is_creating and "📂 " in selected_nav:
-             current_active_kb = selected_nav.split("📂 ")[1].split(" (")[0].strip()
-        
-        if current_active_kb:
-            st.markdown("---")
-            with st.expander("🕒 历史会话", expanded=True):
-                from src.chat.history_manager import HistoryManager
-                sessions = HistoryManager.list_sessions(current_active_kb)
-                
-                # 新建会话按钮
-                if st.button("➕ 新建会话", use_container_width=True, key="sidebar_new_chat"):
-                    import uuid
-                    new_id = str(uuid.uuid4())[:8]
-                    st.session_state.current_session_id = new_id
-                    st.session_state.messages = []
-                    st.session_state.suggestions_history = []
-                    HistoryManager.save_session(current_active_kb, [], new_id)
-                    st.rerun()
-                
-                # 会话列表
-                for sess in sessions:
-                    sess_id = sess['id']
-                    label = sess['title']
-                    is_active = (sess_id == st.session_state.get('current_session_id'))
-                    
-                    if sess.get('is_default'):
-                        label = "📝 默认会话"
-                    
-                    btn_type = "primary" if is_active else "secondary"
-                    icon = "📂" if is_active else "📄"
-                    
-                    if st.button(f"{icon} {label}", key=f"sess_{sess_id}", use_container_width=True, type=btn_type):
-                        st.session_state.current_session_id = sess_id
-                        st.session_state.messages = HistoryManager.load_session(current_active_kb, sess_id)
-                        st.session_state.suggestions_history = []
-                        st.rerun()
-
-        if selected_nav != st.session_state.get('current_nav'):
-            st.session_state.pop('suggestions_history', None) 
-
-        st.session_state.current_nav = selected_nav
-
-        is_create_mode = (selected_nav == "➕ 新建知识库...")
-        
-        # 根据选中的知识库确定当前模式
-        selected_kbs = st.session_state.get('selected_kbs', [])
-        if len(selected_kbs) == 1:
-            current_kb_name = selected_kbs[0]
-        elif len(selected_kbs) > 1:
-            current_kb_name = None  # 多知识库模式
-            st.info(f"🔍 已选择 {len(selected_kbs)} 个知识库: {', '.join(selected_kbs)}")
-        else:
-            if selected_nav == "💬 纯对话模式 (Pure Chat)":
-                current_kb_name = "pure_chat"
-            else:
-                # 兼容带统计信息的格式
-                raw_name = selected_nav.split("📂 ")[1] if "📂 " in selected_nav else ""
-                current_kb_name = raw_name.split(" (")[0].strip() if not is_create_mode and raw_name else None
-
-        # 统一的数据源处理逻辑
-        uploaded_files = None
-        crawl_url = None
-        search_keyword = None
-        target_path = ""
-        btn_start = False # Initialize early to avoid NameError and support APPEND mode
-        source_mode = None # Initialize to avoid NameError in APPEND mode
-        
-        if is_create_mode:
-            # 注入 CSS 增强核心功能视觉效果
-            st.markdown("""
-            <style>
-            /* 放大 4x1 选择器的文字和图标 */
-            div[data-testid="stRadio"] > div[role="radiogroup"] > label {
-                padding: 10px 15px !important;
-                border-radius: 8px !important;
-                transition: all 0.2s ease !important;
-            }
-            div[data-testid="stRadio"] > div[role="radiogroup"] > label p {
-                font-size: 1.15rem !important;
-                font-weight: 600 !important;
-                color: #31333F !important;
-            }
-            /* 选中状态稍微变色提醒 */
-            div[data-testid="stRadio"] > div[role="radiogroup"] > label[data-baseweb="radio"]:has(input:checked) {
-                background-color: rgba(255, 75, 75, 0.05) !important;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-
-            # 4x1 水平数据源选择
-            source_mode = st.radio(
-                "数据源", 
-                ["📂 文件上传", "📝 粘贴文本", "🔗 网址抓取", "🔍 智能搜索"], 
-                horizontal=True,
-                label_visibility="collapsed",
-                key="data_source_selector"
-            )
-            
-            if source_mode == "📂 文件上传":
-                # 添加上传引导
-                from src.utils.user_guidance import show_guidance
-                show_guidance("upload")
-                
-                # 双模式：支持上传和手动输入路径
-                uploaded_files = st.file_uploader(
-                    "拖入文件", 
-                    accept_multiple_files=True, 
-                    key="uploader",
-                    label_visibility="collapsed",
-                    help="支持格式: PDF, DOCX, TXT, MD, Excel"
-                )
-                
-                # 恢复路径输入
-                st.markdown("<div style='margin-top: -5px; margin-bottom: 5px;'><span style='font-size: 0.75rem; color: gray;'>或粘贴本地目录路径:</span></div>", unsafe_allow_html=True)
-                manual_path = st.text_input(
-                    "本地路径",
-                    placeholder="例如: /Users/name/Documents/docs",
-                    key="manual_path_input",
-                    label_visibility="collapsed"
-                )
-                if manual_path and os.path.exists(manual_path):
-                    st.session_state.uploaded_path = manual_path
-            
-            elif source_mode == "📝 粘贴文本":
-                # 只在首次加载时注入CSS，避免重复注入
-                if 'paste_css_injected' not in st.session_state:
-                    st.markdown("""
-                    <style>
-                    .stTextArea textarea {
-                        border: 2px dashed rgba(49, 51, 63, 0.2) !important;
-                        background-color: rgba(240, 242, 246, 0.5) !important;
-                        border-radius: 0.5rem !important;
-                    }
-                    </style>
-                    """, unsafe_allow_html=True)
-                    st.session_state.paste_css_injected = True
-                
-                # 自动保存逻辑 - 失焦时触发
-                def auto_save_text():
-                    # 获取当前输入的文本
-                    content = st.session_state.get('paste_text_display', '')
-                    if content and content.strip():
-                        try:
-                            # 如果是截断显示的文本，需要获取完整内容
-                            if "... [文本过长，已截断显示，完整内容已保存] ..." in content:
-                                # 从完整文本存储中获取
-                                full_content = st.session_state.get('paste_text_content', content)
-                            else:
-                                full_content = content
-                            
-                            # 确保有实际内容
-                            if not full_content or not full_content.strip():
-                                return
-                                
-                            save_dir = os.path.join(UPLOAD_DIR, f"text_{int(time.time())}")
-                            if not os.path.exists(save_dir): 
-                                os.makedirs(save_dir)
-                            safe_name = "manual_input.txt"
-                            
-                            # 保存完整内容
-                            with open(os.path.join(save_dir, safe_name), 'w', encoding='utf-8') as f:
-                                f.write(full_content)
-                            
-                            # 设置路径 - 复用原来的逻辑
-                            abs_path = os.path.abspath(save_dir)
-                            st.session_state.uploaded_path = abs_path
-                            st.session_state.path_input = abs_path
-                            
-                            # 生成名称 - 复用原来的逻辑
-                            preview = "".join(c for c in full_content[:15] if c.isalnum() or c.isspace()).strip()
-                            st.session_state.upload_auto_name = f"Text_{preview}"
-                            
-                            # 标记已保存
-                            st.session_state.text_auto_saved = True
-                            st.session_state.saved_text_length = len(full_content)
-                            
-                        except Exception as e:
-                            st.error(f"自动保存失败: {e}")
-                
-                # 获取当前文本，如果超过10万字符则截断显示
-                current_text = st.session_state.get('paste_text_display', '')
-                display_text = current_text
-                is_truncated = False
-                
-                # 存储完整文本
-                if current_text:
-                    st.session_state.paste_text_content = current_text
-                
-                if len(current_text) > 100000:
-                    display_text = current_text[:10000] + "\n\n... [文本过长，已截断显示，完整内容已保存] ..."
-                    is_truncated = True
-                
-                # 文本输入框 - 显示截断后的文本
-                text_input_content = st.text_area(
-                    "文本内容", 
-                    value=display_text,
-                    height=200,
-                    placeholder="在此粘贴文本，失焦时自动保存...", 
-                    label_visibility="collapsed",
-                    key="paste_text_display",
-                    on_change=auto_save_text
-                )
-                
-                # 更新完整文本存储
-                if not is_truncated:
-                    st.session_state.paste_text_content = text_input_content
-                
-                # 显示状态信息
-                if st.session_state.get('text_auto_saved'):
-                    saved_length = st.session_state.get('saved_text_length', 0)
-                    st.success(f"✅ 文本已自动保存 ({saved_length:,} 字符) - {st.session_state.get('upload_auto_name', '')}")
-                elif current_text:
-                    char_count = len(current_text)
-                    if is_truncated:
-                        st.info(f"📊 大文本 ({char_count:,} 字符) - 前端仅显示前10,000字符，完整内容将自动保存")
-                    else:
-                        st.caption(f"📊 字符数: {char_count:,}")
-                
-                # 不需要手动保存按钮了，失焦自动保存
-        else:
-            # 管理模式 - 使用一行化布局 (1x2 紧凑布局)
-            manage_title_col1, manage_title_col2 = st.columns([4, 1])
-            with manage_title_col1:
-                st.markdown("📤 **添加文档**")
-            with manage_title_col2:
-                if st.button("🔄", help="重建索引 (覆盖该库)", use_container_width=True):
-                    # 触发重建逻辑
-                    st.session_state.uploaded_path = os.path.join("vector_db_storage", current_kb_name)
-                    # 这里需要一种方式标记为 NEW 模式，并通过 trigger_btn_start 强制触发
-                    st.session_state.trigger_rebuild = True
-                    st.session_state.trigger_btn_start = True
-                    st.rerun()
-
-            # 追加模式的文件上传
-            action_mode = "APPEND"
-            # 如果触发了重建，则强制改为 NEW
-            if st.session_state.get('trigger_rebuild'):
-                action_mode = "NEW"
-                st.session_state.trigger_rebuild = False # 消费掉标记
-            
-            # 初始化 btn_start
-            if st.session_state.get('trigger_btn_start'):
-                btn_start = True
-                st.session_state.trigger_btn_start = False # 消费掉标记
-            
-            target_path = "" # 管理模式不需要手动指定路径，使用KB原有路径
-            
-            uploaded_files = st.file_uploader(
-                "追加文件到当前知识库", 
-                accept_multiple_files=True, 
-                key="uploader_append",
-                label_visibility="collapsed"
-            )
-            
-            # 添加更新知识库按钮
-            if uploaded_files:
-                # 添加文件上传成功提示
-                st.success(f"✅ 文件上传成功！共选择了 {len(uploaded_files)} 个文件")
-                
-                # 导入进度显示组件
-                from src.ui.document_progress import doc_progress
-                
-                # 显示文件处理进度
-                st.markdown("### 📄 文件处理进度")
-                doc_progress.start_processing(uploaded_files)
-                
-                # 文档质量评估
-                if st.checkbox("📊 启用文档质量评估", value=False, key="enable_quality_assessment"):
-                    st.markdown("### 📋 文档质量评估")
-                    from src.utils.document_quality_assessor import show_quality_assessment, quality_assessor
-                    
-                    # 对每个上传的文件进行质量评估
-                    for uploaded_file in uploaded_files:
-                        if uploaded_file.type.startswith('text/') or uploaded_file.name.endswith(('.txt', '.md')):
-                            try:
-                                content = str(uploaded_file.read(), "utf-8")
-                                uploaded_file.seek(0)  # 重置文件指针
-                                
-                                with st.expander(f"📄 {uploaded_file.name} - 质量评估"):
-                                    show_quality_assessment(content, uploaded_file.name)
-                            except Exception as e:
-                                st.warning(f"⚠️ 无法评估 {uploaded_file.name}: {str(e)}")
-                        elif uploaded_file.name.endswith('.pdf'):
-                            try:
-                                with st.expander(f"📄 {uploaded_file.name} - PDF质量评估"):
-                                    assessment_result = quality_assessor.assess_pdf_file(uploaded_file)
                                     
-                                    # 显示评估结果
-                                    col1, col2, col3 = st.columns(3)
-                                    
-                                    with col1:
-                                        score = assessment_result['scores']['overall']
-                                        if score >= 80:
-                                            st.success(f"📊 总体评分: {score:.1f}")
-                                        elif score >= 60:
-                                            st.warning(f"📊 总体评分: {score:.1f}")
-                                        else:
-                                            st.error(f"📊 总体评分: {score:.1f}")
-                                    
-                                    with col2:
-                                        st.info(f"🏆 质量等级: {assessment_result['grade']}")
-                                    
-                                    with col3:
-                                        st.info(f"📄 字数: {assessment_result['word_count']}")
-                                    
-                                    # 详细评分
-                                    st.markdown("**📋 详细评分**")
-                                    col1, col2 = st.columns(2)
-                                    
-                                    with col1:
-                                        st.metric("📖 可读性", f"{assessment_result['scores']['readability']:.1f}")
-                                        st.metric("💡 内容密度", f"{assessment_result['scores']['content_density']:.1f}")
-                                    
-                                    with col2:
-                                        st.metric("🏗️ 结构性", f"{assessment_result['scores']['structure']:.1f}")
-                                        st.metric("✏️ 语言质量", f"{assessment_result['scores']['language_quality']:.1f}")
-                                    
-                                    # 改进建议
-                                    if assessment_result['suggestions']:
-                                        st.markdown("**💡 改进建议**")
-                                        for suggestion in assessment_result['suggestions']:
-                                            st.write(f"• {suggestion}")
-                                            st.write(f"• {suggestion}")
-                                            
-                            except Exception as e:
-                                st.error(f"❌ PDF评估失败 {uploaded_file.name}: {str(e)}")
-                        else:
-                            st.info(f"📄 {uploaded_file.name} - 暂不支持此文件类型的质量评估")
-                
-                # 高级选项 (复用新建模式的逻辑)
-                with st.expander("🔧 高级选项 (本次更新有效)", expanded=False):
-                    # 布局优化：全选 + 状态提示在一行
-                    h_col1, h_col2 = st.columns([1.5, 2.5])
-                    with h_col1:
-                        select_all = st.checkbox("✅ 一键全选", value=False, key="kb_adv_select_all_update", help="开启/关闭所有高级选项")
-                    with h_col2:
-                        status_placeholder = st.empty()
-                    
-                    default_val = select_all
-                    
-                    opt_col1, opt_col2, opt_col3 = st.columns(3)
-                    with opt_col1:
-                        st.checkbox("🔍 OCR识别", value=default_val, key="kb_use_ocr", help="识别PDF中的图片文字")
-                    with opt_col2:
-                        st.checkbox("📊 元数据", value=default_val, key="kb_extract_metadata", help="提取文件分类、关键词")
-                    with opt_col3:
-                        st.checkbox("📝 生成摘要", value=default_val, key="kb_generate_summary", help="生成AI摘要")
-                    
-                    # 更新状态提示
-                    options = []
-                    if st.session_state.get("kb_use_ocr"): options.append("OCR")
-                    if st.session_state.get("kb_extract_metadata"): options.append("元数据")
-                    if st.session_state.get("kb_generate_summary"): options.append("摘要")
-                    
-                    if options:
-                        status_placeholder.caption(f"🔧 启用: {'|'.join(options)}")
-                    else:
-                        status_placeholder.caption("⚡ 快速模式：已关闭高级选项")
-
-                st.info("💡 上传后请点击下方 '更新知识库' 按钮")
-                if st.button("🔄 更新知识库", type="primary", use_container_width=True, key="update_kb_btn"):
-                    # 立即处理上传，确保路径存在 (Failsafe)
-                    try:
-                        from src.processors.upload_handler import UploadHandler
-                        # UPLOAD_DIR is global/imported
-                        handler = UploadHandler(UPLOAD_DIR, logger)
-                        with st.spinner("正在预处理文件..."):
-                            result = handler.process_uploads(uploaded_files)
-                            st.session_state.uploaded_path = os.path.abspath(result.batch_dir)
-                            st.session_state.last_processed_path = st.session_state.uploaded_path
-                            # Update hash to prevent double processing downstream
-                            import hashlib
-                            upload_hash = hashlib.md5("".join([f"{f.name}_{f.size}" for f in uploaded_files]).encode()).hexdigest()
-                            st.session_state.last_upload_hash = upload_hash
-                    except Exception as e:
-                        logger.error(f"Immediate upload processing failed: {e}")
-                    
-                    btn_start = True
-                    action_mode = "APPEND"
-                    st.session_state.sidebar_state = "collapsed"
-                    st.markdown("""
-                    <style>
-                    [data-testid="stSidebar"] {
-                        width: 2.5rem !important;
-                        min-width: 2.5rem !important;
-                        max-width: 2.5rem !important;
-                    }
-                    [data-testid="stSidebar"] > div {
-                        overflow: hidden !important;
-                    }
-                    </style>
-                    """, unsafe_allow_html=True)
-
-        # 统一的数据源处理逻辑（仅针对 Web 抓取保留在外部，本地文件已在内部处理）
-        # btn_start already initialized above
-        
-        if is_create_mode:
-            if source_mode == "🔗 网址抓取":
-                # --- 网址抓取模式 ---
-                # 设置同步状态
-                st.session_state.crawl_input_mode = "url"
-                
-                # 加载优化器
-                try:
-                    from src.processors.crawl_optimizer import CrawlOptimizer
-                    if 'crawl_optimizer' not in st.session_state:
-                        st.session_state.crawl_optimizer = CrawlOptimizer()
-                    optimizer = st.session_state.crawl_optimizer
-                except ImportError:
-                    optimizer = None
-
-                c_url, c_btn = st.columns([7, 1])
-                with c_url:
-                    crawl_url = st.text_input("网址", placeholder="https://example.com", label_visibility="collapsed")
-                    st.session_state.crawl_url = crawl_url
-                with c_btn:
-                    if st.button("🧠", help="AI分析", key="smart_analyze_url", use_container_width=True):
-                        if crawl_url:
-                            with st.spinner("🔍"):
-                                test_url = crawl_url if crawl_url.startswith(('http://', 'https://')) else f"https://{crawl_url}"
-                                analysis = optimizer.analyze_website(test_url) if optimizer else None
-                                if analysis: st.session_state.crawl_analysis = analysis
-                        else:
-                            st.toast("请先输入网址", icon="⚠️")
-                
-                # 分析结果
-                if 'crawl_analysis' in st.session_state:
-                    analysis = st.session_state.crawl_analysis
-                    with st.expander("🎯 推荐: " + analysis['site_type'].title(), expanded=True):
-                        st.caption(f"💡 {analysis['description']}")
-
-                # 参数行 (紧凑 4列布局)
-                c_p1, c_p2, c_p3, c_p4 = st.columns(4)
-                with c_p1:
-                    default_depth = st.session_state.crawl_analysis['recommended_depth'] if 'crawl_analysis' in st.session_state else 2
-                    crawl_depth = st.number_input("递归深度", 1, 10, default_depth)
-                    st.session_state.crawl_depth = crawl_depth
-                with c_p2:
-                    default_pages = st.session_state.crawl_analysis['recommended_pages'] if 'crawl_analysis' in st.session_state else 5
-                    max_pages = st.number_input("最大页数", 1, 1000, default_pages)
-                    st.session_state.max_pages = max_pages
-                with c_p3:
-                    parser_type = st.selectbox("解析器", ["default", "article", "documentation"], label_visibility="visible")
-                    st.session_state.parser_type = parser_type
-                with c_p4:
-                    # 质量筛选 (简化为数字输入，0表示关闭)
-                    url_quality_threshold = st.number_input("质量阈值 (0=关)", 0.0, 100.0, 45.0, 5.0, help="内容质量评分阈值，低于此分数的页面将被丢弃")
-                    st.session_state.url_quality_threshold = url_quality_threshold
-                    enable_url_filter = (url_quality_threshold > 0)
-                
-                search_keyword = None # 互斥
-
-            elif source_mode == "🔍 智能搜索":
-                # --- 智能搜索模式 ---
-                # 设置同步状态
-                st.session_state.crawl_input_mode = "search"
-                crawl_url = None # 互斥
-                
-                # 行业选择 (紧凑)
-                try:
-                    from src.config.unified_sites import get_industry_list
-                    industries = get_industry_list()
-                    sel_ind = st.selectbox("行业", industries, label_visibility="collapsed")
-                except:
-                    sel_ind = "🔧 技术开发"
-                
-                c_kw, c_btn = st.columns([7, 1])
-                with c_kw:
-                    search_keyword = st.text_input("关键词", placeholder="输入搜索内容...", label_visibility="collapsed")
-                    st.session_state.search_keyword = search_keyword
-                with c_btn:
-                    st.button("🧠", help="AI推荐", key="smart_analyze_search", use_container_width=True)
-
-                # 参数行 (紧凑 4列布局)
-                c_s1, c_s2, c_s3, c_s4 = st.columns(4)
-                with c_s1:
-                    crawl_depth = st.number_input("深度", 1, 5, 2)
-                    st.session_state.search_crawl_depth = crawl_depth
-                with c_s2:
-                    max_pages = st.number_input("总页数", 1, 500, 5)
-                    st.session_state.search_max_pages = max_pages
-                with c_s3:
-                    parser_type = st.selectbox("解析器", ["default", "article", "documentation"], key="parser_search")
-                    st.session_state.search_parser_type = parser_type
-                with c_s4:
-                    # 质量筛选 (简化为数字输入，0表示关闭)
-                    quality_threshold = st.number_input("质量阈值 (0=关)", 0.0, 100.0, 0.0, 5.0, key="search_quality_threshold", help="内容质量评分阈值")
-                    st.session_state.quality_threshold = quality_threshold
-                
-                # 预估提示
-                est_pages = max_pages ** crawl_depth
-                if est_pages > 100: st.caption(f"ℹ️ 预估抓取: {est_pages} 页")
-                
-                selected_industry = sel_ind # 传递变量
-
-            # 排除配置 (通用)
-            if source_mode in ["🔗 网址抓取", "🔍 智能搜索"]:
-                with st.expander("🚫 排除链接", expanded=False):
-                    exclude_text = st.text_area("每行一个", height=68, placeholder="*/admin/*")
-                    exclude_patterns = [line.strip() for line in exclude_text.split('\n') if line.strip()] if exclude_text else []
-                
-                # 抓取按钮 (已移除，功能合并至侧边栏按钮)
-
-            # 处理上传 (Stage 4.1 - 使用 UploadHandler)
-            if uploaded_files:
-                # 使用文件名+大小的组合作为哈希，判断文件列表是否真正改变
-                import hashlib
-                upload_hash = hashlib.md5("".join([f"{f.name}_{f.size}" for f in uploaded_files]).encode()).hexdigest()
-                
-                print(f"DEBUG: Upload detected. Files: {len(uploaded_files)}, Hash: {upload_hash}")
-                print(f"DEBUG: Last Hash: {st.session_state.get('last_upload_hash')}")
-                
                 # 只要哈希不同，或者当前没有有效的上传路径，就重新处理
                 # 这能修复“路径丢失”的问题，同时保留哈希优化
                 if st.session_state.get('last_upload_hash') != upload_hash or not st.session_state.get('uploaded_path'):
-                    print("DEBUG: New upload hash detected OR path missing. Processing...")
-                    progress_bar = st.progress(0)
+                                        progress_bar = st.progress(0)
                     status_text = st.empty()
 
                     # 使用 UploadHandler 处理上传
@@ -1424,8 +95,6 @@ with st.sidebar:
                     progress_bar.progress(0.5)
 
                     result = handler.process_uploads(uploaded_files)
-                    
-                    print(f"DEBUG: Process result dir: {result.batch_dir}")
 
                     progress_bar.empty()
                     status_text.empty()
@@ -1434,8 +103,6 @@ with st.sidebar:
                     st.session_state.last_upload_hash = upload_hash
                     st.session_state.uploaded_path = os.path.abspath(result.batch_dir)
                     st.session_state.last_processed_path = st.session_state.uploaded_path
-                    
-                    print(f"DEBUG: Saved uploaded_path: {st.session_state.uploaded_path}")
 
                     # 显示上传结果
                     if result.success_count > 0:
@@ -1525,11 +192,8 @@ with st.sidebar:
                 
                 elif st.session_state.get('last_processed_path'):
                     # 如果哈希匹配（说明是 rerun），且有备份路径，则恢复
-                    print(f"DEBUG: Hash matched. Restoring path: {st.session_state.last_processed_path}")
-                    st.session_state.uploaded_path = st.session_state.last_processed_path
+                                        st.session_state.uploaded_path = st.session_state.last_processed_path
                 else:
-                    print("DEBUG: Hash matched but no last_processed_path found!")
-
 
             # 使用上传路径或手动输入的路径
             target_path = st.session_state.get('uploaded_path') or target_path
@@ -1659,7 +323,6 @@ with st.sidebar:
                 else:
                     status_placeholder.caption("⚡ 快速模式：已关闭高级选项")
 
-
             st.write("")
 
             btn_label = "🚀 立即创建" if is_create_mode else ("➕ 执行追加" if action_mode=="APPEND" else "🔄 执行覆盖")
@@ -1780,8 +443,7 @@ with st.sidebar:
                     if st.button("❌ 取消", use_container_width=True):
                         st.session_state.confirm_delete = False
                         st.rerun()
-            
-    
+
     with tab_roles:
         from src.ui.role_manager_ui import RoleManagerUI
         RoleManagerUI.render()
@@ -1985,7 +647,6 @@ def jump_to_knowledge_base(kb_name: str, output_base: str):
     logger.log("知识库跳转", "info", f"✅ 跳转参数已设置: current_nav={st.session_state.current_nav}")
     logger.log("知识库跳转", "info", "🚀 执行页面刷新...")
     logger.log("知识库跳转", "complete", f"✅ 跳转函数执行完成: {kb_name}")
-
 
 def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extract_metadata=False, generate_summary=False, force_reindex=False):
     """处理知识库逻辑 (Stage 4.2 - 使用 IndexBuilder)"""
@@ -2219,7 +880,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-
 # 初始化状态
 initialize_session_state()
 
@@ -2294,12 +954,7 @@ if active_kb_name and st.session_state.chat_engine is None and active_kb_name !=
 
 # 按钮处理
 if btn_start:
-    print(f"DEBUG: btn_start triggered")
-    print(f"DEBUG: is_create_mode = {is_create_mode}")
-    print(f"DEBUG: crawl_input_mode = {st.session_state.get('crawl_input_mode')}")
-    print(f"DEBUG: crawl_url = {st.session_state.get('crawl_url')}")
-    print(f"DEBUG: search_keyword = {st.session_state.get('search_keyword')}")
-    
+                        
     # 检查是否为网页抓取模式 - 自动检测模式
     crawl_url = st.session_state.get('crawl_url', '').strip()
     search_keyword = st.session_state.get('search_keyword', '').strip()
@@ -2312,18 +967,10 @@ if btn_start:
         auto_detected_mode = 'search'
     
     is_web_crawl_mode = (is_create_mode and auto_detected_mode is not None)
-    
-    print(f"DEBUG: auto_detected_mode = {auto_detected_mode}")
-    print(f"DEBUG: is_web_crawl_mode = {is_web_crawl_mode}")
-    
+
     if is_web_crawl_mode:
-        print("DEBUG: 进入网页抓取模式")
-        current_mode = auto_detected_mode
-        
-        print(f"DEBUG: current_mode = {current_mode}")
-        print(f"DEBUG: crawl_url = {crawl_url}")
-        print(f"DEBUG: search_keyword = {search_keyword}")
-        
+                current_mode = auto_detected_mode
+
         # 获取抓取参数
         crawl_depth = st.session_state.get('crawl_depth', 2)
         max_pages = st.session_state.get('max_pages', 5)
@@ -2333,8 +980,7 @@ if btn_start:
         
         # 执行网页抓取并创建知识库的逻辑
         if current_mode == 'url' and crawl_url:
-            print(f"DEBUG: ✅ 进入网址抓取分支，URL = {crawl_url}")
-            logger.log("网页抓取", "start", f"🌐 开始网址抓取模式: {crawl_url}")
+                        logger.log("网页抓取", "start", f"🌐 开始网址抓取模式: {crawl_url}")
             # 网址抓取模式 - 复用现有逻辑
             try:
                 # 优先使用异步爬虫
@@ -2494,8 +1140,7 @@ if btn_start:
                 st.stop()
                 
         elif current_mode == 'search' and search_keyword:
-            print(f"DEBUG: ✅ 进入智能搜索分支，关键词 = {search_keyword}")
-            logger.log("智能搜索", "start", f"🔍 开始智能搜索模式: {search_keyword}")
+                        logger.log("智能搜索", "start", f"🔍 开始智能搜索模式: {search_keyword}")
             # 智能搜索模式 - 复用现有逻辑
             try:
                 # 获取搜索参数
@@ -2688,12 +1333,8 @@ if btn_start:
                 logger.error(f"智能搜索错误: {str(e)}")
                 st.stop()
         else:
-            print(f"DEBUG: ❌ 未匹配任何网页抓取分支")
-            print(f"DEBUG: current_mode = '{current_mode}', crawl_url = '{crawl_url}', search_keyword = '{search_keyword}'")
-            logger.log("网页抓取", "warning", f"⚠️ 未匹配网页抓取条件: mode={current_mode}, url={bool(crawl_url)}, keyword={bool(search_keyword)}")
-    
-    print("DEBUG: 跳过网页抓取模式，进入原有文件处理逻辑")
-    
+                                    logger.log("网页抓取", "warning", f"⚠️ 未匹配网页抓取条件: mode={current_mode}, url={bool(crawl_url)}, keyword={bool(search_keyword)}")
+
     # 检查是否已经完成了网页抓取或智能搜索，避免重复处理
     if st.session_state.get('web_crawl_completed') or st.session_state.get('smart_search_completed'):
         logger.log("文件处理", "info", "🔄 检测到网页抓取/智能搜索已完成，跳过文件处理逻辑")
@@ -2776,10 +1417,6 @@ if btn_start:
                     
                 # 使用优化后的名称
                 final_kb_name = optimized_name
-            
-            print(f"DEBUG: Calling process_knowledge_base_logic with: kb={final_kb_name}, ocr={current_use_ocr}, meta={current_extract_metadata}, summary={current_generate_summary}")
-            print(f"DEBUG: st.session_state.uploaded_path = {st.session_state.get('uploaded_path')}")
-            print(f"DEBUG: uploaded_files present? = {bool(uploaded_files) if 'uploaded_files' in locals() else 'Not in locals'}")
 
             process_knowledge_base_logic(
                 kb_name=final_kb_name,
@@ -3682,7 +2319,6 @@ if is_create_mode:
     </div>
     """, unsafe_allow_html=True)
 
-
 # --- 融合 ChatOllama 风格：会话顶栏 (v2.7.6) ---
 if active_kb_name:
     with st.container():
@@ -4513,10 +3149,8 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             with st.spinner("🔍 正在从多个知识库中检索信息..."):
                 try:
                     # 执行多知识库查询
-                    print(f"🔍 DEBUG: 开始执行多知识库查询，使用查询: '{final_prompt}'")
-                    response = multi_engine.query(final_prompt, selected_kbs, embed_provider, embed_model, embed_key, embed_url)
-                    print(f"✅ DEBUG: 多知识库查询完成")
-                    
+                                        response = multi_engine.query(final_prompt, selected_kbs, embed_provider, embed_model, embed_key, embed_url)
+                                        
                 except Exception as e:
                     error_msg = f"查询失败: {str(e)}"
                     logger.log("多知识库查询", "error", f"❌ 多知识库查询异常: {str(e)}")
@@ -4559,145 +3193,14 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             if kb_dim and kb_dim in model_map:
                 required_model = model_map[kb_dim]
                 if embed_model != required_model:
-                    print(f"🔄 强制切换模型: {embed_model} → {required_model} (维度: {kb_dim}D)")
-                    embed_model = required_model
-                    embed = get_embed(embed_provider, embed_model, embed_key, embed_url)
-                    if embed:
-                        Settings.embed_model = embed
-                        print(f"✅ 模型已切换")
-            else:
-                # 维度检测失败时，不强制切换，但记录日志
-                if not kb_dim:
-                    print(f"⚠️ 无法检测知识库维度，保持当前模型: {embed_model}")
-        
-        logger.separator("知识库查询")
-        
-        # 检查是否为多知识库模式
-        if len(st.session_state.get('selected_kbs', [])) > 1:
-            # 多知识库查询模式
-            selected_kbs = st.session_state.get('selected_kbs', [])
-            logger.start_operation("多知识库查询", f"知识库: {', '.join(selected_kbs)}")
-            
-            # 导入多知识库查询引擎
-            from src.query.multi_kb_query_engine import query_single_kb_worker
-            from concurrent.futures import ProcessPoolExecutor, as_completed
-            
-            # 执行多知识库查询
-            start_time = time.time()
-            
-            # --- 多库模式下的智能研究注入 (v2.9.2) ---
-            if st.session_state.get('enable_deep_research', False):
-                with st.status("🔬 多库智能研究：专家组会审中...", expanded=False) as status:
-                    try:
-                        from llama_index.core import Settings
-                        llm = Settings.llm
-                        st.write("🎭 正在召集跨领域专家分析多库问题...")
-                        role_res = llm.complete(f"针对多知识库问题：'{final_prompt}'，列出3个专业角色。")
-                        roles = role_res.text.strip()
-                        st.write(f"💬 征询专家意见: {roles}...")
-                        syn_res = llm.complete(f"以【{roles}】视角分析问题：{final_prompt}")
-                        final_prompt = f"【多库研究视角】:\n{syn_res.text}\n\n【原始问题】: {final_prompt}"
-                        status.update(label="✅ 多库会审完成", state="complete")
-                        logger.log("INFO", f"🔬 多库研究开启: {roles}", stage="多库查询")
-                    except Exception as e:
-                        logger.error(f"多库研究模式异常: {e}")
-            
-            results = {}
-            max_workers = min(mp.cpu_count(), len(selected_kbs), 3)
-            
-            try:
-                with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                    future_to_kb = {
-                        executor.submit(query_single_kb_worker, kb_name, final_prompt, 3): kb_name 
-                        for kb_name in selected_kbs
-                    }
-                    
-                    for future in as_completed(future_to_kb, timeout=60):
-                        kb_name = future_to_kb[future]
-                        try:
-                            result = future.result(timeout=30)
-                            results[kb_name] = result
-                        except Exception as e:
-                            results[kb_name] = {
-                                "kb_name": kb_name,
-                                "success": False,
-                                "error": f"查询失败: {str(e)}",
-                                "results": []
-                            }
-            except Exception as e:
-                logger.error(f"多进程查询失败: {e}")
-                # 回退到单线程
-                for kb_name in selected_kbs:
-                    try:
-                        result = query_single_kb_worker(kb_name, final_prompt, 3)
-                        results[kb_name] = result
-                    except Exception as kb_error:
-                        results[kb_name] = {
-                            "kb_name": kb_name,
-                            "success": False,
-                            "error": f"查询失败: {str(kb_error)}",
-                            "results": []
-                        }
-            
-            # 生成整合答案
-            successful_results = [r for r in results.values() if r["success"]]
-            total_time = time.time() - start_time
-            
-            if successful_results:
-                # 构建整合答案
-                integrated_answer = f"**基于 {len(successful_results)} 个知识库的查询结果：**\n\n"
-                
-                for i, result in enumerate(successful_results, 1):
-                    kb_name = result["kb_name"]
-                    answer = result.get("answer", "无答案")
-                    integrated_answer += f"#### 📚 知识库 {i}: {kb_name}\n{answer}\n\n"
-                
-                integrated_answer += f"---\n**查询统计**: {len(successful_results)}/{len(selected_kbs)} 个知识库响应成功，耗时 {total_time:.2f} 秒"
-                
-                # 显示结果
-                with st.chat_message("assistant", avatar="🤖"):
-                    st.markdown(integrated_answer)
-                    
-                    # 添加查询成功提示
-                    st.success(f"✅ 查询完成！从 {len(successful_results)} 个知识库获得答案，耗时 {total_time:.2f} 秒")
-                    
-                    # 详细结果
-                    with st.expander("📋 详细结果"):
-                        for kb_name, result in results.items():
-                            if result["success"] and result["results"]:
-                                st.write(f"**📚 {kb_name}**")
-                                for i, doc in enumerate(result["results"][:2], 1):
-                                    st.write(f"📄 {doc['source']} (相关度: {doc['score']:.3f})")
-                                    st.caption(doc['content'][:200] + "...")
-                
-                # 添加到消息历史
-                st.session_state.messages.append({"role": "user", "content": final_prompt})
-                st.session_state.messages.append({"role": "assistant", "content": integrated_answer})
-                
-            else:
-                st.error("❌ 所有知识库查询都失败了")
-            
-            st.session_state.is_processing = False
-            st.rerun()
-            
-        else:
-            # 单知识库查询模式（原逻辑）
-            logger.start_operation("查询", f"知识库: {active_kb_name}")
-        
-        # 查询改写 (v1.6) - 深度思考自动优化
-        if st.session_state.get('enable_query_optimization', False):
-            print(f"🧠 DEBUG: 深度思考功能已启用，开始自动优化查询")
-            logger.info("🧠 深度思考(查询优化)已激活")
+                                logger.info("🧠 深度思考(查询优化)已激活")
             query_rewriter = QueryRewriter(Settings.llm)
             should_rewrite, reason = query_rewriter.should_rewrite(final_prompt)
-            print(f"🧠 DEBUG: should_rewrite={should_rewrite}, reason={reason}")
-            
+                        
             if should_rewrite:
-                print(f"💡 DEBUG: 检测到需要改写查询")
-                logger.info(f"💡 深度思考: 检测到需要改写查询 - {reason}")
+                                logger.info(f"💡 深度思考: 检测到需要改写查询 - {reason}")
                 rewritten_query = query_rewriter.suggest_rewrite(final_prompt)
-                print(f"💡 DEBUG: 优化后的查询: {rewritten_query}")
-                
+                                
                 if rewritten_query and rewritten_query != final_prompt:
                     # 保存原问题
                     original_prompt = final_prompt
@@ -4708,26 +3211,18 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     
                     # 直接使用优化后的查询
                     final_prompt = rewritten_query
-                    print(f"✅ DEBUG: 已自动使用优化后的查询: '{final_prompt}'")
-                    print(f"✅ DEBUG: 原问题: '{original_prompt}'")
-                    print(f"✅ DEBUG: 优化后: '{final_prompt}'")
-                    logger.info(f"✅ 深度思考: 自动使用优化后的查询 - {rewritten_query}")
+                                                                                logger.info(f"✅ 深度思考: 自动使用优化后的查询 - {rewritten_query}")
                     
                     # 确保后续所有地方都使用优化后的查询
                     st.session_state.current_optimized_query = final_prompt
             else:
-                print(f"🧠 DEBUG: 查询清晰，无需改写")
-                logger.info(f"🧠 深度思考: 查询清晰，无需改写 ({reason})")
+                                logger.info(f"🧠 深度思考: 查询清晰，无需改写 ({reason})")
         else:
-            print(f"🧠 DEBUG: 深度思考功能未启用")
-        
-        print(f"🔍 DEBUG: 查询优化完成，final_prompt = '{final_prompt}'")
 
         # 保存用于显示和查询的提示词
         user_display_prompt = final_prompt  # 用于UI显示
         query_prompt = final_prompt  # 用于实际查询
-        print(f"🔍 DEBUG: 准备执行查询，query_prompt = '{query_prompt}'")
-        
+                
         # 处理引用内容
         if st.session_state.get("quote_content"):
             quoted_text = st.session_state.quote_content
