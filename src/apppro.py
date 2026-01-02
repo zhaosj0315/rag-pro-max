@@ -1034,26 +1034,49 @@ with st.sidebar:
                     """, unsafe_allow_html=True)
                     st.session_state.paste_css_injected = True
                 
-                # 使用更大的高度，减少滚动卡顿
+                # 使用更大的高度，但对超大文本进行优化处理
                 text_input_content = st.text_area(
                     "文本内容", 
-                    height=200,  # 增加高度，减少滚动
+                    height=200,
                     placeholder="在此粘贴文本，点击下方按钮保存...", 
                     label_visibility="collapsed",
                     key="paste_text_content"
-                    # 移除字符限制，M4 Max性能足够处理大文本
                 )
                 
-                # 显示字符统计，但不限制
+                # 显示字符统计和性能优化提示
                 if text_input_content:
                     char_count = len(text_input_content)
-                    if char_count > 100000:
-                        st.info(f"📊 大文本处理中 ({char_count:,} 字符) - M4 Max性能足够")
+                    if char_count > 500000:  # 50万字符以上
+                        st.warning(f"⚠️ 超大文本 ({char_count:,} 字符) - 浏览器渲染可能卡顿，建议保存后清空文本框")
+                        # 提供清空按钮
+                        if st.button("🗑️ 保存后清空文本框", help="减少页面卡顿"):
+                            st.session_state.paste_text_content = ""
+                            st.rerun()
+                    elif char_count > 100000:
+                        st.info(f"📊 大文本处理中 ({char_count:,} 字符)")
                     else:
                         st.caption(f"📊 字符数: {char_count:,}")
                 
                 # 添加保存按钮，避免实时触发
-                if st.button("💾 保存文本", disabled=not text_input_content.strip()):
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    save_button = st.button("💾 保存文本", disabled=not text_input_content.strip())
+                with col2:
+                    if text_input_content and len(text_input_content) > 500000:
+                        if st.button("📁 另存为文件", help="超大文本建议保存为文件上传"):
+                            # 直接保存为文件并切换到文件上传模式
+                            try:
+                                import tempfile
+                                with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+                                    f.write(text_input_content)
+                                    temp_path = f.name
+                                
+                                st.session_state.paste_text_content = ""  # 清空文本框
+                                st.success(f"✅ 已保存为临时文件，请切换到文件上传模式选择: {temp_path}")
+                            except Exception as e:
+                                st.error(f"保存失败: {e}")
+                
+                if save_button:
                     content = text_input_content
                     if content.strip():
                         try:
