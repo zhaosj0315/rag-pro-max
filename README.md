@@ -12,6 +12,10 @@
 
 # RAG Pro Max - 智能文档问答系统
 
+**版本**: v3.2.2  
+**更新日期**: 2026-01-03  
+**适用范围**: 企业级部署与运维
+
 ![Version](https://img.shields.io/badge/version-v3.2.2-brightgreen)
 ![Status](https://img.shields.io/badge/status-Stable-blue)
 ![Last Update](https://img.shields.io/badge/last%20update-2026--01--03-orange)

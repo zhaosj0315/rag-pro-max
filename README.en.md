@@ -12,6 +12,10 @@
 
 # RAG Pro Max - Intelligent Document Q&A System
 
+**版本**: v3.2.2  
+**更新日期**: 2026-01-03  
+**适用范围**: 企业级部署与运维
+
 ![Version](https://img.shields.io/badge/version-v3.2.2-brightgreen)
 ![Status](https://img.shields.io/badge/status-Stable-blue)
 ![Last Update](https://img.shields.io/badge/last%20update-2026--01--03-orange)
@@ -36,7 +40,7 @@
 - **Self-hosted Vector Database**: Sensitive information stays internal
 - **Open Source Transparency**: Complete source code for security auditing
 
-### 🔬 Intelligent Research & Deep Analysis (New in v2.9.0)
+### 🔬 Intelligent Research & Deep Analysis (Enhanced in v3.2.2)
 - **Deep Research Mode**: Simulates expert-level multi-step analysis, fact-checking, and cross-domain knowledge integration
 - **Research Instruction Injection**: Automatically decomposes complex questions into multi-dimensional analysis
 - **Status Indicator Bar**: Real-time display of four core capabilities: "Thinking, Networking, Searching, Researching"
