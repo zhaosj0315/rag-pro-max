@@ -194,7 +194,6 @@ class MultimodalProcessor:
         from src.app_logging.log_manager import LogManager
         logger = LogManager()
         
-        # TODO: 实现多模态查询逻辑
         # ⚠️ MOCK IMPLEMENTATION: Real multimodal retrieval (images/tables) is pending integration.
         logger.warning("执行 MOCK 多模态查询 - v3.2.2 版本功能未完整实现", stage="多模态处理")
         
