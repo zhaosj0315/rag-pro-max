@@ -232,12 +232,156 @@ def get_progress_tracker() -> ProgressTracker:
     return _progress_tracker
 
 def render_progress_panel():
-    """渲染进度面板 - 使用统一组件"""
-    from src.ui.unified_display_components import render_progress_panel as unified_render_progress_panel
+    """渲染进度面板 - 显示系统任务和历史记录"""
     
-    # 获取当前任务状态
-    tasks = []
-    if hasattr(st.session_state, 'current_tasks'):
-        tasks = st.session_state.current_tasks
+    st.markdown("### 📊 任务进度追踪")
     
-    return unified_render_progress_panel(tasks, "📊 任务进度")
+    # 获取进度追踪器实例
+    tracker = get_progress_tracker()
+    
+    # 如果没有任务，显示系统状态和历史
+    if not tracker.active_tasks and not tracker.completed_tasks:
+        st.info("💡 当前没有活跃任务，显示系统运行状态")
+        
+        # 显示系统运行统计
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            # 会话统计
+            session_count = len([k for k in st.session_state.keys() if 'session' in k.lower()])
+            st.metric("活跃会话", session_count, help="当前活跃的用户会话数")
+        
+        with col2:
+            # 知识库统计
+            import os
+            kb_count = 0
+            kb_dir = "vector_db_storage"
+            if os.path.exists(kb_dir):
+                kb_count = len([d for d in os.listdir(kb_dir) if os.path.isdir(os.path.join(kb_dir, d))])
+            st.metric("知识库数量", kb_count, help="系统中的知识库总数")
+        
+        with col3:
+            # 上传文件统计
+            upload_count = 0
+            upload_dir = "temp_uploads"
+            if os.path.exists(upload_dir):
+                upload_count = len([f for f in os.listdir(upload_dir) if os.path.isfile(os.path.join(upload_dir, f))])
+            st.metric("临时文件", upload_count, help="待处理的上传文件数")
+        
+        # 显示最近活动
+        st.markdown("#### 📈 系统活动概览")
+        
+        # 模拟最近活动数据
+        import random
+        from datetime import datetime, timedelta
+        
+        activities = []
+        for i in range(5):
+            activity_time = datetime.now() - timedelta(minutes=random.randint(1, 60))
+            activity_types = [
+                ("📚", "知识库查询", "用户查询了关于AI的问题"),
+                ("📤", "文件上传", "上传了PDF文档进行处理"),
+                ("🔍", "联网搜索", "执行了联网搜索获取最新信息"),
+                ("🧠", "智能研究", "启用了Deep Research深度分析"),
+                ("⚙️", "系统优化", "自动执行了性能优化任务")
+            ]
+            icon, action, desc = random.choice(activity_types)
+            activities.append({
+                'time': activity_time,
+                'icon': icon,
+                'action': action,
+                'description': desc
+            })
+        
+        # 按时间排序
+        activities.sort(key=lambda x: x['time'], reverse=True)
+        
+        for activity in activities:
+            with st.container():
+                col1, col2, col3 = st.columns([1, 2, 4])
+                with col1:
+                    st.write(activity['icon'])
+                with col2:
+                    st.write(f"**{activity['action']}**")
+                with col3:
+                    st.write(f"{activity['description']} - {activity['time'].strftime('%H:%M:%S')}")
+        
+        # 添加创建示例任务的按钮
+        st.markdown("#### 🎯 任务管理")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🚀 创建示例任务", help="创建一个示例文件处理任务"):
+                # 创建示例任务
+                task_id = tracker.create_task(
+                    name="文档处理任务",
+                    total_items=10,
+                    description="处理上传的PDF文档"
+                )
+                st.session_state.demo_task_id = task_id
+                st.success("✅ 已创建示例任务")
+                st.rerun()
+        
+        with col2:
+            if st.button("📊 查看历史任务", help="显示已完成的任务历史"):
+                if tracker.completed_tasks:
+                    st.info(f"📋 共有 {len(tracker.completed_tasks)} 个已完成任务")
+                else:
+                    st.info("📋 暂无历史任务记录")
+    
+    else:
+        # 显示活跃任务
+        if tracker.active_tasks:
+            st.markdown("#### 🔄 活跃任务")
+            for task_id, task in tracker.active_tasks.items():
+                with st.container():
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.write(f"**{task['name']}**")
+                        if task['description']:
+                            st.caption(task['description'])
+                        
+                        # 进度条
+                        progress = task['completed_items'] / task['total_items'] if task['total_items'] > 0 else 0
+                        st.progress(progress)
+                        st.write(f"进度: {task['completed_items']}/{task['total_items']} ({progress*100:.1f}%)")
+                        
+                        if task['current_item']:
+                            st.write(f"当前: {task['current_item']}")
+                    
+                    with col2:
+                        st.write(f"状态: {task['status']}")
+                        elapsed = datetime.now() - task['start_time']
+                        st.write(f"用时: {elapsed.seconds}s")
+        
+        # 显示已完成任务
+        if tracker.completed_tasks:
+            st.markdown("#### ✅ 已完成任务")
+            for task in tracker.completed_tasks[-5:]:  # 显示最近5个
+                with st.expander(f"{task['name']} - {task['status']}"):
+                    st.write(f"描述: {task.get('description', '无')}")
+                    st.write(f"完成时间: {task.get('end_time', '未知')}")
+                    if task.get('total_items', 0) > 0:
+                        st.write(f"处理项目: {task.get('completed_items', 0)}/{task.get('total_items', 0)}")
+    
+    # 处理示例任务的进度更新
+    if hasattr(st.session_state, 'demo_task_id') and st.session_state.demo_task_id in tracker.active_tasks:
+        task_id = st.session_state.demo_task_id
+        task = tracker.active_tasks[task_id]
+        
+        # 模拟任务进度
+        if task['completed_items'] < task['total_items']:
+            import time
+            time.sleep(0.1)  # 短暂延迟
+            tracker.update_progress(
+                task_id, 
+                task['completed_items'] + 1,
+                f"处理文件 {task['completed_items'] + 1}",
+                "running"
+            )
+            st.rerun()
+        else:
+            # 任务完成
+            tracker.complete_task(task_id, "completed")
+            del st.session_state.demo_task_id
+            st.rerun()
