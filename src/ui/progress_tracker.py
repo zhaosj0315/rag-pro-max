@@ -351,6 +351,7 @@ def render_progress_panel():
                     
                     with col2:
                         st.write(f"状态: {task['status']}")
+                        from datetime import datetime
                         elapsed = datetime.now() - task['start_time']
                         st.write(f"用时: {elapsed.seconds}s")
         
