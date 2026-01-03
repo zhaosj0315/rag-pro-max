@@ -1,0 +1,48 @@
+name: Documentation Check
+on: 
+  push:
+    paths:
+      - 'docs/**'
+      - 'README*.md'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'README*.md'
+
+jobs:
+  check-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Check multilingual documentation
+        run: |
+          echo "🌍 Checking multilingual documentation structure..."
+          
+          # 检查README文件
+          if [ ! -f "README.md" ]; then
+            echo "❌ README.md not found"
+            exit 1
+          fi
+          
+          if [ ! -f "README.en.md" ]; then
+            echo "❌ README.en.md not found"
+            exit 1
+          fi
+          
+          # 检查文档目录结构
+          if [ ! -d "docs/zh" ]; then
+            echo "❌ docs/zh directory not found"
+            exit 1
+          fi
+          
+          if [ ! -d "docs/en" ]; then
+            echo "❌ docs/en directory not found"
+            exit 1
+          fi
+          
+          # 运行同步检查脚本
+          chmod +x scripts/i18n-sync.sh
+          ./scripts/i18n-sync.sh
+          
+          echo "✅ Documentation structure check passed!"

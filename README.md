@@ -1,3 +1,15 @@
+# RAG Pro Max
+
+<div align="center">
+
+**Languages:** 
+[🇨🇳 中文](README.md) | 
+[🇺🇸 English](README.en.md)
+
+</div>
+
+---
+
 # RAG Pro Max - 智能文档问答系统
 
 ![Version](https://img.shields.io/badge/version-v3.2.2-brightgreen)
