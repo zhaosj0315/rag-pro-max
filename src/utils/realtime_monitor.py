@@ -31,7 +31,14 @@ class RealtimeMonitor:
             st.session_state.monitor_data = {
                 'start_time': current_time,
                 'last_update': current_time,
-                'refresh_count': 0
+                'refresh_count': 0,
+                'history': {
+                    'timestamps': [],
+                    'cpu_usage': [],
+                    'memory_usage': [],
+                    'response_time': [],
+                    'active_sessions': []
+                }
             }
         
         # 计算初始状态
@@ -40,12 +47,125 @@ class RealtimeMonitor:
         progress = ((elapsed % self.update_interval) / self.update_interval) * 100
         refresh_count = int(elapsed // self.update_interval)
         
+        # 获取系统指标
+        cpu_usage = psutil.cpu_percent()
+        memory = psutil.virtual_memory()
+        memory_usage = memory.percent
+        
+        # 模拟其他指标
+        import random
+        response_time = round(random.uniform(1.5, 3.5), 2)
+        active_sessions = random.randint(1, 8)
+        
+        # 更新历史数据 (保留最近50个数据点)
+        if len(st.session_state.monitor_data['history']['timestamps']) >= 50:
+            for key in st.session_state.monitor_data['history']:
+                st.session_state.monitor_data['history'][key].pop(0)
+        
+        st.session_state.monitor_data['history']['timestamps'].append(datetime.now().strftime('%H:%M:%S'))
+        st.session_state.monitor_data['history']['cpu_usage'].append(cpu_usage)
+        st.session_state.monitor_data['history']['memory_usage'].append(memory_usage)
+        st.session_state.monitor_data['history']['response_time'].append(response_time)
+        st.session_state.monitor_data['history']['active_sessions'].append(active_sessions)
+        
         # 显示倒计时 - 使用JavaScript更新
         st.markdown(f"""
         <div id="countdown-display">
             <h2>⏰ 倒计时: <span id="countdown-value">{int(countdown)}</span> 秒</h2>
         </div>
         """, unsafe_allow_html=True)
+        
+        # 显示刷新统计
+        st.markdown(f"📊 已刷新: **{refresh_count}** 次")
+        
+        # 显示进度条
+        st.progress(progress / 100)
+        
+        # 添加图表选项
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("### 📈 历史趋势图表")
+        with col2:
+            show_charts = st.checkbox("显示图表", value=True, help="显示系统指标的历史趋势")
+        
+        if show_charts and len(st.session_state.monitor_data['history']['timestamps']) > 1:
+            # 创建图表
+            import pandas as pd
+            import plotly.graph_objects as go
+            from plotly.subplots import make_subplots
+            
+            # 准备数据
+            df = pd.DataFrame(st.session_state.monitor_data['history'])
+            
+            # 创建子图
+            fig = make_subplots(
+                rows=2, cols=2,
+                subplot_titles=('CPU使用率 (%)', '内存使用率 (%)', '响应时间 (秒)', '活跃会话数'),
+                specs=[[{"secondary_y": False}, {"secondary_y": False}],
+                       [{"secondary_y": False}, {"secondary_y": False}]]
+            )
+            
+            # CPU使用率
+            fig.add_trace(
+                go.Scatter(x=df['timestamps'], y=df['cpu_usage'], 
+                          name='CPU', line=dict(color='#1f77b4')),
+                row=1, col=1
+            )
+            
+            # 内存使用率
+            fig.add_trace(
+                go.Scatter(x=df['timestamps'], y=df['memory_usage'], 
+                          name='内存', line=dict(color='#ff7f0e')),
+                row=1, col=2
+            )
+            
+            # 响应时间
+            fig.add_trace(
+                go.Scatter(x=df['timestamps'], y=df['response_time'], 
+                          name='响应时间', line=dict(color='#2ca02c')),
+                row=2, col=1
+            )
+            
+            # 活跃会话
+            fig.add_trace(
+                go.Scatter(x=df['timestamps'], y=df['active_sessions'], 
+                          name='会话数', line=dict(color='#d62728')),
+                row=2, col=2
+            )
+            
+            # 更新布局
+            fig.update_layout(
+                height=400,
+                showlegend=False,
+                title_text=f"系统监控趋势 (最近{len(df)}个数据点)",
+                title_x=0.5
+            )
+            
+            # 更新x轴，只显示部分时间标签
+            for i in range(1, 3):
+                for j in range(1, 3):
+                    fig.update_xaxes(
+                        tickangle=45,
+                        nticks=5,  # 只显示5个时间点
+                        row=i, col=j
+                    )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # 显示统计摘要
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("平均CPU", f"{df['cpu_usage'].mean():.1f}%", 
+                         f"{df['cpu_usage'].iloc[-1] - df['cpu_usage'].mean():.1f}%")
+            with col2:
+                st.metric("平均内存", f"{df['memory_usage'].mean():.1f}%",
+                         f"{df['memory_usage'].iloc[-1] - df['memory_usage'].mean():.1f}%")
+            with col3:
+                st.metric("平均响应", f"{df['response_time'].mean():.2f}s",
+                         f"{df['response_time'].iloc[-1] - df['response_time'].mean():.2f}s")
+            with col4:
+                st.metric("平均会话", f"{df['active_sessions'].mean():.0f}",
+                         f"{df['active_sessions'].iloc[-1] - df['active_sessions'].mean():.0f}")
         
         # 显示其他信息
         col1, col2 = st.columns(2)
