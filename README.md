@@ -285,7 +285,7 @@ class CustomProcessor:
         return processed_content
 
 # 注册处理器
-from src.processors import register_processor
+from rag_pro_max.processors import register_processor
 register_processor('.custom', CustomProcessor)
 ```
 

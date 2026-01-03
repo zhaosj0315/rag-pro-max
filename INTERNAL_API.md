@@ -21,7 +21,7 @@
 
 #### 生成推荐问题
 ```python
-from src.services.recommendation_service import RecommendationService
+from rag_pro_max.services.recommendation_service import RecommendationService
 
 rec_service = RecommendationService()
 recommendations = rec_service.generate_recommendations(

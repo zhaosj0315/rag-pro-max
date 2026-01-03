@@ -17,7 +17,7 @@
 ### 2️⃣ 选择与建枝 (Select & Branch) 
 - 选择单个功能（Ticket/Issue）
 - **创建分支**：`git checkout -b feature/功能名_日期`
-- **理由**：如果不建分支，一旦开发失败，回退代码非常痛苦
+- **理由**：如果不建分支，一旦开发失败，回退代码极其痛苦
 - **明确完成标准** (Definition of Done)
 
 ### 3️⃣ 实现 (Implement)
