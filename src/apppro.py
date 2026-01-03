@@ -1822,8 +1822,173 @@ with st.sidebar:
             perf_monitor.render_panel()
     
     with tab_help:
-        st.markdown("##### 📖 帮助")
-        st.info("RAG Pro Max v2.4.7 - Web爬取与数据处理增强版")
+        st.markdown("### 📖 RAG Pro Max 帮助中心")
+        
+        # 版本信息
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.info("📦 **版本**: v3.2.2")
+        with col2:
+            st.info("🚀 **状态**: 稳定版")
+        with col3:
+            st.info("📅 **更新**: 2026-01-03")
+        
+        # 快速导航
+        st.markdown("#### 🧭 快速导航")
+        
+        help_tabs = st.tabs(["🚀 快速开始", "💡 使用技巧", "🔧 功能说明", "❓ 常见问题", "📞 获取支持"])
+        
+        with help_tabs[0]:  # 快速开始
+            st.markdown("##### 🚀 快速开始指南")
+            
+            st.markdown("""
+            **第一步：创建知识库**
+            1. 点击左侧 "➕ 新建知识库..."
+            2. 选择创建方式：文件上传、粘贴文本、网址抓取
+            3. 输入知识库名称，点击 "立即创建"
+            
+            **第二步：开始对话**
+            1. 选择已创建的知识库
+            2. 在下方输入框输入问题
+            3. 系统自动检索并生成回答
+            
+            **第三步：高级功能**
+            - 🌐 开启 "联网搜索" 获取最新信息
+            - 🧠 启用 "智能研究" 进行深度分析
+            - 🎭 切换不同角色获得专业回答
+            """)
+            
+            if st.button("🎯 立即开始创建知识库"):
+                st.success("💡 请点击左侧 '➕ 新建知识库...' 开始！")
+        
+        with help_tabs[1]:  # 使用技巧
+            st.markdown("##### 💡 使用技巧")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("""
+                **📝 提问技巧**
+                - 问题越具体，回答越准确
+                - 可以要求"详细解释"或"简要概括"
+                - 支持多轮对话，可以追问细节
+                
+                **🔍 搜索优化**
+                - 联网搜索适合时效性问题
+                - 智能研究适合复杂分析
+                - 组合使用效果更佳
+                
+                **📚 知识库管理**
+                - 定期更新文档内容
+                - 合理命名便于识别
+                - 删除过时的知识库
+                """)
+            
+            with col2:
+                st.markdown("""
+                **⚡ 性能优化**
+                - 文档大小控制在50MB以内
+                - PDF文档效果最佳
+                - 避免重复上传相同内容
+                
+                **🎭 角色切换**
+                - 技术问题选择"技术专家"
+                - 商务问题选择"商务顾问"
+                - 学术问题选择"学术研究员"
+                
+                **🛠️ 故障排除**
+                - 清空浏览器缓存
+                - 检查网络连接
+                - 重新启动应用
+                """)
+        
+        with help_tabs[2]:  # 功能说明
+            st.markdown("##### 🔧 功能说明")
+            
+            features = [
+                ("🌐 联网搜索", "自动搜索互联网最新信息，补充知识库内容", "适用于时效性强的问题"),
+                ("🧠 智能研究", "Deep Research模式，多专家视角深度分析", "适用于复杂问题的全面分析"),
+                ("🎭 角色切换", "不同专业角色提供专业化回答", "根据问题类型选择合适角色"),
+                ("📊 实时监控", "系统性能和资源使用监控", "了解系统运行状态"),
+                ("📈 进度追踪", "任务处理进度和历史记录", "跟踪文档处理状态"),
+                ("⚙️ 智能调度", "自动优化系统资源配置", "提升处理效率")
+            ]
+            
+            for icon_name, description, usage in features:
+                with st.expander(f"{icon_name}"):
+                    st.write(f"**功能**: {description}")
+                    st.write(f"**适用场景**: {usage}")
+        
+        with help_tabs[3]:  # 常见问题
+            st.markdown("##### ❓ 常见问题")
+            
+            faqs = [
+                ("为什么上传文档后没有反应？", "请检查文档格式是否支持，文件大小是否超限，网络连接是否正常。支持的格式：PDF、DOCX、TXT、MD等。"),
+                ("联网搜索没有结果怎么办？", "请检查网络连接，尝试更换关键词，或者关闭后重新开启联网搜索功能。"),
+                ("如何提高回答质量？", "1) 上传高质量的相关文档 2) 使用具体明确的问题 3) 开启智能研究模式 4) 选择合适的角色"),
+                ("系统运行缓慢怎么办？", "1) 检查系统资源使用情况 2) 清理临时文件 3) 重启应用 4) 减少同时处理的任务数量"),
+                ("如何备份知识库？", "知识库数据存储在 vector_db_storage 目录中，可以直接备份该目录。"),
+                ("支持哪些文档格式？", "PDF、DOCX、XLSX、TXT、MD、HTML、RTF等主流格式，以及图片中的文字（OCR）。")
+            ]
+            
+            for question, answer in faqs:
+                with st.expander(f"❓ {question}"):
+                    st.write(answer)
+        
+        with help_tabs[4]:  # 获取支持
+            st.markdown("##### 📞 获取支持")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("""
+                **📚 文档资源**
+                - [用户手册](USER_MANUAL.md) - 详细使用说明
+                - [API文档](API_DOCUMENTATION.md) - 开发者接口
+                - [更新日志](CHANGELOG.md) - 版本更新记录
+                - [常见问题](FAQ.md) - 问题解答集合
+                """)
+                
+                if st.button("📖 打开用户手册"):
+                    st.info("💡 请查看项目根目录的 USER_MANUAL.md 文件")
+            
+            with col2:
+                st.markdown("""
+                **🛠️ 技术支持**
+                - GitHub Issues - 报告问题和建议
+                - 社区论坛 - 用户交流讨论
+                - 技术文档 - 深入了解系统
+                - 开发指南 - 二次开发参考
+                """)
+                
+                if st.button("🐛 报告问题"):
+                    st.info("💡 请在GitHub仓库中创建Issue，描述具体问题和复现步骤")
+        
+        # 系统信息
+        st.markdown("---")
+        st.markdown("#### 📊 系统信息")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            import psutil
+            cpu_percent = psutil.cpu_percent()
+            st.metric("CPU使用率", f"{cpu_percent}%")
+        
+        with col2:
+            memory = psutil.virtual_memory()
+            st.metric("内存使用率", f"{memory.percent}%")
+        
+        with col3:
+            import os
+            kb_count = 0
+            if os.path.exists("vector_db_storage"):
+                kb_count = len([d for d in os.listdir("vector_db_storage") if os.path.isdir(os.path.join("vector_db_storage", d))])
+            st.metric("知识库数量", kb_count)
+        
+        with col4:
+            session_count = len([k for k in st.session_state.keys() if 'session' in k.lower()])
+            st.metric("活跃会话", session_count)
 
 # ==========================================
 # 主功能区域
