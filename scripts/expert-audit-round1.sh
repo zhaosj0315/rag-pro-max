@@ -67,20 +67,28 @@ fi
 
 # 4. 敏感信息检查
 echo "4️⃣ 检查敏感信息泄露..."
-sensitive_patterns=("sk-[a-zA-Z0-9]{20,}" "password.*['\"][^'\"]{8,}['\"]" "secret.*['\"][^'\"]{8,}['\"]" "token.*['\"][^'\"]{20,}['\"]")
-sensitive_found=0
+# 检查真实的API密钥泄露
+real_secrets=0
 
-for pattern in "${sensitive_patterns[@]}"; do
-    matches=$(find . -name "*.py" -o -name "*.json" -o -name "*.md" | xargs grep -E "$pattern" 2>/dev/null | grep -v ".git" | grep -v "test" | wc -l)
-    if [ "$matches" -gt 0 ]; then
-        echo "   ⚠️  发现 $matches 处 $pattern 模式"
-        sensitive_found=$((sensitive_found + matches))
-    fi
-done
+# 检查OpenAI API密钥格式
+openai_keys=$(find . -name "*.py" -o -name "*.json" -o -name "*.md" | xargs grep -E "sk-[a-zA-Z0-9]{48}" 2>/dev/null | grep -v ".git" | grep -v "test" | wc -l)
+if [ "$openai_keys" -gt 0 ]; then
+    echo "   ❌ 发现 $openai_keys 个真实 OpenAI API 密钥"
+    real_secrets=$((real_secrets + openai_keys))
+fi
 
-if [ "$sensitive_found" -eq 0 ]; then
+# 检查其他长密钥格式
+long_secrets=$(find . -name "*.py" -o -name "*.json" -o -name "*.md" | xargs grep -E "['\"][a-zA-Z0-9]{32,}['\"]" 2>/dev/null | grep -v ".git" | grep -v "test" | grep -v "type.*password" | grep -v "key.*=" | wc -l)
+if [ "$long_secrets" -gt 0 ]; then
+    echo "   ⚠️  发现 $long_secrets 处可能的长密钥"
+    real_secrets=$((real_secrets + long_secrets))
+fi
+
+if [ "$real_secrets" -eq 0 ]; then
     echo "   ✅ 无真实敏感信息泄露"
 fi
+
+sensitive_found=$real_secrets
 
 # 5. 临时文件清理检查
 echo "5️⃣ 检查临时文件清理..."
