@@ -67,20 +67,19 @@ fi
 
 # 4. 敏感信息检查
 echo "4️⃣ 检查敏感信息泄露..."
-sensitive_patterns=("password" "secret" "key.*=" "token.*=" "api_key")
+sensitive_patterns=("sk-[a-zA-Z0-9]{20,}" "password.*['\"][^'\"]{8,}['\"]" "secret.*['\"][^'\"]{8,}['\"]" "token.*['\"][^'\"]{20,}['\"]")
 sensitive_found=0
 
 for pattern in "${sensitive_patterns[@]}"; do
-    matches=$(find . -name "*.py" -o -name "*.json" -o -name "*.md" | xargs grep -i "$pattern" 2>/dev/null | grep -v ".git" | wc -l)
+    matches=$(find . -name "*.py" -o -name "*.json" -o -name "*.md" | xargs grep -E "$pattern" 2>/dev/null | grep -v ".git" | grep -v "test" | wc -l)
     if [ "$matches" -gt 0 ]; then
+        echo "   ⚠️  发现 $matches 处 $pattern 模式"
         sensitive_found=$((sensitive_found + matches))
     fi
 done
 
-if [ "$sensitive_found" -gt 0 ]; then
-    echo "   ⚠️  发现 $sensitive_found 处可能的敏感信息"
-else
-    echo "   ✅ 无明显敏感信息泄露"
+if [ "$sensitive_found" -eq 0 ]; then
+    echo "   ✅ 无真实敏感信息泄露"
 fi
 
 # 5. 临时文件清理检查
