@@ -270,12 +270,12 @@ class PageStyle:
                     // 创建拖拽手柄
                     const resizer = doc.createElement('div');
                     resizer.className = 'sidebar-resizer';
-                    resizer.style.width = '10px'; // 加宽一点更容易抓取
+                    resizer.style.width = '14px'; // 加宽感应区，适配 Windows
                     resizer.style.background = 'transparent';
                     resizer.style.position = 'absolute';
                     resizer.style.top = '0';
                     resizer.style.bottom = '0';
-                    resizer.style.right = '-5px'; // 向右偏移，覆盖边缘
+                    resizer.style.right = '0px'; // 紧贴边缘内侧，避开 Windows 外部滚动条
                     resizer.style.cursor = 'col-resize';
                     resizer.style.zIndex = '999999';
                     resizer.setAttribute('title', '↔ 拖动调整侧边栏宽度');
@@ -301,11 +301,13 @@ class PageStyle:
                     resizer.addEventListener('mousedown', (e) => {
                         isResizing = true;
                         doc.body.style.cursor = 'col-resize';
+                        doc.body.style.userSelect = 'none'; // 防止 Windows 上拖拽时选中文本
                         e.preventDefault();
                     });
 
                     doc.addEventListener('mousemove', (e) => {
                         if (!isResizing) return;
+                        e.preventDefault(); // 防止默认事件干扰
                         
                         const newWidth = e.clientX;
                         // 限制宽度范围 (200px ~ 80% 屏幕宽度)
@@ -321,6 +323,7 @@ class PageStyle:
                         if (isResizing) {
                             isResizing = false;
                             doc.body.style.cursor = 'default';
+                            doc.body.style.userSelect = ''; // 恢复文本选择
                         }
                     });
                 }

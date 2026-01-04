@@ -66,10 +66,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 移动端适配
-from src.ui.mobile_adapter import MobileAdapter
-MobileAdapter.apply_mobile_optimization()
-
 # 设置不截断HTML显示
 import streamlit.components.v1 as components
 
@@ -291,6 +287,7 @@ from src.chat import HistoryManager
 # 引入 UI 模块
 from src.ui.page_style import PageStyle
 from src.ui.sidebar_config import SidebarConfig
+from src.ui.mobile_adapter import MobileAdapter
 
 # 引入工具函数
 from src.utils.app_utils import (
@@ -687,6 +684,9 @@ defaults = ConfigLoader.load()
 from src.common.business import generate_doc_summary
 
 with st.sidebar:
+    # 渲染移动端视图适配器 (响应式预览)
+    MobileAdapter.render_view_selector()
+    
     # 横向标签页布局
     tab_main, tab_roles, tab_config, tab_monitor, tab_help = st.tabs(["🏠 主页", "🎭 角色", "⚙️ 配置", "📊 监控", "❓ 帮助"])
     
