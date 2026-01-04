@@ -108,7 +108,7 @@ DEPLOYMENT.md                   # 部署指南
 FAQ.md                         # 常见问题
 FIRST_TIME_GUIDE.md            # 快速上手
 USER_MANUAL.md                 # 使用手册
-API.md                         # 接口文档
+API_DOCUMENTATION.md                         # 接口文档
 ARCHITECTURE.md                # 架构说明
 TESTING.md                     # 测试说明
 CONTRIBUTING.md                # 贡献指南

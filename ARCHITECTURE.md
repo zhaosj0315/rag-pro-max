@@ -267,8 +267,8 @@ RetrievalSystem
 ```
 
 ### 5. 智能推荐系统 (Suggestion Engine)
-v3.2.2 进一步强化了多维同步能力：
-- **Dual-Interface Sync (v3.2.2)**: 
+v3.2.6 进一步强化了多维同步能力：
+- **Dual-Interface Sync (v3.2.6)**: 
     - **Global State Awareness**: 聊天工具栏与模型配置页实时双向同步。
     - **Custom Provider Registry**: 支持通过插件机制动态发现自定义厂商及其模型。
 - **状态感知层**: 

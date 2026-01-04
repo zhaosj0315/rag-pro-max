@@ -98,7 +98,7 @@ python scripts/check_documentation_sync.py
 # 需要同步的文档
 - README.md          # 新功能说明
 - CHANGELOG.md       # 版本变更记录
-- API.md            # 新增API接口
+- API_DOCUMENTATION.md            # 新增API接口
 - USER_MANUAL.md     # 使用说明更新
 - FAQ.md            # 新问题解答
 ```
@@ -347,7 +347,7 @@ python scripts/check_cleanup_completeness.py
 
 ### 开发文档
 - [架构文档](ARCHITECTURE.md)
-- [API文档](API.md)
+- [API文档](API_DOCUMENTATION.md)
 - [测试指南](TESTING.md)
 - [部署指南](DEPLOYMENT.md)
 

@@ -15,7 +15,7 @@
 #### 2. 功能变更文档  
 - [ ] **README.md** - 核心功能列表同步
 - [ ] **USER_MANUAL.md** - 新功能使用说明
-- [ ] **API.md** - 新增/修改的API接口
+- [ ] **API_DOCUMENTATION.md** - 新增/修改的API接口
 
 #### 3. 技术架构文档
 - [ ] **ARCHITECTURE.md** - 架构变更说明
@@ -85,7 +85,7 @@ python tests/check_documentation_sync.py
 |---------|---------|--------|--------|
 | README.md | 每次发布 | 主开发者 | 功能列表、版本号 |
 | CHANGELOG.md | 每次提交 | 提交者 | 变更记录 |
-| API.md | API变更时 | 后端开发者 | 接口文档 |
+| API_DOCUMENTATION.md | API变更时 | 后端开发者 | 接口文档 |
 | USER_MANUAL.md | UI变更时 | 前端开发者 | 界面说明 |
 | DEPLOYMENT.md | 部署变更时 | 运维负责人 | 部署步骤 |
 

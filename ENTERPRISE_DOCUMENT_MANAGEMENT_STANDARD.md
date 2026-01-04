@@ -31,7 +31,7 @@ FAQ.md                      # 企业常见问题
 #### 第二层：技术架构文档
 ```
 ARCHITECTURE.md             # 企业架构说明
-API.md                      # 企业API接口文档
+API_DOCUMENTATION.md                      # 企业API接口文档
 TESTING.md                  # 企业测试标准
 CHANGELOG.md                # 企业版本历史
 ```
@@ -78,7 +78,7 @@ vim README.md
 # 同步 ✨ 核心功能 部分
 
 # 2. 更新API文档
-vim API.md
+vim API_DOCUMENTATION.md
 # 同步新增/修改的接口
 
 # 3. 更新用户手册
@@ -467,7 +467,7 @@ def check_enterprise_deployment():
 
 ### 📚 相关资源
 - [企业架构文档](ARCHITECTURE.md)
-- [企业API文档](API.md)
+- [企业API文档](API_DOCUMENTATION.md)
 - [企业测试指南](TESTING.md)
 - [企业部署指南](DEPLOYMENT.md)
 - [文档维护标准](DOCUMENTATION_MAINTENANCE_STANDARD.md)
