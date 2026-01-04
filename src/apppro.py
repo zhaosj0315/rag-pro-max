@@ -793,24 +793,13 @@ with st.sidebar:
         with select_col2:
             selected_nav = st.selectbox("", nav_options, index=default_idx, label_visibility="collapsed")
             
-            # 自动启动纯对话模式 (v2.7.6)
+            # 自动启动纯对话模式 (v2.7.6) - 简化版本
             if selected_nav == "💬 纯对话模式 (Pure Chat)" and st.session_state.get('current_kb_id') != "pure_chat":
-                try:
-                    from llama_index.core.chat_engine import SimpleChatEngine
-                    from src.config.prompt_manager import PromptManager
-                    
-                    # 获取当前角色提示词
-                    current_role_id = st.session_state.get('current_prompt_id', 'default')
-                    system_prompt = PromptManager.get_content(current_role_id)
-                    
-                    st.session_state.chat_engine = SimpleChatEngine.from_defaults(
-                        system_prompt=system_prompt
-                    )
-                    st.session_state.current_kb_id = "pure_chat"
-                    st.toast("✅ 纯对话模式已自动启动")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"启动失败: {e}")
+                # 纯对话模式不需要加载任何知识库，直接设置为纯对话状态
+                st.session_state.chat_engine = "pure_chat"  # 使用字符串标识，避免加载复杂组件
+                st.session_state.current_kb_id = "pure_chat"
+                st.toast("✅ 纯对话模式已启动 - 直接与AI对话")
+                st.rerun()
 
             # 处理复选框点击逻辑 - 只有当用户手动更改选择时才触发
             if selected_nav != st.session_state.get('current_nav') and (selected_nav.startswith("☐") or selected_nav.startswith("☑️")):
@@ -3935,8 +3924,8 @@ if active_kb_name:
                     st.rerun()
     st.divider()
 
-# 自动摘要 (仅在知识库首次加载且无历史消息时触发)
-if active_kb_name and st.session_state.chat_engine and not st.session_state.messages:
+# 自动摘要 (仅在知识库首次加载且无历史消息时触发，排除纯对话模式)
+if active_kb_name and active_kb_name != "pure_chat" and st.session_state.chat_engine and not st.session_state.messages:
     with st.chat_message("assistant", avatar="🤖"):
         summary_placeholder = st.empty()
         with st.status("✨ 正在分析文档生成摘要...", expanded=True) as status:
@@ -4463,6 +4452,9 @@ else:
                 st.error("请先选择知识库")
             else:
                 st.session_state.question_queue.append(user_input)
+        elif active_kb_name == "pure_chat":
+            # 纯对话模式 - 直接处理，无需知识库
+            st.session_state.question_queue.append(user_input)
         elif not st.session_state.chat_engine:
             st.error("请先点击左侧【🚀 执行处理】启动系统")
         else:
@@ -4687,6 +4679,61 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             # 添加助手消息
             st.session_state.messages.append({"role": "assistant", "content": response})
             logger.log("多知识库查询", "complete", "✅ 多知识库查询完成")
+            
+            st.session_state.is_processing = False
+            st.rerun()
+                
+    elif active_kb_name == "pure_chat":
+        # 纯对话模式处理 - 直接与LLM对话，无需知识库
+        st.session_state.is_processing = True
+        logger.info("✅ 纯对话模式开始处理")
+        logger.info(f"❓ 用户问题: {final_prompt}")
+        
+        # 添加用户消息
+        st.session_state.messages.append({"role": "user", "content": final_prompt})
+        
+        # 显示用户消息
+        with st.chat_message("user"):
+            st.write(final_prompt)
+        
+        # 显示助手回复
+        with st.chat_message("assistant"):
+            response_placeholder = st.empty()
+            
+            try:
+                # 获取当前LLM配置
+                from src.utils.model_manager import load_llm_model
+                llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
+                
+                if llm:
+                    # 获取当前角色提示词
+                    from src.config.prompt_manager import PromptManager
+                    current_role_id = st.session_state.get('current_prompt_id', 'default')
+                    system_prompt = PromptManager.get_content(current_role_id)
+                    
+                    # 构建完整提示
+                    full_prompt = f"{system_prompt}\n\n用户问题: {final_prompt}"
+                    
+                    # 直接调用LLM
+                    response = llm.complete(full_prompt)
+                    response_text = str(response)
+                    
+                    # 显示回复
+                    response_placeholder.write(response_text)
+                    
+                    # 添加助手消息
+                    st.session_state.messages.append({"role": "assistant", "content": response_text})
+                    logger.log("纯对话模式", "complete", "✅ 纯对话模式查询完成")
+                else:
+                    error_msg = "❌ LLM模型未配置，请检查模型设置"
+                    response_placeholder.error(error_msg)
+                    st.session_state.messages.append({"role": "assistant", "content": error_msg})
+                    
+            except Exception as e:
+                error_msg = f"纯对话模式查询失败: {str(e)}"
+                logger.log("纯对话模式", "error", f"❌ 纯对话模式异常: {str(e)}")
+                response_placeholder.error(error_msg)
+                st.session_state.messages.append({"role": "assistant", "content": error_msg})
             
             st.session_state.is_processing = False
             st.rerun()
