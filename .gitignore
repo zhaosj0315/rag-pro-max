@@ -18,6 +18,10 @@ batch_*
 Web_*
 Search_*.txt
 Search_*/
+
+# 用户数据目录 (用户生成的内容)
+rag/
+rag/*
 text_*
 crawler_state_*.json
 crawler_state.json
