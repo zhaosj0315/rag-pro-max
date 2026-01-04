@@ -66,6 +66,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# 移动端适配
+from src.ui.mobile_adapter import MobileAdapter
+MobileAdapter.apply_mobile_optimization()
+
 # 设置不截断HTML显示
 import streamlit.components.v1 as components
 
@@ -1406,13 +1410,9 @@ with st.sidebar:
                 import hashlib
                 upload_hash = hashlib.md5("".join([f"{f.name}_{f.size}" for f in uploaded_files]).encode()).hexdigest()
                 
-                print(f"DEBUG: Upload detected. Files: {len(uploaded_files)}, Hash: {upload_hash}")
-                print(f"DEBUG: Last Hash: {st.session_state.get('last_upload_hash')}")
-                
                 # 只要哈希不同，或者当前没有有效的上传路径，就重新处理
                 # 这能修复“路径丢失”的问题，同时保留哈希优化
                 if st.session_state.get('last_upload_hash') != upload_hash or not st.session_state.get('uploaded_path'):
-                    print("DEBUG: New upload hash detected OR path missing. Processing...")
                     progress_bar = st.progress(0)
                     status_text = st.empty()
 
@@ -1425,8 +1425,6 @@ with st.sidebar:
 
                     result = handler.process_uploads(uploaded_files)
                     
-                    print(f"DEBUG: Process result dir: {result.batch_dir}")
-
                     progress_bar.empty()
                     status_text.empty()
 
@@ -1435,8 +1433,6 @@ with st.sidebar:
                     st.session_state.uploaded_path = os.path.abspath(result.batch_dir)
                     st.session_state.last_processed_path = st.session_state.uploaded_path
                     
-                    print(f"DEBUG: Saved uploaded_path: {st.session_state.uploaded_path}")
-
                     # 显示上传结果
                     if result.success_count > 0:
                         st.toast(f"✅ 成功上传 {result.success_count} 个文件")
@@ -2459,12 +2455,6 @@ if active_kb_name and st.session_state.chat_engine is None and active_kb_name !=
 
 # 按钮处理
 if btn_start:
-    print(f"DEBUG: btn_start triggered")
-    print(f"DEBUG: is_create_mode = {is_create_mode}")
-    print(f"DEBUG: crawl_input_mode = {st.session_state.get('crawl_input_mode')}")
-    print(f"DEBUG: crawl_url = {st.session_state.get('crawl_url')}")
-    print(f"DEBUG: search_keyword = {st.session_state.get('search_keyword')}")
-    
     # 检查是否为网页抓取模式 - 自动检测模式
     crawl_url = st.session_state.get('crawl_url', '').strip()
     search_keyword = st.session_state.get('search_keyword', '').strip()
@@ -2478,16 +2468,8 @@ if btn_start:
     
     is_web_crawl_mode = (is_create_mode and auto_detected_mode is not None)
     
-    print(f"DEBUG: auto_detected_mode = {auto_detected_mode}")
-    print(f"DEBUG: is_web_crawl_mode = {is_web_crawl_mode}")
-    
     if is_web_crawl_mode:
-        print("DEBUG: 进入网页抓取模式")
         current_mode = auto_detected_mode
-        
-        print(f"DEBUG: current_mode = {current_mode}")
-        print(f"DEBUG: crawl_url = {crawl_url}")
-        print(f"DEBUG: search_keyword = {search_keyword}")
         
         # 获取抓取参数
         crawl_depth = st.session_state.get('crawl_depth', 2)
@@ -2498,7 +2480,6 @@ if btn_start:
         
         # 执行网页抓取并创建知识库的逻辑
         if current_mode == 'url' and crawl_url:
-            print(f"DEBUG: ✅ 进入网址抓取分支，URL = {crawl_url}")
             logger.log("网页抓取", "start", f"🌐 开始网址抓取模式: {crawl_url}")
             # 网址抓取模式 - 复用现有逻辑
             try:

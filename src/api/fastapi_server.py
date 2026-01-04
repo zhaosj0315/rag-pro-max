@@ -17,8 +17,11 @@ from src.app_logging import LogManager
 from src.utils.enhanced_cache import smart_cache_manager
 from src.kb.kb_manager import KBManager
 from src.processors.multimodal_processor import MultimodalProcessor
+from src.core.version import get_version_info
 
 logger = LogManager()
+version_info = get_version_info()
+CURRENT_VERSION = version_info.get("version", "3.2.6")
 
 # 原有数据模型
 class QueryRequest(BaseModel):
@@ -62,7 +65,7 @@ class MultimodalQueryRequest(BaseModel):
 app = FastAPI(
     title="RAG Pro Max API",
     description="Enterprise RAG System API Interface",
-    version="3.2.2",
+    version=CURRENT_VERSION,
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -83,12 +86,12 @@ multimodal_processor = MultimodalProcessor()
 @app.get("/")
 async def root():
     """根路径"""
-    return {"message": "RAG Pro Max API v1.7.2", "status": "running"}
+    return {"message": f"RAG Pro Max API v{CURRENT_VERSION}", "status": "running"}
 
 @app.get("/health")
 async def health_check():
     """健康检查"""
-    return {"status": "healthy", "timestamp": "2025-12-10"}
+    return {"status": "healthy", "timestamp": datetime.now().isoformat(), "version": CURRENT_VERSION}
 
 @app.post("/query", response_model=QueryResponse)
 async def query_knowledge_base(request: QueryRequest):

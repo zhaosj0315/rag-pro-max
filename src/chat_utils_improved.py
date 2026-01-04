@@ -206,11 +206,9 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
 
     def _generate():
         nonlocal result
-        print(f"🔍 _generate开始，result初始状态: {result}")
         
         if result is None:
             result = {"questions": []}
-            print(f"🔍 result为None，重新初始化: {result}")
         
         # 尝试从多个来源获取LLM
         llm = None
@@ -218,24 +216,19 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
         # 1. 优先使用传入的LLM
         if llm_model:
             llm = llm_model
-            print(f"🔍 使用传入的LLM: {type(llm_model)}")
         
         # 2. 从Settings获取
         elif hasattr(Settings, 'llm') and Settings.llm:
             llm = Settings.llm
-            print(f"🔍 使用Settings.llm: {type(Settings.llm)}")
         
         # 3. 从query_engine获取
         elif query_engine and hasattr(query_engine, '_llm'):
             llm = query_engine._llm
-            print(f"🔍 使用query_engine._llm: {type(query_engine._llm)}")
         
         if not llm:
-            print("⚠️ LLM未设置，使用知识库感知降级策略")
             result["questions"] = get_smart_fallback(context_text, query_engine)
             return
         
-        print(f"🔍 LLM获取成功，开始生成推荐问题...")
 
         try:
             # 优化上下文处理
@@ -303,15 +296,11 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
                 f"{'已问过的问题（避免重复）：\n' + existing_str if existing_str else ''}"
             )
             
-            print(f"🔍 开始调用LLM生成推荐问题...")
-            print(f"🔍 提示词长度: {len(prompt)} 字符")
             
             try:
                 resp = llm.complete(prompt)
                 text = resp.text.strip()
-                print(f"🔍 LLM响应: {text[:100]}...")
             except Exception as e:
-                print(f"❌ LLM调用失败: {e}")
                 result["questions"] = get_smart_fallback(context_text, query_engine)
                 return
             
@@ -325,21 +314,17 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
                     if question and len(question) > 5:  # 过滤太短的问题
                         questions.append(question)
             
-            print(f"🔍 解析出 {len(questions)} 个问题: {questions[:3]}")
             
             # 直接设置result，跳过复杂的验证逻辑
             if questions:
                 result["questions"] = questions[:num_questions]
-                print(f"🔍 强制设置result: {result}")
                 return
             
             # 如果没有问题，使用fallback
             result["questions"] = get_smart_fallback(context_text, query_engine)
-            print(f"🔍 使用fallback: {result}")
             return
                 
         except Exception as e:
-            print(f"❌ 推荐问题生成异常: {e}")
             if logger:
                 logger.log_error("追问生成", str(e))
             if result is not None:
@@ -351,24 +336,17 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
     thread.join(timeout=timeout)
     
     if thread.is_alive():
-        print(f"⏰ 推荐问题生成超时 ({timeout}秒)，等待后台完成...")
         # 给更多时间让LLM完成
         thread.join(timeout=5)  # 再等5秒
         
         if thread.is_alive():
-            print(f"⏰ 最终超时，使用fallback")
             if logger:
                 logger.log_error("追问生成", "最终超时")
             return get_smart_fallback(context_text, query_engine)
-        else:
-            print(f"✅ 后台生成完成")
     
-    print(f"🔍 线程执行完成，result: {result}")
     
     if result is None or "questions" not in result:
-        print(f"🔍 result为空或无questions，返回fallback")
         return get_smart_fallback(context_text, query_engine)
     
-    print(f"🔍 函数最终返回: {result['questions']}")
     return result["questions"]
     

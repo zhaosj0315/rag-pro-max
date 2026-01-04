@@ -194,8 +194,38 @@ class PageStyle:
         /* 响应式设计 */
         @media (max-width: 768px) {
             section[data-testid="stSidebar"] {
-                width: 320px !important;
-                min-width: 320px !important;
+                width: 100% !important;
+                min-width: 100% !important;
+            }
+            
+            .main .block-container {
+                padding: 0.5rem !important;
+            }
+            
+            .stButton > button {
+                width: 100% !important;
+                padding: 0.75rem !important;
+                font-size: 1rem !important;
+            }
+            
+            .welcome-box {
+                padding: 1.5rem 1rem !important;
+                margin: 0.5rem 0 !important;
+            }
+            
+            .welcome-box h2 {
+                font-size: 1.3rem !important;
+            }
+            
+            .welcome-box p {
+                font-size: 0.95rem !important;
+            }
+        }
+        
+        @media (min-width: 768px) and (max-width: 1024px) {
+            section[data-testid="stSidebar"] {
+                width: 400px !important;
+                min-width: 400px !important;
             }
         }
         </style>
