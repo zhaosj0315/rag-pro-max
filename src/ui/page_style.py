@@ -41,10 +41,11 @@ class PageStyle:
             max-width: 100%;
         }
         
-        /* 舒适的侧边栏 */
+        /* 舒适的侧边栏 - 允许JS动态调整 */
         section[data-testid="stSidebar"] {
-            width: 850px !important;
-            min-width: 850px !important;
+            width: 850px;
+            min-width: 250px;
+            transition: width 0.1s; /* 添加一点平滑过渡 */
         }
         
         section[data-testid="stSidebar"] > div {
@@ -242,7 +243,105 @@ class PageStyle:
         """, unsafe_allow_html=True)
     
     @staticmethod
+    def inject_resizable_sidebar():
+        """注入可拖拽侧边栏的 JS/CSS (修复版)"""
+        js = """
+        <script>
+        (function() {
+            try {
+                // 获取父级文档（突破 iframe 限制）
+                const doc = window.parent.document;
+                
+                // 避免重复注入
+                if (doc.window && doc.window.hasInjectedResizeHandler) return;
+                if (doc.window) doc.window.hasInjectedResizeHandler = true;
+
+                function initResizeHandler() {
+                    const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
+                    if (!sidebar) {
+                        setTimeout(initResizeHandler, 300);
+                        return;
+                    }
+
+                    // 如果已经有手柄了，先移除（防止热重载导致重复）
+                    const oldResizer = sidebar.querySelector('.sidebar-resizer');
+                    if (oldResizer) oldResizer.remove();
+
+                    // 创建拖拽手柄
+                    const resizer = doc.createElement('div');
+                    resizer.className = 'sidebar-resizer';
+                    resizer.style.width = '10px'; // 加宽一点更容易抓取
+                    resizer.style.background = 'transparent';
+                    resizer.style.position = 'absolute';
+                    resizer.style.top = '0';
+                    resizer.style.bottom = '0';
+                    resizer.style.right = '-5px'; // 向右偏移，覆盖边缘
+                    resizer.style.cursor = 'col-resize';
+                    resizer.style.zIndex = '999999';
+                    resizer.setAttribute('title', '↔ 拖动调整侧边栏宽度');
+                    
+                    // 鼠标悬停变色提示 (蓝色光晕)
+                    resizer.onmouseover = () => { 
+                        resizer.style.background = 'rgba(64, 156, 255, 0.3)'; 
+                        resizer.style.boxShadow = '0 0 10px rgba(64, 156, 255, 0.5)';
+                    };
+                    resizer.onmouseout = () => { 
+                        resizer.style.background = 'transparent'; 
+                        resizer.style.boxShadow = 'none';
+                    };
+
+                    sidebar.appendChild(resizer);
+                    // 确保侧边栏定位是 relative 或 absolute，以便手柄定位
+                    if (window.getComputedStyle(sidebar).position === 'static') {
+                        sidebar.style.position = 'relative';
+                    }
+
+                    let isResizing = false;
+
+                    resizer.addEventListener('mousedown', (e) => {
+                        isResizing = true;
+                        doc.body.style.cursor = 'col-resize';
+                        e.preventDefault();
+                    });
+
+                    doc.addEventListener('mousemove', (e) => {
+                        if (!isResizing) return;
+                        
+                        const newWidth = e.clientX;
+                        // 限制宽度范围 (200px ~ 80% 屏幕宽度)
+                        if (newWidth > 200 && newWidth < window.innerWidth * 0.8) {
+                            // 使用 setProperty(..., 'important') 强制覆盖 CSS
+                            sidebar.style.setProperty('width', newWidth + 'px', 'important');
+                            sidebar.style.setProperty('min-width', newWidth + 'px', 'important');
+                            sidebar.style.setProperty('max-width', newWidth + 'px', 'important');
+                        }
+                    });
+
+                    doc.addEventListener('mouseup', () => {
+                        if (isResizing) {
+                            isResizing = false;
+                            doc.body.style.cursor = 'default';
+                        }
+                    });
+                }
+
+                // 启动初始化
+                if (doc.readyState === 'loading') {
+                    doc.addEventListener('DOMContentLoaded', initResizeHandler);
+                } else {
+                    initResizeHandler();
+                }
+            } catch (e) {
+                console.error("Sidebar Resizer Injection Failed:", e);
+            }
+        })();
+        </script>
+        """
+        st.components.v1.html(js, height=0, width=0)
+
+    @staticmethod
     def setup_page():
         """设置完整页面"""
         PageStyle.setup_page_config()
         PageStyle.apply_custom_css()
+        PageStyle.inject_resizable_sidebar()
