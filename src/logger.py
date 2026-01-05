@@ -51,8 +51,8 @@ class Logger:
         # 写入文件
         with open(self.log_file, 'a', encoding='utf-8') as f:
             f.write(json.dumps(entry, ensure_ascii=False) + '\n')
-        # 输出到终端（简化格式）
-        logger.info(message)
+        # 输出到终端（简化格式）- 直接使用print避免递归
+        print(f"[{stage}] {message}")
     
     def start_timer(self, key):
         """开始计时"""
@@ -174,5 +174,26 @@ class Logger:
         msg = f"❌ 错误: {str(error)[:200]}"
         details = {"error": str(error), "context": context}
         self.log(stage, "error", msg, details)
+    
+    # 添加标准日志方法以兼容LogManager接口
+    def info(self, message, stage="INFO"):
+        """信息日志"""
+        self.log(stage, "info", message)
+    
+    def warning(self, message, stage="WARNING"):
+        """警告日志"""
+        self.log(stage, "warning", message)
+    
+    def error(self, message, stage="ERROR"):
+        """错误日志"""
+        self.log(stage, "error", message)
+    
+    def debug(self, message, stage="DEBUG"):
+        """调试日志"""
+        self.log(stage, "debug", message)
+    
+    def success(self, message, stage="SUCCESS"):
+        """成功日志"""
+        self.log(stage, "success", message)
 
 logger = Logger()

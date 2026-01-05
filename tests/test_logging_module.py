@@ -9,7 +9,7 @@ import json
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.logging import LogManager
+from src.app_logging.log_manager import LogManager
 
 
 class TestLogManager:
