@@ -125,7 +125,7 @@ class AsyncWebCrawler:
         self.robots_cache[domain] = True
         return True
     
-    def content_fingerlogger.info(self, text: str) -> str:
+    def content_fingerprint(self, text: str) -> str:
         """生成内容指纹用于去重"""
         # 清理文本并生成哈希
         cleaned = ''.join(text.split()).lower()

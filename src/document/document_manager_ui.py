@@ -16,8 +16,11 @@ class DocumentManagerUI:
     
     @staticmethod
     @st.dialog("📄 文档详情")
-    # 引入统一的对话框组件
-    from src.ui.unified_dialogs import show_document_detail_dialog
+    def show_document_detail_dialog():
+        """显示文档详情对话框"""
+        # 引入统一的对话框组件
+        from src.ui.unified_dialogs import show_document_detail_dialog as unified_dialog
+        return unified_dialog()
     
     def render_document_list(self, kb_name: str):
         """渲染文档列表"""

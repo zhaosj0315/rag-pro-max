@@ -104,7 +104,7 @@ class BatchOCRProcessor:
                 elapsed = time.time() - start_time
                 pages_per_sec = len(self.ocr_tasks) / elapsed if elapsed > 0 else 0
                 
-                logger.success(pages_per_sec:.1f)
+                logger.info(f"OCR处理速度: {pages_per_sec:.1f}页/秒")
                 logger.info(f"🛡️  CPU保护运行正常，系统保持稳定")
                 
             else:
