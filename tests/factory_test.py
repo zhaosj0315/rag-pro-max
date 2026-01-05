@@ -275,7 +275,7 @@ def test_logging_system():
     try:
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
         from src.logger import logger
-        from src.app_logging import LogManager
+        from src.app_logging.log_manager import LogManager
         
         # 测试日志目录
         log_dir = "app_logs"
