@@ -24,7 +24,7 @@ def test_imports():
         return False
     
     try:
-        from src.logging import LogManager
+        from src.app_logging.log_manager import LogManager
         print("✅ LogManager: PASS")
     except Exception as e:
         print(f"❌ LogManager: FAIL")

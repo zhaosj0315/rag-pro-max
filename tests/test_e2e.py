@@ -22,7 +22,7 @@ def test_complete_workflow():
         from src.kb import KBManager
         from src.config import ConfigLoader
         from src.chat import HistoryManager
-        from src.logging import LogManager
+        from src.app_logging.log_manager import LogManager
         print("   ✅ 所有模块导入成功")
         results["passed"] += 1
     except Exception as e:
@@ -134,7 +134,7 @@ def test_performance_baseline():
         from src.kb import KBManager
         from src.config import ConfigLoader
         from src.chat import HistoryManager
-        from src.logging import LogManager
+        from src.app_logging.log_manager import LogManager
         elapsed = time.time() - start
         
         assert elapsed < 1.0, f"导入太慢: {elapsed:.2f}s"
