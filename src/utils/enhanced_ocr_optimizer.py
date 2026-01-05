@@ -100,7 +100,7 @@ class EnhancedOCROptimizer:
             processing_time = time.time() - start_time
             speed = pages_count / processing_time if processing_time > 0 else 0
             
-            logger.success(speed:.1f)
+            logger.info(f"✅ OCR处理完成: {processing_time:.1f}秒, {speed:.1f}页/秒")
             
         except Exception as e:
             logger.error(e)

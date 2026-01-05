@@ -178,7 +178,7 @@ class OptimizedOCRProcessor:
             if i % 2 == 0 and i > 0:
                 resources = self.resource_limiter.check_resources()
                 if resources['cpu_high']:
-                    logger.warning(resources['cpu_percent']:.1f)
+                    logger.warning(f"CPU使用率: {resources['cpu_percent']:.1f}%")
                     time.sleep(1.0)
         
         return results

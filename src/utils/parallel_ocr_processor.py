@@ -152,7 +152,7 @@ class ParallelOCRProcessor:
         elapsed = time.time() - start_time
         speed = len(images) / elapsed if elapsed > 0 else 0
         
-        logger.success(speed:.1f)
+        logger.info(f"OCR处理速度: {speed:.1f}页/秒")
         
         return ordered_results
 

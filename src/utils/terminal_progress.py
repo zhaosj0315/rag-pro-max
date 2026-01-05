@@ -23,7 +23,7 @@ class TerminalProgress:
             logger.info(f"\n🚨 内存告警: {memory.percent:.1f}% - 系统即将耗尽内存!")
             return True
         elif memory.percent > 85:
-            logger.warning(memory.percent:.1f)
+            logger.warning(f"内存使用率: {memory.percent:.1f}%")
         return False
     
     def log_step(self, step, total, name):

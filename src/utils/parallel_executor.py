@@ -61,7 +61,7 @@ class ParallelExecutor:
         try:
             cpu_percent = psutil.cpu_percent(interval=0.1)
             if cpu_percent > 85:  # 降低阈值，更保守
-                logger.warning(cpu_percent:.1f)
+                logger.warning(f"CPU使用率: {cpu_percent:.1f}%")
                 return False
         except:
             pass  # 如果获取失败，继续并行
