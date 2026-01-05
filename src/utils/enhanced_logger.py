@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 增强日志记录器 - 提供结构化、易读的日志输出
 """
@@ -22,12 +26,12 @@ class EnhancedLogger:
         elapsed = time.time() - self.start_time
         timestamp = datetime.now().strftime("%H:%M:%S")
         
-        print(f"\n{'='*60}")
-        print(f"📂 [{timestamp}] 步骤 {step_num}/{self.total_steps}: {step_name}")
-        print(f"⏱️  总耗时: {elapsed/60:.1f}分钟")
+        logger.info(f"\n{'='*60}")
+        logger.info(f"📂 [{timestamp}] 步骤 {step_num}/{self.total_steps}: {step_name}")
+        logger.info(f"⏱️  总耗时: {elapsed/60:.1f}分钟")
         if total_items:
-            print(f"📊 待处理: {total_items:,} 项")
-        print(f"{'='*60}")
+            logger.info(f"📊 待处理: {total_items:,} 项")
+        logger.info(f"{'='*60}")
     
     def log_step_end(self, step_num, step_name, result_summary=None):
         """记录步骤结束"""
@@ -35,18 +39,18 @@ class EnhancedLogger:
             step_duration = time.time() - self.step_times[step_num]
             timestamp = datetime.now().strftime("%H:%M:%S")
             
-            print(f"\n✅ [{timestamp}] 步骤 {step_num} 完成: {step_name}")
-            print(f"⏱️  耗时: {step_duration/60:.1f}分钟")
+            logger.info(f"\n✅ [{timestamp}] 步骤 {step_num} 完成: {step_name}")
+            logger.info(f"⏱️  耗时: {step_duration/60:.1f}分钟")
             if result_summary:
                 for key, value in result_summary.items():
-                    print(f"📊 {key}: {value}")
+                    logger.info(f"📊 {key}: {value}")
     
     def log_ocr_batch_start(self, file_count, total_pages):
         """记录OCR批次开始"""
         timestamp = datetime.now().strftime("%H:%M:%S")
-        print(f"\n🔍 [{timestamp}] OCR批次处理开始")
-        print(f"   📄 文件数: {file_count}")
-        print(f"   📑 总页数: {total_pages}")
+        logger.info(f"\n🔍 [{timestamp}] OCR批次处理开始")
+        logger.info(f"   📄 文件数: {file_count}")
+        logger.info(f"   📑 总页数: {total_pages}")
         self.ocr_batch_start = time.time()
     
     def log_ocr_file_result(self, filename, pages, duration, success, error_msg=None):
@@ -63,9 +67,9 @@ class EnhancedLogger:
         else:
             self.ocr_stats['failed_files'] += 1
         
-        print(f"   {status} {filename}: {pages}页, {duration:.1f}秒, {speed:.1f}页/秒")
+        logger.info(f"   {status} {filename}: {pages}页, {duration:.1f}秒, {speed:.1f}页/秒")
         if not success and error_msg:
-            print(f"      ⚠️  {error_msg}")
+            logger.info(f"      ⚠️  {error_msg}")
     
     def log_ocr_batch_summary(self):
         """记录OCR批次汇总"""
@@ -76,13 +80,13 @@ class EnhancedLogger:
         success_rate = (self.ocr_stats['success_files'] / self.ocr_stats['total_files']) * 100
         avg_speed = self.ocr_stats['total_pages'] / self.ocr_stats['total_time'] if self.ocr_stats['total_time'] > 0 else 0
         
-        print(f"\n📊 OCR批次汇总:")
-        print(f"   📄 处理文件: {self.ocr_stats['total_files']}")
-        print(f"   📑 处理页数: {self.ocr_stats['total_pages']:,}")
-        print(f"   ✅ 成功: {self.ocr_stats['success_files']} ({success_rate:.1f}%)")
-        print(f"   ❌ 失败: {self.ocr_stats['failed_files']}")
-        print(f"   ⏱️  总耗时: {batch_duration/60:.1f}分钟")
-        print(f"   🚀 平均速度: {avg_speed:.1f}页/秒")
+        logger.info(f"\n📊 OCR批次汇总:")
+        logger.info(f"   📄 处理文件: {self.ocr_stats['total_files']}")
+        logger.info(f"   📑 处理页数: {self.ocr_stats['total_pages']:,}")
+        logger.info(f"   ✅ 成功: {self.ocr_stats['success_files']} ({success_rate:.1f}%)")
+        logger.info(f"   ❌ 失败: {self.ocr_stats['failed_files']}")
+        logger.info(f"   ⏱️  总耗时: {batch_duration/60:.1f}分钟")
+        logger.info(f"   🚀 平均速度: {avg_speed:.1f}页/秒")
     
     def log_vector_progress(self, current, total, batch_size=2048):
         """记录向量化进度"""
@@ -103,24 +107,24 @@ class EnhancedLogger:
             self.vector_start_time = time.time()
             remaining_str = ""
         
-        print(f"\r🧠 向量化进度: {progress:.1f}% ({current:,}/{total:,}) | 批次: {batches_done}/{total_batches}{remaining_str}", end="", flush=True)
+        logger.info(f"\r🧠 向量化进度: {progress:.1f}% ({current:,}/{total:,}) | 批次: {batches_done}/{total_batches}{remaining_str}", end="", flush=True)
     
     def log_final_summary(self):
         """记录最终汇总"""
         total_duration = time.time() - self.start_time
         timestamp = datetime.now().strftime("%H:%M:%S")
         
-        print(f"\n\n{'='*60}")
-        print(f"🎉 [{timestamp}] 处理完成!")
-        print(f"⏱️  总耗时: {total_duration/60:.1f}分钟")
+        logger.info(f"\n\n{'='*60}")
+        logger.info(f"🎉 [{timestamp}] 处理完成!")
+        logger.info(f"⏱️  总耗时: {total_duration/60:.1f}分钟")
         
         if self.ocr_stats['total_files'] > 0:
-            print(f"\n📊 OCR处理汇总:")
-            print(f"   📄 文件: {self.ocr_stats['total_files']}")
-            print(f"   📑 页数: {self.ocr_stats['total_pages']:,}")
-            print(f"   ✅ 成功率: {(self.ocr_stats['success_files']/self.ocr_stats['total_files']*100):.1f}%")
+            logger.info(f"\n📊 OCR处理汇总:")
+            logger.info(f"   📄 文件: {self.ocr_stats['total_files']}")
+            logger.info(f"   📑 页数: {self.ocr_stats['total_pages']:,}")
+            logger.info(f"   ✅ 成功率: {(self.ocr_stats['success_files']/self.ocr_stats['total_files']*100):.1f}%")
         
-        print(f"{'='*60}")
+        logger.info(f"{'='*60}")
 
 # 全局增强日志器
 enhanced_logger = EnhancedLogger()

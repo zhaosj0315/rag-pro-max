@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 内存优化器
 主动优化内存使用
@@ -87,7 +91,7 @@ class MemoryOptimizer:
             try:
                 callback()
             except Exception as e:
-                print(f"缓存清理失败: {e}")
+                logger.info(f"缓存清理失败: {e}")
         
         # 清理Streamlit缓存
         if hasattr(st, 'cache_data'):
@@ -125,10 +129,10 @@ class MemoryOptimizer:
         """自动优化"""
         warning, message = self.memory_warning_check()
         if warning:
-            print(f"⚠️ {message}")
+            logger.warning(message)
             self.optimize_session_state()
             self.cleanup_all_caches()
-            print("🧹 自动内存优化完成")
+            logger.info("🧹 自动内存优化完成")
 
 # 全局内存优化器
 memory_optimizer = MemoryOptimizer()

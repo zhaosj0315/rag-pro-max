@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 批量OCR处理器
 将所有扫描版PDF的OCR任务统一处理，避免重复创建进程池
@@ -29,14 +33,14 @@ class BatchOCRProcessor:
         if not self.ocr_tasks:
             return {}
         
-        print(f"🚀 批量OCR处理: {len(self.ocr_tasks)} 个页面，来自 {len(set(t['task_id'] for t in self.ocr_tasks))} 个文件")
+        logger.info(f"🚀 批量OCR处理: {len(self.ocr_tasks)} 个页面，来自 {len(set(t['task_id'] for t in self.ocr_tasks))} 个文件")
         
         # 动态调整进程数
         from src.utils.ocr_optimizer import ocr_optimizer
         max_workers, strategy = ocr_optimizer.get_optimal_workers(len(self.ocr_tasks))
         
-        print(f"📊 {strategy}，使用 {max_workers} 进程并行处理")
-        print(f"🛡️  CPU保护已启用，确保系统稳定运行")
+        logger.info(f"📊 {strategy}，使用 {max_workers} 进程并行处理")
+        logger.info(f"🛡️  CPU保护已启用，确保系统稳定运行")
         
         # 启动CPU监控
         ocr_optimizer.start_cpu_monitoring(max_workers)
@@ -79,7 +83,7 @@ class BatchOCRProcessor:
             
             # 检查紧急停止
             if ocr_optimizer.should_emergency_stop():
-                print(f"🛑 检测到紧急停止信号，终止OCR处理")
+                logger.info(f"🛑 检测到紧急停止信号，终止OCR处理")
                 return self.results
             
             if result.returncode == 0:
@@ -100,14 +104,14 @@ class BatchOCRProcessor:
                 elapsed = time.time() - start_time
                 pages_per_sec = len(self.ocr_tasks) / elapsed if elapsed > 0 else 0
                 
-                print(f"✅ 批量OCR完成: {elapsed:.1f}秒, {pages_per_sec:.1f}页/秒")
-                print(f"🛡️  CPU保护运行正常，系统保持稳定")
+                logger.success(pages_per_sec:.1f)
+                logger.info(f"🛡️  CPU保护运行正常，系统保持稳定")
                 
             else:
-                print(f"❌ OCR进程失败: {result.stderr}")
+                logger.error(result.stderr)
                 
         except Exception as e:
-            print(f"❌ OCR处理异常: {e}")
+            logger.error(e)
         finally:
             # 停止CPU监控
             from src.utils.ocr_optimizer import ocr_optimizer

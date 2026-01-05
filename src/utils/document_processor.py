@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 文档处理模块 - 统一管理文档加载、解析和元数据提取
 """
@@ -70,7 +74,7 @@ def load_pptx_file(file_path: str) -> list:
         full_text = "\n".join(text_content)
         return [Document(text=full_text, metadata={"file_path": file_path, "file_type": "pptx"})]
     except Exception as e:
-        print(f"❌ PPTX 加载失败: {e}")
+        logger.error(e)
         return []
 
 
@@ -118,7 +122,7 @@ def get_file_info(file_path: str, metadata_mgr=None) -> dict:
                 
         return info
     except Exception as e:
-        print(f"❌ 获取文件信息失败: {e}")
+        logger.error(e)
         return {
             "name": os.path.basename(file_path),
             "size": "0 KB",

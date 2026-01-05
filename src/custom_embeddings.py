@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 自定义嵌入模型 - 支持大 batch_size，绕过 LlamaIndex 限制
 """
@@ -22,9 +26,9 @@ class CustomHuggingFaceEmbedding(BaseEmbedding):
         self._batch_size = batch_size
         self._device = device
         
-        print(f"🔄 加载模型: {model_name}")
-        print(f"📦 Batch Size: {batch_size}")
-        print(f"🎮 设备: {device}")
+        logger.info(f"🔄 加载模型: {model_name}")
+        logger.info(f"📦 Batch Size: {batch_size}")
+        logger.info(f"🎮 设备: {device}")
         
         # 加载模型和分词器
         self._tokenizer = AutoTokenizer.from_pretrained(
@@ -43,11 +47,11 @@ class CustomHuggingFaceEmbedding(BaseEmbedding):
                 # PyTorch 2.0+ 编译优化
                 if hasattr(torch, 'compile'):
                     self._model = torch.compile(self._model, mode="max-autotune")
-                    print(f"🚀 已启用 torch.compile 加速")
+                    logger.info(f"🚀 已启用 torch.compile 加速")
             except:
                 pass
         
-        print(f"✅ 模型加载完成")
+        logger.info(f"✅ 模型加载完成")
     
     def _mean_pooling(self, model_output, attention_mask):
         """平均池化"""

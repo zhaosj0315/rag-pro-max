@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 知识库服务模块 - 统一知识库操作逻辑
 """
@@ -40,7 +44,7 @@ class KnowledgeBaseService:
             return kb_list
             
         except Exception as e:
-            print(f"列出知识库失败: {e}")
+            logger.info(f"列出知识库失败: {e}")
             return []
     
     def get_knowledge_base_info(self, kb_name: str) -> Optional[Dict[str, Any]]:
@@ -76,7 +80,7 @@ class KnowledgeBaseService:
             return info
             
         except Exception as e:
-            print(f"获取知识库信息失败 {kb_name}: {e}")
+            logger.info(f"获取知识库信息失败 {kb_name}: {e}")
             return None
     
     def create_knowledge_base(self, kb_name: str, description: str = "") -> Dict[str, Any]:
@@ -188,7 +192,7 @@ class KnowledgeBaseService:
             return True
             
         except Exception as e:
-            print(f"更新元数据失败: {e}")
+            logger.info(f"更新元数据失败: {e}")
             return False
     
     def get_storage_stats(self) -> Dict[str, Any]:
@@ -213,7 +217,7 @@ class KnowledgeBaseService:
             }
             
         except Exception as e:
-            print(f"获取存储统计失败: {e}")
+            logger.info(f"获取存储统计失败: {e}")
             return {
                 'total_size': 0,
                 'total_kb_count': 0,

@@ -231,9 +231,39 @@ class UnifiedDocumentProcessor:
         return f"Office文件已处理: {file_path}"
     
     def _process_image_file(self, file_path: str, options: Dict[str, Any]) -> str:
-        """处理图片文件"""
-        # 这里可以集成OCR处理逻辑
-        return f"图片文件已处理: {file_path}"
+        """处理图片文件 - 使用OCR提取文字"""
+        try:
+            # 导入多模态处理器
+            from .multimodal_processor import MultimodalProcessor
+            
+            processor = MultimodalProcessor()
+            result = processor.extract_text_from_image(file_path)
+            
+            if result.get('error'):
+                return f"图片OCR处理失败: {result['error']}"
+            
+            extracted_text = result.get('text', '')
+            confidence = result.get('confidence', 0)
+            
+            if not extracted_text.strip():
+                return "图片中未检测到文字内容"
+            
+            # 返回格式化的OCR结果
+            return f"""图片OCR提取结果 (置信度: {confidence:.1f}%):
+
+{extracted_text}
+
+--- 图片信息 ---
+文件: {os.path.basename(file_path)}
+尺寸: {result.get('image_size', 'Unknown')}
+格式: {result.get('format', 'Unknown')}
+字数: {result.get('word_count', 0)}
+"""
+            
+        except ImportError:
+            return "OCR功能不可用，请安装相关依赖包 (pillow, pytesseract)"
+        except Exception as e:
+            return f"图片处理失败: {str(e)}"
     
     def _show_processing_results(self, results: Dict[str, Any]):
         """显示处理结果"""

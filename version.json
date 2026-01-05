@@ -1,11 +1,20 @@
 {
-    "version": "3.2.6",
-    "release_date": "2026-01-04",
-    "features": [
-        "🚀 联网搜索增强 - 结果持久化显示、质量评分算法优化及关键词增强",
-        "🎨 用户体验提升 - 友好错误处理(Friendly Error Handling)与操作成功反馈(Success Feedback)",
-        "🛠️ 操作栏重构 - '4+1' 布局优化，提升空间利用率",
-        "🐛 稳定性修复 - 修复联网搜索结果消失及状态重复显示问题",
-        "🔄 流程规范化 - 引入V2.0单功能迭代规范与自动化任务启动器"
-    ]
+  "version": "3.2.7",
+  "release_date": "2026-01-05",
+  "build_number": "20260105",
+  "status": "stable",
+  "major_features": [
+    "图片上传OCR支持",
+    "联网搜索质量评估",
+    "用户体验优化",
+    "智能研究分析",
+    "持续优化系统"
+  ],
+  "compatibility": {
+    "python": ">=3.8",
+    "platforms": ["macOS", "Linux", "Windows"],
+    "dependencies_updated": "2026-01-05"
+  },
+  "changelog_url": "CHANGELOG.md",
+  "documentation_updated": "2026-01-05"
 }

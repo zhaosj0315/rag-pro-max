@@ -125,7 +125,7 @@ class ResourceLimiter:
     def wait_if_needed(self, max_wait: float = 5.0):
         """如果需要则等待资源可用"""
         if self.should_throttle():
-            print(f"⚠️ 系统资源紧张，等待资源释放...")
+            logger.info(f"⚠️ 系统资源紧张，等待资源释放...")
             self.cpu_monitor.wait_for_cpu_available(max_wait)
 
 # 全局资源限制器

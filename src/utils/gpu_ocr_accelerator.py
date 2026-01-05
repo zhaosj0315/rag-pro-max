@@ -68,16 +68,16 @@ class GPUOCRAccelerator:
         # 防止在 Worker 进程中重复初始化
         current_process_name = multiprocessing.current_process().name
         if "SpawnPoolWorker" in current_process_name or "ForkPoolWorker" in current_process_name:
-            # print(f"⚠️ Worker进程检测到: {current_process_name}, 跳过 GPU OCR 初始化")
+            # logger.warning(current_process_name)
             return False
         
         try:
             # 尝试导入PaddleOCR
             from paddleocr import PaddleOCR
             
-            print(f"🚀 初始化GPU OCR加速器...")
-            print(f"   设备: {self.device}")
-            print(f"   批量大小: {self.batch_size}")
+            logger.info(f"🚀 初始化GPU OCR加速器...")
+            logger.info(f"   设备: {self.device}")
+            logger.info(f"   批量大小: {self.batch_size}")
             
             # 初始化PaddleOCR
             # 设备检测已在初始化中处理
@@ -112,14 +112,14 @@ class GPUOCRAccelerator:
             self._warmup()
             
             self.initialized = True
-            print(f"✅ GPU OCR加速器初始化成功")
+            logger.info(f"✅ GPU OCR加速器初始化成功")
             return True
             
         except ImportError:
-            print("⚠️  PaddleOCR未安装，回退到CPU OCR")
+            logger.info("⚠️  PaddleOCR未安装，回退到CPU OCR")
             return False
         except Exception as e:
-            print(f"❌ GPU OCR初始化失败: {e}")
+            logger.error(e)
             return False
     
     def _warmup(self):
@@ -128,9 +128,9 @@ class GPUOCRAccelerator:
             # 创建测试图像
             test_image = Image.new('RGB', (100, 50), color='white')
             self.ocr_engine.ocr(np.array(test_image))
-            print("🔥 模型预热完成")
+            logger.info("🔥 模型预热完成")
         except Exception as e:
-            print(f"⚠️  模型预热失败: {e}")
+            logger.warning(e)
     
     def process_images_batch(self, images: List[Image.Image]) -> List[str]:
         """批量处理图像"""
@@ -167,7 +167,7 @@ class GPUOCRAccelerator:
                 try:
                     result = self.ocr_engine.ocr(img_array)
                 except Exception as ocr_error:
-                    print(f"❌ GPU OCR处理失败: {ocr_error}")
+                    logger.error(ocr_error)
                     result = None
                 
                 # 提取文本
@@ -177,10 +177,10 @@ class GPUOCRAccelerator:
             elapsed = time.time() - start_time
             speed = len(batch) / elapsed if elapsed > 0 else 0
             
-            print(f"🚀 GPU批量OCR: {len(batch)}张图片, {elapsed:.2f}秒, {speed:.1f}张/秒")
+            logger.info(f"🚀 GPU批量OCR: {len(batch)}张图片, {elapsed:.2f}秒, {speed:.1f}张/秒")
             
         except Exception as e:
-            print(f"❌ GPU OCR批量处理失败: {e}")
+            logger.error(e)
             # 回退到逐张处理
             batch_texts = self._fallback_ocr(batch)
         
@@ -205,7 +205,7 @@ class GPUOCRAccelerator:
         try:
             import pytesseract
             
-            print(f"🔄 回退到CPU OCR处理 {len(images)} 张图片")
+            logger.info(f"🔄 回退到CPU OCR处理 {len(images)} 张图片")
             results = []
             
             for image in images:
@@ -213,13 +213,13 @@ class GPUOCRAccelerator:
                     text = pytesseract.image_to_string(image, lang='chi_sim+eng')
                     results.append(text.strip())
                 except Exception as e:
-                    print(f"⚠️  CPU OCR失败: {e}")
+                    logger.warning(e)
                     results.append("")
             
             return results
             
         except ImportError:
-            print("❌ 未安装pytesseract，无法进行OCR")
+            logger.info("❌ 未安装pytesseract，无法进行OCR")
             return [""] * len(images)
     
     def _cleanup_gpu_memory(self):
@@ -230,7 +230,7 @@ class GPUOCRAccelerator:
             elif self.device == "mps":
                 torch.mps.empty_cache()
         except Exception as e:
-            print(f"⚠️  GPU内存清理失败: {e}")
+            logger.warning(e)
     
     def get_device_info(self) -> dict:
         """获取设备信息"""

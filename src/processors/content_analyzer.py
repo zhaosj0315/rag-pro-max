@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 内容质量分析器
 实现内容去重、质量评估和相关性评分
@@ -332,10 +336,10 @@ if __name__ == "__main__":
         min_quality_score=30.0
     )
     
-    print(f"分析结果: {len(results)} 个内容")
+    logger.info(f"分析结果: {len(results)} 个内容")
     for i, result in enumerate(results, 1):
-        print(f"\n{i}. {result['title']}")
-        print(f"   质量评分: {result['quality_score']['total_score']:.1f}")
-        print(f"   相关性: {result['relevance_score']:.2f}")
-        print(f"   综合评分: {result['final_score']:.1f}")
-        print(f"   关键词: {result['quality_score']['details']['top_keywords'][:5]}")
+        logger.info(f"\n{i}. {result['title']}")
+        logger.info(f"   质量评分: {result['quality_score']['total_score']:.1f}")
+        logger.info(f"   相关性: {result['relevance_score']:.2f}")
+        logger.info(f"   综合评分: {result['final_score']:.1f}")
+        logger.info(f"   关键词: {result['quality_score']['details']['top_keywords'][:5]}")

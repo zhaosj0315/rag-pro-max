@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 清单管理器 - 完整实现
 """
@@ -37,7 +41,7 @@ class ManifestManager:
                         manifest['file_count'] = len(manifest['files'])
                     return manifest
             except Exception as e:
-                print(f"加载清单失败: {e}")
+                logger.info(f"加载清单失败: {e}")
         
         return {
             'files': [],
@@ -99,7 +103,7 @@ class ManifestManager:
             return True
             
         except Exception as e:
-            print(f"保存清单失败: {e}")
+            logger.info(f"保存清单失败: {e}")
             return False
     
     @staticmethod

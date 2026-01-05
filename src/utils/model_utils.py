@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 模型工具函数
 提取自 apppro.py
@@ -155,7 +159,7 @@ def get_kb_embedding_dim(db_path):
     if kb_cache_key in st.session_state.kb_dimensions:
         return st.session_state.kb_dimensions[kb_cache_key]
 
-    print(f"🔍 开始检测维度: {db_path}")
+    logger.info(db_path)
     
     try:
         # 方法0: 优先检查保存的 KB 信息 (.kb_info.json)
@@ -170,7 +174,7 @@ def get_kb_embedding_dim(db_path):
                     if 'embedding_dim' in kb_info and isinstance(kb_info['embedding_dim'], int) and kb_info['embedding_dim'] > 0:
                         dim = kb_info['embedding_dim']
                         model = kb_info.get('embedding_model', 'unknown')
-                        print(f"✅ 从 KB 信息读取维度: {dim}D (模型: {model})")
+                        logger.success(model)
                         st.session_state.kb_dimensions[kb_cache_key] = dim
                         return dim
                     
@@ -178,51 +182,51 @@ def get_kb_embedding_dim(db_path):
                     if 'embedding_model' in kb_info:
                         model_name = kb_info['embedding_model']
                         inferred_dim = get_model_dimension(model_name)
-                        print(f"⚠️ 未找到明确维度，根据模型名推断: {model_name} -> {inferred_dim}D")
+                        logger.warning(inferred_dim)
                         st.session_state.kb_dimensions[kb_cache_key] = inferred_dim
                         return inferred_dim
                         
             except Exception as e:
-                print(f"⚠️ 读取 KB 信息失败: {e}")
+                logger.warning(e)
         
         # 方法1: 直接从 ChromaDB 读取维度
         import chromadb
         try:
             client = chromadb.PersistentClient(path=db_path)
             collections = client.list_collections()
-            print(f"📦 找到 {len(collections)} 个集合")
+            logger.info(f"📦 找到 {len(collections)} 个集合")
             
             if collections:
                 col = client.get_collection(collections[0].name)
                 data = col.get(limit=1, include=['embeddings'])
                 if data['embeddings'] and len(data['embeddings']) > 0:
                     dim = len(data['embeddings'][0])
-                    print(f"✅ ChromaDB 检测到维度: {dim}D")
+                    logger.success(dim)
                     st.session_state.kb_dimensions[kb_cache_key] = dim
                     return dim
         except Exception as e:
-            print(f"⚠️ ChromaDB 检测失败: {e}")
+            logger.warning(e)
         
         # 方法2: 检查 vector_store.json
         vector_store_path = os.path.join(db_path, "vector_store.json")
         if os.path.exists(vector_store_path):
-            print(f"📄 检查 vector_store.json...")
+            logger.info(f"📄 检查 vector_store.json...")
             with open(vector_store_path, 'r') as f:
                 data = json.load(f)
                 if 'embedding_dict' in data and data['embedding_dict']:
                     first_embedding = next(iter(data['embedding_dict'].values()))
                     if isinstance(first_embedding, list):
                         dim = len(first_embedding)
-                        print(f"✅ JSON 检测到维度: {dim}D")
+                        logger.success(dim)
                         st.session_state.kb_dimensions[kb_cache_key] = dim
                         return dim
         else:
-            print(f"❌ vector_store.json 不存在")
+            logger.info(f"❌ vector_store.json 不存在")
         
     except Exception as e:
-        print(f"❌ 维度检测异常: {e}")
+        logger.error(e)
     
-    print(f"❌ 无法检测维度")
+    logger.info(f"❌ 无法检测维度")
     return None
 
 

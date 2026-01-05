@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 CPU 使用率限制器
 防止 CPU 使用率超过 90%，避免系统过载导致自动关机
@@ -48,20 +52,20 @@ class CPUThrottle:
                 
                 if cpu_percent > self.max_cpu_percent:
                     if not self.is_throttling:
-                        print(f"⚠️  CPU 使用率过高 ({cpu_percent:.1f}%)，启动限流保护...")
+                        logger.warning(cpu_percent:.1f)
                         self.is_throttling = True
                     
                     # 强制休眠，降低 CPU 使用率
                     time.sleep(0.2)
                 else:
                     if self.is_throttling:
-                        print(f"✅ CPU 使用率恢复正常 ({cpu_percent:.1f}%)，解除限流")
+                        logger.success(cpu_percent:.1f)
                         self.is_throttling = False
                 
                 time.sleep(self.check_interval)
                 
             except Exception as e:
-                print(f"CPU 监控异常: {e}")
+                logger.info(f"CPU 监控异常: {e}")
                 time.sleep(1.0)
     
     def wait_if_throttling(self, max_wait: float = 5.0):
@@ -149,7 +153,7 @@ def safe_parallel_execute(func: Callable, tasks: list, max_workers: int = None,
                     result = future.result(timeout=30)  # 30秒超时
                     results.append(result)
                 except Exception as e:
-                    print(f"任务执行失败: {e}")
+                    logger.info(f"任务执行失败: {e}")
                     results.append(None)
             
             return results

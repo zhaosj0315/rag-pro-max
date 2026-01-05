@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 OCR性能优化器 - 带CPU保护
 动态调整OCR进程数，确保CPU使用率不超过95%
@@ -90,22 +94,22 @@ class OCROptimizer:
                     
                     if cpu_usage > 98:
                         consecutive_high += 1
-                        print(f"🚨 CPU危险: {cpu_usage:.1f}% (连续{consecutive_high}次)")
+                        logger.info(f"🚨 CPU危险: {cpu_usage:.1f}% (连续{consecutive_high}次)")
                         
                         if consecutive_high >= 3:  # 连续3次超过98%
-                            print(f"🛑 紧急停止OCR处理！CPU过载风险")
+                            logger.info(f"🛑 紧急停止OCR处理！CPU过载风险")
                             self.emergency_stop = True
                             break
                             
                         time.sleep(3)  # 更长的暂停
                     elif cpu_usage > self.max_cpu_usage:
                         consecutive_high = max(0, consecutive_high - 1)
-                        print(f"⚠️  CPU使用率过高: {cpu_usage:.1f}% > {self.max_cpu_usage}%")
-                        print(f"💤 暂停OCR处理3秒，等待CPU降温...")
+                        logger.warning(self.max_cpu_usage)
+                        logger.info(f"💤 暂停OCR处理3秒，等待CPU降温...")
                         time.sleep(3)
                     elif cpu_usage > 85:
                         consecutive_high = 0
-                        print(f"🔥 CPU使用率较高: {cpu_usage:.1f}%，降低处理速度")
+                        logger.info(f"🔥 CPU使用率较高: {cpu_usage:.1f}%，降低处理速度")
                         time.sleep(1)
                     else:
                         consecutive_high = 0
@@ -157,18 +161,18 @@ class OCROptimizer:
         workers, strategy = self.get_optimal_workers(page_count)
         estimated_time = self.estimate_time(page_count, workers)
         
-        print(f"   📊 OCR优化策略: {strategy}")
-        print(f"   🔄 使用进程数: {workers}/{self.cpu_count} (保留{self.cpu_count-workers}核给系统)")
-        print(f"   ⏱️  预估时间: {estimated_time:.0f}秒")
-        print(f"   🛡️  CPU保护: 限制使用率 < {self.max_cpu_usage}%")
+        logger.info(f"   📊 OCR优化策略: {strategy}")
+        logger.info(f"   🔄 使用进程数: {workers}/{self.cpu_count} (保留{self.cpu_count-workers}核给系统)")
+        logger.info(f"   ⏱️  预估时间: {estimated_time:.0f}秒")
+        logger.info(f"   🛡️  CPU保护: 限制使用率 < {self.max_cpu_usage}%")
         
         # 性能提示
         if workers >= 6:
-            print(f"   🚀 高效模式：充分利用多核CPU，但保护系统稳定")
+            logger.info(f"   🚀 高效模式：充分利用多核CPU，但保护系统稳定")
         elif workers >= 3:
-            print(f"   ⚡ 平衡模式：兼顾性能和稳定性")
+            logger.info(f"   ⚡ 平衡模式：兼顾性能和稳定性")
         else:
-            print(f"   🛡️  保护模式：系统负载较高，优先保证稳定性")
+            logger.info(f"   🛡️  保护模式：系统负载较高，优先保证稳定性")
 
 # 全局实例
 ocr_optimizer = OCROptimizer()

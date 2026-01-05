@@ -13,6 +13,14 @@ try:
 except ImportError:
     HAS_OCR = False
 
+# macOS原生OCR支持
+try:
+    import subprocess
+    import platform
+    HAS_MACOS_OCR = platform.system() == 'Darwin'
+except ImportError:
+    HAS_MACOS_OCR = False
+
 try:
     import pandas as pd
     import tabula
@@ -47,9 +55,20 @@ class MultimodalProcessor:
             return 'text'
     
     def extract_text_from_image(self, image_path: str) -> Dict[str, Any]:
-        """从图片中提取文字"""
+        """从图片中提取文字 - 优先使用macOS原生OCR"""
+        
+        # 优先尝试macOS原生OCR
+        if HAS_MACOS_OCR:
+            try:
+                result = self._extract_with_macos_ocr(image_path)
+                if result['text'].strip():
+                    return result
+            except Exception as e:
+                logger.warning("macOS OCR失败，尝试备用方案", str(e))
+        
+        # 备用方案：pytesseract
         if not HAS_OCR:
-            logger.log_warning("OCR功能不可用", "请安装 pillow 和 pytesseract")
+            logger.warning("OCR功能不可用", "请安装 pillow 和 pytesseract")
             return {'text': '', 'confidence': 0, 'error': 'OCR不可用'}
         
         try:
@@ -69,17 +88,60 @@ class MultimodalProcessor:
                 'confidence': avg_confidence,
                 'word_count': len(text.split()),
                 'image_size': image.size,
-                'format': image.format
+                'format': image.format,
+                'ocr_engine': 'pytesseract'
             }
             
         except Exception as e:
-            logger.log_error(f"图片OCR失败: {image_path}", str(e))
+            logger.error(f"图片OCR失败: {image_path}", str(e))
             return {'text': '', 'confidence': 0, 'error': str(e)}
+    
+    def _extract_with_macos_ocr(self, image_path: str) -> Dict[str, Any]:
+        """使用macOS原生OCR提取文字"""
+        try:
+            # 使用shortcuts命令调用macOS OCR
+            cmd = ['shortcuts', 'run', 'Extract Text from Image', '-i', image_path]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0 and result.stdout.strip():
+                text = result.stdout.strip()
+                return {
+                    'text': text,
+                    'confidence': 95.0,  # macOS OCR通常很准确
+                    'word_count': len(text.split()),
+                    'image_size': self._get_image_size(image_path),
+                    'format': Path(image_path).suffix.upper(),
+                    'ocr_engine': 'macos_native'
+                }
+            else:
+                # 如果shortcuts不可用，尝试Vision框架
+                return self._extract_with_vision_framework(image_path)
+                
+        except Exception as e:
+            raise Exception(f"macOS OCR失败: {str(e)}")
+    
+    def _extract_with_vision_framework(self, image_path: str) -> Dict[str, Any]:
+        """使用Vision框架OCR (需要PyObjC)"""
+        try:
+            # 这里可以集成Vision框架，但需要额外依赖
+            # 暂时返回空结果，让系统回退到pytesseract
+            raise Exception("Vision框架OCR暂未实现")
+        except Exception:
+            raise
+    
+    def _get_image_size(self, image_path: str) -> tuple:
+        """获取图片尺寸"""
+        try:
+            from PIL import Image
+            with Image.open(image_path) as img:
+                return img.size
+        except:
+            return (0, 0)
     
     def extract_tables_from_pdf(self, pdf_path: str) -> List[Dict[str, Any]]:
         """从PDF中提取表格"""
         if not HAS_TABLE_EXTRACTION:
-            logger.log_warning("表格提取功能不可用", "请安装 pandas 和 tabula-py")
+            logger.warning("表格提取功能不可用", "请安装 pandas 和 tabula-py")
             return []
         
         try:
@@ -102,7 +164,7 @@ class MultimodalProcessor:
             return extracted_tables
             
         except Exception as e:
-            logger.log_error(f"PDF表格提取失败: {pdf_path}", str(e))
+            logger.error(f"PDF表格提取失败: {pdf_path}", str(e))
             return []
     
     def extract_tables_from_excel(self, excel_path: str) -> List[Dict[str, Any]]:
@@ -132,7 +194,7 @@ class MultimodalProcessor:
             return extracted_tables
             
         except Exception as e:
-            logger.log_error(f"Excel表格提取失败: {excel_path}", str(e))
+            logger.error(f"Excel表格提取失败: {excel_path}", str(e))
             return []
     
     def process_multimodal_file(self, file_path: str) -> Dict[str, Any]:
@@ -183,7 +245,7 @@ class MultimodalProcessor:
             }
             
         except Exception as e:
-            logger.log_error(f"多模态文件处理失败: {file_path}", str(e))
+            logger.error(f"多模态文件处理失败: {file_path}", str(e))
             result['error'] = str(e)
         
         return result

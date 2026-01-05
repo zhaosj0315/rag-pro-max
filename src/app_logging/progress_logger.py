@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 进度日志记录器
 提供详细的步骤耗时、进度百分比和ETA估算
@@ -26,7 +30,7 @@ class ProgressLogger:
         if self.logger:
             self.logger.info(msg)
         else:
-            print(f"ℹ️ [{timestamp}] {msg}")
+            logger.info(f"ℹ️ [{timestamp}] {msg}")
 
     def update_progress(self, current: int, total: int, prefix: str = ""):
         """更新当前步骤的进度"""
@@ -60,7 +64,7 @@ class ProgressLogger:
         if self.logger:
             self.logger.success(msg)
         else:
-            print(f"ℹ️ [{timestamp}] {msg}")
+            logger.info(f"ℹ️ [{timestamp}] {msg}")
 
     def finish_all(self, success: bool = True):
         """完成所有任务"""
@@ -77,5 +81,5 @@ class ProgressLogger:
             else:
                 self.logger.error(msg)
         else:
-            print(f"{msg}")
+            logger.info(f"{msg}")
 

@@ -31,13 +31,13 @@ class UploadInterface:
     def render_file_upload(self):
         """渲染文件上传"""
         uploaded_files = st.file_uploader(
-            "拖入文件 (PDF, DOCX, TXT, MD)",
+            "拖入文件 (PDF, DOCX, TXT, MD, 图片)",
             accept_multiple_files=True,
             key="uploader",
             label_visibility="collapsed"
         )
         
-        st.caption("支持格式: PDF, DOCX, TXT, MD, Excel | 单个文件最大 100MB")
+        st.caption("支持格式: PDF, DOCX, TXT, MD, Excel, 图片(JPG/PNG/BMP/TIFF/GIF) | 单个文件最大 100MB")
         
         if uploaded_files:
             return self.process_uploaded_files(uploaded_files)
@@ -337,7 +337,8 @@ class UploadInterface:
             return False, f"文件 {file.name} 超过100MB限制"
         
         # 文件类型检查
-        allowed_extensions = {'.pdf', '.txt', '.docx', '.md', '.xlsx', '.pptx', '.csv', '.html', '.json'}
+        allowed_extensions = {'.pdf', '.txt', '.docx', '.md', '.xlsx', '.pptx', '.csv', '.html', '.json',
+                             '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif'}
         ext = os.path.splitext(file.name)[1].lower()
         if ext not in allowed_extensions:
             return False, f"不支持的文件类型: {ext}"

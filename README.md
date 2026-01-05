@@ -12,15 +12,15 @@
 
 # RAG Pro Max - 智能文档问答系统
 
-**版本**: v3.2.6  
-**更新日期**: 2026-01-04  
+**版本**: v3.2.7  
+**更新日期**: 2026-01-05  
 **适用范围**: 企业级部署与运维
 
-![Version](https://img.shields.io/badge/version-v3.2.6-brightgreen)
+![Version](https://img.shields.io/badge/version-v3.2.7-brightgreen)
 ![Status](https://img.shields.io/badge/status-Stable-blue)
-![Last Update](https://img.shields.io/badge/last%20update-2026--01--04-orange)
+![Last Update](https://img.shields.io/badge/last%20update-2026--01--05-orange)
 
-# 🚀 RAG Pro Max v3.2.6
+# 🚀 RAG Pro Max v3.2.7
 
 > **企业级 RAG (Retrieval Augmented Generation) 知识库系统 - 智能推荐与极速检索的终极进化**
 ...
@@ -29,6 +29,12 @@
 ---
 
 ## ✨ 核心功能
+
+### 🖼️ 图片上传OCR支持 (v3.2.7 新增)
+- **智能OCR引擎**: macOS原生OCR优先，识别速度极快，自动回退pytesseract确保兼容
+- **多格式支持**: 支持JPG, JPEG, PNG, BMP, TIFF, GIF等主流图片格式
+- **中英文识别**: 智能文字提取，支持中英文混合内容识别
+- **无缝集成**: 完整集成到现有文档处理流程，零配置即用
 
 ### 🔍 联网搜索与质量评估 (v3.2.6 增强)
 - **结果持久化**: 联网搜索结果现在会持久显示，不会在回答完成后消失

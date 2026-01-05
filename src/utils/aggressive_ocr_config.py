@@ -3,6 +3,10 @@
 import psutil
 import multiprocessing as mp
 
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 def get_aggressive_ocr_workers():
     cpu_count = mp.cpu_count()
     # 激进模式：使用最大进程数
@@ -16,4 +20,4 @@ def force_ocr_all_pdfs():
 AGGRESSIVE_WORKERS = get_aggressive_ocr_workers()
 FORCE_OCR_ALL = True
 
-print(f"⚡ 激进OCR配置: {AGGRESSIVE_WORKERS} 进程")
+logger.info(f"⚡ 激进OCR配置: {AGGRESSIVE_WORKERS} 进程")

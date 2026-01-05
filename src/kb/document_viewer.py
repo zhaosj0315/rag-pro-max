@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 文档查看器模块 - Document Viewer
 支持文档预览、查看、编辑、删除
@@ -132,7 +136,7 @@ class DocumentViewer:
                     
                     return docs
             except Exception as e:
-                print(f"读取 manifest 失败: {e}")
+                logger.info(f"读取 manifest 失败: {e}")
         
         return []
     
@@ -234,7 +238,7 @@ class DocumentViewer:
             return chunks
             
         except Exception as e:
-            print(f"获取文档分块失败: {e}")
+            logger.info(f"获取文档分块失败: {e}")
             return []
     
     def delete_document(self, kb_name: str, file_path: str) -> bool:
@@ -269,5 +273,5 @@ class DocumentViewer:
             return True
             
         except Exception as e:
-            print(f"删除文档失败: {e}")
+            logger.info(f"删除文档失败: {e}")
             return False

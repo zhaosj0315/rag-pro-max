@@ -44,7 +44,8 @@ class DocumentWatcher(FileSystemEventHandler):
     
     def _should_process_file(self, file_path: str) -> bool:
         """判断是否应该处理该文件"""
-        supported_extensions = {'.pdf', '.txt', '.docx', '.md', '.xlsx', '.pptx', '.csv', '.html', '.json'}
+        supported_extensions = {'.pdf', '.txt', '.docx', '.md', '.xlsx', '.pptx', '.csv', '.html', '.json',
+                                '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif'}
         return Path(file_path).suffix.lower() in supported_extensions
     
     def _trigger_incremental_update(self, file_path: str):

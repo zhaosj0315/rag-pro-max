@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 性能监控器 - 实时性能数据收集和分析
 """
@@ -70,7 +74,7 @@ class PerformanceMonitor:
                 
                 time.sleep(interval)
             except Exception as e:
-                print(f"监控错误: {e}")
+                logger.info(f"监控错误: {e}")
                 time.sleep(interval)
     
     def record_query(self, query: str, response_time: float, success: bool):

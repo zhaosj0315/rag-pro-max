@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 爬取统计管理器
 实现实时监控、效果分析和可视化展示
@@ -43,7 +47,7 @@ class CrawlStatsManager:
                 with open(self.stats_file, 'r', encoding='utf-8') as f:
                     return json.load(f)
         except Exception as e:
-            print(f"加载历史统计失败: {e}")
+            logger.info(f"加载历史统计失败: {e}")
         return []
     
     def _save_stats(self):
@@ -53,7 +57,7 @@ class CrawlStatsManager:
             with open(self.stats_file, 'w', encoding='utf-8') as f:
                 json.dump(self.historical_stats, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"保存统计失败: {e}")
+            logger.info(f"保存统计失败: {e}")
     
     def start_session(self, industry: str, keywords: List[str], total_urls: int):
         """开始新的爬取会话"""
@@ -389,7 +393,7 @@ if __name__ == "__main__":
     
     # 获取统计信息
     current_stats = stats_manager.get_current_stats()
-    print("当前统计:", json.dumps(current_stats, indent=2, ensure_ascii=False))
+    logger.info("当前统计:", json.dumps(current_stats, indent=2, ensure_ascii=False))
     
     industry_comparison = stats_manager.get_industry_comparison()
-    print("行业对比:", json.dumps(industry_comparison, indent=2, ensure_ascii=False))
+    logger.info("行业对比:", json.dumps(industry_comparison, indent=2, ensure_ascii=False))

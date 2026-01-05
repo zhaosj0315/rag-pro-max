@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 向量化包装器 - 简化异步向量化接口
 """
@@ -36,7 +40,7 @@ class VectorizationWrapper:
         )
         
         if show_progress:
-            print(f"ℹ️ [向量化] 准备处理 {len(documents)} 个片段 (批量大小: {optimal_batch})")
+            logger.info(f"ℹ️ [向量化] 准备处理 {len(documents)} 个片段 (批量大小: {optimal_batch})")
         
         # 构建索引（LlamaIndex 内部会处理向量化）
         # 批量优化主要通过内存管理实现

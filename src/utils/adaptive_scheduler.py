@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 自适应CPU调度器
 基于历史性能数据和系统状态智能调整处理策略
@@ -45,7 +49,7 @@ class AdaptiveScheduler:
                         PerformanceRecord(**record) for record in data
                     ]
             except Exception as e:
-                print(f"⚠️  加载性能历史失败: {e}")
+                logger.warning(e)
                 self.performance_history = []
     
     def save_history(self):
@@ -56,7 +60,7 @@ class AdaptiveScheduler:
             with open(self.history_file, 'w') as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
-            print(f"⚠️  保存性能历史失败: {e}")
+            logger.warning(e)
     
     def record_performance(self, workers: int, pages: int, processing_time: float, success: bool):
         """记录性能数据"""
@@ -78,7 +82,7 @@ class AdaptiveScheduler:
             self.save_history()
             
         except Exception as e:
-            print(f"⚠️  记录性能数据失败: {e}")
+            logger.warning(e)
     
     def get_optimal_strategy(self, pages: int) -> Tuple[int, str, float]:
         """

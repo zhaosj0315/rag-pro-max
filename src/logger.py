@@ -3,6 +3,10 @@ import json
 from datetime import datetime
 import time
 
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 LOG_DIR = "app_logs"
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
@@ -29,11 +33,11 @@ class Logger:
                     
                     if log_date < cutoff:
                         os.remove(log_file)
-                        print(f"🗑️ 已自动清理旧日志: {filename}")
+                        logger.info(f"🗑️ 已自动清理旧日志: {filename}")
                 except Exception:
                     continue
         except Exception as e:
-            print(f"⚠️ 日志清理失败: {e}")
+            logger.warning(e)
     
     def log(self, stage, status, message, details=None):
         """记录日志到文件和终端"""
@@ -48,7 +52,7 @@ class Logger:
         with open(self.log_file, 'a', encoding='utf-8') as f:
             f.write(json.dumps(entry, ensure_ascii=False) + '\n')
         # 输出到终端（简化格式）
-        print(message)
+        logger.info(message)
     
     def start_timer(self, key):
         """开始计时"""

@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 并发爬取管理器
 支持多进程和多线程混合模式，突破GIL限制
@@ -495,7 +499,7 @@ class ConcurrentCrawler:
 
 # 使用示例
 if __name__ == "__main__":
-    print("🧪 测试多进程 vs 多线程爬取性能...")
+    logger.info("🧪 测试多进程 vs 多线程爬取性能...")
     
     test_urls = [
         "https://www.runoob.com/",
@@ -505,43 +509,43 @@ if __name__ == "__main__":
     
     def progress_callback(message, progress=None):
         if progress:
-            print(f"{message} ({progress:.1%})")
+            logger.info(f"{message} ({progress:.1%})")
         else:
-            print(message)
+            logger.info(message)
     
     # 测试多进程模式
-    print("\n🔄 测试多进程模式:")
+    logger.info("\n🔄 测试多进程模式:")
     process_crawler = ConcurrentCrawler(max_workers=3, use_processes=True)
     start_time = time.time()
     process_results = process_crawler.crawl_urls_concurrent(test_urls, progress_callback)
     process_time = time.time() - start_time
     process_stats = process_crawler.get_stats()
     
-    print(f"进程模式结果: {len(process_results)}个页面, 耗时: {process_time:.2f}秒")
-    print(f"成功率: {process_stats['success_rate']:.1%}, 速度: {process_stats['pages_per_minute']:.1f}页/分钟")
+    logger.info(f"进程模式结果: {len(process_results)}个页面, 耗时: {process_time:.2f}秒")
+    logger.info(f"成功率: {process_stats['success_rate']:.1%}, 速度: {process_stats['pages_per_minute']:.1f}页/分钟")
     
     # 测试多线程模式
-    print("\n🧵 测试多线程模式:")
+    logger.info("\n🧵 测试多线程模式:")
     thread_crawler = ConcurrentCrawler(max_workers=3, use_processes=False)
     start_time = time.time()
     thread_results = thread_crawler.crawl_urls_concurrent(test_urls, progress_callback)
     thread_time = time.time() - start_time
     thread_stats = thread_crawler.get_stats()
     
-    print(f"线程模式结果: {len(thread_results)}个页面, 耗时: {thread_time:.2f}秒")
-    print(f"成功率: {thread_stats['success_rate']:.1%}, 速度: {thread_stats['pages_per_minute']:.1f}页/分钟")
+    logger.info(f"线程模式结果: {len(thread_results)}个页面, 耗时: {thread_time:.2f}秒")
+    logger.info(f"成功率: {thread_stats['success_rate']:.1%}, 速度: {thread_stats['pages_per_minute']:.1f}页/分钟")
     
     # 性能对比
-    print(f"\n📊 性能对比:")
-    print(f"进程模式: {process_time:.2f}秒, {process_stats['pages_per_minute']:.1f}页/分钟")
-    print(f"线程模式: {thread_time:.2f}秒, {thread_stats['pages_per_minute']:.1f}页/分钟")
+    logger.info(f"\n📊 性能对比:")
+    logger.info(f"进程模式: {process_time:.2f}秒, {process_stats['pages_per_minute']:.1f}页/分钟")
+    logger.info(f"线程模式: {thread_time:.2f}秒, {thread_stats['pages_per_minute']:.1f}页/分钟")
     
     if process_time < thread_time:
         improvement = ((thread_time - process_time) / thread_time) * 100
-        print(f"🚀 进程模式快 {improvement:.1f}%")
+        logger.info(f"🚀 进程模式快 {improvement:.1f}%")
     else:
         improvement = ((process_time - thread_time) / process_time) * 100
-        print(f"🧵 线程模式快 {improvement:.1f}%")
+        logger.info(f"🧵 线程模式快 {improvement:.1f}%")
         
     def _get_random_headers(self):
         """获取随机请求头"""
@@ -807,9 +811,9 @@ if __name__ == "__main__":
     
     def progress_callback(message, progress=None):
         if progress:
-            print(f"{message} ({progress:.1%})")
+            logger.info(f"{message} ({progress:.1%})")
         else:
-            print(message)
+            logger.info(message)
     
     # 测试并发爬取
     test_urls = [
@@ -827,10 +831,10 @@ if __name__ == "__main__":
     
     # 显示统计信息
     stats = crawler.get_stats()
-    print(f"\n统计信息:")
-    print(f"总请求: {stats['total_requests']}")
-    print(f"成功: {stats['successful_requests']}")
-    print(f"失败: {stats['failed_requests']}")
-    print(f"成功率: {stats['success_rate']:.1%}")
-    print(f"平均响应时间: {stats['avg_response_time']:.2f}秒")
-    print(f"爬取速度: {stats['pages_per_minute']:.1f}页/分钟")
+    logger.info(f"\n统计信息:")
+    logger.info(f"总请求: {stats['total_requests']}")
+    logger.info(f"成功: {stats['successful_requests']}")
+    logger.info(f"失败: {stats['failed_requests']}")
+    logger.info(f"成功率: {stats['success_rate']:.1%}")
+    logger.info(f"平均响应时间: {stats['avg_response_time']:.2f}秒")
+    logger.info(f"爬取速度: {stats['pages_per_minute']:.1f}页/分钟")

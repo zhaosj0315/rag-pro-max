@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 模型选择器组件
 Stage 3.2.1 - 中风险重构
@@ -232,7 +236,7 @@ snapshot_download(
     local_dir="./hf_cache/{model_name.replace('/', '--')}",
     local_dir_use_symlinks=False
 )
-print("SUCCESS")
+logger.info("SUCCESS")
 """
             result = subprocess.run(
                 [sys.executable, "-c", download_script],

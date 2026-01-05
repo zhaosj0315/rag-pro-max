@@ -1,5 +1,9 @@
 from .safe_parallel_tasks import safe_process_node_worker, safe_extract_metadata_task
 from .cpu_throttle import CPUThrottle, SafeThreadPoolExecutor
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 并行执行管理器
 Stage 6 - 统一的多进程/多线程执行接口
@@ -57,14 +61,14 @@ class ParallelExecutor:
         try:
             cpu_percent = psutil.cpu_percent(interval=0.1)
             if cpu_percent > 85:  # 降低阈值，更保守
-                print(f"⚠️  CPU使用率过高 ({cpu_percent:.1f}%)，禁用并行处理")
+                logger.warning(cpu_percent:.1f)
                 return False
         except:
             pass  # 如果获取失败，继续并行
         
         # 检查是否正在限流
         if self.cpu_throttle.is_throttling:
-            print("⚠️  CPU正在限流中，禁用并行处理")
+            logger.info("⚠️  CPU正在限流中，禁用并行处理")
             return False
         
         return True

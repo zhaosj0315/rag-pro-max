@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 智能目录选择工具
 提供统一的目录选择逻辑，优先选择有文件的目录
@@ -20,18 +24,18 @@ try:
             try:
                 base_logger.log(msg)
             except:
-                print(f"ℹ️ {msg}")
+                logger.info(f"ℹ️ {msg}")
         def warning(self, msg): 
             try:
                 base_logger.log(msg)
             except:
-                print(f"⚠️ {msg}")
+                logger.warning(msg)
     logger = LoggerWrapper()
 except ImportError:
     # 如果无法导入logger，使用简单的print
     class SimpleLogger:
-        def info(self, msg): print(f"ℹ️ {msg}")
-        def warning(self, msg): print(f"⚠️ {msg}")
+        def info(self, msg): logger.info(f"ℹ️ {msg}")
+        def warning(self, msg): logger.warning(msg)
     logger = SimpleLogger()
 
 class DirectorySelector:
@@ -148,14 +152,14 @@ def select_best_directory_simple(pattern: str) -> Optional[str]:
 
 if __name__ == "__main__":
     # 测试代码
-    print("🧪 测试智能目录选择器")
+    logger.info("🧪 测试智能目录选择器")
     
     # 测试网页抓取目录选择
     domain = "help_aliyun_com"
     selected_dir, files = select_best_web_crawl_directory(domain)
     
     if selected_dir:
-        print(f"✅ 选择目录: {selected_dir}")
-        print(f"📁 文件数量: {len(files)}")
+        logger.success(selected_dir)
+        logger.info(f"📁 文件数量: {len(files)}")
     else:
-        print("❌ 未找到有效目录")
+        logger.info("❌ 未找到有效目录")

@@ -1,9 +1,14 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 "文件处理结果追踪"
 import os
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-SUPPORTED_FORMATS = {'.pdf', '.txt', '.docx', '.md', '.xlsx', '.csv', '.json', '.pptx', '.ppt'}
+SUPPORTED_FORMATS = {'.pdf', '.txt', '.docx', '.md', '.xlsx', '.csv', '.json', '.pptx', '.ppt',
+                     '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif'}
 
 class FileProcessResult:
     def __init__(self):
@@ -62,8 +67,7 @@ from pathlib import Path
 import os
 import multiprocessing as mp
 
-# 支持的文件格式
-SUPPORTED_FORMATS = {'.pdf', '.txt', '.docx', '.md', '.xlsx', '.xls', '.csv', '.json'}
+# 支持的文件格式 (已在文件开头定义，这里不再重复定义)
 
 # OCR多进程函数（必须在模块级别）
 def _ocr_page(args):
@@ -88,7 +92,7 @@ def _ocr_page(args):
         
         return idx, text if text else ""
     except Exception as e:
-        print(f"   ⚠️  第{idx}页OCR失败: {str(e)[:30]}")
+        logger.info(f"   ⚠️  第{idx}页OCR失败: {str(e)[:30]}")
         return idx, ""
 
 # 将文件加载函数移到模块级别（用于多进程）
@@ -134,7 +138,7 @@ def _load_single_file(file_info, use_ocr=True):
                 "file_path": str(file_path)
             }
             # 仅在调试时打印，避免日志刷屏
-            # print(f"⚠️  元数据提取警告: {e}")
+            # logger.warning(e)
 
         size = os.path.getsize(file_path)
         ext = file_ext.lower() # 统一使用小写扩展名
@@ -217,6 +221,48 @@ def _load_single_file(file_info, use_ocr=True):
                 read_mode = 'fast'
             except Exception as e:
                 return None, file_name, 'failed', f"PPTX解析失败: {str(e)[:50]}", 'slow'
+        elif ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif']:
+            # 图片文件：使用OCR提取文字
+            try:
+                from src.processors.multimodal_processor import MultimodalProcessor
+                processor = MultimodalProcessor()
+                ocr_result = processor.extract_text_from_image(file_path)
+                
+                if ocr_result.get('error'):
+                    return None, file_name, 'failed', f"OCR失败: {ocr_result['error']}", 'ocr'
+                
+                extracted_text = ocr_result.get('text', '')
+                if not extracted_text.strip():
+                    return None, file_name, 'skipped', "图片中未检测到文字内容", 'ocr'
+                
+                # 构建包含OCR信息的文档
+                ocr_metadata = base_metadata.copy()
+                ocr_metadata.update({
+                    'ocr_confidence': ocr_result.get('confidence', 0),
+                    'ocr_engine': ocr_result.get('ocr_engine', 'unknown'),
+                    'image_size': str(ocr_result.get('image_size', 'unknown')),
+                    'word_count': ocr_result.get('word_count', 0)
+                })
+                
+                # 格式化OCR结果
+                formatted_text = f"""图片OCR提取结果:
+
+{extracted_text}
+
+--- 图片信息 ---
+文件: {file_name}
+置信度: {ocr_result.get('confidence', 0):.1f}%
+OCR引擎: {ocr_result.get('ocr_engine', 'unknown')}
+尺寸: {ocr_result.get('image_size', 'unknown')}
+字数: {ocr_result.get('word_count', 0)}
+"""
+                
+                docs = [Document(text=formatted_text, metadata=ocr_metadata, id_=str(uuid.uuid4()))]
+                read_mode = 'ocr'
+            except ImportError:
+                return None, file_name, 'failed', "OCR功能不可用，请安装相关依赖", 'ocr'
+            except Exception as e:
+                return None, file_name, 'failed', f"图片处理失败: {str(e)[:50]}", 'ocr'
         else:
             # 其他格式：使用 SimpleDirectoryReader（慢速模式）
             from llama_index.core import SimpleDirectoryReader
@@ -240,14 +286,14 @@ def _load_single_file(file_info, use_ocr=True):
                 # 如果前台禁用OCR或环境变量设置跳过，则跳过OCR
                 if not use_ocr or skip_ocr_env:
                     source = "前台设置" if not use_ocr else "环境变量"
-                    print(f"   ⚡ 跳过OCR处理（{source}控制）")
+                    logger.info(f"   ⚡ 跳过OCR处理（{source}控制）")
                     return "此PDF为扫描版，已跳过OCR处理。如需OCR识别，请在前台勾选'启用OCR识别'"
                 
                 try:
                     from pdf2image import convert_from_path
                     from src.utils.enhanced_ocr_optimizer import enhanced_ocr_optimizer
                     
-                    print(f"   🔍 检测到扫描版PDF，启用增强OCR处理...")
+                    logger.info(f"   🔍 检测到扫描版PDF，启用增强OCR处理...")
                     
                     # 转换PDF为图片
                     images = convert_from_path(file_path, dpi=200)
@@ -262,7 +308,7 @@ def _load_single_file(file_info, use_ocr=True):
                     ])
                     
                     if full_text.strip():
-                        print(f"   ✅ OCR处理完成: {len(images)} 页，提取 {len(full_text)} 字符")
+                        logger.info(f"   ✅ OCR处理完成: {len(images)} 页，提取 {len(full_text)} 字符")
                         # OCR直接返回文本，上层逻辑会处理，但这里我们需要确保返回的元数据一致性
                         # 原逻辑直接返回文本字符串，调用方 _process_batch 似乎能处理？
                         # 检查 _process_batch -> 它是直接返回 _load_single_file 的结果。
@@ -275,7 +321,7 @@ def _load_single_file(file_info, use_ocr=True):
                         # 修正为：返回单文档列表
                         return [Document(text=full_text, metadata=base_metadata)], file_name, 'success', (size, 1), 'ocr'
                     else:
-                        print(f"   ⚠️  OCR未提取到文本内容")
+                        logger.info(f"   ⚠️  OCR未提取到文本内容")
                         return None, file_name, 'failed', "此PDF为扫描版，OCR处理未能提取到文本内容。", 'ocr'
                     
                     # 原代码中还有 batch_ocr 逻辑，但这里被上面的 return 覆盖了？
@@ -353,7 +399,7 @@ def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'Fi
     all_docs = []
     
     # 第一步：并行扫描所有文件（优化：多线程加速）
-    print(f"📁 [第 2 步] 并行扫描目录: {input_dir}")
+    logger.info(f"📁 [第 2 步] 并行扫描目录: {input_dir}")
     file_list = []
     
     # 获取所有子目录
@@ -375,14 +421,14 @@ def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'Fi
                         ext = Path(f).suffix.lower()
                         local_files.append((fp, f, ext))
         except Exception as e:
-            print(f"   扫描失败 {directory}: {e}")
+            logger.info(f"   扫描失败 {directory}: {e}")
         return local_files
     
     # 多线程并行扫描（安全配置：32 线程）
     if len(subdirs) > 1:
         from concurrent.futures import ThreadPoolExecutor, as_completed
         scan_workers = min(32, len(subdirs))  # 32 线程
-        print(f"⚡ [第 2 步] 安全模式：{scan_workers} 线程并行扫描 {len(subdirs)} 个目录")
+        logger.info(f"⚡ [第 2 步] 安全模式：{scan_workers} 线程并行扫描 {len(subdirs)} 个目录")
         
         with ThreadPoolExecutor(max_workers=scan_workers) as executor:
             futures = [executor.submit(scan_dir, d) for d in subdirs]
@@ -392,7 +438,7 @@ def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'Fi
         # 单目录直接扫描
         file_list = scan_dir(input_dir)
     
-    print(f"✅ [第 2 步] 扫描完成: 发现 {len(file_list)} 个文件")
+    logger.success(len(file_list))
     
     # 第二步：多线程并行处理（动态调度，保持资源 < 80%）
     import psutil
@@ -420,8 +466,8 @@ def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'Fi
     if max_workers > 1 and len(file_list) > 10:
         # batch_size已在上面动态计算，这里不再重复定义
         
-        print(f"🚀 [第 3 步] {mode_name}模式: {max_workers} 进程 | 文本占比: {fast_ratio*100:.1f}%")
-        print(f"📦 [第 3 步] 批量大小: {batch_size} 个/批")
+        logger.info(f"🚀 [第 3 步] {mode_name}模式: {max_workers} 进程 | 文本占比: {fast_ratio*100:.1f}%")
+        logger.info(f"📦 [第 3 步] 批量大小: {batch_size} 个/批")
         
         # 使用多进程（突破GIL限制）
         import time as time_module
@@ -429,7 +475,7 @@ def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'Fi
         # 移除强制 set_start_method('fork')，使用默认设置
         
         actual_workers = max_workers
-        print(f"💻 [第 3 步] 启动处理：使用 {actual_workers} 个进程")
+        logger.info(f"💻 [第 3 步] 启动处理：使用 {actual_workers} 个进程")
         
         # 统计快速/慢速读取
         fast_count = 0
@@ -437,14 +483,14 @@ def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'Fi
         
         # 将文件列表分批 (打包 use_ocr 参数)
         batches = [(file_list[i:i + batch_size], use_ocr) for i in range(0, len(file_list), batch_size)]
-        print(f"📊 [第 3 步] 总计 {len(file_list)} 个文件，分成 {len(batches)} 批")
+        logger.info(f"📊 [第 3 步] 总计 {len(file_list)} 个文件，分成 {len(batches)} 批")
         
         start_time = time_module.time()
         completed = 0
         
         # 使用更多进程，小批次，强制分布到所有核心
         with mp.Pool(processes=actual_workers) as pool:
-            print(f"🎯 启动 {actual_workers} 个进程，小批次处理强制使用所有CPU核心")
+            logger.info(f"🎯 启动 {actual_workers} 个进程，小批次处理强制使用所有CPU核心")
             # 使用imap_unordered获取结果
             for batch_results in pool.imap_unordered(_process_batch, batches, chunksize=1):
                 try:
@@ -457,7 +503,7 @@ def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'Fi
                             read_mode = 'unknown'
                         else:
                             # 处理异常情况
-                            print(f"⚠️ 异常返回值: {file_result}")
+                            logger.warning(file_result)
                             continue
                             
                         completed += 1
@@ -486,23 +532,23 @@ def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'Fi
                         eta_minutes = eta_seconds / 60
                         
                         progress_pct = completed / len(file_list) * 100
-                        print(f"📊 [第 3 步] {completed}/{len(file_list)} ({progress_pct:.1f}%) | 进程: {actual_workers}")
-                        print(f"   ⚡ 快速: {fast_count} | 🐌 慢速: {slow_count} | 速度: {speed:.1f} 文件/秒 | ⏱️  预计剩余: {eta_minutes:.1f} 分钟")
+                        logger.info(f"📊 [第 3 步] {completed}/{len(file_list)} ({progress_pct:.1f}%) | 进程: {actual_workers}")
+                        logger.info(f"   ⚡ 快速: {fast_count} | 🐌 慢速: {slow_count} | 速度: {speed:.1f} 文件/秒 | ⏱️  预计剩余: {eta_minutes:.1f} 分钟")
                     
                     # 每处理50个文件打印简单进度
                     if completed % 50 == 0:
-                        print(f"   已读取: {completed}/{len(file_list)}")
+                        logger.info(f"   已读取: {completed}/{len(file_list)}")
                 
                 except Exception as e:
-                    print(f"   批次处理失败: {e}")
+                    logger.info(f"   批次处理失败: {e}")
         
         
         # 最终统计
-        print(f"\n✅ [第 3 步] 文件读取完成:")
-        print(f"   ⚡ 快速读取 (直接): {fast_count} 个文件")
-        print(f"   🐌 慢速读取 (解析): {slow_count} 个文件")
+        logger.info(f"\n✅ [第 3 步] 文件读取完成:")
+        logger.info(f"   ⚡ 快速读取 (直接): {fast_count} 个文件")
+        logger.info(f"   🐌 慢速读取 (解析): {slow_count} 个文件")
         if fast_count + slow_count > 0:
-            print(f"   📈 快速占比: {fast_count/(fast_count+slow_count)*100:.1f}%")
+            logger.info(f"   📈 快速占比: {fast_count/(fast_count+slow_count)*100:.1f}%")
     
     else:
         # 单核模式（文件少时）
@@ -542,7 +588,7 @@ def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'Fi
     from src.utils.batch_ocr_processor import batch_ocr_processor
     
     if batch_ocr_processor.ocr_tasks:
-        print(f"\n🚀 [第 4 步] 批量OCR处理开始...")
+        logger.info(f"\n🚀 [第 4 步] 批量OCR处理开始...")
         
         # 统一处理所有OCR任务
         ocr_results = batch_ocr_processor.process_all_ocr_tasks()
@@ -562,18 +608,18 @@ def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'Fi
                     full_text = "\n\n".join(ocr_texts)
                     new_doc = Document(text=full_text, metadata=doc.metadata)
                     pending_docs.append(new_doc)
-                    print(f"   ✅ OCR完成: {doc.metadata.get('file_name', 'unknown')} ({len(ocr_texts)} 页)")
+                    logger.info(f"   ✅ OCR完成: {doc.metadata.get('file_name', 'unknown')} ({len(ocr_texts)} 页)")
                 else:
                     # OCR失败，记录到失败列表
                     fname = doc.metadata.get('file_name', 'unknown')
                     result.add_failed(fname, "OCR未识别到文字")
-                    print(f"   ❌ OCR失败: {fname}")
+                    logger.info(f"   ❌ OCR失败: {fname}")
         
         # 替换待处理的文档
         all_docs = [doc for doc in all_docs if not (hasattr(doc, 'text') and doc.text.startswith('__BATCH_OCR__'))]
         all_docs.extend(pending_docs)
         
-        print(f"✅ [第 4 步] 批量OCR处理完成")
+        logger.info(f"✅ [第 4 步] 批量OCR处理完成")
     
     return all_docs, result
 

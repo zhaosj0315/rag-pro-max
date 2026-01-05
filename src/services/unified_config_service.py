@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 统一配置服务
 整合所有配置保存、加载、验证逻辑
@@ -28,7 +32,7 @@ class UnifiedConfigService:
             
             return True
         except Exception as e:
-            print(f"保存配置失败 {config_name}: {e}")
+            logger.info(f"保存配置失败 {config_name}: {e}")
             return False
     
     def load_config(self, config_name: str, default_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -41,7 +45,7 @@ class UnifiedConfigService:
                 with open(config_file, 'r', encoding='utf-8') as f:
                     loaded_config = json.load(f)
             except Exception as e:
-                print(f"加载配置失败 {config_name}: {e}")
+                logger.info(f"加载配置失败 {config_name}: {e}")
         
         # 合并逻辑: 使用默认配置作为基础，用加载的配置覆盖
         final_config = (default_config or {}).copy()

@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 离线嵌入模型支持
 当网络不可用时使用本地模型
@@ -26,7 +30,7 @@ class OfflineEmbeddings:
             )
             return True
         except Exception as e:
-            print(f"❌ 离线模型加载失败: {e}")
+            logger.error(e)
             return False
     
     def encode(self, texts: List[str]) -> List[List[float]]:
@@ -41,7 +45,7 @@ class OfflineEmbeddings:
             embeddings = self.model.encode(texts, convert_to_tensor=False)
             return embeddings.tolist()
         except Exception as e:
-            print(f"❌ 文本编码失败: {e}")
+            logger.error(e)
             # 返回随机向量作为fallback
             import numpy as np
             return [np.random.rand(384).tolist() for _ in texts]

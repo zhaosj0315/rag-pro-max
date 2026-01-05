@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 配置服务模块 - 统一配置管理逻辑
 """
@@ -88,7 +92,7 @@ class ConfigService:
             return backup_path
             
         except Exception as e:
-            print(f"备份配置失败: {e}")
+            logger.info(f"备份配置失败: {e}")
             return None
     
     def restore_config(self, backup_path: str, config_name: str = "app_config.json") -> bool:
@@ -110,7 +114,7 @@ class ConfigService:
             return True
             
         except Exception as e:
-            print(f"恢复配置失败: {e}")
+            logger.info(f"恢复配置失败: {e}")
             return False
     
     def list_config_files(self) -> List[str]:
@@ -214,7 +218,7 @@ class ConfigService:
             return success
             
         except Exception as e:
-            print(f"配置更新失败: {e}")
+            logger.info(f"配置更新失败: {e}")
             return False
 
 # 全局配置服务实例

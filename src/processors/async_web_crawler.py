@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 异步并发网页爬虫 - 性能提升10倍+
 支持并发请求、智能限流、断点续传
@@ -121,7 +125,7 @@ class AsyncWebCrawler:
         self.robots_cache[domain] = True
         return True
     
-    def content_fingerprint(self, text: str) -> str:
+    def content_fingerlogger.info(self, text: str) -> str:
         """生成内容指纹用于去重"""
         # 清理文本并生成哈希
         cleaned = ''.join(text.split()).lower()
@@ -129,7 +133,7 @@ class AsyncWebCrawler:
     
     def is_duplicate_content(self, text: str) -> bool:
         """检查内容是否重复"""
-        fingerprint = self.content_fingerprint(text)
+        fingerprint = self.content_fingerlogger.info(text)
         if fingerprint in self.content_hashes:
             return True
         self.content_hashes.add(fingerprint)
@@ -450,7 +454,7 @@ class AsyncWebCrawler:
 async def main():
     async with AsyncWebCrawler(max_concurrent=20) as crawler:
         def progress_callback(message):
-            print(f"[{time.strftime('%H:%M:%S')}] {message}")
+            logger.info(f"[{time.strftime('%H:%M:%S')}] {message}")
         
         files = await crawler.crawl_recursive(
             start_url="https://docs.python.org/",
@@ -460,7 +464,7 @@ async def main():
             status_callback=progress_callback
         )
         
-        print(f"爬取完成，保存了 {len(files)} 个文件")
+        logger.info(f"爬取完成，保存了 {len(files)} 个文件")
 
 if __name__ == "__main__":
     asyncio.run(main())

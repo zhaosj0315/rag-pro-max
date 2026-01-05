@@ -92,7 +92,7 @@ class ToolsUI:
         
         st.markdown("---")
         st.markdown("##### ⬆️ 快速上传")
-        uploaded_file = st.file_uploader("选择文件", type=['pdf', 'txt', 'docx', 'md'], key="tools_uploader")
+        uploaded_file = st.file_uploader("选择文件", type=['pdf', 'txt', 'docx', 'md', 'jpg', 'jpeg', 'png', 'bmp', 'tiff', 'gif'], key="tools_uploader")
         if uploaded_file:
             st.success(f"✅ 已选择: {uploaded_file.name}")
             st.info("💡 请到主页完成处理")

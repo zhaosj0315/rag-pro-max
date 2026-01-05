@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 消息渲染模块
 负责聊天消息的显示、引用处理和推荐问题渲染
@@ -142,10 +146,10 @@ class MessageRenderer:
                 st.session_state.current_suggestions = new_suggestions[:3] if new_suggestions else new_sugs[:3]
                 
                 # 详细日志记录
-                print(f"🔄 MessageRenderer生成 {len(new_suggestions)} 个新推荐问题")
+                logger.info(f"🔄 MessageRenderer生成 {len(new_suggestions)} 个新推荐问题")
                 if new_suggestions:
                     for i, q in enumerate(new_suggestions[:3], 1):
-                        print(f"   {i}. {q}")
+                        logger.info(f"   {i}. {q}")
                 
                 st.rerun(scope="fragment")
             else:

@@ -21,7 +21,7 @@ from src.core.version import get_version_info
 
 logger = LogManager()
 version_info = get_version_info()
-CURRENT_VERSION = version_info.get("version", "3.2.6")
+CURRENT_VERSION = version_info.get("version", "3.2.7")
 
 # 原有数据模型
 class QueryRequest(BaseModel):

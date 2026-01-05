@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 智能爬取优化器 - v2.4.1
 自动分析网站类型并推荐最佳爬取参数
@@ -268,6 +272,6 @@ if __name__ == "__main__":
     ]
     
     for url in test_urls:
-        print(f"\n🔍 分析网站: {url}")
+        logger.info(f"\n🔍 分析网站: {url}")
         result = optimizer.analyze_website(url)
-        print(optimizer.generate_crawl_report(result))
+        logger.info(optimizer.generate_crawl_report(result))

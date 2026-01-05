@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 应用初始化器 - 负责环境配置和应用启动
 """
@@ -85,7 +89,7 @@ class AppInitializer:
         from src.common.utils import cleanup_temp_files
         cleaned_count = cleanup_temp_files("temp_uploads", 24)
         if cleaned_count > 0:
-            print(f"🧹 已清理 {cleaned_count} 个临时文件")
+            logger.info(f"🧹 已清理 {cleaned_count} 个临时文件")
     
     @staticmethod
     def initialize_app():

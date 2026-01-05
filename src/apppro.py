@@ -1,6 +1,6 @@
 # 初始化环境配置
 # 环境变量设置 - 减少启动警告
-__version__ = "3.2.2"
+__version__ = "3.2.7"
 
 import os
 os.environ['DISABLE_MODEL_SOURCE_CHECK'] = 'True'
@@ -81,7 +81,7 @@ from src.common.utils import cleanup_temp_files
 # 执行启动清理（使用一周=168小时）
 cleaned_count = cleanup_temp_files("temp_uploads", 168)
 if cleaned_count > 0:
-    print(f"🧹 已清理 {cleaned_count} 个临时文件")
+    logger.info(f"🧹 已清理 {cleaned_count} 个临时文件")
 
 import json
 import platform
@@ -1510,10 +1510,10 @@ with st.sidebar:
                 
                 elif st.session_state.get('last_processed_path'):
                     # 如果哈希匹配（说明是 rerun），且有备份路径，则恢复
-                    print(f"DEBUG: Hash matched. Restoring path: {st.session_state.last_processed_path}")
+                    logger.debug(st.session_state.last_processed_path)
                     st.session_state.uploaded_path = st.session_state.last_processed_path
                 else:
-                    print("DEBUG: Hash matched but no last_processed_path found!")
+                    logger.info("DEBUG: Hash matched but no last_processed_path found!")
 
 
             # 使用上传路径或手动输入的路径
@@ -2629,7 +2629,7 @@ if btn_start:
                 st.stop()
                 
         elif current_mode == 'search' and search_keyword:
-            print(f"DEBUG: ✅ 进入智能搜索分支，关键词 = {search_keyword}")
+            logger.debug(search_keyword)
             logger.log("智能搜索", "start", f"🔍 开始智能搜索模式: {search_keyword}")
             # 智能搜索模式 - 复用现有逻辑
             try:
@@ -2823,11 +2823,11 @@ if btn_start:
                 logger.error(f"智能搜索错误: {str(e)}")
                 st.stop()
         else:
-            print(f"DEBUG: ❌ 未匹配任何网页抓取分支")
-            print(f"DEBUG: current_mode = '{current_mode}', crawl_url = '{crawl_url}', search_keyword = '{search_keyword}'")
+            logger.info(f"DEBUG: ❌ 未匹配任何网页抓取分支")
+            logger.debug(search_keyword)
             logger.log("网页抓取", "warning", f"⚠️ 未匹配网页抓取条件: mode={current_mode}, url={bool(crawl_url)}, keyword={bool(search_keyword)}")
     
-    print("DEBUG: 跳过网页抓取模式，进入原有文件处理逻辑")
+    logger.info("DEBUG: 跳过网页抓取模式，进入原有文件处理逻辑")
     
     # 检查是否已经完成了网页抓取或智能搜索，避免重复处理
     if st.session_state.get('web_crawl_completed') or st.session_state.get('smart_search_completed'):
@@ -2912,9 +2912,9 @@ if btn_start:
                 # 使用优化后的名称
                 final_kb_name = optimized_name
             
-            print(f"DEBUG: Calling process_knowledge_base_logic with: kb={final_kb_name}, ocr={current_use_ocr}, meta={current_extract_metadata}, summary={current_generate_summary}")
-            print(f"DEBUG: st.session_state.uploaded_path = {st.session_state.get('uploaded_path')}")
-            print(f"DEBUG: uploaded_files present? = {bool(uploaded_files) if 'uploaded_files' in locals() else 'Not in locals'}")
+            logger.debug(current_generate_summary)
+            logger.debug(st.session_state.get('uploaded_path'))
+            logger.debug(bool(uploaded_files) if 'uploaded_files' in locals() else 'Not in locals')
 
             process_knowledge_base_logic(
                 kb_name=final_kb_name,
@@ -4661,9 +4661,9 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             with st.spinner("🔍 正在从多个知识库中检索信息..."):
                 try:
                     # 执行多知识库查询
-                    print(f"🔍 DEBUG: 开始执行多知识库查询，使用查询: '{final_prompt}'")
+                    logger.info(final_prompt)
                     response = multi_engine.query(final_prompt, selected_kbs, embed_provider, embed_model, embed_key, embed_url)
-                    print(f"✅ DEBUG: 多知识库查询完成")
+                    logger.info(f"✅ DEBUG: 多知识库查询完成")
                     
                 except Exception as e:
                     error_msg = f"查询失败: {str(e)}"
@@ -4762,16 +4762,16 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             if kb_dim and kb_dim in model_map:
                 required_model = model_map[kb_dim]
                 if embed_model != required_model:
-                    print(f"🔄 强制切换模型: {embed_model} → {required_model} (维度: {kb_dim}D)")
+                    logger.info(f"🔄 强制切换模型: {embed_model} → {required_model} (维度: {kb_dim}D)")
                     embed_model = required_model
                     embed = get_embed(embed_provider, embed_model, embed_key, embed_url)
                     if embed:
                         Settings.embed_model = embed
-                        print(f"✅ 模型已切换")
+                        logger.info(f"✅ 模型已切换")
             else:
                 # 维度检测失败时，不强制切换，但记录日志
                 if not kb_dim:
-                    print(f"⚠️ 无法检测知识库维度，保持当前模型: {embed_model}")
+                    logger.warning(embed_model)
         
         logger.separator("知识库查询")
         
@@ -4889,17 +4889,17 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
         
         # 查询改写 (v1.6) - 深度思考自动优化
         if st.session_state.get('enable_query_optimization', False):
-            print(f"🧠 DEBUG: 深度思考功能已启用，开始自动优化查询")
+            logger.info(f"🧠 DEBUG: 深度思考功能已启用，开始自动优化查询")
             logger.info("🧠 深度思考(查询优化)已激活")
             query_rewriter = QueryRewriter(Settings.llm)
             should_rewrite, reason = query_rewriter.should_rewrite(final_prompt)
-            print(f"🧠 DEBUG: should_rewrite={should_rewrite}, reason={reason}")
+            logger.info(f"🧠 DEBUG: should_rewrite={should_rewrite}, reason={reason}")
             
             if should_rewrite:
-                print(f"💡 DEBUG: 检测到需要改写查询")
+                logger.info(f"💡 DEBUG: 检测到需要改写查询")
                 logger.info(f"💡 深度思考: 检测到需要改写查询 - {reason}")
                 rewritten_query = query_rewriter.suggest_rewrite(final_prompt)
-                print(f"💡 DEBUG: 优化后的查询: {rewritten_query}")
+                logger.info(f"💡 DEBUG: 优化后的查询: {rewritten_query}")
                 
                 if rewritten_query and rewritten_query != final_prompt:
                     # 保存原问题
@@ -4911,25 +4911,25 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     
                     # 直接使用优化后的查询
                     final_prompt = rewritten_query
-                    print(f"✅ DEBUG: 已自动使用优化后的查询: '{final_prompt}'")
-                    print(f"✅ DEBUG: 原问题: '{original_prompt}'")
-                    print(f"✅ DEBUG: 优化后: '{final_prompt}'")
+                    logger.success(final_prompt)
+                    logger.success(original_prompt)
+                    logger.success(final_prompt)
                     logger.info(f"✅ 深度思考: 自动使用优化后的查询 - {rewritten_query}")
                     
                     # 确保后续所有地方都使用优化后的查询
                     st.session_state.current_optimized_query = final_prompt
             else:
-                print(f"🧠 DEBUG: 查询清晰，无需改写")
+                logger.info(f"🧠 DEBUG: 查询清晰，无需改写")
                 logger.info(f"🧠 深度思考: 查询清晰，无需改写 ({reason})")
         else:
-            print(f"🧠 DEBUG: 深度思考功能未启用")
+            logger.info(f"🧠 DEBUG: 深度思考功能未启用")
         
-        print(f"🔍 DEBUG: 查询优化完成，final_prompt = '{final_prompt}'")
+        logger.info(final_prompt)
 
         # 保存用于显示和查询的提示词
         user_display_prompt = final_prompt  # 用于UI显示
         query_prompt = final_prompt  # 用于实际查询
-        print(f"🔍 DEBUG: 准备执行查询，query_prompt = '{query_prompt}'")
+        logger.info(query_prompt)
         
         # 处理引用内容
         if st.session_state.get("quote_content"):
@@ -5248,7 +5248,7 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                 
                 except Exception as e: 
                     error_msg = str(e)
-                    print(f"❌ 查询出错: {error_msg}\n")
+                    logger.error(error_msg)
                     logger.error(f"查询处理失败: {error_msg}")
                     
                     # 显示详细错误信息

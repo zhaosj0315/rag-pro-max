@@ -14,7 +14,8 @@ class FileService:
     # 支持的文件类型
     SUPPORTED_EXTENSIONS = {
         '.txt', '.md', '.pdf', '.docx', '.doc', '.xlsx', '.xls', 
-        '.pptx', '.ppt', '.csv', '.json', '.html', '.htm', '.zip'
+        '.pptx', '.ppt', '.csv', '.json', '.html', '.htm', '.zip',
+        '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif'
     }
     
     # 文件大小限制 (100MB)

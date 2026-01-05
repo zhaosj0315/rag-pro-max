@@ -445,7 +445,7 @@ class DocumentManager:
                 else:
                     st.error(f"找不到文件: {file_name}")
                     # 在控制台输出更详细的调试信息
-                    print(f"DEBUG: Preview failed. Checked candidates for {file_name}: {candidates}")
+                    logger.debug(candidates)
                     
         with btn_col2:
             if btn_col2.button("🗑️", key=f"del_{orig_idx}_{display_idx}", help="删除"):

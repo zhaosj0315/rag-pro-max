@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """知识库基础操作模块"""
 
 import os
@@ -20,7 +24,7 @@ class KBOperations:
                 return True
             return False
         except Exception as e:
-            print(f"❌ 创建知识库失败: {e}")
+            logger.error(e)
             return False
     
     @staticmethod
@@ -37,7 +41,7 @@ class KBOperations:
             
             return True
         except Exception as e:
-            print(f"❌ 删除知识库失败: {e}")
+            logger.error(e)
             return False
     
     @staticmethod
@@ -59,7 +63,7 @@ class KBOperations:
             
             return True
         except Exception as e:
-            print(f"❌ 重命名知识库失败: {e}")
+            logger.error(e)
             return False
     
     @staticmethod
@@ -101,7 +105,7 @@ class KBOperations:
             
             return True
         except Exception as e:
-            print(f"❌ 保存知识库信息失败: {e}")
+            logger.error(e)
             return False
     
     @staticmethod
@@ -114,6 +118,6 @@ class KBOperations:
                 with open(kb_info_file, 'r') as f:
                     return json.load(f)
             except Exception as e:
-                print(f"⚠️ 读取知识库信息失败: {e}")
+                logger.warning(e)
         
         return None

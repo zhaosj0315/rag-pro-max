@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 可配置的行业网站管理服务
 支持用户自定义每个行业的网站列表
@@ -24,7 +28,7 @@ class ConfigurableIndustryService:
             else:
                 return {"custom_industries": {}}
         except Exception as e:
-            print(f"加载配置失败: {e}")
+            logger.info(f"加载配置失败: {e}")
             return {"custom_industries": {}}
     
     def _save_config(self):
@@ -34,7 +38,7 @@ class ConfigurableIndustryService:
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.config_data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"保存配置失败: {e}")
+            logger.info(f"保存配置失败: {e}")
     
     def get_all_industries(self) -> List[str]:
         """获取所有行业列表"""

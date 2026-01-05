@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 def _process_single_image_global(args):
     """处理单张图片 - 全局函数用于多进程"""
     import pytesseract
@@ -34,11 +38,11 @@ class EnhancedOCROptimizer:
         try:
             self.gpu_available = gpu_ocr_accelerator.initialize()
             if self.gpu_available:
-                print("🚀 GPU OCR加速已启用")
+                logger.info("🚀 GPU OCR加速已启用")
             else:
-                print("💻 使用CPU OCR处理")
+                logger.info("💻 使用CPU OCR处理")
         except Exception as e:
-            print(f"⚠️  GPU初始化失败: {e}")
+            logger.warning(e)
             self.gpu_available = False
     
     def process_pdf_pages(self, pdf_path: str, images: List[Image.Image]) -> List[str]:
@@ -59,7 +63,7 @@ class EnhancedOCROptimizer:
         task_id = str(uuid.uuid4())
         pages_count = len(images)
         
-        print(f"📊 使用优化OCR处理器处理 {pages_count} 页")
+        logger.info(f"📊 使用优化OCR处理器处理 {pages_count} 页")
         
         # 实时进度监控 - 开始任务
         progress_monitor.start_task(
@@ -96,10 +100,10 @@ class EnhancedOCROptimizer:
             processing_time = time.time() - start_time
             speed = pages_count / processing_time if processing_time > 0 else 0
             
-            print(f"✅ OCR处理完成: {processing_time:.1f}秒, {speed:.1f}页/秒")
+            logger.success(speed:.1f)
             
         except Exception as e:
-            print(f"❌ OCR处理失败: {e}")
+            logger.error(e)
             results = [''] * pages_count
         finally:
             # 清理临时文件
@@ -116,7 +120,7 @@ class EnhancedOCROptimizer:
     
     def _gpu_batch_process(self, task_id: str, images: List[Image.Image]) -> List[str]:
         """真正的并行OCR处理"""
-        print(f"🚀 使用优化OCR处理 {len(images)} 页")
+        logger.info(f"🚀 使用优化OCR处理 {len(images)} 页")
         
         # 导入优化OCR处理器
         from .optimized_ocr_processor import process_images_optimized
@@ -154,7 +158,7 @@ class EnhancedOCROptimizer:
     
     def _cpu_process(self, task_id: str, images: List[Image.Image], workers: int) -> List[str]:
         """CPU多进程处理"""
-        print(f"💻 使用CPU处理 {len(images)} 页 (进程数: {workers})")
+        logger.info(f"💻 使用CPU处理 {len(images)} 页 (进程数: {workers})")
         
         if workers == 1:
             # 单进程处理
@@ -180,7 +184,7 @@ class EnhancedOCROptimizer:
                 text = pytesseract.image_to_string(image, lang='chi_sim+eng')
                 results.append(text.strip())
             except Exception as e:
-                print(f"⚠️  第{i+1}页OCR失败: {e}")
+                logger.warning(e)
                 results.append("")
         
         return results
@@ -223,7 +227,7 @@ class EnhancedOCROptimizer:
                     )
                     
                 except Exception as e:
-                    print(f"⚠️  多进程OCR异常: {e}")
+                    logger.warning(e)
         
         return results
     
@@ -245,7 +249,7 @@ class EnhancedOCROptimizer:
     
     def benchmark_performance(self) -> dict:
         """性能基准测试"""
-        print("🧪 开始性能基准测试...")
+        logger.info("🧪 开始性能基准测试...")
         
         # 创建测试图像
         test_images = []

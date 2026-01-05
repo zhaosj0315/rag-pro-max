@@ -1,3 +1,7 @@
+from src.app_logging.log_manager import LogManager
+
+logger = LogManager()
+
 """
 日志分析器 - 解析和统计处理日志
 """
@@ -132,24 +136,24 @@ class LogAnalyzer:
         """打印格式化摘要"""
         summary = self.generate_summary()
         
-        print("=" * 60)
-        print("📊 处理摘要报告")
-        print("=" * 60)
+        logger.info("=" * 60)
+        logger.info("📊 处理摘要报告")
+        logger.info("=" * 60)
         
-        print("\n🔍 OCR处理统计:")
+        logger.info("\n🔍 OCR处理统计:")
         for key, value in summary['ocr_summary'].items():
-            print(f"   {key}: {value}")
+            logger.info(f"   {key}: {value}")
         
-        print("\n🧠 向量化统计:")
+        logger.info("\n🧠 向量化统计:")
         for key, value in summary['vector_summary'].items():
-            print(f"   {key}: {value}")
+            logger.info(f"   {key}: {value}")
         
         if summary['timeline']:
-            print("\n⏰ 处理时间线:")
+            logger.info("\n⏰ 处理时间线:")
             for event in summary['timeline']:
-                print(f"   [{event['time']}] 步骤{event['step']}/{event['total_steps']}: {event['description']}")
+                logger.info(f"   [{event['time']}] 步骤{event['step']}/{event['total_steps']}: {event['description']}")
         
-        print("=" * 60)
+        logger.info("=" * 60)
 
 def analyze_current_log():
     """分析当前日志"""

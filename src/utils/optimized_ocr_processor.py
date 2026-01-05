@@ -58,7 +58,7 @@ class OptimizedOCRProcessor:
             return True
             
         try:
-            print("🚀 初始化优化OCR处理器...")
+            logger.info("🚀 初始化优化OCR处理器...")
             self.logger.info("🚀 开始初始化OCR引擎")
             start_time = time.time()
             
@@ -81,13 +81,13 @@ class OptimizedOCRProcessor:
             init_time = time.time() - start_time
             self.initialized = True
             
-            print("✅ OCR引擎初始化完成")
+            logger.info("✅ OCR引擎初始化完成")
             self.logger.info(f"✅ OCR引擎初始化成功，耗时: {init_time:.2f}秒")
             return True
             
         except Exception as e:
             error_msg = f"❌ OCR引擎初始化失败: {str(e)}"
-            print(error_msg)
+            logger.info(error_msg)
             self.logger.error(error_msg)
             return False
     
@@ -102,18 +102,18 @@ class OptimizedOCRProcessor:
         
         # 检查系统资源
         resources = self.resource_limiter.check_resources()
-        print(f"📊 系统资源: CPU {resources['cpu_percent']:.1f}%, 内存 {resources['memory_percent']:.1f}%")
+        logger.info(f"📊 系统资源: CPU {resources['cpu_percent']:.1f}%, 内存 {resources['memory_percent']:.1f}%")
         logging.info(f"📊 系统资源状态: CPU {resources['cpu_percent']:.1f}%, 内存 {resources['memory_percent']:.1f}%")
         
         # 根据资源状况决定处理方式
         if resources['cpu_high'] or len(image_paths) <= 2:
-            print("⚡ 使用串行OCR处理")
+            logger.info("⚡ 使用串行OCR处理")
             logging.info("⚡ 资源紧张或文件较少，使用串行处理")
             result = self._process_serial(image_paths, progress_callback)
         else:
             # 获取安全的工作线程数
             safe_workers = self.resource_limiter.get_safe_worker_count(self.max_workers)
-            print(f"🚀 使用并行处理 {len(image_paths)} 张图片 (工作线程: {safe_workers})")
+            logger.info(f"🚀 使用并行处理 {len(image_paths)} 张图片 (工作线程: {safe_workers})")
             logging.info(f"🚀 使用并行处理，工作线程: {safe_workers}")
             result = self._process_parallel(image_paths, progress_callback, safe_workers)
         
@@ -149,16 +149,16 @@ class OptimizedOCRProcessor:
     def print_statistics(self):
         """打印处理统计信息"""
         stats = self.get_statistics()
-        print("\n" + "="*50)
-        print("📊 OCR处理统计信息")
-        print("="*50)
-        print(f"📁 总处理文件数: {stats['total_files_processed']} 个")
-        print(f"⏱️  总处理时间: {stats['total_processing_time']:.2f} 秒")
-        print(f"🕐 会话持续时间: {stats['session_duration']:.2f} 秒")
-        print(f"⚡ 平均每文件: {stats['avg_time_per_file']:.2f} 秒")
-        print(f"🚀 处理速度: {stats['files_per_minute']:.1f} 文件/分钟")
-        print(f"🎯 会话开始: {stats['session_start_time']}")
-        print("="*50)
+        logger.info("\n" + "="*50)
+        logger.info("📊 OCR处理统计信息")
+        logger.info("="*50)
+        logger.info(f"📁 总处理文件数: {stats['total_files_processed']} 个")
+        logger.info(f"⏱️  总处理时间: {stats['total_processing_time']:.2f} 秒")
+        logger.info(f"🕐 会话持续时间: {stats['session_duration']:.2f} 秒")
+        logger.info(f"⚡ 平均每文件: {stats['avg_time_per_file']:.2f} 秒")
+        logger.info(f"🚀 处理速度: {stats['files_per_minute']:.1f} 文件/分钟")
+        logger.info(f"🎯 会话开始: {stats['session_start_time']}")
+        logger.info("="*50)
     
     def _process_serial(self, image_paths: List[str], progress_callback: Optional[Callable] = None) -> List[Dict]:
         """串行处理"""
@@ -178,7 +178,7 @@ class OptimizedOCRProcessor:
             if i % 2 == 0 and i > 0:
                 resources = self.resource_limiter.check_resources()
                 if resources['cpu_high']:
-                    print(f"⚠️ CPU使用率过高 ({resources['cpu_percent']:.1f}%)，暂停1秒")
+                    logger.warning(resources['cpu_percent']:.1f)
                     time.sleep(1.0)
         
         return results
