@@ -162,13 +162,13 @@ class LogManager:
         if details:
             msg += f" - {details}"
         if self.enable_terminal:
-            logger.info(f"🚀 [{datetime.now().strftime('%H:%M:%S')}] {msg}")
+            print(f"🚀 [{datetime.now().strftime('%H:%M:%S')}] {msg}")
         self.log(self.INFO, msg)
     
     def processing(self, message: str):
         """处理中"""
         if self.enable_terminal:
-            logger.info(f"⏳ [{datetime.now().strftime('%H:%M:%S')}] {message}")
+            print(f"⏳ [{datetime.now().strftime('%H:%M:%S')}] {message}")
         self.log(self.INFO, message)
     
     def complete_operation(self, operation: str, details: str = ""):
@@ -177,24 +177,24 @@ class LogManager:
         if details:
             msg += f" - {details}"
         if self.enable_terminal:
-            logger.info(f"✨ [{datetime.now().strftime('%H:%M:%S')}] {msg}")
+            print(f"✨ [{datetime.now().strftime('%H:%M:%S')}] {msg}")
         self.log(self.SUCCESS, msg)
     
     # ==================== 数据日志 ====================
     def data_summary(self, title: str, data: Dict[str, Any]):
         """数据摘要"""
         if self.enable_terminal:
-            logger.info(f"📊 [{datetime.now().strftime('%H:%M:%S')}] {title}:")
+            print(f"📊 [{datetime.now().strftime('%H:%M:%S')}] {title}:")
             for key, value in data.items():
-                logger.info(f"  ├─ {key}: {value}")
+                print(f"  ├─ {key}: {value}")
         self.log(self.INFO, f"{title}: {data}")
     
     def list_items(self, title: str, items: List[str]):
         """列表项"""
         if self.enable_terminal:
-            logger.info(f"📋 [{datetime.now().strftime('%H:%M:%S')}] {title}:")
+            print(f"📋 [{datetime.now().strftime('%H:%M:%S')}] {title}:")
             for item in items:
-                logger.info(f"  • {item}")
+                print(f"  • {item}")
         self.log(self.INFO, f"{title}: {items}")
     
     # ==================== 分隔符 ====================
@@ -202,11 +202,11 @@ class LogManager:
         """分隔符"""
         if self.enable_terminal:
             if title:
-                logger.info(f"\n{'='*60}")
-                logger.info(f"  {title}")
-                logger.info(f"{'='*60}")
+                print(f"\n{'='*60}")
+                print(f"  {title}")
+                print(f"{'='*60}")
             else:
-                logger.info(f"{'='*60}")
+                print(f"{'='*60}")
     
     # ==================== 性能监控 ====================
     def start_timer(self, name: str):
@@ -236,7 +236,7 @@ class LogManager:
         finally:
             elapsed = time.time() - start
             if show_result and self.enable_terminal:
-                logger.info(f"⏱️  [{datetime.now().strftime('%H:%M:%S')}] {operation} 耗时: {elapsed:.2f}秒")
+                print(f"⏱️  [{datetime.now().strftime('%H:%M:%S')}] {operation} 耗时: {elapsed:.2f}秒")
             
             # 记录性能指标
             if operation not in self.metrics:
@@ -289,12 +289,12 @@ class LogManager:
         
         self.separator("性能指标")
         for operation, stats in metrics.items():
-            logger.info(f"  {operation}:")
-            logger.info(f"    次数: {stats['count']}")
-            logger.info(f"    总计: {stats['total']:.2f}秒")
-            logger.info(f"    平均: {stats['avg']:.2f}秒")
-            logger.info(f"    最小: {stats['min']:.2f}秒")
-            logger.info(f"    最大: {stats['max']:.2f}秒")
+            print(f"  {operation}:")
+            print(f"    次数: {stats['count']}")
+            print(f"    总计: {stats['total']:.2f}秒")
+            print(f"    平均: {stats['avg']:.2f}秒")
+            print(f"    最小: {stats['min']:.2f}秒")
+            print(f"    最大: {stats['max']:.2f}秒")
     
     # ==================== 进度显示 ====================
     def progress_bar(self, current: int, total: int, label: str = ""):
@@ -308,7 +308,7 @@ class LogManager:
         bar = '█' * filled + '░' * (bar_length - filled)
         
         if self.enable_terminal:
-            logger.info(f"\r{label} [{bar}] {percent}% ({current}/{total})", end='', flush=True)
+            print(f"\r{label} [{bar}] {percent}% ({current}/{total})", end='', flush=True)
             if current == total:
                 print()  # 完成后换行
     
