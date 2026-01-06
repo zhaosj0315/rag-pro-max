@@ -627,6 +627,22 @@ st.markdown("""
     }
 </style>""", unsafe_allow_html=True)
 
+# ==========================================
+# 用户认证检查 (必须在应用初始化之前)
+# ==========================================
+from src.auth.login_page import check_authentication
+from src.auth.user_context import user_context
+
+# 检查用户认证状态
+check_authentication()
+
+# 确保用户目录存在
+user_context.ensure_user_directories()
+
+# 迁移现有数据到admin用户下（仅首次运行）
+if not os.path.exists("vector_db_storage/admin"):
+    user_context.migrate_existing_data()
+
 # 应用启动日志
 if 'app_initialized' not in st.session_state:
     logger.separator("RAG Pro Max 启动")

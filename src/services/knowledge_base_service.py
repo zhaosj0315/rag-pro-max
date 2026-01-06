@@ -5,6 +5,7 @@ logger = LogManager()
 
 """
 知识库服务模块 - 统一知识库操作逻辑
+支持用户数据隔离
 """
 
 import os
@@ -16,36 +17,128 @@ from pathlib import Path
 class KnowledgeBaseService:
     """统一的知识库管理服务"""
     
-    def __init__(self, storage_dir: str = "vector_db_storage"):
-        self.storage_dir = storage_dir
+    def __init__(self, storage_dir: str = "vector_db_storage", user_context=None):
+        self.base_storage_dir = storage_dir
+        self.user_context = user_context
+        self.storage_dir = self._get_user_storage_dir()
         self.ensure_storage_dir()
+    
+    def _get_user_storage_dir(self) -> str:
+        """获取用户专属的存储目录"""
+        if self.user_context:
+            return self.user_context.get_user_kb_path()
+        else:
+            # 向后兼容：尝试从session_state获取用户上下文
+            try:
+                import streamlit as st
+                if hasattr(st, 'session_state') and 'user_context' in st.session_state:
+                    from src.auth.user_context import UserContext
+                    return UserContext.get_user_kb_path()
+            except:
+                pass
+            return self.base_storage_dir
     
     def ensure_storage_dir(self):
         """确保存储目录存在"""
         os.makedirs(self.storage_dir, exist_ok=True)
     
     def list_knowledge_bases(self) -> List[Dict[str, Any]]:
-        """列出所有知识库"""
-        kb_list = []
-        
+        """列出知识库（根据用户权限）"""
         try:
-            if not os.path.exists(self.storage_dir):
-                return kb_list
+            # 检查是否为管理员
+            is_admin = False
+            try:
+                import streamlit as st
+                if hasattr(st, 'session_state') and 'user_context' in st.session_state:
+                    is_admin = st.session_state.user_context.get('is_admin', False)
+            except:
+                pass
             
-            for item in os.listdir(self.storage_dir):
-                kb_path = os.path.join(self.storage_dir, item)
-                if os.path.isdir(kb_path):
-                    kb_info = self.get_knowledge_base_info(item)
-                    if kb_info:
-                        kb_list.append(kb_info)
-            
-            # 按修改时间排序
-            kb_list.sort(key=lambda x: x.get('modified', 0), reverse=True)
-            return kb_list
-            
+            if is_admin:
+                return self._list_all_knowledge_bases()
+            else:
+                return self._list_user_knowledge_bases()
+                
         except Exception as e:
             logger.info(f"列出知识库失败: {e}")
             return []
+    
+    def _list_user_knowledge_bases(self) -> List[Dict[str, Any]]:
+        """列出当前用户的知识库"""
+        kb_list = []
+        
+        if not os.path.exists(self.storage_dir):
+            return kb_list
+        
+        for item in os.listdir(self.storage_dir):
+            kb_path = os.path.join(self.storage_dir, item)
+            if os.path.isdir(kb_path):
+                kb_info = self.get_knowledge_base_info(item)
+                if kb_info:
+                    kb_list.append(kb_info)
+        
+        # 按修改时间排序
+        kb_list.sort(key=lambda x: x.get('modified', 0), reverse=True)
+        return kb_list
+    
+    def _list_all_knowledge_bases(self) -> List[Dict[str, Any]]:
+        """列出所有用户的知识库（管理员专用）"""
+        kb_list = []
+        
+        if not os.path.exists(self.base_storage_dir):
+            return kb_list
+        
+        # 遍历所有用户目录
+        for username in os.listdir(self.base_storage_dir):
+            user_path = os.path.join(self.base_storage_dir, username)
+            if os.path.isdir(user_path):
+                for kb_name in os.listdir(user_path):
+                    kb_path = os.path.join(user_path, kb_name)
+                    if os.path.isdir(kb_path):
+                        kb_info = self._get_kb_info_with_user(username, kb_name, kb_path)
+                        if kb_info:
+                            kb_list.append(kb_info)
+        
+        # 按修改时间排序
+        kb_list.sort(key=lambda x: x.get('modified', 0), reverse=True)
+        return kb_list
+    
+    def _get_kb_info_with_user(self, username: str, kb_name: str, kb_path: str) -> Optional[Dict[str, Any]]:
+        """获取带用户信息的知识库信息"""
+        try:
+            info = {
+                'name': f"{username}/{kb_name}",
+                'display_name': kb_name,
+                'username': username,
+                'path': kb_path,
+                'modified': os.path.getmtime(kb_path),
+                'size': self._get_directory_size(kb_path)
+            }
+            
+            # 尝试读取元数据
+            metadata_file = os.path.join(kb_path, 'metadata.json')
+            if os.path.exists(metadata_file):
+                with open(metadata_file, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+                    info.update(metadata)
+            
+            return info
+        except Exception as e:
+            logger.info(f"获取知识库信息失败 {username}/{kb_name}: {e}")
+            return None
+    
+    def _get_directory_size(self, path: str) -> int:
+        """获取目录大小"""
+        total_size = 0
+        try:
+            for dirpath, dirnames, filenames in os.walk(path):
+                for filename in filenames:
+                    filepath = os.path.join(dirpath, filename)
+                    if os.path.exists(filepath):
+                        total_size += os.path.getsize(filepath)
+        except:
+            pass
+        return total_size
     
     def get_knowledge_base_info(self, kb_name: str) -> Optional[Dict[str, Any]]:
         """获取知识库信息"""

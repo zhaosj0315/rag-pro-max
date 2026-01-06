@@ -15,7 +15,8 @@ class TabbedSidebar:
             "config": {"icon": "⚙️", "name": "配置", "key": "config"},
             "monitor": {"icon": "📊", "name": "监控", "key": "monitor"},
             "tools": {"icon": "🔧", "name": "工具", "key": "tools"},
-            "help": {"icon": "ℹ️", "name": "帮助", "key": "help"}
+            "help": {"icon": "ℹ️", "name": "帮助", "key": "help"},
+            "user": {"icon": "👤", "name": "用户", "key": "user"}
         }
         
         # 初始化会话状态
@@ -57,6 +58,8 @@ class TabbedSidebar:
                 self._render_tools_tab()
             elif selected_tab == "help":
                 self._render_help_tab()
+            elif selected_tab == "user":
+                self._render_user_tab()
             
             return selected_tab
     
@@ -316,8 +319,12 @@ class TabbedSidebar:
     # 辅助方法
     def _get_knowledge_bases(self):
         """获取知识库列表"""
-        # 这里应该从实际的知识库管理器获取
-        return ["默认知识库", "技术文档", "产品手册", "FAQ库"]
+        try:
+            from src.auth.user_context import UserContext
+            kb_list = UserContext.list_user_knowledge_bases()
+            return kb_list if kb_list else ["暂无知识库"]
+        except Exception as e:
+            return ["默认知识库", "技术文档", "产品手册", "FAQ库"]
     
     def _get_cpu_usage(self):
         """获取CPU使用率"""
@@ -347,6 +354,11 @@ class TabbedSidebar:
             {"name": "python", "cpu": 8, "memory": 128},
             {"name": "chrome", "cpu": 12, "memory": 512}
         ]
+    
+    def _render_user_tab(self):
+        """用户标签 - 用户管理"""
+        from src.auth.user_management import show_user_management
+        show_user_management()
     
     def _save_config(self):
         """保存配置 - 使用统一服务"""
