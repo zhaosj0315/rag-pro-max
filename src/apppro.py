@@ -2196,7 +2196,15 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
     """处理知识库逻辑 (Stage 4.2 - 使用 IndexBuilder)"""
     global logger
     
-    persist_dir = os.path.join(output_base, kb_name)
+    # 使用用户上下文获取正确的知识库路径
+    try:
+        from src.auth.user_context import UserContext
+        user_kb_base = UserContext.get_user_kb_path()
+        persist_dir = os.path.join(user_kb_base, kb_name)
+    except:
+        # 向后兼容
+        persist_dir = os.path.join(output_base, kb_name)
+    
     start_time = time.time()
     
     # 资源保护检查
@@ -3072,7 +3080,15 @@ elif active_kb_name:
     
     # 文件管理
     with st.container(key="kb_details_container"):
-        with st.expander("📊 知识库详情与管理", expanded=False):
+        # 知识库详情标题行 - 添加下载按钮
+        detail_col1, detail_col2 = st.columns([4, 1])
+        with detail_col1:
+            detail_expander = st.expander("📊 知识库详情与管理", expanded=False)
+        with detail_col2:
+            if st.button("📥", help="下载知识库", use_container_width=True, key="kb_detail_download"):
+                st.session_state.show_download_dialog = True
+        
+        with detail_expander:
             if not doc_manager.manifest['files']: 
                 st.info("暂无文件")
             else:
@@ -5327,9 +5343,6 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
 # ==========================================
 # 知识库下载对话框
 # ==========================================
-if st.session_state.get('show_download_dialog', False):
-    show_kb_download_dialog()
-
 @st.dialog("📥 下载知识库")
 def show_kb_download_dialog():
     """显示知识库下载对话框"""
@@ -5407,3 +5420,6 @@ def show_kb_download_dialog():
         if st.button("❌ 取消", use_container_width=True):
             st.session_state.show_download_dialog = False
             st.rerun()
+
+if st.session_state.get('show_download_dialog', False):
+    show_kb_download_dialog()
