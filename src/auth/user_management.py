@@ -55,6 +55,10 @@ def show_user_panel():
     st.subheader("📊 我的统计")
     
     username = st.session_state.user_context['username']
+    is_guest = username.startswith('guest_')
+    
+    if is_guest:
+        st.warning("👤 您正在使用游客模式，数据将在会话结束后清理")
     
     # 用户知识库统计
     user_kb_path = f"vector_db_storage/{username}"
@@ -75,6 +79,21 @@ def show_user_panel():
         st.metric("📚 我的知识库", kb_count)
     with col2:
         st.metric("💬 对话历史", chat_count)
+    
+    # 游客模式额外功能
+    if is_guest:
+        st.markdown("---")
+        st.subheader("🔄 游客操作")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("📝 转为正式用户"):
+                st.info("请先退出登录，然后注册正式账户")
+        with col2:
+            if st.button("🗑️ 清理我的数据"):
+                from src.auth.user_auth import user_auth
+                user_auth.cleanup_guest_data(username)
+                st.success("✅ 游客数据已清理")
+                st.rerun()
 
 def show_user_list():
     """显示用户列表"""
@@ -187,20 +206,44 @@ def show_data_management():
     
     st.warning("⚠️ 危险操作，请谨慎使用")
     
-    if st.button("🧹 清理临时文件"):
-        # 清理临时上传文件
-        temp_path = "temp_uploads"
-        if os.path.exists(temp_path):
-            for file in os.listdir(temp_path):
-                file_path = os.path.join(temp_path, file)
-                try:
-                    if os.path.isfile(file_path):
-                        os.unlink(file_path)
-                    elif os.path.isdir(file_path):
-                        shutil.rmtree(file_path)
-                except Exception as e:
-                    st.error(f"清理失败: {e}")
-            st.success("✅ 临时文件清理完成")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🧹 清理临时文件"):
+            # 清理临时上传文件
+            temp_path = "temp_uploads"
+            if os.path.exists(temp_path):
+                for file in os.listdir(temp_path):
+                    file_path = os.path.join(temp_path, file)
+                    try:
+                        if os.path.isfile(file_path):
+                            os.unlink(file_path)
+                        elif os.path.isdir(file_path):
+                            shutil.rmtree(file_path)
+                    except Exception as e:
+                        st.error(f"清理失败: {e}")
+                st.success("✅ 临时文件清理完成")
+    
+    with col2:
+        if st.button("👤 清理游客数据"):
+            # 清理所有游客数据
+            cleaned_count = 0
+            for storage_dir in ["vector_db_storage", "chat_histories", "temp_uploads"]:
+                if os.path.exists(storage_dir):
+                    for item in os.listdir(storage_dir):
+                        if item.startswith("guest_"):
+                            item_path = os.path.join(storage_dir, item)
+                            try:
+                                if os.path.isdir(item_path):
+                                    shutil.rmtree(item_path)
+                                    cleaned_count += 1
+                            except Exception as e:
+                                st.error(f"清理游客数据失败: {e}")
+            
+            if cleaned_count > 0:
+                st.success(f"✅ 已清理 {cleaned_count} 个游客数据目录")
+            else:
+                st.info("ℹ️ 没有找到游客数据")
 
 def cleanup_user_data(username: str):
     """清理用户数据"""

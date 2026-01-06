@@ -54,14 +54,18 @@ def show_login_page():
         # 处理登录
         if login_btn:
             if username and password:
-                success, user_info = user_auth.authenticate(username, password)
+                success, result = user_auth.authenticate(username, password)
                 if success:
                     st.session_state.authenticated = True
-                    st.session_state.user_info = user_info
-                    st.success(f"✅ 登录成功！欢迎 {user_info['username']}")
+                    st.session_state.user_info = result
+                    st.success(f"✅ 登录成功！欢迎 {result['username']}")
                     st.rerun()
                 else:
-                    st.error("❌ 用户名或密码错误")
+                    if isinstance(result, dict) and result.get('error') == 'password_reset_required':
+                        st.error("🔐 " + result['message'])
+                        st.code("python scripts/reset_admin_password.py")
+                    else:
+                        st.error("❌ 用户名或密码错误")
             else:
                 st.error("❌ 请输入用户名和密码")
         
@@ -77,9 +81,18 @@ def show_login_page():
             else:
                 st.error("❌ 请输入用户名和密码")
         
-        # 默认账户提示
+        # 游客登录
         st.markdown("---")
-        st.info("💡 默认管理员账户：admin / admin123")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("👤 游客登录", use_container_width=True):
+                guest_info = user_auth.create_guest_session()
+                st.session_state.authenticated = True
+                st.session_state.user_info = guest_info
+                st.success(f"✅ 游客登录成功！")
+                st.rerun()
+        with col2:
+            st.info("💡 游客模式数据临时保存")
         
         st.markdown('</div>', unsafe_allow_html=True)
 

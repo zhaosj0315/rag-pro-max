@@ -22,13 +22,14 @@ class UserAuth:
         """确保用户文件存在"""
         if not os.path.exists(self.users_file):
             os.makedirs(os.path.dirname(self.users_file), exist_ok=True)
-            # 创建默认管理员
+            # 创建默认管理员（需要通过脚本设置密码）
             default_users = {
                 "admin": {
-                    "password_hash": self.hash_password("admin123"),
+                    "password_hash": "",  # 空密码，需要通过脚本重置
                     "role": "admin",
                     "created_at": datetime.now().isoformat(),
-                    "last_login": None
+                    "last_login": None,
+                    "password_reset_required": True
                 }
             }
             with open(self.users_file, 'w', encoding='utf-8') as f:
@@ -59,6 +60,11 @@ class UserAuth:
             return False, None
         
         user = users[username]
+        
+        # 检查是否需要重置密码
+        if user.get('password_reset_required', False) or not user.get('password_hash'):
+            return False, {"error": "password_reset_required", "message": "管理员密码需要重置，请运行: python scripts/reset_admin_password.py"}
+        
         if user['password_hash'] == self.hash_password(password):
             # 更新最后登录时间
             user['last_login'] = datetime.now().isoformat()
@@ -90,6 +96,42 @@ class UserAuth:
         
         self.save_users(users)
         return True
+    
+    def create_guest_session(self) -> Dict:
+        """创建游客会话"""
+        import uuid
+        from datetime import datetime
+        
+        guest_id = f"guest_{uuid.uuid4().hex[:8]}"
+        
+        guest_info = {
+            'username': guest_id,
+            'role': 'guest',
+            'created_at': datetime.now().isoformat(),
+            'last_login': datetime.now().isoformat(),
+            'is_temporary': True
+        }
+        
+        return guest_info
+    
+    def cleanup_guest_data(self, guest_id: str):
+        """清理游客数据"""
+        import shutil
+        
+        # 清理游客知识库
+        guest_kb_path = f"vector_db_storage/{guest_id}"
+        if os.path.exists(guest_kb_path):
+            shutil.rmtree(guest_kb_path)
+        
+        # 清理游客对话历史
+        guest_chat_path = f"chat_histories/{guest_id}"
+        if os.path.exists(guest_chat_path):
+            shutil.rmtree(guest_chat_path)
+        
+        # 清理游客临时文件
+        guest_temp_path = f"temp_uploads/{guest_id}"
+        if os.path.exists(guest_temp_path):
+            shutil.rmtree(guest_temp_path)
     
     def get_all_users(self) -> Dict:
         """获取所有用户（管理员专用）"""

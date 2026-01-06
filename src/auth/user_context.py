@@ -21,8 +21,16 @@ class UserContext:
         return UserContext.get_current_user().get('username', 'anonymous')
     
     @staticmethod
+    def is_guest() -> bool:
+        """判断是否为游客"""
+        username = UserContext.get_username()
+        return username.startswith('guest_')
+    
+    @staticmethod
     def is_admin() -> bool:
         """判断是否为管理员"""
+        if UserContext.is_guest():
+            return False
         return UserContext.get_current_user().get('is_admin', False)
     
     @staticmethod
