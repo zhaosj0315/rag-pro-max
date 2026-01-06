@@ -3072,7 +3072,7 @@ elif active_kb_name:
     if not os.path.exists(db_path):
         st.error(f"❌ 知识库路径不存在: {db_path}")
         st.info(f"📍 活跃知识库名称: {active_kb_name}")
-        return
+        st.stop()  # 使用 st.stop() 而不是 return
     
     stats = doc_manager.get_kb_statistics()
 
