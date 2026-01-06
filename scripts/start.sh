@@ -9,6 +9,8 @@ echo "🚀 RAG Pro Max 启动中..."
 export DISABLE_MODEL_SOURCE_CHECK=True
 export TOKENIZERS_PARALLELISM=false
 export PYTHONWARNINGS="ignore::UserWarning:jieba,ignore::UserWarning:pydantic"
+export STREAMLIT_LOGGER_LEVEL=ERROR
+export STREAMLIT_SERVER_HEADLESS=true
 
 
 
@@ -72,7 +74,7 @@ export PYTHONPATH="${PWD}:${PYTHONPATH}"
 
 # 启动主应用
 echo "🌐 启动 Streamlit 应用 (端口 8501)..."
-streamlit run src/apppro.py --server.port 8501 &
+streamlit run src/apppro.py --server.port 8501 --logger.level error --server.headless true 2>/dev/null &
 STREAMLIT_PID=$!
 
 # 如果v2.0可用，启动API服务

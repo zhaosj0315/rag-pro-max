@@ -1,6 +1,6 @@
-# RAG Pro Max v3.2.2 Enterprise Deployment Guide
+# RAG Pro Max v3.2.7 Enterprise Deployment Guide
 
-**Version**: v3.2.2  
+**Version**: v3.2.7  
 **Updated**: 2026-01-03  
 **Scope**: Enterprise Deployment & Operations
 

@@ -20,7 +20,11 @@
   "system": {
     "max_file_size": 104857600,
     "temp_cleanup_hours": 24,
-    "max_concurrent_tasks": 4
+    "max_concurrent_tasks": 4,
+    "auto_summary_enabled": true,
+    "auto_summary_timeout": 30,
+    "fast_kb_loading": true,
+    "skip_existing_kb_rebuild": true
   },
   "llm_model_ollama": "gpt-oss:20b"
 }

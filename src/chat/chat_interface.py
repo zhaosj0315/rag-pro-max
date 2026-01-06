@@ -155,6 +155,13 @@ class ChatInterface:
             
             # 实际调用聊天引擎
             try:
+                # 检查chat_engine是否存在且有效
+                if not hasattr(st.session_state, 'chat_engine'):
+                    raise Exception("Chat engine not initialized in session state")
+                
+                if st.session_state.chat_engine is None:
+                    raise Exception("Chat engine is None")
+                
                 chat_engine = st.session_state.chat_engine
                 response = chat_engine.stream_chat(prompt)
                 

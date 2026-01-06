@@ -116,6 +116,13 @@ class QueryHandler:
             
             start_time = time.time()
             
+            # 检查chat_engine是否存在且有效
+            if not hasattr(st.session_state, 'chat_engine'):
+                raise Exception("Chat engine not initialized in session state")
+            
+            if st.session_state.chat_engine is None:
+                raise Exception("Chat engine is None")
+            
             # 流式响应
             response = st.session_state.chat_engine.stream_chat(question)
             

@@ -18,7 +18,9 @@ from bs4 import BeautifulSoup
 from typing import List, Dict, Set, Optional, Callable
 import urllib.robotparser
 from pathlib import Path
-import logging
+from src.app_logging import LogManager
+
+logger = LogManager()
 
 # 🔥 新增：导入智能优化器
 from .crawl_optimizer import CrawlOptimizer

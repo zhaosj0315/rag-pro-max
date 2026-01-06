@@ -44,6 +44,16 @@ def update_all_model_configs(new_model):
         set_global_llm_model("Ollama", new_model, api_url=ollama_url)
     
     return success
+
+def normalize_kb_name_for_storage(kb_name: str) -> str:
+    """规范化知识库名称用于存储
+    
+    将显示名称 [username] kb_name 转换为存储名称 kb_name
+    """
+    if kb_name and kb_name.startswith('[') and '] ' in kb_name:
+        # 格式: [username] kb_name -> 使用 kb_name
+        return kb_name.split('] ')[1]
+    return kb_name
 os.environ['GLOG_minloglevel'] = '3'  # 只显示致命错误
 os.environ['FLAGS_logtostderr'] = '0'  # 不输出到stderr
 os.environ['PADDLE_LOG_LEVEL'] = '50'  # 最高级别，几乎不输出
@@ -944,7 +954,7 @@ with st.sidebar:
                     st.session_state.current_session_id = new_id
                     st.session_state.messages = []
                     st.session_state.suggestions_history = []
-                    HistoryManager.save_session(current_active_kb, [], new_id)
+                    HistoryManager.save_session(normalize_kb_name_for_storage(current_active_kb), [], new_id)
                     st.rerun()
                 
                 # 会话列表
@@ -1779,7 +1789,7 @@ with st.sidebar:
                             st.session_state.messages.pop()
                             st.session_state.messages.pop()
                             if current_kb_name:
-                                HistoryManager.save_session(current_kb_name, state.get_messages(), st.session_state.get('current_session_id'))
+                                HistoryManager.save_session(normalize_kb_name_for_storage(current_kb_name), state.get_messages(), st.session_state.get('current_session_id'))
                             st.toast("✅ 已撤销")
                             time.sleep(0.5)
                             st.rerun()
@@ -1789,7 +1799,7 @@ with st.sidebar:
                         st.session_state.messages = []
                         st.session_state.suggestions_history = []
                         if current_kb_name:
-                            HistoryManager.save_session(current_kb_name, [], st.session_state.get('current_session_id'))
+                            HistoryManager.save_session(normalize_kb_name_for_storage(current_kb_name), [], st.session_state.get('current_session_id'))
                         st.toast("✅ 已清空")
                         time.sleep(0.5)
                         st.rerun()
@@ -4039,7 +4049,7 @@ if active_kb_name:
                         st.session_state.messages = []
                         st.session_state.suggestions_history = []
                         from src.chat import HistoryManager
-                        HistoryManager.save_session(active_kb_name, [], st.session_state.get('current_session_id'))
+                        HistoryManager.save_session(normalize_kb_name_for_storage(active_kb_name), [], st.session_state.get('current_session_id'))
                         st.rerun()
 
             with c_new:
@@ -4053,23 +4063,77 @@ if active_kb_name:
                     st.session_state.pop('session_ctx_limit', None)
                     
                     from src.chat import HistoryManager
-                    HistoryManager.save_session(active_kb_name, [], new_id)
+                    HistoryManager.save_session(normalize_kb_name_for_storage(active_kb_name), [], new_id)
                     st.rerun()
     st.divider()
 
 # 自动摘要 (仅在知识库首次加载且无历史消息时触发，排除纯对话模式)
-if active_kb_name and active_kb_name != "pure_chat" and st.session_state.chat_engine and not st.session_state.messages:
+if (active_kb_name and active_kb_name != "pure_chat" and 
+    hasattr(st.session_state, 'chat_engine') and st.session_state.chat_engine and 
+    not st.session_state.messages):
+    
+    # 添加跳过摘要的选项
+    col1, col2 = st.columns([3, 1])
+    with col2:
+        if st.button("⏭️ 跳过摘要", key="skip_summary"):
+            st.session_state.messages.append({"role": "assistant", "content": "👋 知识库已就绪，请开始提问。"})
+            st.rerun()
+    
     with st.chat_message("assistant", avatar="🤖"):
         summary_placeholder = st.empty()
         with st.status("✨ 正在分析文档生成摘要...", expanded=True) as status:
             try:
+                # 检查chat_engine是否存在且有效
+                if not hasattr(st.session_state, 'chat_engine'):
+                    raise Exception("st.session_state has no attribute 'chat_engine'. Did you forget to initialize it?")
+                
+                if st.session_state.chat_engine is None:
+                    raise Exception("Chat engine is None")
+                    
+                if not hasattr(st.session_state.chat_engine, 'stream_chat'):
+                    raise Exception("Chat engine not properly initialized")
+                
                 # 使用当前选择的 LLM 模型名称
                 current_model = st.session_state.get('selected_model', 'Ollama')
                 logger.info(f"💬 摘要生成使用模型: {current_model}")
                 
                 prompt = "请用一段话简要总结此知识库的核心内容。然后，提出3个用户可能最关心的问题，每行一个，不要序号。"
                 full = ""
-                resp = st.session_state.chat_engine.stream_chat(prompt)
+                
+                # 添加超时控制 - 使用threading替代signal
+                timeout_seconds = st.session_state.get('app_config', {}).get('system', {}).get('auto_summary_timeout', 30)
+                import threading
+                import time
+                
+                # 在线程外部获取chat_engine引用，避免线程内访问session_state
+                chat_engine_ref = st.session_state.chat_engine
+                
+                # 超时标志
+                timeout_flag = threading.Event()
+                result_container = {'response': None, 'error': None}
+                
+                def generate_summary():
+                    try:
+                        result_container['response'] = chat_engine_ref.stream_chat(prompt)
+                    except Exception as e:
+                        result_container['error'] = e
+                
+                # 启动生成线程
+                thread = threading.Thread(target=generate_summary)
+                thread.daemon = True
+                thread.start()
+                
+                # 等待结果或超时
+                thread.join(timeout=timeout_seconds)
+                
+                if thread.is_alive():
+                    # 超时处理
+                    raise TimeoutError("Summary generation timeout")
+                
+                if result_container['error']:
+                    raise result_container['error']
+                
+                resp = result_container['response']
                 
                 for t in resp.response_gen:
                     # 🛑 检查停止信号
@@ -4086,23 +4150,32 @@ if active_kb_name and active_kb_name != "pure_chat" and st.session_state.chat_en
                 summary_placeholder.markdown(full)
                 
                 summary_lines = full.split('\n')
-                summary = summary_lines[0]
+                summary = summary_lines[0] if summary_lines else "知识库已就绪"
                 sug = [re.sub(r'^\d+\.\s*', '', q.strip()) for q in summary_lines[1:] if q.strip()][:3]
 
                 st.session_state.messages.append({"role": "assistant", "content": summary, "suggestions": sug})
-                HistoryManager.save_session(active_kb_name, state.get_messages(), st.session_state.get('current_session_id'))
+                
+                # 规范化知识库名称用于保存历史
+                normalized_kb_name = normalize_kb_name_for_storage(active_kb_name)
+                HistoryManager.save_session(normalized_kb_name, state.get_messages(), st.session_state.get('current_session_id'))
                 st.rerun()
-            except Exception as e:
+            except (TimeoutError, Exception) as e:
                 error_msg = str(e)
-                if "timed out" in error_msg.lower() or "timeout" in error_msg.lower():
+                if "timeout" in error_msg.lower() or isinstance(e, TimeoutError):
                     status.update(label="⏱️ 摘要生成超时", state="error")
                     summary_placeholder.info("⏱️ LLM 响应超时，已跳过自动摘要。您可以直接开始提问。")
                     logger.warning(f"⏱️ 摘要生成超时: {e}")
+                elif "not properly initialized" in error_msg:
+                    status.update(label="⚙️ 引擎初始化中", state="error")
+                    summary_placeholder.info("⚙️ 知识库引擎正在初始化，请稍后刷新页面。")
+                    logger.warning(f"⚙️ Chat engine not ready: {e}")
                 else:
                     status.update(label="❌ 摘要生成失败", state="error")
                     summary_placeholder.warning(f"摘要生成受阻: {e}")
                     logger.error(f"❌ 摘要生成失败: {e}")
-                st.session_state.messages.append({"role": "assistant", "content": "👋 知识库已就绪。"})
+                
+                # 添加默认消息，避免无限循环
+                st.session_state.messages.append({"role": "assistant", "content": "👋 知识库已就绪，请开始提问。"})
 
 # 渲染消息
 for msg_idx, msg in enumerate(state.get_messages()):

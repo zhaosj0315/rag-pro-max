@@ -31,8 +31,8 @@ class FileProcessResult:
             'success': len(self.success),
             'failed': len(self.failed),
             'skipped': len(self.skipped),
-            'total_docs': sum(f['docs'] for f in self.success),
-            'total_size': sum(f['size'] for f in self.success),
+            'total_docs': sum(f.get('docs', 0) for f in self.success),
+            'total_size': sum(f.get('size', 0) for f in self.success),
         }
     
     def get_report(self) -> str:
@@ -383,7 +383,7 @@ def _process_batch(args):
 
 def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'FileProcessResult']:
     """
-    安全扫描目录，返回成功加载的文档和处理结果（多线程并行）
+    安全扫描目录，返回成功加载的文档和处理结果（优化版本）
     
     Args:
         input_dir: 输入目录路径
@@ -393,84 +393,56 @@ def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'Fi
         (documents, result) - 文档列表和处理结果
     """
     from llama_index.core import SimpleDirectoryReader
-    from concurrent.futures import ThreadPoolExecutor, as_completed
     
     result = FileProcessResult()
-    all_docs = []
     
-    # 第一步：并行扫描所有文件（优化：多线程加速）
-    logger.info(f"📁 [第 2 步] 并行扫描目录: {input_dir}")
-    file_list = []
+    # 快速检查：如果目录为空或不存在，直接返回
+    if not os.path.exists(input_dir):
+        logger.warning(f"目录不存在: {input_dir}")
+        return [], result
     
-    # 获取所有子目录
-    subdirs = [input_dir]
     try:
-        subdirs.extend([os.path.join(input_dir, d) for d in os.listdir(input_dir) 
-                       if os.path.isdir(os.path.join(input_dir, d)) and not d.startswith('.')])
-    except:
-        pass
-    
-    # 并行扫描函数
-    def scan_dir(directory):
-        local_files = []
+        # 获取文件列表
+        file_list = []
+        for root, _, filenames in os.walk(input_dir):
+            for f in filenames:
+                if not f.startswith('.'):
+                    fp = os.path.join(root, f)
+                    if os.path.getsize(fp) > 0:  # 跳过空文件
+                        file_list.append(fp)
+        
+        if not file_list:
+            logger.info("目录中没有找到有效文件")
+            return [], result
+        
+        logger.info(f"📁 发现 {len(file_list)} 个文件，开始处理...")
+        
+        # 使用SimpleDirectoryReader批量处理（更快）
         try:
-            for root, _, filenames in os.walk(directory):
-                for f in filenames:
-                    if not f.startswith('.'):
-                        fp = os.path.join(root, f)
-                        ext = Path(f).suffix.lower()
-                        local_files.append((fp, f, ext))
+            reader = SimpleDirectoryReader(
+                input_dir=input_dir,
+                recursive=True,
+                exclude_hidden=True,
+                required_exts=None  # 允许所有文件类型
+            )
+            
+            documents = reader.load_data()
+            
+            # 统计结果 - 正确设置结果对象
+            for i, doc in enumerate(documents):
+                filename = doc.metadata.get('file_name', f'document_{i}')
+                result.add_success(filename, 0, 1)  # size=0, doc_count=1
+            
+            logger.info(f"✅ 成功处理 {len(documents)} 个文档")
+            return documents, result
+            
         except Exception as e:
-            logger.info(f"   扫描失败 {directory}: {e}")
-        return local_files
+            logger.error(f"批量处理失败: {e}")
+            return [], result
     
-    # 多线程并行扫描（安全配置：32 线程）
-    if len(subdirs) > 1:
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-        scan_workers = min(32, len(subdirs))  # 32 线程
-        logger.info(f"⚡ [第 2 步] 安全模式：{scan_workers} 线程并行扫描 {len(subdirs)} 个目录")
-        
-        with ThreadPoolExecutor(max_workers=scan_workers) as executor:
-            futures = [executor.submit(scan_dir, d) for d in subdirs]
-            for future in as_completed(futures):
-                file_list.extend(future.result())
-    else:
-        # 单目录直接扫描
-        file_list = scan_dir(input_dir)
-    
-    logger.success(len(file_list))
-    
-    # 第二步：多线程并行处理（动态调度，保持资源 < 80%）
-    import psutil
-    import time as time_module
-    from queue import Queue
-    from threading import Semaphore
-    
-    # 初始线程数（极限配置：250 线程，冲刺 80%）
-    # 动态计算最优配置
-    fast_formats = {'.txt', '.md', '.py', '.js', '.json', '.xml', '.html', '.css', '.yaml', '.yml', '.sh', '.sql',
-                   '.log', '.ini', '.conf', '.cfg', '.csv', '.tsv', '.properties', '.env', '.rst', '.toml',
-                   '.xlsx', '.xls'}  # Excel也加入快速读取
-    fast_count = sum(1 for _, _, ext in file_list if ext in fast_formats)
-    fast_ratio = fast_count / len(file_list) if len(file_list) > 0 else 0
-    
-    # 稳定策略：使用合理的核心数，避免死机
-    cpu_cores = mp.cpu_count()
-    # 限制最大进程数，保留部分核心给系统
-    max_workers = min(cpu_cores, 12)
-    batch_size = 10
-    mode_name = "稳定并行"
-    
-    max_workers = int(max_workers)
-    
-    if max_workers > 1 and len(file_list) > 10:
-        # batch_size已在上面动态计算，这里不再重复定义
-        
-        logger.info(f"🚀 [第 3 步] {mode_name}模式: {max_workers} 进程 | 文本占比: {fast_ratio*100:.1f}%")
-        logger.info(f"📦 [第 3 步] 批量大小: {batch_size} 个/批")
-        
-        # 使用多进程（突破GIL限制）
-        import time as time_module
+    except Exception as e:
+        logger.error(f"扫描目录失败: {e}")
+        return [], result
         
         # 移除强制 set_start_method('fork')，使用默认设置
         

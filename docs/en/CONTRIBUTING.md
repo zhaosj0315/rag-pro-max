@@ -1,6 +1,6 @@
-# RAG Pro Max v3.2.2 Contributing Guide
+# RAG Pro Max v3.2.7 Contributing Guide
 
-**Version**: v3.2.2  
+**Version**: v3.2.7  
 **Updated**: 2026-01-03  
 **Scope**: Enterprise Development & Contribution
 

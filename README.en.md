@@ -12,11 +12,11 @@
 
 # RAG Pro Max - Intelligent Document Q&A System
 
-**版本**: v3.2.2  
+**版本**: v3.2.7  
 **更新日期**: 2026-01-03  
 **适用范围**: 企业级部署与运维
 
-![Version](https://img.shields.io/badge/version-v3.2.2-brightgreen)
+![Version](https://img.shields.io/badge/version-v3.2.7-brightgreen)
 ![Status](https://img.shields.io/badge/status-Stable-blue)
 ![Last Update](https://img.shields.io/badge/last%20update-2026--01--03-orange)
 
@@ -40,7 +40,7 @@
 - **Self-hosted Vector Database**: Sensitive information stays internal
 - **Open Source Transparency**: Complete source code for security auditing
 
-### 🔬 Intelligent Research & Deep Analysis (Enhanced in v3.2.2)
+### 🔬 Intelligent Research & Deep Analysis (Enhanced in v3.2.7)
 - **Deep Research Mode**: Simulates expert-level multi-step analysis, fact-checking, and cross-domain knowledge integration
 - **Research Instruction Injection**: Automatically decomposes complex questions into multi-dimensional analysis
 - **Status Indicator Bar**: Real-time display of four core capabilities: "Thinking, Networking, Searching, Researching"
@@ -50,7 +50,7 @@
 - **Quality Assessment System**: Integrated intelligent quality analyzer with automatic authority scoring (🏆/⭐/⚠️)
 - **Collapsible Display**: Search details sorted by quality and collapsed in status bar by default
 
-### 🔄 Continuous Optimization System (New in v3.2.2)
+### 🔄 Continuous Optimization System (New in v3.2.7)
 - **Virtuous Cycle Mechanism**: Automated optimization workflow of patrol → analyze → plan → implement → verify
 - **Intelligent Monitoring**: Automatic monitoring of code quality, performance metrics, test coverage, documentation completeness
 - **Auto Optimization**: Executes automated improvement tasks like cleanup, refactoring, performance tuning

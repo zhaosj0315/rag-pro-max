@@ -7,7 +7,6 @@ import os
 import time
 import psutil
 import threading
-import logging
 from typing import List, Dict, Optional, Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -94,27 +93,27 @@ class OptimizedOCRProcessor:
     def process_images(self, image_paths: List[str], progress_callback: Optional[Callable] = None) -> List[Dict]:
         """批量处理图片"""
         if not self.initialize():
-            logging.error("❌ OCR引擎初始化失败，无法处理图片")
+            logger.error("❌ OCR引擎初始化失败，无法处理图片")
             return [{'path': path, 'text': '', 'error': 'OCR初始化失败'} for path in image_paths]
         
         start_time = time.time()
-        logging.info(f"🚀 开始批量OCR处理，共 {len(image_paths)} 个文件")
+        logger.info(f"🚀 开始批量OCR处理，共 {len(image_paths)} 个文件")
         
         # 检查系统资源
         resources = self.resource_limiter.check_resources()
         logger.info(f"📊 系统资源: CPU {resources['cpu_percent']:.1f}%, 内存 {resources['memory_percent']:.1f}%")
-        logging.info(f"📊 系统资源状态: CPU {resources['cpu_percent']:.1f}%, 内存 {resources['memory_percent']:.1f}%")
+        logger.info(f"📊 系统资源状态: CPU {resources['cpu_percent']:.1f}%, 内存 {resources['memory_percent']:.1f}%")
         
         # 根据资源状况决定处理方式
         if resources['cpu_high'] or len(image_paths) <= 2:
             logger.info("⚡ 使用串行OCR处理")
-            logging.info("⚡ 资源紧张或文件较少，使用串行处理")
+            logger.info("⚡ 资源紧张或文件较少，使用串行处理")
             result = self._process_serial(image_paths, progress_callback)
         else:
             # 获取安全的工作线程数
             safe_workers = self.resource_limiter.get_safe_worker_count(self.max_workers)
             logger.info(f"🚀 使用并行处理 {len(image_paths)} 张图片 (工作线程: {safe_workers})")
-            logging.info(f"🚀 使用并行处理，工作线程: {safe_workers}")
+            logger.info(f"🚀 使用并行处理，工作线程: {safe_workers}")
             result = self._process_parallel(image_paths, progress_callback, safe_workers)
         
         # 更新统计信息
@@ -124,8 +123,8 @@ class OptimizedOCRProcessor:
         
         # 记录处理结果
         success_count = len([r for r in result if r.get('success', True) and not r.get('error')])
-        logging.info(f"✅ OCR处理完成: {success_count}/{len(image_paths)} 成功，耗时: {processing_time:.2f}秒")
-        logging.info(f"📊 累计处理文件: {self.total_files_processed} 个，累计耗时: {self.total_processing_time:.2f}秒")
+        logger.info(f"✅ OCR处理完成: {success_count}/{len(image_paths)} 成功，耗时: {processing_time:.2f}秒")
+        logger.info(f"📊 累计处理文件: {self.total_files_processed} 个，累计耗时: {self.total_processing_time:.2f}秒")
         
         return result
     
@@ -143,7 +142,7 @@ class OptimizedOCRProcessor:
             'session_start_time': self.session_start_time.strftime('%Y-%m-%d %H:%M:%S')
         }
         
-        logging.info(f"📊 OCR处理统计: {stats}")
+        logger.info(f"📊 OCR处理统计: {stats}")
         return stats
     
     def print_statistics(self):

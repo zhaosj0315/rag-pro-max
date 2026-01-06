@@ -220,6 +220,41 @@ class IndexBuilder:
     
     def _read_documents(self, source_path, total_files, callback):
         """读取文档"""
+        # 快速检查：如果知识库已存在且完整，跳过重新处理
+        if hasattr(self, 'persist_dir') and self.persist_dir:
+            ready_marker = os.path.join(self.persist_dir, '.kb_ready')
+            manifest_path = os.path.join(self.persist_dir, 'manifest.json')
+            docstore_path = os.path.join(self.persist_dir, 'docstore.json')
+            vector_store_path = os.path.join(self.persist_dir, 'default__vector_store.json')
+            
+            # 检查就绪标记或完整文件
+            if (os.path.exists(ready_marker) or 
+                (os.path.exists(manifest_path) and 
+                 os.path.exists(docstore_path) and 
+                 os.path.exists(vector_store_path))):
+                
+                try:
+                    import json
+                    with open(manifest_path, 'r', encoding='utf-8') as f:
+                        manifest = json.load(f)
+                    
+                    file_count = manifest.get('file_count', 0)
+                    if file_count > 0:
+                        if callback:
+                            callback("info", f"✅ 知识库已就绪，跳过重新处理 ({file_count} 个文件)")
+                        
+                        # 创建一个模拟的成功摘要
+                        from src.file_processor import FileProcessResult
+                        mock_result = FileProcessResult()
+                        for i in range(file_count):
+                            mock_result.add_success(f"existing_file_{i}", 0, 1)
+                        
+                        return [], mock_result.get_summary()
+                except Exception as e:
+                    if callback:
+                        callback("warning", f"检查现有知识库失败，继续重新处理: {e}")
+        
+        # 原有的文档读取逻辑
         docs, process_result = scan_directory_safe(source_path, use_ocr=self.use_ocr)
         summary = process_result.get_summary()
         

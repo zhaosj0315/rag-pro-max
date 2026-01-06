@@ -85,6 +85,7 @@ exports/
 # ===== 配置运行时文件 =====
 # 应用运行时配置 (包含用户数据)
 config/app_config.json
+config/users.json
 config/alert_history.json
 config/scheduler_history.json
 config/monitoring_history.json

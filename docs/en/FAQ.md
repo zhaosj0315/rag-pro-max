@@ -1,6 +1,6 @@
-# RAG Pro Max v3.2.2 Enterprise FAQ
+# RAG Pro Max v3.2.7 Enterprise FAQ
 
-**Version**: v3.2.2  
+**Version**: v3.2.7  
 **Updated**: 2026-01-03  
 **Scope**: Enterprise Deployment & Operations
 
@@ -9,7 +9,7 @@
 ## 🏢 Enterprise Deployment
 
 ### Q: Does RAG Pro Max support complete offline deployment?
-**A**: Yes, RAG Pro Max v3.2.2 fully supports offline deployment:
+**A**: Yes, RAG Pro Max v3.2.7 fully supports offline deployment:
 - **Local LLM**: Use Ollama local models (qwen2.5:7b, etc.)
 - **Local Storage**: All data stored in local ChromaDB
 - **Zero Network Dependency**: Core functions require no internet

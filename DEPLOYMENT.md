@@ -1,12 +1,12 @@
-**版本**: v3.2.6  
+**版本**: v3.2.7  
 **更新日期**: 2026-01-03  
 **适用范围**: 企业级部署与运维  
 
-# RAG Pro Max v3.2.2 企业级部署指南
+# RAG Pro Max v3.2.7 企业级部署指南
 
-RAG Pro Max v3.2.2 企业级版本支持多种部署方式，从本地开发到生产环境，提供完整的部署解决方案。
+RAG Pro Max v3.2.7 企业级版本支持多种部署方式，从本地开发到生产环境，提供完整的部署解决方案。
 
-**🔥 v3.2.2 企业级特性**:
+**🔥 v3.2.7 企业级特性**:
 - 🌍 多语言国际化支持 - 中英文双语文档体系
 - 🛡️ 企业级安全特性 - 完全离线部署，数据不出内网
 - 🔒 零数据上传 - 100% 本地存储，敏感信息不外泄
@@ -77,14 +77,14 @@ streamlit run src/apppro.py --server.port 8501
 ### 1. 使用预构建镜像
 ```bash
 # 拉取镜像
-docker pull ragpromax/rag-pro-max:v3.2.2
+docker pull ragpromax/rag-pro-max:v3.2.7
 
 # 运行容器
 docker run -d \
   --name rag-pro-max \
   -p 8501:8501 \
   -v $(pwd)/data:/app/data \
-  ragpromax/rag-pro-max:v3.2.2
+  ragpromax/rag-pro-max:v3.2.7
 ```
 
 ### 2. 本地构建镜像
@@ -321,7 +321,7 @@ spec:
     spec:
       containers:
       - name: rag-pro-max
-        image: ragpromax/rag-pro-max:v3.2.2
+        image: ragpromax/rag-pro-max:v3.2.7
         ports:
         - containerPort: 8501
         env:
@@ -355,7 +355,7 @@ spec:
 version: '3.8'
 services:
   rag-pro-max:
-    image: ragpromax/rag-pro-max:v3.2.2
+    image: ragpromax/rag-pro-max:v3.2.7
     ports:
       - "8501:8501"
     deploy:
