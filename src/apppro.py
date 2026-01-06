@@ -5427,7 +5427,7 @@ def show_kb_download_dialog():
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("📥 生成下载包", type="primary", use_container_width=True):
+        if st.button("📥 生成并下载", type="primary", use_container_width=True):
             try:
                 from src.utils.kb_downloader import download_knowledge_base_custom
                 
@@ -5444,21 +5444,23 @@ def show_kb_download_dialog():
                     download_data = download_knowledge_base_custom(actual_kb_name, actual_kb_path, options)
                 
                 if download_data:
-                    st.success("✅ 下载包生成成功！")
-                    
-                    # 显示下载按钮
+                    # 直接触发下载
                     from datetime import datetime
                     filename = f"kb_{actual_kb_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
                     
+                    # 立即显示下载按钮并关闭对话框
                     st.download_button(
-                        "💾 下载知识库",
+                        "💾 立即下载",
                         download_data,
                         file_name=filename,
                         mime="application/zip",
-                        use_container_width=True
+                        use_container_width=True,
+                        key="immediate_download"
                     )
                     
-                    # 下载按钮点击后自动关闭对话框
+                    st.success("✅ 下载包已生成！")
+                    
+                    # 立即关闭对话框
                     st.session_state.show_download_dialog = False
                     st.rerun()
                 else:
