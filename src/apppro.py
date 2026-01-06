@@ -2523,9 +2523,16 @@ if active_kb_name and active_kb_name != st.session_state.current_kb_id:
 if active_kb_name and st.session_state.chat_engine is None and active_kb_name != "multi_kb_mode":
     from src.kb.kb_loader import KnowledgeBaseLoader
     
+    # 解析实际的知识库名称（去除前缀）
+    actual_kb_name = active_kb_name
+    if active_kb_name.startswith('[admin] '):
+        actual_kb_name = active_kb_name[8:]  # 去除 "[admin] " 前缀
+    elif active_kb_name.startswith('[历史] '):
+        actual_kb_name = active_kb_name[5:]  # 去除 "[历史] " 前缀
+    
     kb_loader = KnowledgeBaseLoader(output_base)
     chat_engine, error_msg, kb_index = kb_loader.load_knowledge_base(
-        active_kb_name, embed_provider, embed_model, embed_key, embed_url
+        actual_kb_name, embed_provider, embed_model, embed_key, embed_url
     )
     
     if chat_engine:
@@ -3066,21 +3073,13 @@ elif active_kb_name:
         # 向后兼容
         db_path = os.path.join(output_base, active_kb_name)
     
-    # 尝试初始化DocumentManager，如果路径不存在会自动处理
+    # 尝试初始化DocumentManager
     try:
-        st.write(f"🔍 调试 - 尝试初始化DocumentManager:")
-        st.write(f"- 知识库路径: {db_path}")
-        st.write(f"- 路径存在: {os.path.exists(db_path)}")
-        st.write(f"- 活跃知识库: {active_kb_name}")
-        
         doc_manager = DocumentManager(db_path)
         stats = doc_manager.get_kb_statistics()
         
-        st.write("✅ DocumentManager初始化成功")
-        
     except Exception as e:
         st.error(f"❌ 知识库初始化失败: {str(e)}")
-        st.write(f"🔍 错误详情: {type(e).__name__}: {str(e)}")
         st.info(f"📍 知识库路径: {db_path}")
         st.info(f"📍 活跃知识库名称: {active_kb_name}")
         st.stop()
@@ -5490,12 +5489,6 @@ def show_kb_download_dialog():
 if st.session_state.get('download_ready'):
     download_info = st.session_state.download_ready
     
-    # 调试日志
-    st.write("🔍 调试信息:")
-    st.write(f"- download_ready存在: {bool(st.session_state.get('download_ready'))}")
-    st.write(f"- 文件名: {download_info.get('filename', 'N/A')}")
-    st.write(f"- 数据大小: {len(download_info.get('data', b''))} bytes")
-    
     # 在页面顶部显示下载按钮
     st.success("✅ 知识库打包完成！")
     
@@ -5509,11 +5502,8 @@ if st.session_state.get('download_ready'):
         use_container_width=True
     )
     
-    st.write(f"🔍 下载按钮点击状态: {download_clicked}")
-    
     # 下载后清除状态
     if download_clicked:
-        st.write("🔍 清除下载状态...")
         del st.session_state.download_ready
         st.rerun()
     
