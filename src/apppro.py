@@ -3097,15 +3097,7 @@ elif active_kb_name:
     
     # 文件管理
     with st.container(key="kb_details_container"):
-        # 知识库详情标题行 - 添加下载按钮
-        detail_col1, detail_col2 = st.columns([4, 1])
-        with detail_col1:
-            detail_expander = st.expander("📊 知识库详情与管理", expanded=False)
-        with detail_col2:
-            if st.button("📥", help="下载知识库", use_container_width=True, key="kb_detail_download"):
-                st.session_state.show_download_dialog = True
-        
-        with detail_expander:
+        with st.expander("📊 知识库详情与管理", expanded=False):
             if not doc_manager.manifest['files']: 
                 st.info("暂无文件")
             else:
