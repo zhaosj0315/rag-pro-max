@@ -142,6 +142,9 @@ class SidebarConfig:
             
             # 其他工具
             SidebarConfig._render_other_tools()
+        
+        # 用户管理 - 独立显示
+        SidebarConfig._render_user_management()
     
     @staticmethod
     def _detect_gpu():
@@ -185,6 +188,39 @@ class SidebarConfig:
         
         for key, value in info.items():
             st.caption(f"**{key}**: {value}")
+    
+    @staticmethod
+    def _render_user_management():
+        """渲染用户管理"""
+        st.markdown("---")
+        
+        # 显示当前用户信息
+        user_context = st.session_state.get('user_context', {})
+        username = user_context.get('username', 'Unknown')
+        role = user_context.get('role', 'Unknown')
+        
+        # 用户信息显示
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown(f"**👤 {username}** ({role})")
+        with col2:
+            if st.button("👤", help="用户管理", key="user_mgmt_btn"):
+                st.session_state.show_user_management = True
+        
+        # 用户管理对话框
+        if st.session_state.get('show_user_management', False):
+            SidebarConfig._show_user_management_dialog()
+    
+    @staticmethod
+    @st.dialog("👤 用户管理")
+    def _show_user_management_dialog():
+        """显示用户管理对话框"""
+        from src.auth.user_management import show_user_management
+        show_user_management()
+        
+        if st.button("关闭", key="close_user_mgmt"):
+            st.session_state.show_user_management = False
+            st.rerun()
     
     @staticmethod
     def extract_config_values(config_values):
