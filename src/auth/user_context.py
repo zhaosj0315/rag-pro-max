@@ -77,7 +77,7 @@ class UserContext:
     def list_user_knowledge_bases():
         """列出用户的知识库"""
         if UserContext.is_admin():
-            # 管理员可以看到所有用户的知识库
+            # 管理员可以看到所有知识库
             return UserContext.list_all_knowledge_bases()
         else:
             # 普通用户只能看到自己的知识库
@@ -99,15 +99,38 @@ class UserContext:
             return []
         
         all_kbs = []
+        
+        # 1. 添加历史知识库（根目录下的，没有用户归属的）
+        for item in os.listdir("vector_db_storage"):
+            item_path = os.path.join("vector_db_storage", item)
+            if os.path.isdir(item_path):
+                # 跳过用户目录（admin, user1, guest_xxx等）
+                if not UserContext._is_user_directory(item):
+                    all_kbs.append(f"[历史] {item}")
+        
+        # 2. 添加各用户的知识库
         for username in os.listdir("vector_db_storage"):
             user_path = os.path.join("vector_db_storage", username)
-            if os.path.isdir(user_path):
+            if os.path.isdir(user_path) and UserContext._is_user_directory(username):
                 for kb_name in os.listdir(user_path):
                     kb_path = os.path.join(user_path, kb_name)
                     if os.path.isdir(kb_path):
-                        all_kbs.append(f"{username}/{kb_name}")
+                        all_kbs.append(f"[{username}] {kb_name}")
         
         return sorted(all_kbs)
+    
+    @staticmethod
+    def _is_user_directory(dirname: str) -> bool:
+        """判断是否为用户目录"""
+        # 用户目录特征：admin, 普通用户名, guest_xxxxxxxx
+        if dirname == "admin":
+            return True
+        if dirname.startswith("guest_"):
+            return True
+        # 其他简单用户名（不包含特殊字符和日期）
+        if len(dirname) < 20 and not any(c in dirname for c in ['_20', '副本', 'Search_', 'Text_']):
+            return True
+        return False
     
     @staticmethod
     def migrate_existing_data():
@@ -153,12 +176,39 @@ class UserContext:
             if is_admin:
                 return True
             
-            # 普通用户只能访问自己的知识库
-            user_kb_path = UserContext.get_user_kb_path(kb_name)
-            return os.path.exists(user_kb_path)
+            # 解析知识库名称格式
+            if kb_name.startswith('[历史] '):
+                # 历史知识库只有管理员可以访问
+                return False
+            elif kb_name.startswith('[') and '] ' in kb_name:
+                # 格式: [username] kb_name
+                kb_owner = kb_name.split('] ')[0][1:]
+                actual_kb_name = kb_name.split('] ')[1]
+                # 只能访问自己的知识库
+                return kb_owner == username
+            else:
+                # 普通格式，检查是否在用户目录下
+                user_kb_path = UserContext.get_user_kb_path(kb_name)
+                return os.path.exists(user_kb_path)
             
         except Exception:
             return False
+    
+    @staticmethod
+    def get_actual_kb_path(kb_name: str) -> str:
+        """获取知识库的实际路径"""
+        if kb_name.startswith('[历史] '):
+            # 历史知识库在根目录
+            actual_name = kb_name[5:]  # 移除 "[历史] " 前缀
+            return os.path.join("vector_db_storage", actual_name)
+        elif kb_name.startswith('[') and '] ' in kb_name:
+            # 格式: [username] kb_name
+            kb_owner = kb_name.split('] ')[0][1:]
+            actual_kb_name = kb_name.split('] ')[1]
+            return os.path.join("vector_db_storage", kb_owner, actual_kb_name)
+        else:
+            # 普通格式，使用用户上下文
+            return UserContext.get_user_kb_path(kb_name)
     
     @staticmethod
     def validate_kb_access(kb_name: str):

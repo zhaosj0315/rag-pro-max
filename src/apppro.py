@@ -978,6 +978,20 @@ with st.sidebar:
                 if not can_access:
                     st.error(f"🚫 {message}")
                     current_kb_name = None  # 重置为无效状态
+                else:
+                    # 获取实际的知识库路径用于后续操作
+                    actual_kb_path = UserContext.get_actual_kb_path(current_kb_name)
+                    # 提取实际的知识库名称（去掉前缀）
+                    if current_kb_name.startswith('[历史] '):
+                        actual_kb_name = current_kb_name[5:]
+                    elif current_kb_name.startswith('[') and '] ' in current_kb_name:
+                        actual_kb_name = current_kb_name.split('] ')[1]
+                    else:
+                        actual_kb_name = current_kb_name
+                    
+                    # 更新session state中的实际名称
+                    st.session_state.actual_kb_name = actual_kb_name
+                    st.session_state.actual_kb_path = actual_kb_path
             except Exception:
                 pass  # 向后兼容，忽略权限检查错误
 
@@ -1148,8 +1162,9 @@ with st.sidebar:
                 st.markdown("📤 **添加文档**")
             with manage_title_col2:
                 if st.button("🔄", help="重建索引 (覆盖该库)", use_container_width=True):
-                    # 触发重建逻辑
-                    st.session_state.uploaded_path = os.path.join("vector_db_storage", current_kb_name)
+                    # 触发重建逻辑 - 使用实际路径
+                    actual_path = st.session_state.get('actual_kb_path', os.path.join("vector_db_storage", current_kb_name))
+                    st.session_state.uploaded_path = actual_path
                     # 这里需要一种方式标记为 NEW 模式，并通过 trigger_btn_start 强制触发
                     st.session_state.trigger_rebuild = True
                     st.session_state.trigger_btn_start = True
