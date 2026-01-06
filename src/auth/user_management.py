@@ -263,7 +263,6 @@ def show_usage_statistics():
         for i, (name, size_mb) in enumerate(storage_stats.items()):
             with cols[i % 3]:
                 st.metric(name, f"{size_mb:.1f} MB")
-        st.metric("💬 总对话数", total_chats)
 
 def show_data_management():
     """数据管理"""
