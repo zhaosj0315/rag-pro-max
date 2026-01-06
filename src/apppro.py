@@ -3027,7 +3027,29 @@ if active_kb_name == "multi_kb_mode":
 elif active_kb_name:
     from src.documents.document_manager import DocumentManager
     
-    db_path = os.path.join(output_base, active_kb_name)
+    # 解析知识库路径 - 支持用户权限控制
+    try:
+        # 根据知识库名称格式确定路径
+        if active_kb_name.startswith('[历史] '):
+            # 历史知识库在根目录
+            actual_kb_name = active_kb_name[5:]  # 移除 "[历史] " 前缀
+            db_path = os.path.join("vector_db_storage", actual_kb_name)
+        elif active_kb_name.startswith('[') and '] ' in active_kb_name:
+            # 格式: [username] kb_name
+            kb_owner = active_kb_name.split('] ')[0][1:]
+            actual_kb_name = active_kb_name.split('] ')[1]
+            db_path = os.path.join("vector_db_storage", kb_owner, actual_kb_name)
+        else:
+            # 普通格式，使用用户上下文
+            try:
+                from src.auth.user_context import UserContext
+                db_path = UserContext.get_user_kb_path(active_kb_name)
+            except:
+                db_path = os.path.join(output_base, active_kb_name)
+    except:
+        # 向后兼容
+        db_path = os.path.join(output_base, active_kb_name)
+    
     doc_manager = DocumentManager(db_path)
     stats = doc_manager.get_kb_statistics()
 
