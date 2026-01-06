@@ -704,7 +704,7 @@ with st.sidebar:
     MobileAdapter.render_view_selector()
     
     # 横向标签页布局
-    tab_main, tab_roles, tab_config, tab_monitor, tab_help = st.tabs(["🏠 主页", "🎭 角色", "⚙️ 配置", "📊 监控", "❓ 帮助"])
+    tab_main, tab_roles, tab_config, tab_monitor, tab_help, tab_user = st.tabs(["🏠 主页", "🎭 角色", "⚙️ 配置", "📊 监控", "❓ 帮助", "👤 用户"])
     
     with tab_main:
 
@@ -1156,11 +1156,15 @@ with st.sidebar:
                 
                 # 不需要手动保存按钮了，失焦自动保存
         else:
-            # 管理模式 - 使用一行化布局 (1x2 紧凑布局)
-            manage_title_col1, manage_title_col2 = st.columns([4, 1])
+            # 管理模式 - 使用一行化布局 (1x3 紧凑布局)
+            manage_title_col1, manage_title_col2, manage_title_col3 = st.columns([3, 1, 1])
             with manage_title_col1:
                 st.markdown("📤 **添加文档**")
             with manage_title_col2:
+                if st.button("📥", help="下载知识库", use_container_width=True, key="download_kb"):
+                    # 触发知识库下载
+                    st.session_state.show_download_dialog = True
+            with manage_title_col3:
                 if st.button("🔄", help="重建索引 (覆盖该库)", use_container_width=True):
                     # 触发重建逻辑 - 使用实际路径
                     actual_path = st.session_state.get('actual_kb_path', os.path.join("vector_db_storage", current_kb_name))
@@ -2021,6 +2025,10 @@ with st.sidebar:
         with col4:
             session_count = len([k for k in st.session_state.keys() if 'session' in k.lower()])
             st.metric("活跃会话", session_count)
+
+    with tab_user:
+        from src.auth.user_management import show_user_management
+        show_user_management()
 
 # ==========================================
 # 主功能区域
@@ -5315,3 +5323,87 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     logger.info("🧹 错误处理完成，内存已清理")
                     st.session_state.is_processing = False
                     st.rerun()
+
+# ==========================================
+# 知识库下载对话框
+# ==========================================
+if st.session_state.get('show_download_dialog', False):
+    show_kb_download_dialog()
+
+@st.dialog("📥 下载知识库")
+def show_kb_download_dialog():
+    """显示知识库下载对话框"""
+    st.markdown("### 📦 知识库下载")
+    
+    # 获取当前知识库信息
+    current_kb_name = st.session_state.get('current_kb_name')
+    actual_kb_name = st.session_state.get('actual_kb_name', current_kb_name)
+    actual_kb_path = st.session_state.get('actual_kb_path')
+    
+    if not actual_kb_name or not actual_kb_path:
+        st.error("❌ 无法获取知识库信息")
+        if st.button("关闭"):
+            st.session_state.show_download_dialog = False
+            st.rerun()
+        return
+    
+    st.info(f"📚 知识库: **{actual_kb_name}**")
+    
+    # 下载选项
+    st.markdown("#### 📋 下载内容")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        include_vectors = st.checkbox("🔢 向量数据", value=True, help="包含向量索引文件")
+        include_docs = st.checkbox("📄 源文档", value=True, help="包含原始文档文件")
+        include_config = st.checkbox("⚙️ 配置文件", value=True, help="包含知识库配置")
+    
+    with col2:
+        include_history = st.checkbox("💬 对话历史", value=False, help="包含聊天记录")
+        include_stats = st.checkbox("📊 统计信息", value=True, help="包含使用统计")
+        include_metadata = st.checkbox("📋 元数据", value=True, help="包含知识库元信息")
+    
+    # 下载按钮
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("📥 生成下载包", type="primary", use_container_width=True):
+            try:
+                from src.utils.kb_downloader import download_knowledge_base_custom
+                
+                options = {
+                    'include_vectors': include_vectors,
+                    'include_docs': include_docs,
+                    'include_config': include_config,
+                    'include_history': include_history,
+                    'include_stats': include_stats,
+                    'include_metadata': include_metadata
+                }
+                
+                with st.spinner("🔄 正在打包知识库..."):
+                    download_data = download_knowledge_base_custom(actual_kb_name, actual_kb_path, options)
+                
+                if download_data:
+                    st.success("✅ 下载包生成成功！")
+                    
+                    # 显示下载按钮
+                    from datetime import datetime
+                    filename = f"kb_{actual_kb_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+                    
+                    st.download_button(
+                        "💾 下载知识库",
+                        download_data,
+                        file_name=filename,
+                        mime="application/zip",
+                        use_container_width=True
+                    )
+                else:
+                    st.error("❌ 下载包生成失败")
+                    
+            except Exception as e:
+                st.error(f"❌ 下载错误: {str(e)}")
+    
+    with col2:
+        if st.button("❌ 取消", use_container_width=True):
+            st.session_state.show_download_dialog = False
+            st.rerun()
