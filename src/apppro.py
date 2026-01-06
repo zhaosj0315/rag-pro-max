@@ -3066,15 +3066,15 @@ elif active_kb_name:
         # 向后兼容
         db_path = os.path.join(output_base, active_kb_name)
     
-    doc_manager = DocumentManager(db_path)
-    
-    # 调试信息：检查路径和文件
-    if not os.path.exists(db_path):
-        st.error(f"❌ 知识库路径不存在: {db_path}")
+    # 尝试初始化DocumentManager，如果路径不存在会自动处理
+    try:
+        doc_manager = DocumentManager(db_path)
+        stats = doc_manager.get_kb_statistics()
+    except Exception as e:
+        st.error(f"❌ 知识库初始化失败: {str(e)}")
+        st.info(f"📍 知识库路径: {db_path}")
         st.info(f"📍 活跃知识库名称: {active_kb_name}")
-        st.stop()  # 使用 st.stop() 而不是 return
-    
-    stats = doc_manager.get_kb_statistics()
+        st.stop()
 
     # --- 批量操作处理逻辑 ---
     if st.session_state.get('trigger_batch_summary'):
@@ -5477,21 +5477,30 @@ def show_kb_download_dialog():
             st.session_state.show_download_dialog = False
             st.rerun()
 
-if st.session_state.get('show_download_dialog', False):
-    show_kb_download_dialog()
-
-# 自动下载处理
+# 自动下载处理 - 移到页面顶部显示
 if st.session_state.get('download_ready'):
     download_info = st.session_state.download_ready
     
-    # 显示自动下载按钮
-    st.download_button(
-        "💾 自动下载中...",
+    # 在页面顶部显示下载按钮
+    st.success("✅ 知识库打包完成！")
+    
+    # 立即显示下载按钮
+    download_clicked = st.download_button(
+        "📥 点击下载知识库",
         download_info['data'],
         file_name=download_info['filename'],
         mime="application/zip",
-        key="auto_download_trigger"
+        key="auto_download_trigger",
+        use_container_width=True
     )
     
-    # 清除下载状态
-    del st.session_state.download_ready
+    # 下载后清除状态
+    if download_clicked:
+        del st.session_state.download_ready
+        st.rerun()
+    
+    st.divider()
+
+# 显示下载对话框
+if st.session_state.get('show_download_dialog', False):
+    show_kb_download_dialog()
