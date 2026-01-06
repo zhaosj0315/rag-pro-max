@@ -158,46 +158,111 @@ def show_usage_statistics():
     """显示使用统计"""
     st.markdown("#### 📊 系统使用统计")
     
+    # 获取所有用户数据
     users = user_auth.get_all_users()
+    
+    # 统计信息
     total_users = len(users)
+    admin_count = len([u for u in users.values() if u.get('role') == 'admin'])
+    user_count = len([u for u in users.values() if u.get('role') == 'user'])
     
-    # 统计各用户的知识库和对话数量
-    user_stats = []
-    for username in users.keys():
-        # 知识库统计
-        user_kb_path = f"vector_db_storage/{username}"
-        kb_count = 0
-        if os.path.exists(user_kb_path):
-            kb_count = len([d for d in os.listdir(user_kb_path) if os.path.isdir(os.path.join(user_kb_path, d))])
-        
-        # 对话统计
-        user_chat_path = f"chat_histories/{username}"
-        chat_count = 0
-        if os.path.exists(user_chat_path):
-            chat_count = len([f for f in os.listdir(user_chat_path) if f.endswith('.json')])
-        
-        user_stats.append({
-            'username': username,
-            'role': users[username]['role'],
-            'kb_count': kb_count,
-            'chat_count': chat_count
-        })
+    # 游客统计 - 检查临时数据目录
+    guest_dirs = []
+    guest_storage_path = "vector_db_storage"
+    if os.path.exists(guest_storage_path):
+        for item in os.listdir(guest_storage_path):
+            if item.startswith("guest_"):
+                guest_dirs.append(item)
     
-    # 显示统计表格
-    if user_stats:
-        import pandas as pd
-        df = pd.DataFrame(user_stats)
-        st.dataframe(df, use_container_width=True)
+    guest_count = len(guest_dirs)
     
-    # 总体统计
-    col1, col2, col3 = st.columns(3)
+    # 显示统计卡片
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("👥 总用户数", total_users)
+        st.metric("总用户数", total_users)
     with col2:
-        total_kbs = sum(stat['kb_count'] for stat in user_stats)
-        st.metric("📚 总知识库", total_kbs)
+        st.metric("管理员", admin_count)
     with col3:
-        total_chats = sum(stat['chat_count'] for stat in user_stats)
+        st.metric("普通用户", user_count)
+    with col4:
+        st.metric("活跃游客", guest_count)
+    
+    # 详细用户列表
+    st.write("### 📋 详细用户信息")
+    
+    # 注册用户
+    if users:
+        st.write("**注册用户:**")
+        for username, user_info in users.items():
+            role_icon = "👑" if user_info.get('role') == 'admin' else "👤"
+            last_login = user_info.get('last_login', '从未登录')
+            
+            # 统计用户知识库
+            user_kb_path = f"vector_db_storage/{username}"
+            kb_count = 0
+            if os.path.exists(user_kb_path):
+                kb_count = len([d for d in os.listdir(user_kb_path) if os.path.isdir(os.path.join(user_kb_path, d))])
+            
+            st.write(f"- {role_icon} **{username}** ({user_info.get('role', 'user')}) - 知识库: {kb_count} - 最后登录: {last_login}")
+    
+    # 游客用户
+    if guest_dirs:
+        st.write("**活跃游客:**")
+        for guest_dir in guest_dirs:
+            # 获取目录创建时间和知识库数量
+            dir_path = os.path.join(guest_storage_path, guest_dir)
+            if os.path.exists(dir_path):
+                import time
+                create_time = time.ctime(os.path.getctime(dir_path))
+                kb_count = len([d for d in os.listdir(dir_path) if os.path.isdir(os.path.join(dir_path, d))])
+                st.write(f"- 👻 **{guest_dir}** - 知识库: {kb_count} - 创建时间: {create_time}")
+    
+    # 历史知识库统计
+    historical_kbs = []
+    if os.path.exists(guest_storage_path):
+        for item in os.listdir(guest_storage_path):
+            item_path = os.path.join(guest_storage_path, item)
+            if os.path.isdir(item_path) and not item.startswith(('admin', 'guest_')) and item not in users:
+                historical_kbs.append(item)
+    
+    if historical_kbs:
+        st.write("**历史数据:**")
+        st.write(f"- 📜 **历史知识库**: {len(historical_kbs)} 个")
+        with st.expander("查看历史知识库详情"):
+            for kb in historical_kbs:
+                st.write(f"  - {kb}")
+    
+    # 系统资源统计
+    st.write("### 💾 系统资源统计")
+    
+    # 计算存储空间使用
+    def get_dir_size(path):
+        total = 0
+        try:
+            for dirpath, dirnames, filenames in os.walk(path):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    if os.path.exists(fp):
+                        total += os.path.getsize(fp)
+        except:
+            pass
+        return total
+    
+    # 各目录大小
+    storage_stats = {}
+    if os.path.exists("vector_db_storage"):
+        storage_stats["向量数据库"] = get_dir_size("vector_db_storage") / (1024*1024)  # MB
+    if os.path.exists("chat_histories"):
+        storage_stats["对话历史"] = get_dir_size("chat_histories") / (1024*1024)  # MB
+    if os.path.exists("uploaded_files"):
+        storage_stats["上传文件"] = get_dir_size("uploaded_files") / (1024*1024)  # MB
+    
+    if storage_stats:
+        col1, col2, col3 = st.columns(3)
+        cols = [col1, col2, col3]
+        for i, (name, size_mb) in enumerate(storage_stats.items()):
+            with cols[i % 3]:
+                st.metric(name, f"{size_mb:.1f} MB")
         st.metric("💬 总对话数", total_chats)
 
 def show_data_management():
