@@ -2177,11 +2177,27 @@ def jump_to_knowledge_base(kb_name: str, output_base: str):
     logger.log("知识库跳转", "info", f"📋 当前知识库列表: {kb_list}")
     logger.log("知识库跳转", "info", f"📊 知识库总数: {len(kb_list)}")
     
+    # 查找匹配的知识库名称（支持带前缀格式）
+    target_kb_name = None
+    for kb in kb_list:
+        # 检查是否是目标知识库
+        if kb == kb_name:  # 直接匹配
+            target_kb_name = kb
+            break
+        elif kb.endswith(f"] {kb_name}"):  # 带前缀匹配，如 [admin] kb_name
+            target_kb_name = kb
+            break
+        elif kb.startswith("[历史] ") and kb[5:] == kb_name:  # 历史知识库匹配
+            target_kb_name = kb
+            break
+    
     # 确认新知识库在列表中
-    if kb_name in kb_list:
-        logger.log("知识库跳转", "success", f"✅ 新知识库已在列表中: {kb_name}")
+    if target_kb_name:
+        logger.log("知识库跳转", "success", f"✅ 找到目标知识库: {kb_name} -> {target_kb_name}")
     else:
-        logger.log("知识库跳转", "warning", f"⚠️ 新知识库不在列表中: {kb_name}")
+        logger.log("知识库跳转", "warning", f"⚠️ 未找到目标知识库: {kb_name}")
+        # 如果找不到，尝试使用原始名称
+        target_kb_name = kb_name
     
     # 设置跳转参数
     logger.log("知识库跳转", "info", f"⚙️ 开始设置跳转参数")
@@ -2197,16 +2213,16 @@ def jump_to_knowledge_base(kb_name: str, output_base: str):
             cleared_count += 1
         st.session_state[f"kb_check_{kb}"] = False
     
-    # 核心修复：在清理完所有状态后，再设置目标知识库的选中状态
-    st.session_state[f"kb_check_{kb_name}"] = True
-    st.session_state.current_nav = f"☑️ 📂 {kb_name}"
-    st.session_state.current_kb_id = kb_name
+    # 核心修复：使用找到的目标知识库名称设置状态
+    st.session_state[f"kb_check_{target_kb_name}"] = True
+    st.session_state.current_nav = f"☑️ 📂 {target_kb_name}"
+    st.session_state.current_kb_id = target_kb_name
     st.session_state.chat_engine = None  # 重置聊天引擎，触发重新加载
     
     logger.log("知识库跳转", "info", f"🧹 已清除 {cleared_count} 个复选框状态")
     logger.log("知识库跳转", "info", f"✅ 跳转参数已设置: current_nav={st.session_state.current_nav}")
     logger.log("知识库跳转", "info", "🚀 执行页面刷新...")
-    logger.log("知识库跳转", "complete", f"✅ 跳转函数执行完成: {kb_name}")
+    logger.log("知识库跳转", "complete", f"✅ 跳转函数执行完成: {kb_name} -> {target_kb_name}")
 
 
 def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extract_metadata=False, generate_summary=False, force_reindex=False):
