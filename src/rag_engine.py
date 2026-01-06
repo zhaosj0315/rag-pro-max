@@ -289,7 +289,7 @@ def create_rag_engine(kb_name: str, logger=None) -> Optional['RAGEngine']:
     创建 RAGEngine 实例的工厂函数
     
     Args:
-        kb_name: 知识库名称
+        kb_name: 知识库名称（可能带前缀）
         logger: 日志记录器
         
     Returns:
@@ -301,7 +301,29 @@ def create_rag_engine(kb_name: str, logger=None) -> Optional['RAGEngine']:
         
         # 加载配置
         config = load_config()
-        persist_dir = os.path.join(output_base, kb_name)
+        
+        # 解析知识库路径 - 支持用户权限控制
+        try:
+            # 根据知识库名称格式确定路径
+            if kb_name.startswith('[历史] '):
+                # 历史知识库在根目录
+                actual_kb_name = kb_name[5:]  # 移除 "[历史] " 前缀
+                persist_dir = os.path.join("vector_db_storage", actual_kb_name)
+            elif kb_name.startswith('[') and '] ' in kb_name:
+                # 格式: [username] kb_name
+                kb_owner = kb_name.split('] ')[0][1:]
+                actual_kb_name = kb_name.split('] ')[1]
+                persist_dir = os.path.join("vector_db_storage", kb_owner, actual_kb_name)
+            else:
+                # 普通格式，使用用户上下文
+                try:
+                    from src.auth.user_context import UserContext
+                    persist_dir = UserContext.get_user_kb_path(kb_name)
+                except:
+                    persist_dir = os.path.join(output_base, kb_name)
+        except:
+            # 向后兼容
+            persist_dir = os.path.join(output_base, kb_name)
         
         # 确保配置值有效 (防止空字符串导致模型加载失败)
         llm_provider = config.get('llm_provider') or "Ollama"
