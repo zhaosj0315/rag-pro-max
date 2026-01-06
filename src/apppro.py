@@ -5419,6 +5419,9 @@ def show_kb_download_dialog():
                         mime="application/zip",
                         use_container_width=True
                     )
+                    
+                    # 提示用户下载完成后对话框会自动关闭
+                    st.info("💡 下载完成后请点击\"关闭\"按钮")
                 else:
                     st.error("❌ 下载包生成失败")
                     
@@ -5426,7 +5429,7 @@ def show_kb_download_dialog():
                 st.error(f"❌ 下载错误: {str(e)}")
     
     with col2:
-        if st.button("❌ 取消", use_container_width=True):
+        if st.button("✅ 关闭", use_container_width=True):
             st.session_state.show_download_dialog = False
             st.rerun()
 
