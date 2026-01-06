@@ -76,10 +76,13 @@ class DocumentManager:
     
     def render_statistics_overview(self, kb_name, stats):
         """渲染统计概览"""
-        # 知识库名称和修改按钮在一行
-        name_col, edit_col = st.columns([4, 1])
+        # 知识库名称、下载按钮和修改按钮在一行
+        name_col, download_col, edit_col = st.columns([3, 1, 1])
         with name_col:
             st.markdown(f"### 💬 {kb_name}")
+        with download_col:
+            if st.button("📥", help="下载知识库", use_container_width=True, key="kb_name_download"):
+                st.session_state.show_download_dialog = True
         
         # 返回编辑按钮列，用于放置修改按钮
         return edit_col
