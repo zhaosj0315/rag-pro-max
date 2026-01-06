@@ -5420,8 +5420,9 @@ def show_kb_download_dialog():
                         use_container_width=True
                     )
                     
-                    # 提示用户下载完成后对话框会自动关闭
-                    st.info("💡 下载完成后请点击\"关闭\"按钮")
+                    # 下载按钮点击后自动关闭对话框
+                    st.session_state.show_download_dialog = False
+                    st.rerun()
                 else:
                     st.error("❌ 下载包生成失败")
                     
