@@ -755,9 +755,26 @@ with st.sidebar:
         from src.config.manifest_manager import ManifestManager
         nav_options = ["➕ 新建知识库...", "💬 纯对话模式 (Pure Chat)"]
         for kb in base_kbs:
-            # 获取统计信息 (v2.7.6: 增强信息展示)
+            # 获取统计信息 (v2.7.6: 增强信息展示) - 支持用户权限
             try:
-                kb_path = os.path.join(output_base, kb)
+                # 根据知识库名称格式确定路径
+                if kb.startswith('[历史] '):
+                    # 历史知识库在根目录
+                    actual_kb_name = kb[5:]  # 移除 "[历史] " 前缀
+                    kb_path = os.path.join("vector_db_storage", actual_kb_name)
+                elif kb.startswith('[') and '] ' in kb:
+                    # 格式: [username] kb_name
+                    kb_owner = kb.split('] ')[0][1:]
+                    actual_kb_name = kb.split('] ')[1]
+                    kb_path = os.path.join("vector_db_storage", kb_owner, actual_kb_name)
+                else:
+                    # 普通格式，使用用户上下文
+                    try:
+                        from src.auth.user_context import UserContext
+                        kb_path = UserContext.get_user_kb_path(kb)
+                    except:
+                        kb_path = os.path.join(output_base, kb)
+                
                 stats = ManifestManager.get_stats(kb_path)
                 doc_count = stats.get('file_count', 0)
                 size_str = ManifestManager.format_size(stats.get('total_size', 0))
