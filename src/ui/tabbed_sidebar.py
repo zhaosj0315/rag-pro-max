@@ -318,12 +318,13 @@ class TabbedSidebar:
     
     # 辅助方法
     def _get_knowledge_bases(self):
-        """获取知识库列表"""
+        """获取知识库列表（根据用户权限）"""
         try:
             from src.auth.user_context import UserContext
             kb_list = UserContext.list_user_knowledge_bases()
             return kb_list if kb_list else ["暂无知识库"]
         except Exception as e:
+            # 向后兼容
             return ["默认知识库", "技术文档", "产品手册", "FAQ库"]
     
     def _get_cpu_usage(self):

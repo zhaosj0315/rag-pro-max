@@ -728,7 +728,12 @@ with st.sidebar:
         with storage_col1:
             st.markdown("**路径:**")
         with storage_col2:
-            default_output_path = os.path.join(os.getcwd(), "vector_db_storage")
+            # 根据用户权限设置默认路径
+            try:
+                from src.auth.user_context import UserContext
+                default_output_path = UserContext.get_user_kb_path()
+            except:
+                default_output_path = os.path.join(os.getcwd(), "vector_db_storage")
             output_base = st.text_input("", value=default_output_path, help="知识库文件的保存位置", label_visibility="collapsed")
         with storage_col3:
             if st.button("📂", help="打开存储目录", use_container_width=True, key="open_storage_dir"):
@@ -964,6 +969,17 @@ with st.sidebar:
                 # 兼容带统计信息的格式
                 raw_name = selected_nav.split("📂 ")[1] if "📂 " in selected_nav else ""
                 current_kb_name = raw_name.split(" (")[0].strip() if not is_create_mode and raw_name else None
+
+        # 权限检查：验证用户是否可以访问选中的知识库
+        if current_kb_name and current_kb_name != "pure_chat":
+            try:
+                from src.auth.user_context import UserContext
+                can_access, message = UserContext.validate_kb_access(current_kb_name)
+                if not can_access:
+                    st.error(f"🚫 {message}")
+                    current_kb_name = None  # 重置为无效状态
+            except Exception:
+                pass  # 向后兼容，忽略权限检查错误
 
         # 统一的数据源处理逻辑
         uploaded_files = None

@@ -55,7 +55,22 @@ class KBManager:
             return False, "重命名失败"
     
     def list_all(self, sort_by_time: bool = True) -> List[str]:
-        """列出所有知识库"""
+        """列出知识库（根据用户权限）"""
+        try:
+            # 检查用户上下文
+            import streamlit as st
+            if hasattr(st, 'session_state') and 'user_context' in st.session_state:
+                from src.auth.user_context import UserContext
+                return UserContext.list_user_knowledge_bases()
+            else:
+                # 向后兼容：没有用户上下文时返回所有知识库
+                return self.ops.list_kbs(self.base_path, sort_by_time)
+        except Exception:
+            # 出错时返回基础列表
+            return self.ops.list_kbs(self.base_path, sort_by_time)
+    
+    def list_all_admin(self, sort_by_time: bool = True) -> List[str]:
+        """列出所有知识库（管理员专用）"""
         return self.ops.list_kbs(self.base_path, sort_by_time)
     
     def exists(self, kb_name: str) -> bool:

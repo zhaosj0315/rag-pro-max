@@ -136,6 +136,41 @@ class UserContext:
                     if os.path.isfile(item_path):
                         import shutil
                         shutil.move(item_path, os.path.join(admin_chat_path, item))
+    
+    @staticmethod
+    def can_access_kb(kb_name: str) -> bool:
+        """检查用户是否可以访问指定知识库"""
+        try:
+            import streamlit as st
+            if not hasattr(st, 'session_state') or 'user_context' not in st.session_state:
+                return True  # 向后兼容
+            
+            user_context = st.session_state.user_context
+            username = user_context.get('username', '')
+            is_admin = user_context.get('is_admin', False)
+            
+            # 管理员可以访问所有知识库
+            if is_admin:
+                return True
+            
+            # 普通用户只能访问自己的知识库
+            user_kb_path = UserContext.get_user_kb_path(kb_name)
+            return os.path.exists(user_kb_path)
+            
+        except Exception:
+            return False
+    
+    @staticmethod
+    def validate_kb_access(kb_name: str):
+        """验证知识库访问权限并返回结果"""
+        if not kb_name:
+            return False, "知识库名称不能为空"
+        
+        if not UserContext.can_access_kb(kb_name):
+            username = UserContext.get_username()
+            return False, f"用户 {username} 无权访问知识库 '{kb_name}'"
+        
+        return True, "访问权限验证通过"
 
 # 全局用户上下文实例
 user_context = UserContext()

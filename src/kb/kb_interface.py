@@ -22,7 +22,13 @@ class KBInterface:
         from src.kb import KBManager
         kb_manager = KBManager()
         
-        default_output_path = os.path.join(os.getcwd(), "vector_db_storage")
+        # 根据用户权限设置存储路径
+        try:
+            from src.auth.user_context import UserContext
+            default_output_path = UserContext.get_user_kb_path()
+        except:
+            default_output_path = os.path.join(os.getcwd(), "vector_db_storage")
+        
         output_base = st.text_input("存储根目录", value=default_output_path)
         
         kb_manager.base_path = output_base
