@@ -52,7 +52,7 @@ class CPUThrottle:
                 
                 if cpu_percent > self.max_cpu_percent:
                     if not self.is_throttling:
-                        logger.warning(cpu_percent:.1f)
+                        logger.warning(f"CPU使用率过高，开始限流: {cpu_percent:.1f}%")
                         self.is_throttling = True
                     
                     # 强制休眠，降低 CPU 使用率

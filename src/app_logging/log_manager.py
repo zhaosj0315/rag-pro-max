@@ -130,9 +130,9 @@ class LogManager:
             message += f" [角色: {details['role']}]"
         
         if stage:
-            logger.info(f"{icon} [{ts}] [{stage}] {message}")
+            print(f"{icon} [{ts}] [{stage}] {message}")
         else:
-            logger.info(f"{icon} [{ts}] {message}")
+            print(f"{icon} [{ts}] {message}")
     
     # ==================== 基础日志方法 ====================
     def debug(self, message: str, stage: str = "", details: Optional[Dict] = None):

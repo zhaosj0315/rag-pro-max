@@ -728,7 +728,10 @@ with st.sidebar:
         existing_kbs = (setattr(kb_manager, "base_path", output_base), kb_manager.list_all())[1]
 
         # --- 核心导航 ---
-        base_kbs = kb_manager.list_all()
+        # 使用权限过滤的知识库列表
+        from src.ui.kb_management_ui import get_knowledge_base_list
+        filtered_kbs = get_knowledge_base_list()
+        base_kbs = [kb.get('name', kb.get('kb_name', '')) for kb in filtered_kbs]
         
         # 为每个知识库创建带复选框的选项
         from src.config.manifest_manager import ManifestManager

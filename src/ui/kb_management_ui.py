@@ -284,6 +284,18 @@ def get_knowledge_base_list():
     if not vector_db_dir.exists():
         return kb_list
     
+    # 获取当前用户信息
+    current_user = st.session_state.get('username', 'guest')
+    is_admin = False
+    
+    # 检查是否是管理员
+    try:
+        from src.services.auth_service import get_auth_service
+        auth_service = get_auth_service()
+        is_admin = auth_service.is_admin(current_user)
+    except:
+        pass
+    
     for kb_dir in vector_db_dir.iterdir():
         if kb_dir.is_dir():
             # 同时检查带点和不带点的 info 文件
@@ -296,7 +308,17 @@ def get_knowledge_base_list():
                     import json
                     with open(kb_info_file, 'r', encoding='utf-8') as f:
                         kb_info = json.load(f)
-                    kb_list.append(kb_info)
+                    
+                    # 权限过滤
+                    kb_owner = kb_info.get('owner', 'unknown')
+                    
+                    # 管理员可以看到所有知识库
+                    if is_admin:
+                        kb_list.append(kb_info)
+                    # 普通用户只能看到自己的知识库和无所有者的旧知识库
+                    elif kb_owner == current_user or kb_owner == 'unknown':
+                        kb_list.append(kb_info)
+                        
                 except:
                     # 兼容旧版本，没有info文件的知识库
                     kb_list.append({

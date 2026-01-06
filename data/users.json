@@ -1,0 +1,17 @@
+{
+  "admin": {
+    "password": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+    "email": "admin@ragpromax.com",
+    "created_at": "2026-01-06T08:22:01.009322",
+    "last_login": "2026-01-06T08:37:53.549814",
+    "is_active": true,
+    "role": "admin"
+  },
+  "demo": {
+    "password": "d3ad9315b7be5dd53b31a273b3b3aba5defe700808305aa16a3062b76658a791",
+    "email": "demo@example.com",
+    "created_at": "2026-01-06T08:33:32.621309",
+    "last_login": "2026-01-06T10:24:06.893957",
+    "is_active": true
+  }
+}
