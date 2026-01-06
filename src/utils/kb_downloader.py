@@ -10,6 +10,7 @@ import zipfile
 import io
 from datetime import datetime
 from typing import Optional, Dict, Any
+from src.logger import logger
 
 def download_knowledge_base_custom(kb_name: str, kb_path: str, options: Dict[str, bool]) -> Optional[bytes]:
     """
@@ -64,7 +65,7 @@ def download_knowledge_base_custom(kb_name: str, kb_path: str, options: Dict[str
         return zip_buffer.getvalue()
         
     except Exception as e:
-        print(f"下载知识库失败: {e}")
+        logger.error(f"下载知识库失败: {e}")
         return None
 
 def generate_readme(kb_name: str, options: Dict[str, bool]) -> str:
@@ -159,7 +160,7 @@ def download_knowledge_base(kb_name: str, kb_path: str) -> Optional[bytes]:
         return zip_buffer.getvalue()
         
     except Exception as e:
-        print(f"下载知识库失败: {e}")
+        logger.error(f"下载知识库失败: {e}")
         return None
 
 def collect_kb_metadata(kb_name: str, kb_path: str) -> Dict[str, Any]:

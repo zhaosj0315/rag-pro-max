@@ -133,7 +133,7 @@ class AsyncWebCrawler:
     
     def is_duplicate_content(self, text: str) -> bool:
         """检查内容是否重复"""
-        fingerprint = self.content_fingerlogger.info(text)
+        fingerprint = self.content_fingerprint(text)
         if fingerprint in self.content_hashes:
             return True
         self.content_hashes.add(fingerprint)

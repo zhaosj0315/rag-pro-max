@@ -2,6 +2,7 @@ import os
 import json
 from datetime import datetime
 import time
+import sys
 
 from src.app_logging.log_manager import LogManager
 
@@ -52,7 +53,7 @@ class Logger:
         with open(self.log_file, 'a', encoding='utf-8') as f:
             f.write(json.dumps(entry, ensure_ascii=False) + '\n')
         # 输出到终端（简化格式）- 直接使用print避免递归
-        print(f"[{stage}] {message}")
+        sys.stdout.write(f"[{stage}] {message}\n")
     
     def start_timer(self, key):
         """开始计时"""

@@ -363,9 +363,6 @@ def create_rag_engine(kb_name: str, logger=None) -> Optional['RAGEngine']:
                 logger.error(f"❌ 无法加载知识库索引: {kb_name} (路径: {persist_dir})")
             return None
             
-    except Exception as e:
-        if logger:
+        except Exception as e:
             logger.error(f"❌ 创建 RAG 引擎失败: {str(e)} (知识库: {kb_name})")
-        else:
-            print(f"❌ 创建 RAG 引擎失败: {str(e)} (知识库: {kb_name})")
-        return None
+            return None

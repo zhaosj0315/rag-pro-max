@@ -3,6 +3,7 @@
 import os
 import json
 import time
+import sys
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from contextlib import contextmanager
@@ -130,9 +131,9 @@ class LogManager:
             message += f" [角色: {details['role']}]"
         
         if stage:
-            print(f"{icon} [{ts}] [{stage}] {message}")
+            sys.stdout.write(f"{icon} [{ts}] [{stage}] {message}\n")
         else:
-            print(f"{icon} [{ts}] {message}")
+            sys.stdout.write(f"{icon} [{ts}] {message}\n")
     
     # ==================== 基础日志方法 ====================
     def debug(self, message: str, stage: str = "", details: Optional[Dict] = None):
@@ -162,13 +163,13 @@ class LogManager:
         if details:
             msg += f" - {details}"
         if self.enable_terminal:
-            print(f"🚀 [{datetime.now().strftime('%H:%M:%S')}] {msg}")
+            sys.stdout.write(f"🚀 [{datetime.now().strftime('%H:%M:%S')}] {msg}\n")
         self.log(self.INFO, msg)
     
     def processing(self, message: str):
         """处理中"""
         if self.enable_terminal:
-            print(f"⏳ [{datetime.now().strftime('%H:%M:%S')}] {message}")
+            sys.stdout.write(f"⏳ [{datetime.now().strftime('%H:%M:%S')}] {message}\n")
         self.log(self.INFO, message)
     
     def complete_operation(self, operation: str, details: str = ""):
@@ -177,24 +178,24 @@ class LogManager:
         if details:
             msg += f" - {details}"
         if self.enable_terminal:
-            print(f"✨ [{datetime.now().strftime('%H:%M:%S')}] {msg}")
+            sys.stdout.write(f"✨ [{datetime.now().strftime('%H:%M:%S')}] {msg}\n")
         self.log(self.SUCCESS, msg)
     
     # ==================== 数据日志 ====================
     def data_summary(self, title: str, data: Dict[str, Any]):
         """数据摘要"""
         if self.enable_terminal:
-            print(f"📊 [{datetime.now().strftime('%H:%M:%S')}] {title}:")
+            sys.stdout.write(f"📊 [{datetime.now().strftime('%H:%M:%S')}] {title}:\n")
             for key, value in data.items():
-                print(f"  ├─ {key}: {value}")
+                sys.stdout.write(f"  ├─ {key}: {value}\n")
         self.log(self.INFO, f"{title}: {data}")
     
     def list_items(self, title: str, items: List[str]):
         """列表项"""
         if self.enable_terminal:
-            print(f"📋 [{datetime.now().strftime('%H:%M:%S')}] {title}:")
+            sys.stdout.write(f"📋 [{datetime.now().strftime('%H:%M:%S')}] {title}:\n")
             for item in items:
-                print(f"  • {item}")
+                sys.stdout.write(f"  • {item}\n")
         self.log(self.INFO, f"{title}: {items}")
     
     # ==================== 分隔符 ====================
@@ -202,11 +203,11 @@ class LogManager:
         """分隔符"""
         if self.enable_terminal:
             if title:
-                print(f"\n{'='*60}")
-                print(f"  {title}")
-                print(f"{'='*60}")
+                sys.stdout.write(f"\n{'='*60}\n")
+                sys.stdout.write(f"  {title}\n")
+                sys.stdout.write(f"{'='*60}\n")
             else:
-                print(f"{'='*60}")
+                sys.stdout.write(f"{'='*60}\n")
     
     # ==================== 性能监控 ====================
     def start_timer(self, name: str):
@@ -236,7 +237,7 @@ class LogManager:
         finally:
             elapsed = time.time() - start
             if show_result and self.enable_terminal:
-                print(f"⏱️  [{datetime.now().strftime('%H:%M:%S')}] {operation} 耗时: {elapsed:.2f}秒")
+                sys.stdout.write(f"⏱️  [{datetime.now().strftime('%H:%M:%S')}] {operation} 耗时: {elapsed:.2f}秒\n")
             
             # 记录性能指标
             if operation not in self.metrics:
@@ -289,12 +290,12 @@ class LogManager:
         
         self.separator("性能指标")
         for operation, stats in metrics.items():
-            print(f"  {operation}:")
-            print(f"    次数: {stats['count']}")
-            print(f"    总计: {stats['total']:.2f}秒")
-            print(f"    平均: {stats['avg']:.2f}秒")
-            print(f"    最小: {stats['min']:.2f}秒")
-            print(f"    最大: {stats['max']:.2f}秒")
+            sys.stdout.write(f"  {operation}:\n")
+            sys.stdout.write(f"    次数: {stats['count']}\n")
+            sys.stdout.write(f"    总计: {stats['total']:.2f}秒\n")
+            sys.stdout.write(f"    平均: {stats['avg']:.2f}秒\n")
+            sys.stdout.write(f"    最小: {stats['min']:.2f}秒\n")
+            sys.stdout.write(f"    最大: {stats['max']:.2f}秒\n")
     
     # ==================== 进度显示 ====================
     def progress_bar(self, current: int, total: int, label: str = ""):
@@ -308,9 +309,10 @@ class LogManager:
         bar = '█' * filled + '░' * (bar_length - filled)
         
         if self.enable_terminal:
-            print(f"\r{label} [{bar}] {percent}% ({current}/{total})", end='', flush=True)
+            sys.stdout.write(f"\r{label} [{bar}] {percent}% ({current}/{total})")
+            sys.stdout.flush()
             if current == total:
-                print()  # 完成后换行
+                sys.stdout.write('\n')  # 完成后换行
     
     # ==================== 多核处理监控 ====================
     def cpu_multicore_start(self, num_workers: int):
