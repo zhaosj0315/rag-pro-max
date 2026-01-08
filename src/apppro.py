@@ -784,7 +784,7 @@ with st.sidebar:
         nav_options = []
         
         # 权限检查：是否可以新建知识库
-        can_create = permission_manager.has_permission(current_user, "create_kb")
+        can_create = permission_manager.has_permission(current_user, "kb_create")
         if can_create:
             nav_options.append("➕ 新建知识库...")
             

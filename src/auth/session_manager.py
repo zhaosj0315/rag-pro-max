@@ -38,17 +38,17 @@ def get_visible_kbs(username, role, all_kbs):
     根据权限过滤可见的知识库
     规则：
     1. Admin 可见全部
-    2. 用户可见：自己拥有的 + 被显式分享给自己的 + 全局公开的
-    3. 访客可见：全局公开的
+    2. 用户可见：自己拥有的 + 被显式分享给自己的 + 被分享给所属角色的 + 全局公开的
+    3. 访客可见：全局公开的 + 被分享给 guest 角色的
     """
     if role == "admin":
         return all_kbs
         
     sharing_config = load_sharing_config()
     public_kbs = sharing_config.get("public_kbs", [])
-    
-    if role == "guest":
-        return [kb for kb in all_kbs if kb in public_kbs]
+    role_sharing = sharing_config.get("role_sharing", {})
+    # 属于该角色的共享库
+    shared_to_role = role_sharing.get(role, [])
     
     # 注册用户逻辑
     users = load_users()
@@ -57,15 +57,19 @@ def get_visible_kbs(username, role, all_kbs):
     
     visible = []
     for kb in all_kbs:
-        # 1. 检查是否为公开库
+        # 1. 全局公开
         if kb in public_kbs:
             visible.append(kb)
             continue
-        # 2. 检查是否在用户的授权白名单中
+        # 2. 属于该角色的
+        if kb in shared_to_role:
+            visible.append(kb)
+            continue
+        # 3. 显式分享给个人的
         if kb in whitelist:
             visible.append(kb)
             continue
-        # 3. 检查所有权 (通过前缀匹配: username_)
+        # 4. 物理所有权
         if kb.startswith(f"{username}_"):
             visible.append(kb)
             
