@@ -1848,7 +1848,12 @@ with st.sidebar:
                     st.download_button("📥 导出", export_content, file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d')}.md", mime="text/markdown", use_container_width=True, disabled=len(state.get_messages()) == 0)
 
                 with op_row1[3]:
-                    if st.button("🗑️ 删除", use_container_width=True, type="primary", disabled=not current_kb_name, help="永久删除该知识库"):
+                    # 删除权限检查 (颗粒化)
+                    from src.auth.permission_manager import permission_manager
+                    current_user = st.session_state.get('user', 'guest_user')
+                    can_delete = permission_manager.has_permission(current_user, "kb_delete_own")
+                    
+                    if st.button("🗑️ 删除", use_container_width=True, type="primary", disabled=not current_kb_name or not can_delete, help="永久删除该知识库" if can_delete else "🔒 您没有删除知识库的权限"):
                         st.session_state.confirm_delete = True
                         st.rerun()
 
@@ -3001,6 +3006,20 @@ if btn_start:
         validation_error("知识库名称", "名称不能为空", "请输入一个有意义的知识库名称，例如：'技术文档'、'产品手册'等")
     else:
         try:
+            # --- 空间配额检查 ---
+            from src.auth.session_manager import get_user_storage_usage
+            from src.auth.user_auth import load_users
+            
+            curr_user = st.session_state.get('user', 'admin')
+            u_data = load_users().get(curr_user, {})
+            u_quota_mb = u_data.get("storage_quota_mb", 100)
+            
+            if u_quota_mb != -1:
+                curr_usage_bytes = get_user_storage_usage(curr_user)
+                if curr_usage_bytes / (1024 * 1024) >= u_quota_mb:
+                    st.error(f"❌ 存储空间已满 ({u_quota_mb}MB)。请清理不再需要的知识库或联系管理员扩容。")
+                    st.stop()
+
             # 使用优化器生成唯一名称，避免重复和时间戳冲突
             # Only optimize name in NEW mode to avoid renaming existing KBs in APPEND mode
             if is_create_mode:
@@ -3165,13 +3184,15 @@ elif active_kb_name:
                 st.markdown("**🎁 终极资产导出**")
                 st.caption("包含报告、索引、元数据、原始文档及全量向量数据库")
                 
-                # 权限拦截逻辑 (实时校验)
+                # 权限拦截逻辑 (实时校验 - 颗粒化)
                 from src.auth.permission_manager import permission_manager
                 current_user = st.session_state.get('user', 'guest_user')
-                can_export_full = permission_manager.has_permission(current_user, "export_data")
+                
+                can_export_full = permission_manager.has_permission(current_user, "kb_export_full")
+                can_export_report = permission_manager.has_permission(current_user, "kb_export_report")
                 
                 if not can_export_full:
-                    st.warning("🔒 权限不足：仅管理员或授权用户可执行全量资产打包。")
+                    st.warning("🔒 权限不足：当前角色无法导出全量镜像。")
                 
                 if st.button("🌟 一键生成全量资产包 (ZIP)", use_container_width=True, key=f"dl_all_in_one_{active_kb_name}", type="primary", disabled=not can_export_full):
                     from src.auth.audit_logger import AuditLogger
@@ -4554,7 +4575,16 @@ with st.container():
         st.session_state.enable_query_optimization = deep_on
 
     with c_web:
-        web_search_on = st.toggle("联网搜索", value=st.session_state.get('enable_web_search', False), help="启用联网搜索")
+        # 权限检查：联网搜索 (实时颗粒化)
+        from src.auth.permission_manager import permission_manager
+        current_user = st.session_state.get('user', 'guest_user')
+        can_search = permission_manager.has_permission(current_user, "smart_search")
+        
+        if not can_search:
+            st.toggle("🌐 联网搜索 (🔒 权限受限)", value=False, disabled=True, help="请联系管理员开启联网搜索权限")
+            web_search_on = False
+        else:
+            web_search_on = st.toggle("联网搜索", value=st.session_state.get('enable_web_search', False), help="启用联网搜索")
         st.session_state.enable_web_search = web_search_on
 
     with c_research:

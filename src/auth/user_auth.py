@@ -28,7 +28,8 @@ def _init_admin():
             "role": "admin",
             "created_at": datetime.now().isoformat(),
             "is_active": True,
-            "kb_whitelist": []
+            "kb_whitelist": [],
+            "storage_quota_mb": -1  # 无限
         }
     }
     save_users(admin_user)
@@ -49,7 +50,8 @@ def register_user(username, password, role="standard_user"):
         "role": role,
         "created_at": datetime.now().isoformat(),
         "is_active": True,
-        "kb_whitelist": []
+        "kb_whitelist": [],
+        "storage_quota_mb": 100  # 默认 100MB
     }
     save_users(users)
     return True, "注册成功"
