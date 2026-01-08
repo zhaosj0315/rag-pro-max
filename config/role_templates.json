@@ -8,16 +8,15 @@
   "creator": {
     "name": "知识专家",
     "description": "专注内容采集与深度构建，支持爬虫",
-    "permissions": ["chat", "kb_create", "kb_delete_own", "upload_files", "paste_text", "use_crawler", "smart_search", "summary_gen", "kb_export_report"],
-    "default_quota_mb": 1024
-  },
-  "standard_user": {
-    "name": "标准用户",
-    "description": "日常文档构建与问答",
-    "permissions": ["chat", "kb_create", "kb_delete_own", "upload_files", "paste_text", "summary_gen", "kb_export_report"],
-    "default_quota_mb": 200
-  },
-  "analyst": {
+            "permissions": ["chat", "kb_create", "kb_delete_own", "upload_files", "paste_text", "use_crawler", "smart_search", "summary_gen", "kb_export_report", "data_analysis"],
+            "default_quota_mb": 1024
+          },
+          "standard_user": {
+            "name": "标准用户",
+            "description": "日常文档构建与问答",
+            "permissions": ["chat", "kb_create", "kb_delete_own", "upload_files", "paste_text", "summary_gen", "kb_export_report", "data_analysis"],
+            "default_quota_mb": 200
+          },  "analyst": {
     "name": "数据分析师",
     "description": "专注已有知识库的深度对话与资产导出",
     "permissions": ["chat", "smart_search", "summary_gen", "kb_export_report", "kb_export_full"],
