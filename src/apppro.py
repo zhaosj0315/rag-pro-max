@@ -1036,12 +1036,12 @@ with st.sidebar:
                 current_kb_name = raw_name.split(" (")[0].strip() if not is_create_mode and raw_name else None
 
         # 统一的数据源处理逻辑
-        uploaded_files = None
+        uploaded_files = st.session_state.get('uploader') # 优先从 uploader 获取，支持多模式
         crawl_url = None
         search_keyword = None
         target_path = ""
         btn_start = False # Initialize early to avoid NameError and support APPEND mode
-        source_mode = None # Initialize to avoid NameError in APPEND mode
+        source_mode = st.session_state.get('data_source_selector') # 确保从 radio 获取最新模式
         
         if is_create_mode:
             # 注入 CSS 增强核心功能视觉效果
@@ -1076,14 +1076,16 @@ with st.sidebar:
             
             if source_mode == "📊 数据分析":
                 st.info("💡 **数据分析模式**: 适合上传 CSV、Excel 或包含报表的文档。系统将自动提取表格结构并支持复杂的 SQL 统计查询。")
-                uploaded_files = st.file_uploader(
+                da_files = st.file_uploader(
                     "上传数据文件", 
                     type=['csv', 'xlsx', 'xls', 'pdf', 'docx'],
                     accept_multiple_files=True,
                     key="data_analyst_uploader"
                 )
-                if uploaded_files:
+                if da_files:
                     st.session_state.is_data_analysis_mode = True
+                    # 关键：立即同步给全局变量供下文统一处理
+                    uploaded_files = da_files
             
             elif source_mode == "📂 文件上传":
                 # 权限拦截 (实时校验)
@@ -1104,7 +1106,8 @@ with st.sidebar:
                     accept_multiple_files=True, 
                     key="uploader",
                     label_visibility="collapsed",
-                    help="支持格式: PDF, DOCX, TXT, MD, Excel",
+                    help="支持格式: PDF, DOCX, TXT, MD, Excel, CSV",
+                    type=['pdf', 'docx', 'txt', 'md', 'xlsx', 'xls', 'csv', 'pptx', 'jpg', 'png', 'jpeg'],
                     disabled=not can_upload
                 )
                 
@@ -1613,11 +1616,14 @@ with st.sidebar:
                     if result.skipped_count > 0:
                         st.warning(f"⚠️ 跳过 {result.skipped_count} 个文件")
 
-                    # 为文件上传场景生成智能名称
+                    # 为文件上传场景生成智能名称 (兼容数据分析模式)
                     if result.success_count > 0:
                         try:
+                            # 统一捕获当前模式下的文件列表
+                            curr_files = uploaded_files if uploaded_files else []
+                            
                             file_types = {}
-                            for f in uploaded_files:
+                            for f in curr_files:
                                 ext = os.path.splitext(f.name)[1].lower()
                                 file_types[ext] = file_types.get(ext, 0) + 1
 
@@ -1710,12 +1716,22 @@ with st.sidebar:
                         type_text = " · ".join([f"{ext.replace('.', '')}:{count}" for ext, count in sorted_types])
                         st.caption(f"📊 {type_text} · 源: {display_name}")
                 else:
-                    st.error("❌ 路径不存在，请检查路径是否正确")
-                    # 添加友好的错误引导
-                    from src.utils.friendly_error_handler import friendly_error
-                    friendly_error("文件上传", 
-                                 "指定的路径不存在或无法访问",
-                                 ["检查路径拼写是否正确", "确认您有访问该路径的权限", "尝试使用文件上传功能代替手动路径"])
+                    # 只有在非爬虫且非数据分析初级阶段时才报错
+                    is_web_waiting = (source_mode == "🔗 网址抓取" and st.session_state.get('crawl_url_input'))
+                    is_da_waiting = (source_mode == "📊 数据分析" and uploaded_files)
+                    
+                    if not is_web_waiting and not is_da_waiting:
+                        st.error("❌ 路径不存在，请检查路径是否正确")
+                        # 添加友好的错误引导
+                        from src.utils.friendly_error_handler import friendly_error
+                        friendly_error("文件上传", 
+                                     "指定的路径不存在或无法访问",
+                                     ["检查路径拼写是否正确", "确认您有访问该路径的权限", "尝试使用文件上传功能代替手动路径"])
+                    elif is_da_waiting:
+                        st.markdown(
+                            """<div style='background: #fffbeb; color: #92400e; padding: 6px 8px; border-radius: 6px; border: 1px solid #fef3c7; text-align: center; font-size: 0.85rem;'>⏳ 等待文件预处理...</div>""", 
+                            unsafe_allow_html=True
+                        )
                     final_kb_name = current_kb_name if not is_create_mode else ""
             else:
                 final_kb_name = current_kb_name if not is_create_mode else ""
@@ -2350,11 +2366,12 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
 
     # 使用 IndexBuilder 处理
     from src.processors.index_builder import IndexBuilder
+    # 显式使用局部变量以防止 Unknown 报错
     builder = IndexBuilder(
         kb_name=kb_name,
         persist_dir=persist_dir,
         embed_model=embed,
-        embed_model_name=embed_model,
+        embed_model_name=embed_model, # 使用当前活跃的模型名
         use_ocr=use_ocr,
         extract_metadata=extract_metadata,
         generate_summary=generate_summary,
@@ -2367,52 +2384,67 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
         status_container.update(label="❌ 路径无效", state="error")
         raise ValueError(f"路径无效: {current_target_path}")
 
-    # --- 核心增强：数据分析引擎接入 (业务推演版) ---
+    # --- 核心增强：数据分析 5.0 业务推演 ---
     is_da_mode = st.session_state.get('is_data_analysis_mode', False)
     if is_da_mode:
-        status_container.write("📂 [专项] 启动业务架构分析引擎...")
+        status_container.write("📂 [专项] 启动业务语义大脑引擎...")
         from src.processors.data_analyst import DataAnalystEngine
         from src.utils.model_manager import load_llm_model
         
         da_engine = DataAnalystEngine(persist_dir, logger)
-        # 获取当前LLM
         llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
         
-        # 1. 提取物理结构
-        import glob
-        source_files = glob.glob(os.path.join(current_target_path, "*"))
-        status_container.write(f"📊 正在扫描 {len(source_files)} 个源文件结构...")
-        schemas = da_engine.process_files(source_files)
+        # 1. 执行 RAG 预扫描以获取文本（用于非结构化建模）
+        # 这里先运行 builder._scan_files 和 _read_documents 以获取 docs 对象
+        docs, _ = builder._read_documents(current_target_path, 0, None)
         
-        # 2. 业务蓝图推演
-        status_container.write("🧠 正在理解业务含义与表间关联...")
+        # 2. 深度 Schema 建模 (核心升级：从文档推导演算法)
+        status_container.write("🧠 正在从文档中提取数据字典与表结构...")
+        schemas = da_engine.extract_schema_from_docs(docs, llm)
+        
+        # 3. 业务蓝图推演
+        status_container.write("🌐 正在构建业务全景图与关联路径...")
         blueprint = da_engine.infer_business_blueprint(schemas, llm)
-        status_container.info(f"📍 业务场景识别: {blueprint.get('business_scenario', '识别中')}")
+        status_container.info(f"📍 识别业务场景: {blueprint.get('business_scenario', '未知业务')}")
         
-        # 3. 仿真数据模拟 (如果库为空)
-        status_container.write("🧪 正在准备仿真实验室数据环境...")
-        da_engine.simulate_mock_data(schemas, blueprint, llm)
-        
-        status_container.write("✅ 业务仿真环境建模完成")
+        status_container.write("✅ 业务语义建模已就绪 (去RAG纯分析模式已激活)")
+        allow_empty_docs = True
+    else:
+        allow_empty_docs = False
 
     # 执行标准处理 (RAG + Indexing)
-    result = builder.build(
-        source_path=current_target_path,
-        force_reindex=force_reindex,
-        action_mode=action_mode,
-        status_callback=status_callback
-    )
+    try:
+        result = builder.build(
+            source_path=current_target_path,
+            force_reindex=force_reindex,
+            action_mode=action_mode,
+            status_callback=status_callback
+        )
+    except Exception as e:
+        if allow_empty_docs:
+            # 数据分析模式允许 RAG 读取失败
+            logger.warning(f"RAG索引构建跳过(数据分析模式): {e}")
+            result = BuildResult(True, None, 0, 0, 0)
+        else:
+            raise e
     
-    # --- 补丁: 写入所有权信息 ---
-    if owner:
-        try:
-            from src.config.manifest_manager import ManifestManager
-            manifest = ManifestManager.load(persist_dir)
+    # --- 补丁: 写入所有权信息与模型对齐 ---
+    try:
+        from src.config.manifest_manager import ManifestManager
+        manifest = ManifestManager.load(persist_dir)
+        
+        # 记录所有者
+        if owner:
             manifest['owner'] = owner
-            ManifestManager.save(persist_dir, manifest)
-            logger.info(f"✅ 已记录所有权: {owner}")
-        except Exception as e:
-            logger.warning(f"⚠️ 记录所有权失败: {e}")
+            
+        # 强制纠正模型元数据 (关键修复)
+        manifest['embed_model'] = embed_model
+        manifest['embed_provider'] = embed_provider
+        
+        ManifestManager.save(persist_dir, manifest)
+        logger.info(f"✅ 资产所有权与模型对齐已完成: {owner} | {embed_model}")
+    except Exception as e:
+        logger.warning(f"⚠️ 元数据补全失败: {e}")
 
     # 计算耗时
     duration = time.time() - start_time
@@ -2715,8 +2747,9 @@ if btn_start:
                     # 设置抓取目录为数据源
                     target_path = unique_output_dir
                     
-                    # 自动生成知识库名称
-                    kb_name = f"Web_{domain}_{timestamp_dir}"
+                    # 自动生成知识库名称 (对齐管理为先: 增加所有者前缀)
+                    current_user = st.session_state.get('user', 'admin')
+                    kb_name = f"{current_user}_Web_{domain}_{timestamp_dir}"
                     
                     # 继续执行知识库创建逻辑
                     st.info("🚀 开始创建知识库...")
@@ -2919,8 +2952,9 @@ if btn_start:
                     # 设置搜索目录为数据源
                     target_path = unique_output_dir
                     
-                    # 自动生成知识库名称
-                    kb_name = f"Search_{search_keyword.replace(' ', '_')}_{timestamp_dir}"
+                    # 自动生成知识库名称 (对齐管理为先: 增加所有者前缀)
+                    current_user = st.session_state.get('user', 'admin')
+                    kb_name = f"{current_user}_Search_{search_keyword.replace(' ', '_')}_{timestamp_dir}"
                     
                     # 继续执行知识库创建逻辑
                     st.info("🚀 开始创建知识库...")
@@ -5345,52 +5379,49 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             msg_placeholder = st.empty()
             
             # 使用一个连贯的spinner包装整个问答流程
-            with st.spinner("🤖 正在思考并准备完整回答..."):
+            with st.spinner("🧠 正在进行深度业务逻辑推演..."):
                 try:
-                    # --- 核心增强：数据分析引擎执行 (优先级最高) ---
+                    # --- 核心增强：数据分析 5.0 (业务语义模式) ---
                     db_path = os.path.join(output_base, active_kb_name)
-                    sql_db_path = os.path.join(db_path, "business_data.db")
-                    if os.path.exists(sql_db_path):
-                        try:
-                            from src.processors.data_analyst import DataAnalystEngine
-                            from src.utils.model_manager import load_llm_model
-                            da_engine = DataAnalystEngine(db_path, logger)
+                    schema_path = os.path.join(db_path, "business_schema.json")
+                    
+                    if os.path.exists(schema_path):
+                        from src.processors.data_analyst import DataAnalystEngine
+                        from src.utils.model_manager import load_llm_model
+                        da_engine = DataAnalystEngine(db_path, logger)
+                        llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
+                        
+                        # 执行业务推演与 SQL 统计
+                        analysis_res = da_engine.execute_analysis(final_prompt, llm)
+                        
+                        # 1. 显示逻辑推演报告
+                        st.markdown("### 📊 业务分析报告")
+                        st.markdown(analysis_res["logic"])
+                        
+                        if analysis_res["success"]:
+                            # 2. 显示执行的 SQL
+                            with st.expander("🛠️ 查看执行指令 (SQL)", expanded=False):
+                                st.code(analysis_res["sql"], language="sql")
                             
-                            with st.status("📊 正在进行结构化业务分析...", expanded=False):
-                                st.write("🔍 正在分析业务模型与字段关系...")
-                                llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
-                                
-                                st.write("🧠 正在生成 SQL 统计指令...")
-                                sql_query = da_engine.generate_sql_query(final_prompt, llm)
-                                st.code(sql_query, language="sql")
-                                
-                                st.write("🚀 正在从数据库执行查询...")
-                                da_result = da_engine.execute_sql(sql_query)
+                            # 3. 显示结果数据
+                            import pandas as pd
+                            df_res = pd.DataFrame(analysis_res["data"])
+                            st.markdown(f"✅ **实时查询成功**：返回 {len(df_res)} 条数据")
+                            st.dataframe(df_res, use_container_width=True)
                             
-                            if da_result['success'] and da_result['rows'] > 0:
-                                # 显示结果表格
-                                import pandas as pd
-                                df_res = pd.DataFrame(da_result['data'])
-                                st.markdown(f"✅ **分析完成**：找到 {da_result['rows']} 条相关记录。")
-                                st.dataframe(df_res, use_container_width=True)
-                                
-                                # 尝试自动生成图表 (如果列数合适)
-                                if len(df_res.columns) >= 2 and da_result['rows'] > 1:
+                            # 4. 自动可视化
+                            if len(df_res.columns) >= 2 and len(df_res) > 1:
+                                with st.expander("📈 数据看板", expanded=True):
                                     st.bar_chart(df_res.set_index(df_res.columns[0]))
-                                
-                                # 补充文字说明
-                                summary_prompt = f"请根据以下数据查询结果，用简洁的语言为用户提供分析结论：\n问题: {final_prompt}\nSQL结果: {json.dumps(da_result['data'][:5], ensure_ascii=False)}"
-                                response_text = str(llm.complete(summary_prompt))
-                                msg_placeholder.write(response_text)
-                                
-                                # 归档消息
-                                st.session_state.messages.append({"role": "assistant", "content": f"{response_text}\n\n[数据分析模式已执行]"})
-                                st.session_state.is_processing = False
-                                st.rerun()
-                        except Exception as da_err:
-                            logger.warning(f"⚠️ 数据分析引擎执行跳过/失败，转为 RAG 模式: {da_err}")
+                        else:
+                            st.warning("⚠️ 无法执行实时统计，已为您提供逻辑推演建议。")
+                        
+                        # 归档并彻底阻断 RAG 流程
+                        st.session_state.messages.append({"role": "assistant", "content": analysis_res["logic"]})
+                        st.session_state.is_processing = False
+                        st.rerun()
 
-                    # 开始计时
+                    # --- 原始 RAG 逻辑 (仅当不是分析模式时执行) ---
                     start_time = time.time()
                     
                     # 显示启用的检索增强功能

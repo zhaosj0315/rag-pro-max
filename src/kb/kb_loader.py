@@ -114,6 +114,16 @@ class KnowledgeBaseLoader:
             status.write("⏳ [1/3] 正在加载向量数据...")
             logger.processing("[1/3] 开始加载向量数据...")
             
+            # --- 容灾补丁：如果是纯数据分析库，跳过向量加载 ---
+            sql_db_path = os.path.join(db_path, "business_data.db")
+            docstore_path = os.path.join(db_path, "docstore.json")
+            if not os.path.exists(docstore_path) and os.path.exists(sql_db_path):
+                status.write("⚠️  未发现向量索引，已切换至【纯数据分析】模式")
+                chat_engine = self._create_chat_engine(None, db_path, status)
+                status.update(label=f"✅ 知识库 '{kb_name}' 以纯数据模式挂载成功！", state="complete")
+                progress_placeholder.empty()
+                return chat_engine, None, None
+
             stage1_start = time.time()
             storage_context = self._load_with_progress(
                 lambda: StorageContext.from_defaults(persist_dir=db_path),
@@ -179,6 +189,14 @@ class KnowledgeBaseLoader:
                 else:
                     raise ValueError(f"无法加载嵌入模型: {kb_embed_model}")
                 
+                # --- 容灾补丁：纯数据分析库处理 ---
+                sql_db_path = os.path.join(db_path, "business_data.db")
+                docstore_path = os.path.join(db_path, "docstore.json")
+                if not os.path.exists(docstore_path) and os.path.exists(sql_db_path):
+                    st.warning("⚠️  检测到纯数据知识库，已激活 SQL 分析引擎")
+                    chat_engine = self._create_chat_engine(None, db_path, None)
+                    return chat_engine, None, None
+
                 storage_context = StorageContext.from_defaults(persist_dir=db_path)
                 index = load_index_from_storage(storage_context)
                 
@@ -215,10 +233,27 @@ class KnowledgeBaseLoader:
         return result[0]
     
     def _create_chat_engine(self, index, db_path, status, filters=None):
-        """创建聊天引擎"""
-        node_postprocessors = []
-        similarity_top_k = 5
+        """创建聊天引擎 (支持降级)"""
+        # --- 核心：如果索引缺失，返回虚拟 SQL 引擎 ---
+        if index is None:
+            class DataOnlyChatEngine:
+                def chat(self, message):
+                    return "当前知识库仅支持【数据分析模式】，您可以直接在下方输入统计查询类问题。"
+                def stream_chat(self, message):
+                    # 模拟流式输出响应对象 (补全 UI 所需的所有属性)
+                    class MockResponse:
+                        def __init__(self, text):
+                            self.response_gen = (word + " " for word in text.split())
+                            self.source_nodes = [] # 核心修复：防止 UI 报错
+                            self.metadata = {}
+                            self.response = text
+                        def __str__(self): return self.response
+                    return MockResponse("当前知识库仅支持【数据分析模式】，您可以直接在下方输入统计查询类问题。")
+                def reset(self): pass
+            return DataOnlyChatEngine()
+
         retriever = None
+        node_postprocessors = []
         
         # 1. 准备过滤器
         if filters is None:

@@ -22,16 +22,15 @@ def clean_proxy():
 def load_embedding_model(provider: str, model_name: str, api_key: str = "", api_url: str = ""):
     """
     加载嵌入模型
-    
-    Args:
-        provider: 供应商 (HuggingFace/OpenAI/Ollama)
-        model_name: 模型名称
-        api_key: API密钥（OpenAI需要）
-        api_url: API地址（OpenAI/Ollama需要）
-    
-    Returns:
-        嵌入模型实例，失败返回 None
     """
+    # --- 核心底层补丁：强制拦截 Unknown 模型名 ---
+    if not model_name or model_name == "Unknown":
+        from src.core.app_config import load_config
+        config = load_config()
+        model_name = config.get('embed_model') or "sentence-transformers/all-MiniLM-L6-v2"
+        provider = config.get('embed_provider') or "HuggingFace (本地/极速)"
+        logger.warning(f"🛡️ 底层检测到损坏的模型请求(Unknown)，已强制纠正为系统默认: {model_name}")
+
     try:
         if provider.startswith("HuggingFace"):
             # HuggingFace 本地模型

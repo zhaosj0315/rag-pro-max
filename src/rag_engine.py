@@ -54,24 +54,39 @@ class RAGEngine:
     def load_existing_index(self) -> bool:
         """
         加载已有索引
-        
-        Returns:
-            bool: 是否成功加载
         """
         if not os.path.exists(self.persist_dir):
             return False
         
+        # 检查是否为纯数据分析库 (只有 SQL DB, 没向量库)
+        db_path = os.path.join(self.persist_dir, "business_data.db")
+        docstore_path = os.path.join(self.persist_dir, "docstore.json")
+        
         try:
-            if self.logger:
-                self.logger.info(f"📂 加载现有索引: {self.kb_name}")
-            
+            # 关键：如果核心向量文件不全，直接视为纯数据分析模式，不调用 StorageContext
+            if not os.path.exists(docstore_path) or not os.path.exists(os.path.join(self.persist_dir, "vector_store.json")):
+                if os.path.exists(db_path):
+                    if self.logger:
+                        self.logger.warning(f"⚠️  未发现完整向量索引，已切换至【纯数据分析】模式")
+                    self.index = None # 标记没有向量索引
+                    return True
+                else:
+                    return False
+
+            # 只有文件齐全才尝试加载
             storage_context = StorageContext.from_defaults(persist_dir=self.persist_dir)
             self.index = load_index_from_storage(storage_context)
             
             if self.logger:
-                self.logger.success("✅ 索引加载成功")
-            
+                self.logger.success("✅ 向量索引加载成功")
             return True
+            
+        except Exception as e:
+            if os.path.exists(db_path):
+                if self.logger: self.logger.warning(f"⚠️  索引加载异常，降级至纯数据模式: {e}")
+                self.index = None
+                return True
+            return False
             
         except Exception as e:
             error_msg = str(e)
@@ -298,19 +313,32 @@ def create_rag_engine(kb_name: str, logger=None) -> Optional['RAGEngine']:
     try:
         from src.core.app_config import load_config, output_base
         from src.utils.model_manager import load_embedding_model, load_llm_model
+        from src.config.manifest_manager import ManifestManager
         
-        # 加载配置
+        # 加载全局配置
         config = load_config()
         persist_dir = os.path.join(output_base, kb_name)
         
-        # 确保配置值有效 (防止空字符串导致模型加载失败)
+        # --- 核心补丁：元数据自动纠错 ---
+        manifest = ManifestManager.load(persist_dir)
+        kb_embed_model = manifest.get('embed_model')
+        kb_embed_provider = manifest.get('embed_provider')
+        
+        # 如果知识库元数据中模型是 Unknown，则强制使用全局配置模型
+        if not kb_embed_model or kb_embed_model == "Unknown":
+            kb_embed_model = config.get('embed_model') or "sentence-transformers/all-MiniLM-L6-v2"
+            kb_embed_provider = config.get('embed_provider') or "HuggingFace (本地/极速)"
+            if logger:
+                logger.warning(f"⚠️ 检测到损坏的元数据(Unknown)，已自动纠错为系统默认模型: {kb_embed_model}")
+        
+        # 确保配置值有效 (LLM)
         llm_provider = config.get('llm_provider') or "Ollama"
         llm_model_name = config.get('llm_model') or "gpt-oss:20b"
         
-        # 加载 Embedding 模型
+        # 加载 Embedding 模型 (优先使用纠错后的知识库配置)
         embed_model = load_embedding_model(
-            provider=config.get('embed_provider'),
-            model_name=config.get('embed_model'),
+            provider=kb_embed_provider,
+            model_name=kb_embed_model,
             api_key=config.get('embed_key'),
             api_url=config.get('embed_url')
         )
@@ -335,6 +363,7 @@ def create_rag_engine(kb_name: str, logger=None) -> Optional['RAGEngine']:
         
         # 加载已有索引
         if engine.load_existing_index():
+            # 补丁：即使 engine.index 为 None (纯数据分析模式)，也视为挂载成功
             return engine
         else:
             if logger:

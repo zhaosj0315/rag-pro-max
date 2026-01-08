@@ -219,12 +219,12 @@ class AlertSystem:
         level_icons = {'warning': '⚠️', 'critical': '🚨'}
         icon = level_icons.get(alert['level'], '📢')
         
-        logger.info(f"\n{icon} 系统告警 [{alert['level'].upper()}]")
-        logger.info(f"时间: {alert['timestamp']}")
-        logger.info(f"类型: {alert['type']}")
-        logger.info(f"消息: {alert['message']}")
-        logger.info(f"当前值: {alert['value']:.1f}% (阈值: {alert['threshold']}%)")
-        logger.info("-" * 50)
+        logging.info(f"\n{icon} 系统告警 [{alert['level'].upper()}]")
+        logging.info(f"时间: {alert['timestamp']}")
+        logging.info(f"类型: {alert['type']}")
+        logging.info(f"消息: {alert['message']}")
+        logging.info(f"当前值: {alert['value']:.1f}% (阈值: {alert['threshold']}%)")
+        logging.info("-" * 50)
     
     def _send_desktop_notification(self, alert: Dict):
         """发送桌面通知"""

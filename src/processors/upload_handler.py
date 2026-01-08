@@ -24,7 +24,7 @@ class UploadHandler:
     
     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
     MAX_ZIP_SIZE = 500 * 1024 * 1024   # 500MB
-    ALLOWED_EXTENSIONS = {'.pdf', '.txt', '.docx', '.md', '.xlsx', '.csv', 
+    ALLOWED_EXTENSIONS = {'.pdf', '.txt', '.docx', '.md', '.xlsx', '.xls', '.csv', 
                          '.pptx', '.html', '.json', '.zip',
                          '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif'}
     

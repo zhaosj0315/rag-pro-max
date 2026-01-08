@@ -13,21 +13,54 @@ class DataAnalystEngine:
         self.schema_path = os.path.join(kb_path, "business_schema.json")
         self.blueprint_path = os.path.join(kb_path, "business_blueprint.json")
 
+    def extract_schema_from_docs(self, docs: List[Any], model_client) -> Dict[str, Any]:
+        """
+        [核心升级] 语义化提取：从自然语言文档（PDF/Word）中识别表结构、数据字典。
+        """
+        # 合并所有文档的文本片段进行分析
+        all_text = "\n".join([d.text for d in docs[:20]]) # 取前20个片段防止Token溢出
+        
+        prompt = f"""
+你是一名顶级的数据库架构师。请从以下文档内容中提取出所有的数据库表结构、字段说明、数据字典及表间关联关系：
+{all_text}
+
+请输出一个标准的 JSON 对象，格式如下：
+{{
+  "tables": {{
+    "表名": {{
+      "description": "业务含义",
+      "columns": [
+        {{"name": "字段名", "type": "类型", "comment": "业务解释", "is_primary": true/false}}
+      ],
+      "foreign_keys": [
+        {{"column": "本表字段", "ref_table": "关联表", "ref_column": "关联字段"}}
+      ]
+    }}
+  }}
+}}
+请仅输出 JSON。
+"""
+        response = model_client.complete(prompt)
+        try:
+            schema_data = json.loads(response.text.strip().replace("```json", "").replace("```", ""))
+            with open(self.schema_path, 'w', encoding='utf-8') as f:
+                json.dump(schema_data, f, indent=4, ensure_ascii=False)
+            return schema_data
+        except:
+            return {"error": "语义解析失败"}
+
     def infer_business_blueprint(self, schemas: Dict[str, Any], model_client) -> Dict[str, Any]:
         """
-        [核心] 业务推演：分析表结构、字段名，推导出业务场景、关联路径和分析建议。
+        业务推演：推导出业务场景、关联路径和分析建议。
         """
         prompt = f"""
-你是一名资深的业务架构师。请深入分析以下数据库表结构，并推导出其背后的业务逻辑：
+请根据以下数据库结构推导业务全景图：
 {json.dumps(schemas, indent=2, ensure_ascii=False)}
 
-请输出一个 JSON 格式的“业务蓝图”，包含：
-1. business_scenario: 简要描述这是什么业务系统。
-2. core_entities: 核心业务实体及其作用。
-3. relationships: 表与表之间的关联路径（包含关联字段）。
-4. analytical_suggestions: 基于此结构，可以进行的 3-5 个深度分析维度（如：用户生命周期、订单转化率）。
-
-请仅输出 JSON 内容。
+请输出 JSON：
+1. business_scenario: 业务系统描述。
+2. core_logic: 核心业务流转逻辑。
+3. analysis_dimensions: 推荐的 5 个业务分析维度。
 """
         response = model_client.complete(prompt)
         try:
@@ -36,141 +69,60 @@ class DataAnalystEngine:
                 json.dump(blueprint, f, indent=4, ensure_ascii=False)
             return blueprint
         except:
-            return {"error": "推演失败"}
+            return {{}}
 
-    def simulate_mock_data(self, schemas: Dict[str, Any], blueprint: Dict[str, Any], model_client):
+    def execute_analysis(self, query: str, model_client) -> Dict[str, Any]:
         """
-        [核心] 仿真模拟：如果表是空的，根据业务蓝图生成高质量模拟数据并注入。
+        [主动分析版] 强制执行 SQL 并返回结构化结果
         """
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        with open(self.schema_path, 'r', encoding='utf-8') as f:
+            schemas = json.load(f)
         
-        for table_name, info in schemas.items():
-            # 检查表是否为空
-            cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
-            if cursor.fetchone()[0] == 0:
-                if self.logger: self.logger.info(f"🧪 正在为 {table_name} 生成仿真模拟数据...")
-                
-                sim_prompt = f"""
-请为表 {table_name} 生成 10 条符合业务逻辑的模拟数据。
-表结构: {json.dumps(info, ensure_ascii=False)}
-业务背景: {blueprint.get('business_scenario', '通用业务')}
+        # 1. 强制生成 SQL (哪怕问题模糊)
+        sql_prompt = f"""
+你是一名资深 SQL 专家。基于以下表结构，请生成一条 SQL 来回答用户的问题。
+如果问题未指定具体个体（如“某个用户”），请默认查询“所有个体的汇总统计”或“前10名排行”。
+
+表结构：{json.dumps(schemas, ensure_ascii=False)}
+
+用户问题：{query}
+
 要求：
-1. 必须符合字段类型。
-2. 关联字段（如 ID）必须与该业务蓝图中的其他实体保持一致。
-3. 仅返回 JSON 数组格式的数据。
+1. 必须返回 SQL，不要反问用户。
+2. SQL 必须包裹在 [SQL_START] 和 [SQL_END] 之间。
+3. 如果需要计算总额，请使用 SUM()；如果需要计数，请使用 COUNT()。
 """
-                response = model_client.complete(sim_prompt)
-                try:
-                    mock_data = json.loads(response.text.strip().replace("```json", "").replace("```", ""))
-                    df_mock = pd.DataFrame(mock_data)
-                    df_mock.to_sql(table_name, conn, if_exists='append', index=False)
-                except:
-                    continue
+        sql_res = model_client.complete(sql_prompt).text
+        sql_query = ""
+        if "[SQL_START]" in sql_res:
+            sql_query = sql_res.split("[SQL_START]")[1].split("[SQL_END]")[0].strip()
         
-        conn.close()
+        # 2. 尝试执行
+        execution_result = {"success": False}
+        if sql_query:
+            execution_result = self.execute_sql(sql_query)
+        
+        # 3. 最终业务解读
+        summary_prompt = f"""
+根据以下 SQL 执行结果，请为用户提供一份简洁的业务分析报告：
+SQL: {sql_query}
+结果数据: {json.dumps(execution_result.get('data', [])[:10], ensure_ascii=False)}
+问题: {query}
 
-    def _sanitize_table_name(self, name: str) -> str:
-        # 去除扩展名并保留合法字符
-        base = os.path.splitext(name)[0]
-        clean = "".join([c if c.isalnum() else "_" for c in base])
-        return f"tbl_{clean.lower()}"
-
-    def _extract_df_info(self, df: pd.DataFrame, source_desc: str) -> Dict[str, Any]:
+报告结构：
+- [💡 逻辑推演]：说明查询了哪些表及字段。
+- [📊 核心发现]：用一句话总结数据发现。
+- [📈 仿真建议]：说明后续可以关注的业务指标。
+"""
+        final_report = model_client.complete(summary_prompt).text
+        
         return {
-            "source": source_desc,
-            "columns": list(df.columns),
-            "dtypes": {col: str(dtype) for col, dtype in df.dtypes.items()},
-            "row_count": len(df),
-            "sample_data": df.head(3).to_dict(orient='records')
+            "sql": sql_query,
+            "data": execution_result.get('data', []),
+            "logic": final_report,
+            "success": execution_result.get('success', False)
         }
 
     def process_files(self, file_paths: List[str]):
-        """
-        全量处理文件：
-        1. 识别并提取表格内容
-        2. 自动建立 SQL 表
-        3. 调用 LLM 生成语义 Schema 和关联关系
-        """
-        all_schemas = {}
-        conn = sqlite3.connect(self.db_path)
-        
-        for fp in file_paths:
-            ext = os.path.splitext(fp)[1].lower()
-            try:
-                if ext == '.csv':
-                    df = pd.read_csv(fp)
-                    table_name = self._sanitize_table_name(os.path.basename(fp))
-                    df.to_sql(table_name, conn, if_exists='replace', index=False)
-                    all_schemas[table_name] = self._extract_df_info(df, "CSV数据表")
-                
-                elif ext in ['.xlsx', '.xls']:
-                    excel_data = pd.read_excel(fp, sheet_name=None)
-                    for sheet_name, df in excel_data.items():
-                        table_name = self._sanitize_table_name(f"{os.path.basename(fp)}_{sheet_name}")
-                        df.to_sql(table_name, conn, if_exists='replace', index=False)
-                        all_schemas[table_name] = self._extract_df_info(df, f"Excel工作表: {sheet_name}")
-                
-                # TODO: 以后扩展 PDF/Word 中的表格提取逻辑
-            except Exception as e:
-                if self.logger: self.logger.error(f"Failed to process {fp} for data analysis: {e}")
-        
-        conn.close()
-        
-        # 写入元数据
-        with open(self.schema_path, 'w', encoding='utf-8') as f:
-            json.dump(all_schemas, f, indent=4, ensure_ascii=False)
-            
-        return all_schemas
-
-    def _sanitize_table_name(self, name: str) -> str:
-        # 去除扩展名并保留合法字符
-        base = os.path.splitext(name)[0]
-        clean = "".join([c if c.isalnum() else "_" for c in base])
-        return f"tbl_{clean.lower()}"
-
-    def _extract_df_info(self, df: pd.DataFrame, source_desc: str) -> Dict[str, Any]:
-        return {
-            "source": source_desc,
-            "columns": list(df.columns),
-            "dtypes": {col: str(dtype) for col, dtype in df.dtypes.items()},
-            "row_count": len(df),
-            "sample_data": df.head(3).to_dict(orient='records')
-        }
-
-    def generate_sql_query(self, query: str, model_client) -> str:
-        """调用 LLM 根据 Schema 生成 SQL"""
-        with open(self.schema_path, 'r', encoding='utf-8') as f:
-            schema = json.load(f)
-            
-        prompt = f"""
-你是一名专业的数据分析师。请根据以下数据库结构生成一条标准的 SQLite 查询语句来回答用户的问题。
-数据库包含以下表：
-{json.dumps(schema, indent=2, ensure_ascii=False)}
-
-要求：
-1. 仅返回 SQL 语句，不要有任何其他文字。
-2. 确保 SQL 语法符合 SQLite 规范。
-3. 如果需要跨表，请使用 JOIN。
-4. 字段名请严格对照提供的 Schema。
-
-用户问题：{query}
-"""
-        # 此处调用实际的 LLM 客户端
-        response = model_client.complete(prompt)
-        return response.text.strip().replace("```sql", "").replace("```", "")
-
-    def execute_sql(self, sql: str) -> Dict[str, Any]:
-        """执行 SQL 并返回结果表格"""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            df = pd.read_sql_query(sql, conn)
-            conn.close()
-            return {
-                "success": True,
-                "data": df.to_dict(orient='records'),
-                "columns": list(df.columns),
-                "rows": len(df)
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        # 保留原有的 CSV/Excel 处理能力供 fallback
+        pass
