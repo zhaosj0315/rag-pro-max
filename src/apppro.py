@@ -713,7 +713,7 @@ with st.sidebar:
             st.markdown("**路径:**")
         with storage_col2:
             default_output_path = os.path.join(os.getcwd(), "vector_db_storage")
-            output_base = st.text_input("", value=default_output_path, help="知识库文件的保存位置", label_visibility="collapsed")
+            output_base = st.text_input("知识库存储路径", value=default_output_path, help="知识库文件的保存位置", label_visibility="collapsed")
         with storage_col3:
             if st.button("📂", help="打开存储目录", use_container_width=True, key="open_storage_dir"):
                 if output_base and os.path.exists(output_base):
@@ -791,7 +791,7 @@ with st.sidebar:
         with select_col1:
             st.markdown("**选择:**")
         with select_col2:
-            selected_nav = st.selectbox("", nav_options, index=default_idx, label_visibility="collapsed")
+            selected_nav = st.selectbox("选择知识库或对话模式", nav_options, index=default_idx, label_visibility="collapsed")
             
             # 自动启动纯对话模式 (v2.7.6) - 简化版本
             if selected_nav == "💬 纯对话模式 (Pure Chat)" and st.session_state.get('current_kb_id') != "pure_chat":
