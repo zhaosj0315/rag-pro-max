@@ -3011,7 +3011,123 @@ elif active_kb_name:
         c1.text_input("新名称", value=active_kb_name, key="new_name_input", on_change=apply_rename)
         c2.button("取消", on_click=lambda: st.session_state.update({"renaming": False}))
     else:
-        rename_col = doc_manager.render_statistics_overview(active_kb_name, stats)
+        dl_col, rename_col = doc_manager.render_statistics_overview(active_kb_name, stats)
+        with dl_col:
+            # 使用 popover 将下载选项折叠，节省空间
+            with st.popover("📥 数据导出", use_container_width=True, help="导出知识库的所有原始数据、AI加工成果及向量数据库"):
+                import io
+                import zipfile
+                import pandas as pd
+                import json
+                from datetime import datetime
+                
+                # --- A. 快速资产导出 ---
+                st.markdown("**🧠 核心知识 (轻量)**")
+                if doc_manager.manifest.get('files'):
+                    col_idx, col_rpt = st.columns(2)
+                    with col_idx:
+                        # 1. 深度 CSV 导出内容生成
+                        df_data = []
+                        for info in doc_manager.manifest['files']:
+                            df_data.append({
+                                "文件名": info.get('name'),
+                                "分类": info.get('category', '未分类'),
+                                "摘要": info.get('summary', '暂无'),
+                                "片段数": len(info.get('doc_ids', [])),
+                                "路径": info.get('file_path', '未知')
+                            })
+                        df = pd.DataFrame(df_data)
+                        csv_data = df.to_csv(index=False).encode('utf-8-sig')
+                        st.download_button(label="📊 CSV 索引", data=csv_data, file_name=f"{active_kb_name}_索引.csv", mime='text/csv', use_container_width=True, key=f"dl_csv_h_{active_kb_name}")
+
+                    with col_rpt:
+                        # 2. Markdown 报告内容生成
+                        report_md = f"# 知识库全量报告: {active_kb_name}\n\n- 导出时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                        for info in doc_manager.manifest['files']:
+                            report_md += f"## 📄 {info.get('name')}\n- **分类**: {info.get('category', '未分类')}\n- **摘要**: {info.get('summary', '暂无摘要')}\n\n---\n"
+                        st.download_button(label="📝 MD 报告", data=report_md, file_name=f"{active_kb_name}_报告.md", mime='text/markdown', use_container_width=True, key=f"dl_md_h_{active_kb_name}")
+
+                st.divider()
+                
+                # --- B. 终极全量包 ---
+                st.markdown("**🎁 终极资产导出**")
+                st.caption("包含报告、索引、元数据、原始文档及全量向量数据库")
+                
+                if st.button("🌟 一键生成全量资产包 (ZIP)", use_container_width=True, key=f"dl_all_in_one_{active_kb_name}", type="primary"):
+                    with st.status("正在进行全量数据打包 (含历史对话)...", expanded=True) as status:
+                        # 确保元数据已序列化
+                        manifest_json = json.dumps(doc_manager.manifest, indent=4, ensure_ascii=False)
+                        
+                        # 确保即使没有文件也能生成基础报告
+                        if 'report_md' not in locals():
+                            report_md = f"# 知识库全量报告: {active_kb_name}\n\n(无文件数据)"
+                        if 'csv_data' not in locals():
+                            csv_data = "文件名,分类,摘要,片段数,路径\n".encode('utf-8-sig')
+
+                        zip_buffer = io.BytesIO()
+                        with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+                            # 1. 知识报告与索引
+                            status.write("正在生成知识报告与索引...")
+                            zip_file.writestr("01_核心资产/知识摘要报告.md", report_md)
+                            zip_file.writestr("01_核心资产/结构化资产清单.csv", csv_data)
+                            
+                            # 2. 对话历史导出
+                            status.write("正在检索并格式化对话历史...")
+                            user_name = st.session_state.get('user', 'guest')
+                            history_dir = os.path.join("chat_histories", user_name)
+                            chat_history_md = f"# 对话历史备份: {active_kb_name}\n\n"
+                            
+                            has_chats = False
+                            if os.path.exists(history_dir):
+                                for chat_file in os.listdir(history_dir):
+                                    if chat_file.endswith(".json"):
+                                        try:
+                                            with open(os.path.join(history_dir, chat_file), 'r', encoding='utf-8') as f:
+                                                chat_data = json.load(f)
+                                                # 仅备份与当前知识库相关的对话
+                                                if chat_data.get('kb_name') == active_kb_name or active_kb_name in chat_file:
+                                                    has_chats = True
+                                                    # 存入原始 JSON 供迁移
+                                                    zip_file.write(os.path.join(history_dir, chat_file), arcname=f"02_历史对话/raw_json/{chat_file}")
+                                                    # 格式化 MD 供阅读
+                                                    chat_history_md += f"### 📅 会话: {chat_file.replace('.json','')}\n"
+                                                    for msg in chat_data.get('messages', []):
+                                                        role = "👤 用户" if msg['role'] == 'user' else "🤖 AI"
+                                                        chat_history_md += f"**{role}**: {msg['content']}\n\n"
+                                                    chat_history_md += "---\n\n"
+                                        except: continue
+                            
+                            if has_chats:
+                                zip_file.writestr("02_历史对话/对话纪要_可阅读.md", chat_history_md)
+                            
+                            # 3. 系统底层元数据
+                            zip_file.writestr("03_系统配置文件/底层元数据.json", manifest_json)
+                            
+                            # 4. 递归写入整个数据库目录 (包含向量库和源文件)
+                            status.write("正在打包向量数据库与物理文件...")
+                            target_dir = db_path
+                            for root, dirs, files in os.walk(target_dir):
+                                for file in files:
+                                    abs_path = os.path.join(root, file)
+                                    rel_path = os.path.relpath(abs_path, target_dir)
+                                    if "raw_files" in rel_path:
+                                        arc_path = os.path.join("04_原始文档", os.path.basename(rel_path))
+                                    else:
+                                        arc_path = os.path.join("05_向量引擎数据", rel_path)
+                                    zip_file.write(abs_path, arcname=arc_path)
+                        
+                        status.update(label="✅ 终极全量打包完成 (含对话记录)！", state="complete")
+                        st.download_button(
+                            label=f"⬇️ 立即下载全量资产包 (.zip)",
+                            data=zip_buffer.getvalue(),
+                            file_name=f"ULTIMATE_BACKUP_{active_kb_name}_{datetime.now().strftime('%Y%m%d')}.zip",
+                            mime="application/zip",
+                            use_container_width=True,
+                            key=f"dl_final_all_{active_kb_name}"
+                        )
+                
+                st.info("💡 提示：全量包可直接用于系统迁移或永久离线归档。")
+
         if rename_col.button("✏️", help="重命名"): 
             st.session_state.renaming = True
     

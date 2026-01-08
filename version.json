@@ -1,20 +1,19 @@
 {
-  "version": "3.2.7",
-  "release_date": "2026-01-05",
-  "build_number": "20260105",
+  "version": "3.3.9",
+  "release_date": "2026-01-08",
+  "build_number": "20260108",
   "status": "stable",
   "major_features": [
-    "图片上传OCR支持",
-    "联网搜索质量评估",
-    "用户体验优化",
-    "智能研究分析",
-    "持续优化系统"
+    "Ultimate All-in-One Asset Export (Full Mirror)",
+    "Cross-System Migration Support for Vector DB & Chats",
+    "Header-Integrated Compact Export UI",
+    "Unified Performance & Data Ownership Alignment"
   ],
   "compatibility": {
-    "python": ">=3.8",
+    "python": ">=3.9",
     "platforms": ["macOS", "Linux", "Windows"],
-    "dependencies_updated": "2026-01-05"
+    "dependencies_updated": "2026-01-08"
   },
   "changelog_url": "CHANGELOG.md",
-  "documentation_updated": "2026-01-05"
+  "documentation_updated": "2026-01-08"
 }
