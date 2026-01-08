@@ -1,0 +1,28 @@
+{
+  "admin": {
+    "name": "超级管理员",
+    "permissions": ["*"],
+    "description": "拥有全系统所有操作权限"
+  },
+  "standard_user": {
+    "name": "注册用户",
+    "permissions": [
+      "upload_files",
+      "paste_text",
+      "chat",
+      "export_own_data",
+      "delete_own_kb",
+      "create_kb",
+      "use_crawler",
+      "export_data"
+    ],
+    "description": "可构建自己的知识库，管理个人资产，支持网页抓取与全量导出"
+  },
+  "guest": {
+    "name": "访客",
+    "permissions": [
+      "chat"
+    ],
+    "description": "仅能查看公开知识库并进行对话"
+  }
+}

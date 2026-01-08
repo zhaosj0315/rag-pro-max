@@ -1863,6 +1863,8 @@ with st.sidebar:
                 
                 with confirm_col1:
                     if st.button("✅ 确认删除", type="primary", use_container_width=True):
+                        from src.auth.audit_logger import AuditLogger
+                        AuditLogger.log(st.session_state.get('user'), "DELETE_KB", f"永久删除了知识库: {current_kb_name}", status="warning")
                         kb_manager.delete(current_kb_name) # 确保实际调用删除逻辑
                         st.toast(f"🗑️ 已删除知识库: {current_kb_name}")
                         # 重置状态
@@ -3172,6 +3174,8 @@ elif active_kb_name:
                     st.warning("🔒 权限不足：仅管理员或授权用户可执行全量资产打包。")
                 
                 if st.button("🌟 一键生成全量资产包 (ZIP)", use_container_width=True, key=f"dl_all_in_one_{active_kb_name}", type="primary", disabled=not can_export_full):
+                    from src.auth.audit_logger import AuditLogger
+                    AuditLogger.log(current_user, "EXPORT_FULL_SNAPSHOT", f"导出知识库全量镜像: {active_kb_name}")
                     with st.status("正在进行全量数据打包 (含历史对话)...", expanded=True) as status:
                         # 确保元数据已序列化
                         manifest_json = json.dumps(doc_manager.manifest, indent=4, ensure_ascii=False)
