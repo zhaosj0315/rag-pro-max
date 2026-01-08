@@ -133,7 +133,7 @@ class DocumentManager:
         
         # 质量分析
         low_quality = len([f for f in self.manifest['files'] if len(f.get('doc_ids', [])) < 2])
-        large_files = len([f for f in self.manifest['files'] if 'MB' in f['size']])
+        large_files = len([f for f in self.manifest['files'] if f.get('size') and 'MB' in f['size']])
         empty_docs = len([f for f in self.manifest['files'] if len(f.get('doc_ids', [])) == 0])
         
         quality_status = "✅ 优秀" if low_quality == 0 and large_files == 0 and empty_docs == 0 else f"⚠️ {empty_docs}空 {low_quality}低质"

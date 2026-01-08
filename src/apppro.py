@@ -673,6 +673,14 @@ if 'app_initialized' not in st.session_state:
     logger.success("应用初始化完成")
 
 # ==========================================
+# 登录拦截逻辑 (管理为先)
+# ==========================================
+from src.auth.login_page import render_login_page
+if 'logged_in' not in st.session_state or not st.session_state.logged_in:
+    render_login_page()
+    st.stop()
+
+# ==========================================
 # 2. 本地持久化与工具函数
 # ==========================================
 CONFIG_FILE = "rag_config.json"
@@ -692,10 +700,37 @@ with st.sidebar:
     # 渲染移动端视图适配器 (响应式预览)
     MobileAdapter.render_view_selector()
     
-    # 横向标签页布局
-    tab_main, tab_roles, tab_config, tab_monitor, tab_help = st.tabs(["🏠 主页", "🎭 角色", "⚙️ 配置", "📊 监控", "❓ 帮助"])
+    # 横向标签页布局 (v3.4: 管理为先)
+    tab_labels = ["🏠 主页", "🎭 角色", "⚙️ 配置", "📊 监控", "❓ 帮助"]
+    if st.session_state.get('role') == 'admin':
+        tab_labels.append("👤 用户")
     
+    tabs = st.tabs(tab_labels)
+    
+    # 动态分配 tab 变量
+    if st.session_state.get('role') == 'admin':
+        tab_main, tab_roles, tab_config, tab_monitor, tab_help, tab_user = tabs
+    else:
+        tab_main, tab_roles, tab_config, tab_monitor, tab_help = tabs
+    
+    # 渲染管理 Tab (仅 Admin)
+    if st.session_state.get('role') == 'admin':
+        with tab_user:
+            from src.auth.user_management import render_admin_management
+            render_admin_management()
+
+    # --- 退出登录按钮 (位于侧边栏底部) ---
+    st.sidebar.markdown("---")
+    if st.sidebar.button("🚪 退出当前账号", use_container_width=True):
+        st.session_state.logged_in = False
+        st.session_state.user = None
+        st.session_state.role = None
+        st.rerun()
+
     with tab_main:
+        # ... 原有代码保持不变 ...
+        # (定位到知识库控制台)
+
 
         # 知识库控制台标题与一键配置完全一行化
         console_col1, console_col2, console_col3 = st.columns([4, 1, 0.5])
@@ -733,12 +768,40 @@ with st.sidebar:
         existing_kbs = (setattr(kb_manager, "base_path", output_base), kb_manager.list_all())[1]
 
         # --- 核心导航 ---
-        base_kbs = kb_manager.list_all()
+        all_base_kbs = kb_manager.list_all()
+        
+        # --- 权限与可见性过滤 ---
+        from src.auth.session_manager import get_visible_kbs
+        from src.auth.permission_manager import permission_manager
+        
+        current_user = st.session_state.get('user', 'guest_user')
+        current_role = st.session_state.get('role', 'guest')
+        
+        base_kbs = get_visible_kbs(current_user, current_role, all_base_kbs)
         
         # 为每个知识库创建带复选框的选项
         from src.config.manifest_manager import ManifestManager
-        nav_options = ["➕ 新建知识库...", "💬 纯对话模式 (Pure Chat)"]
+        nav_options = []
+        
+        # 权限检查：是否可以新建知识库
+        can_create = permission_manager.has_permission(current_user, "create_kb")
+        if can_create:
+            nav_options.append("➕ 新建知识库...")
+            
+        nav_options.append("💬 纯对话模式 (Pure Chat)")
+        
         for kb in base_kbs:
+            # --- 前端脱敏: 剥离用户名前缀 ---
+            display_name = kb
+            from src.auth.user_auth import load_users
+            all_known_users = load_users()
+            
+            if "_" in kb:
+                parts = kb.split("_", 1)
+                # 如果前半部分是已知用户，则剥离
+                if parts[0] in all_known_users:
+                    display_name = parts[1]
+
             # 获取统计信息 (v2.7.6: 增强信息展示)
             try:
                 kb_path = os.path.join(output_base, kb)
@@ -753,7 +816,25 @@ with st.sidebar:
             # 检查是否被选中
             is_selected = st.session_state.get(f"kb_check_{kb}", False)
             checkbox_symbol = "☑️" if is_selected else "☐"
-            nav_options.append(f"{checkbox_symbol} 📂 {kb}{info_str}")
+            
+            # --- Admin 视角增强: 显示所有者 ---
+            owner_info = ""
+            if current_role == 'admin':
+                try:
+                    kb_path = os.path.join(output_base, kb)
+                    manifest_path = ManifestManager.get_path(kb_path)
+                    with open(manifest_path, 'r', encoding='utf-8') as f:
+                        m_data = json.load(f)
+                        owner = m_data.get('owner', 'admin(历史)')
+                        owner_info = f" | 👤{owner}"
+                except:
+                    # 备选：从文件名解析前缀
+                    if "_" in kb:
+                        owner_info = f" | 👤{kb.split('_')[0]}"
+                    else:
+                        owner_info = " | 👤admin"
+            
+            nav_options.append(f"{checkbox_symbol} 📂 {display_name}{info_str}{owner_info}")
         
         # 保存选中的知识库列表
         selected_kbs = [kb for kb in base_kbs if st.session_state.get(f"kb_check_{kb}", False)]
@@ -994,6 +1075,14 @@ with st.sidebar:
             )
             
             if source_mode == "📂 文件上传":
+                # 权限拦截 (实时校验)
+                from src.auth.permission_manager import permission_manager
+                current_user = st.session_state.get('user', 'guest_user')
+                can_upload = permission_manager.has_permission(current_user, "upload_files")
+                
+                if not can_upload:
+                    st.warning("🔒 权限不足：您当前的角色没有上传文件的权限。")
+                
                 # 添加上传引导
                 from src.utils.user_guidance import show_guidance
                 show_guidance("upload")
@@ -1004,7 +1093,8 @@ with st.sidebar:
                     accept_multiple_files=True, 
                     key="uploader",
                     label_visibility="collapsed",
-                    help="支持格式: PDF, DOCX, TXT, MD, Excel"
+                    help="支持格式: PDF, DOCX, TXT, MD, Excel",
+                    disabled=not can_upload
                 )
                 
                 # 恢复路径输入
@@ -1013,12 +1103,20 @@ with st.sidebar:
                     "本地路径",
                     placeholder="例如: /Users/name/Documents/docs",
                     key="manual_path_input",
-                    label_visibility="collapsed"
+                    label_visibility="collapsed",
+                    disabled=not can_upload
                 )
                 if manual_path and os.path.exists(manual_path):
                     st.session_state.uploaded_path = manual_path
             
             elif source_mode == "📝 粘贴文本":
+                # 权限拦截 (实时校验)
+                from src.auth.permission_manager import permission_manager
+                current_user = st.session_state.get('user', 'guest_user')
+                can_upload = permission_manager.has_permission(current_user, "upload_files")
+                
+                if not can_upload:
+                    st.warning("🔒 权限不足：您当前的角色没有粘贴文本的权限。")
                 # 只在首次加载时注入CSS，避免重复注入
                 if 'paste_css_injected' not in st.session_state:
                     st.markdown("""
@@ -1293,6 +1391,14 @@ with st.sidebar:
         
         if is_create_mode:
             if source_mode == "🔗 网址抓取":
+                # 权限拦截 (实时校验)
+                from src.auth.permission_manager import permission_manager
+                current_user = st.session_state.get('user', 'guest_user')
+                can_crawl = permission_manager.has_permission(current_user, "use_crawler")
+                
+                if not can_crawl:
+                    st.warning("🔒 权限不足：您当前的角色没有抓取网页的权限。")
+                
                 # --- 网址抓取模式 ---
                 # 设置同步状态
                 st.session_state.crawl_input_mode = "url"
@@ -2142,7 +2248,7 @@ def jump_to_knowledge_base(kb_name: str, output_base: str):
     logger.log("知识库跳转", "complete", f"✅ 跳转函数执行完成: {kb_name}")
 
 
-def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extract_metadata=False, generate_summary=False, force_reindex=False):
+def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extract_metadata=False, generate_summary=False, force_reindex=False, owner=None):
     """处理知识库逻辑 (Stage 4.2 - 使用 IndexBuilder)"""
     global logger
     
@@ -2157,7 +2263,6 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
     if throttle_info.get('action') == 'reject':
         st.warning(f"⚠️ 系统资源紧张，请稍后再试")
         logger.warning(f"资源不足，暂停处理: CPU={cpu}%, MEM={mem}%")
-        time.sleep(2)
         return
 
     # 设置嵌入模型
@@ -2218,70 +2323,62 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
             logger.info(f"   {info_msg}")
         elif msg_type == "warning":
             warn_msg = args[0]
-            status_container.write(f"   ⚠️  {warn_msg}")
-            logger.warning(f"   ⚠️  {warn_msg}")
-    
-    # 获取源路径
-    current_target_path = st.session_state.get('uploaded_path') or st.session_state.get('path_input')
-    if not current_target_path or not os.path.exists(current_target_path):
-        status_container.update(label="❌ 路径无效", state="error")
-        logger.error(f"❌ 路径无效: {current_target_path} (uploaded_path={st.session_state.get('uploaded_path')}, path_input={st.session_state.get('path_input')})")
-        raise ValueError(f"路径无效: {current_target_path} - 请检查文件是否已上传或路径是否正确")
-    
-    # 使用 IndexBuilder 构建索引
+            status_container.warning(f"   {warn_msg}")
+            logger.warning(f"   {warn_msg}")
+        elif msg_type == "error":
+            err_msg = args[0]
+            status_container.error(f"   {err_msg}")
+            logger.error(f"   {err_msg}")
+
+    # 使用 IndexBuilder 处理
+    from src.processors.index_builder import IndexBuilder
     builder = IndexBuilder(
         kb_name=kb_name,
         persist_dir=persist_dir,
         embed_model=embed,
         embed_model_name=embed_model,
-        use_ocr=use_ocr,  # 传递OCR选项
-        extract_metadata=extract_metadata,  # 传递性能选项
-        generate_summary=generate_summary,  # 传递摘要选项
+        use_ocr=use_ocr,
+        extract_metadata=extract_metadata,
+        generate_summary=generate_summary,
         logger=logger
     )
     
+    # 执行处理
     result = builder.build(
-        source_path=current_target_path,
+        source_path=st.session_state.get('uploaded_path'),
         force_reindex=force_reindex,
         action_mode=action_mode,
         status_callback=status_callback
     )
     
-    if not result.success:
-        status_container.update(label=f"❌ 处理失败: {result.error}", state="error")
-        logger.error(f"❌ 处理失败: {result.error}")
-        raise ValueError(result.error)
-    
-    # 保存索引
-    if result.index:
-        result.index.storage_context.persist(persist_dir=persist_dir)
-        logger.success(f"💾 索引已保存到: {persist_dir}")
-    
-    # 更新进度
-    prog_bar.progress(100)
-    
+    # --- 补丁: 写入所有权信息 ---
+    if owner:
+        try:
+            from src.config.manifest_manager import ManifestManager
+            manifest = ManifestManager.load(persist_dir)
+            manifest['owner'] = owner
+            ManifestManager.save(persist_dir, manifest)
+            logger.info(f"✅ 已记录所有权: {owner}")
+        except Exception as e:
+            logger.warning(f"⚠️ 记录所有权失败: {e}")
+
     # 计算耗时
     duration = time.time() - start_time
+    prog_bar.progress(100)
+    status_container.update(label=f"✅ 知识库 '{kb_name}' 处理完成", state="complete", expanded=True)
+    
+    # 统计信息
     logger.separator("处理完成")
     logger.success(f"✅ 知识库 '{kb_name}' 处理完成")
     logger.info(f"📊 统计: {result.file_count} 个文件, {result.doc_count} 个文档片段")
     logger.info(f"⏱️  耗时: {duration:.1f} 秒")
     
-    logger.log("SUCCESS", f"知识库处理完成: {kb_name}, 文档数: {result.doc_count}", stage="知识库处理")
-    
-    status_container.update(label=f"✅ 知识库 '{kb_name}' 处理完成", state="complete", expanded=True)
-    
     # 跳转到新创建的知识库
     jump_to_knowledge_base(kb_name, output_base)
     
-    # 显示成功消息并自动跳转
     st.success(f"🎉 知识库 '{kb_name}' 创建成功！正在跳转...")
+    time.sleep(1)
     st.rerun()
-    
-    # 资源清理
-    resource_guard.throttler.cleanup_memory()
-    logger.info("🧹 资源已清理")
-    
     return result.doc_count
 
 # ==========================================
@@ -2921,13 +3018,21 @@ if btn_start:
             logger.debug(st.session_state.get('uploaded_path'))
             logger.debug(bool(uploaded_files) if 'uploaded_files' in locals() else 'Not in locals')
 
+            # --- 核心：重名冲突解决与所有权绑定 ---
+            current_user = st.session_state.get('user', 'admin')
+            if is_create_mode:
+                # 仅在新建时强制加前缀，追加模式保持原名
+                if not final_kb_name.startswith(f"{current_user}_"):
+                    final_kb_name = f"{current_user}_{final_kb_name}"
+
             process_knowledge_base_logic(
                 kb_name=final_kb_name,
                 action_mode=action_mode,
                 use_ocr=current_use_ocr,
                 extract_metadata=current_extract_metadata,
                 generate_summary=current_generate_summary,
-                force_reindex=current_force_reindex
+                force_reindex=current_force_reindex,
+                owner=current_user # 明确传递所有者
             )
             # st.session_state.current_nav 等跳转逻辑已移至 process_knowledge_base_logic 内部的 jump_to_knowledge_base
             
@@ -3058,7 +3163,15 @@ elif active_kb_name:
                 st.markdown("**🎁 终极资产导出**")
                 st.caption("包含报告、索引、元数据、原始文档及全量向量数据库")
                 
-                if st.button("🌟 一键生成全量资产包 (ZIP)", use_container_width=True, key=f"dl_all_in_one_{active_kb_name}", type="primary"):
+                # 权限拦截逻辑 (实时校验)
+                from src.auth.permission_manager import permission_manager
+                current_user = st.session_state.get('user', 'guest_user')
+                can_export_full = permission_manager.has_permission(current_user, "export_data")
+                
+                if not can_export_full:
+                    st.warning("🔒 权限不足：仅管理员或授权用户可执行全量资产打包。")
+                
+                if st.button("🌟 一键生成全量资产包 (ZIP)", use_container_width=True, key=f"dl_all_in_one_{active_kb_name}", type="primary", disabled=not can_export_full):
                     with st.status("正在进行全量数据打包 (含历史对话)...", expanded=True) as status:
                         # 确保元数据已序列化
                         manifest_json = json.dumps(doc_manager.manifest, indent=4, ensure_ascii=False)
