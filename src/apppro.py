@@ -1,4 +1,9 @@
 # 初始化环境配置
+import warnings
+# 极其早地抑制 Pydantic 警告，防止第三方库加载时触发
+warnings.filterwarnings("ignore", category=UserWarning, message=".*UnsupportedFieldAttributeWarning.*")
+warnings.filterwarnings("ignore", message=".*validate_default.*")
+
 # 环境变量设置 - 减少启动警告
 __version__ = "3.2.7"
 
