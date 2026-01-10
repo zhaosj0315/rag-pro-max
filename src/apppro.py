@@ -5497,33 +5497,44 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     # [JIT/语义嗅探] 激活 3.5.0 分析引擎
                     if not os.path.exists(schema_path):
                         import glob
+                        # 扫描知识库目录下的原始数据文件
                         data_files = glob.glob(os.path.join(db_path, "*.csv")) + \
                                      glob.glob(os.path.join(db_path, "*.xlsx")) + \
                                      glob.glob(os.path.join(db_path, "*.xls"))
                         
-                        # 强制判定：如果文件名带 csv 且无 schema，或者有物理文件，则启动建模
-                        should_activate_da = len(data_files) > 0 or "csv" in active_kb_name.lower() or "excel" in active_kb_name.lower()
+                        # 判定逻辑：有物理文件，或者名称中带有数据特征
+                        is_data_kb = "csv" in active_kb_name.lower() or "excel" in active_kb_name.lower()
                         
-                        if should_activate_da:
+                        if data_files or is_data_kb:
                             try:
                                 from src.processors.data_analyst import DataAnalystEngine
                                 from src.utils.model_manager import load_llm_model
-                                st.toast("📊 嗅探到数据特征，正在激活 3.5.0 分析引擎...", icon="🧠")
+                                
+                                logger.info(f"🔎 [v3.5.1] 发现数据特征，尝试唤醒分析引擎...")
                                 da_engine = DataAnalystEngine(db_path, logger)
                                 llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
                                 
                                 if data_files:
+                                    logger.info(f"📂 [v3.5.1] 正在对物理文件进行建模: {data_files}")
                                     da_engine.process_files(data_files)
                                 else:
-                                    # [语义恢复] 如果没物理文件，从索引中提取 Schema
-                                    status_container.write("🔍 物理文件缺失，正在从语义索引中恢复表结构...")
-                                    docs, _ = builder._read_documents(db_path, 0, None)
-                                    if docs:
-                                        da_engine.extract_schema_from_docs(docs, llm)
+                                    # 如果没物理文件，尝试从已有的语义索引中恢复 (使用临时 Reader)
+                                    logger.info(f"🧩 [v3.5.1] 物理文件缺失，尝试通过语义嗅探恢复结构...")
+                                    from llama_index.core import SimpleDirectoryReader
+                                    try:
+                                        # 尝试读取 persist_dir 里的文本 (如果有缓存)
+                                        reader = SimpleDirectoryReader(input_dir=db_path)
+                                        docs = reader.load_data()
+                                        if docs:
+                                            da_engine.extract_schema_from_docs(docs, llm)
+                                    except:
+                                        pass
                                 
-                                logger.success(f"✅ [v3.5.0] 语义建模/恢复完成")
+                                if os.path.exists(schema_path):
+                                    logger.success(f"✨ [v3.5.1] 数据分析引擎激活成功")
+                                    st.toast("✅ 已成功激活 3.5.0 分析模式", icon="📊")
                             except Exception as e:
-                                logger.warning(f"⚠️ [v3.5.0] 引擎激活失败: {e}")
+                                logger.warning(f"❌ [v3.5.1] 引擎唤醒失败: {e}")
 
                     if os.path.exists(schema_path):
                         from src.processors.data_analyst import DataAnalystEngine
@@ -5531,69 +5542,76 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         da_engine = DataAnalystEngine(db_path, logger)
                         llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
                         
-                        # 执行业务推演与 SQL 统计
-                        logger.info(f"🔮 [v3.5.0] 正在生成深度分析报告...")
-                        analysis_res = da_engine.execute_analysis(final_prompt, llm)
+                        # [核心修复] 兼容性获取仿真养料
+                        context_text = ""
+                        try:
+                            ce = st.session_state.get('chat_engine')
+                            if ce:
+                                # 针对 ContextChatEngine 的特殊提取方式
+                                if hasattr(ce, "_context_builder"):
+                                    nodes = ce._context_builder.get_nodes(final_prompt)
+                                    context_text = "\n".join([n.get_content() for n in nodes])
+                                elif hasattr(ce, "retrieve"):
+                                    nodes = ce.retrieve(final_prompt)
+                                    context_text = "\n".join([n.node.get_text() for n in nodes])
+                                
+                                if context_text:
+                                    logger.info(f"🧬 [Mode: 📊 DataAnalyst] 已抓取到 {len(context_text)} 字符的仿真养料")
+                        except Exception as e:
+                            logger.warning(f"⚠️ [Mode: 📊 DataAnalyst] 仿真上下文获取异常: {e}")
                         
-                        # 仅当成功生成并执行了 SQL 时才拦截
+                        # 执行业务推演与 SQL 统计
+                        logger.info(f"🔮 [Mode: 📊 DataAnalyst] 启动深度分析逻辑推演...")
+                        analysis_res = da_engine.execute_analysis(final_prompt, llm, context_text=context_text)
+                        
+                        # 仅当成功生成并执行了 SQL（或仿真成功）时才拦截
                         if analysis_res.get("success", False):
-                            # 1. 显示逻辑推演报告
-                            st.markdown("---")
-                            st.markdown("### 📊 3.5.0 业务深度分析报告")
+                            logger.success(f"⚡ [Mode: 📊 DataAnalyst] 分析链路贯通，开始渲染 3.5.1 智能看板")
                             
-                            # 布局优化：左侧报告，右侧指标
-                            col1, col2 = st.columns([3, 1])
-                            with col1:
+                            # 1. 渲染标题与状态
+                            sim_suffix = " (语义仿真)" if analysis_res.get("is_simulated") else ""
+                            st.markdown(f"### 📊 3.5.1 智能数据看板{sim_suffix}")
+                            
+                            # 2. 核心指标卡 (st.metric)
+                            import pandas as pd
+                            df_res = pd.DataFrame(analysis_res["data"])
+                            
+                            if not df_res.empty:
+                                cols = st.columns(min(len(df_res.columns), 4))
+                                numeric_cols = df_res.select_dtypes(include=['number']).columns
+                                for i, col_name in enumerate(numeric_cols[:4]):
+                                    with cols[i % 4]:
+                                        val = df_res[col_name].iloc[0]
+                                        st.metric(label=col_name, value=f"{val:,.2f}" if isinstance(val, (int, float)) else val)
+
+                            # 3. 深度分析报告
+                            with st.container():
                                 st.markdown(analysis_res["logic"])
                             
-                            with col2:
-                                # 提取数值作为指标卡 (st.metric)
-                                import pandas as pd
-                                df_res = pd.DataFrame(analysis_res["data"])
-                                if not df_res.empty:
-                                    # 尝试寻找数值列展示
-                                    numeric_cols = df_res.select_dtypes(include=['number']).columns
-                                    if len(numeric_cols) > 0:
-                                        val = df_res[numeric_cols[0]].iloc[0]
-                                        label = numeric_cols[0]
-                                        st.metric(label=f"关键指标: {label}", value=f"{val:,.2f}")
-                            
-                            # 2. 显示执行的 SQL
-                            with st.expander("🛠️ 查看执行指令 (SQL)", expanded=False):
-                                st.code(analysis_res["sql"], language="sql")
-                            
-                            # 3. 结果数据与可视化
-                            if not df_res.empty:
-                                st.markdown(f"✅ **实时查询成功**：返回 {len(df_res)} 条数据")
-                                # 4. [增强] 自动可视化看板
-                                with st.container():
+                            # 4. 可视化看板
+                            if not df_res.empty and len(df_res) > 0:
+                                with st.expander("📈 数据可视化展现", expanded=True):
                                     if len(df_res.columns) >= 2:
+                                        # 自动推断 X 轴和 Y 轴
                                         st.bar_chart(df_res.set_index(df_res.columns[0]))
                                     else:
-                                        st.bar_chart(df_res)
-                                
+                                        st.line_chart(df_res)
+                            
+                            # 5. 执行指令与明细
+                            with st.expander("🛠️ 执行指令与数据明细", expanded=False):
+                                st.code(analysis_res["sql"], language="sql")
                                 st.dataframe(df_res, use_container_width=True)
                             
-                            # 5. [增强] 业务蓝图建议 - 升级为可点击按钮
-                            blueprint_path = os.path.join(db_path, "business_blueprint.json")
-                            if os.path.exists(blueprint_path):
-                                try:
-                                    with open(blueprint_path, 'r') as f:
-                                        bp_data = json.load(f)
-                                    dims = bp_data.get("analysis_dimensions", [])
-                                    if dims:
-                                        st.markdown("#### 💡 进阶业务分析建议")
-                                        for i, dim in enumerate(dims[:3]):
-                                            if st.button(f"🔍 深度探测: {dim}", key=f"da_sug_{i}"):
-                                                st.session_state.messages.append({"role": "user", "content": f"执行分析: {dim}"})
-                                                st.rerun()
-                                except:
-                                    pass
-                            
-                            # 归档并彻底阻断 RAG 流程
-                            st.session_state.messages.append({"role": "assistant", "content": analysis_res["logic"]})
+                            # 6. 归档到消息列表并阻断 RAG 流程
+                            st.session_state.messages.append({
+                                "role": "assistant", 
+                                "content": analysis_res["logic"],
+                                "is_data_report": True,
+                                "data": analysis_res["data"],
+                                "sql": analysis_res["sql"]
+                            })
                             st.session_state.is_processing = False
-                            st.rerun()                        # else: 失败或无SQL，自动回退到下方 RAG 流程
+                            st.rerun()
 
                     # --- 原始 RAG 逻辑 (仅当不是分析模式或分析失败时执行) ---
                     start_time = time.time()

@@ -3,8 +3,9 @@
         "password_hash": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
         "role": "admin",
         "created_at": "2025-12-14T06:57:52.927469",
-        "last_login": "2026-01-10T14:53:43.366509",
-        "is_active": true
+        "last_login": "2026-01-10T23:04:10.152637",
+        "is_active": true,
+        "storage_quota_mb": 9999
     },
     "zhaosj": {
         "password_hash": "f867aff52a68a971ab89d2d7f9110406ac1613c98413c5c9b21922f8895b9d8c",

@@ -87,9 +87,10 @@ class DataAnalystEngine:
                 "error": str(e)
             }
 
-    def execute_analysis(self, query: str, model_client) -> Dict[str, Any]:
+    def execute_analysis(self, query: str, model_client, context_text: str = "") -> Dict[str, Any]:
         """
         [主动分析版] 强制执行 SQL 并返回结构化结果
+        支持语义仿真：如果物理数据库不可用，则利用上下文进行模拟计算
         """
         if not os.path.exists(self.schema_path):
              return {"success": False, "logic": "未找到数据结构定义，请先上传数据或文档。"}
@@ -97,7 +98,6 @@ class DataAnalystEngine:
         with open(self.schema_path, 'r', encoding='utf-8') as f:
             schemas = json.load(f)
         
-        # 获取当前时间，辅助 SQL 生成
         from datetime import datetime
         current_date = datetime.now().strftime("%Y-%m-%d")
         
@@ -105,81 +105,82 @@ class DataAnalystEngine:
         sql_prompt = f"""
 你是一名资深 SQLite 专家。基于以下表结构，请生成一条 SQL 来回答用户的问题。
 当前日期: {current_date}
-
 表结构：{json.dumps(schemas, ensure_ascii=False)}
-
 用户问题：{query}
 
 要求：
-1. 必须返回 SQL，不要反问用户。
-2. SQL 必须包裹在 [SQL_START] 和 [SQL_END] 之间。
-3. 如果需要计算总额，请使用 SUM()；如果需要计数，请使用 COUNT()。
-4. 使用 SQLite 语法。
-5. **重要**：如果用户查询"最近"、"上周"等时间范围，请优先基于表中的数据时间分布生成查询（例如：如果数据都是2024年的，不要只查2026年）。可以先查询 MAX(date) 作为参考锚点。
-6. 如果问题涉及表中不存在的字段（如单价），请尝试用现有字段计算（如 总额/数量）或仅查询现有字段。
+1. 必须返回 SQL，包裹在 [SQL_START] 和 [SQL_END] 之间。
+2. 尽量使用聚合函数 (SUM, COUNT, AVG) 来回答统计类问题。
+3. 如果是多表查询，请使用 JOIN。
+4. 仅输出一条 SQL。
 """
-        try:
-            # 兼容不同类型的 model_client
-            if hasattr(model_client, 'complete'):
-                sql_res = model_client.complete(sql_prompt).text
-            else:
-                # ChatClient 适配
-                msgs = [{"role": "user", "content": sql_prompt}]
-                sql_res = model_client.chat(model=model_client.model, messages=msgs).message.content
-        except Exception as e:
-            return {"success": False, "logic": f"模型调用失败: {e}"}
-
         sql_query = ""
-        if "[SQL_START]" in sql_res:
-            sql_query = sql_res.split("[SQL_START]")[1].split("[SQL_END]")[0].strip()
-        elif "SELECT" in sql_res.upper():
-             # Fallback regex
-             import re
-             match = re.search(r'```sql\s*(.*?)\s*```', sql_res, re.DOTALL | re.IGNORECASE)
-             if match:
-                 sql_query = match.group(1).strip()
-             else:
-                 # 尝试直接提取 Select 开头
-                 lines = sql_res.split('\n')
-                 for line in lines:
-                     if line.strip().upper().startswith('SELECT'):
-                         sql_query = line.strip()
-                         break
-        
-        # 2. 尝试执行
+        try:
+            res = model_client.complete(sql_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":sql_prompt}]).message.content
+            if "[SQL_START]" in res:
+                sql_query = res.split("[SQL_START]")[1].split("[SQL_END]")[0].strip()
+            elif "SELECT" in res.upper():
+                import re
+                match = re.search(r'```sql\s*(.*?)\s*```', res, re.DOTALL | re.IGNORECASE)
+                if match:
+                    sql_query = match.group(1).strip()
+        except: pass
+
+        # 2. 执行与仿真
         execution_result = {"success": False, "data": []}
+        is_simulated = False
+        
         if sql_query:
             execution_result = self.execute_sql(sql_query)
-        else:
-            # 如果没生成 SQL，可能是不需要查库的闲聊
-            return {"success": False, "logic": sql_res, "sql": ""}
-        
-        # 3. 最终业务解读
-        summary_prompt = f"""
-根据以下 SQL 执行结果，请为用户提供一份简洁的业务分析报告：
+            
+            # 如果执行失败且有上下文，启动仿真
+            if not execution_result["success"] and context_text:
+                is_simulated = True
+                sim_prompt = f"""
+你是一名数据分析师。数据库暂时无法访问，请根据提供的【参考数据】和【SQL指令】，模拟计算出查询结果。
 SQL: {sql_query}
-结果数据: {json.dumps(execution_result.get('data', [])[:20], ensure_ascii=False, default=str)}
-问题: {query}
+参考数据: {context_text[:3000]}
+请仅输出一个 JSON 数组，例如: [{"列1": "值1", "列2": 100}]
+"""
+                try:
+                    sim_res = model_client.complete(sim_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":sim_prompt}]).message.content
+                    import re
+                    json_match = re.search(r'(\[.*\])', sim_res, re.DOTALL)
+                    if json_match:
+                        execution_result = {"success": True, "data": json.loads(json_match.group(1))}
+                except: pass
 
-报告结构：
-- [💡 逻辑推演]：说明查询了哪些表及字段。
-- [📊 核心发现]：用一句话总结数据发现。
-- [📈 仿真建议]：说明后续可以关注的业务指标。
+        if not execution_result["success"] or not sql_query:
+            return {"success": False, "logic": "分析引擎未能获取有效数据", "sql": sql_query}
+
+        # 3. 最终业务解读 (v3.5.1 标准格式)
+        summary_prompt = f"""
+你是一名资深商业分析师。请根据以下 SQL 和查询结果，撰写一份专业的分析报告。
+问题: {query}
+SQL: {sql_query}
+数据: {json.dumps(execution_result['data'][:15], ensure_ascii=False)}
+{"(注意：这是基于上下文仿真的数据)" if is_simulated else ""}
+
+报告必须包含以下模块：
+### 💡 核心结论
+(一句话总结核心数据发现)
+
+### 📊 数据洞察
+(详细解读数据背后的业务逻辑，至少2点)
+
+### 🚀 行动建议
+(基于数据给出的具体业务改进建议)
 """
         try:
-            if hasattr(model_client, 'complete'):
-                final_report = model_client.complete(summary_prompt).text
-            else:
-                msgs = [{"role": "user", "content": summary_prompt}]
-                final_report = model_client.chat(model=model_client.model, messages=msgs).message.content
-        except:
-            final_report = "无法生成分析报告"
+            final_report = model_client.complete(summary_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":summary_prompt}]).message.content
+        except: final_report = "分析报告生成失败"
         
         return {
             "sql": sql_query,
-            "data": execution_result.get('data', []),
+            "data": execution_result['data'],
             "logic": final_report,
-            "success": execution_result.get('success', False)
+            "success": True,
+            "is_simulated": is_simulated
         }
 
     def execute_sql(self, sql: str) -> Dict[str, Any]:
