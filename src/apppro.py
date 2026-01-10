@@ -4,6 +4,13 @@ import warnings
 warnings.filterwarnings("ignore", category=UserWarning, message=".*UnsupportedFieldAttributeWarning.*")
 warnings.filterwarnings("ignore", message=".*validate_default.*")
 
+# [v3.9.2] 多进程安全入口保护
+if __name__ != "__main__":
+    import sys
+    # 如果不是主进程（即 Streamlit 启动的进程），则不执行下方复杂的 UI 和环境逻辑
+    # 这样可以防止 multiprocessing spawn 出来的子进程递归加载整个应用
+    sys.exit(0)
+
 # 环境变量设置 - 减少启动警告
 __version__ = "3.2.7"
 

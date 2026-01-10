@@ -204,10 +204,16 @@ SQL逻辑: {sql_query}
                         if hasattr(chunk, 'delta') and chunk.delta: yield chunk.delta
                         elif hasattr(chunk, 'message') and hasattr(chunk.message, 'content'): yield chunk.message.content
                         else: yield str(chunk)
-                except: yield "报告生成异常"
+                except:
+                    # 容错：如果流式调用失败，回退到同步
+                    res = model_client.complete(summary_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":summary_prompt}]).message.content
+                    for char in res: yield char
             else:
-                res = model_client.complete(summary_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":summary_prompt}]).message.content
-                for char in res: yield char
+                # 原生不支持流式的情况
+                try:
+                    res = model_client.complete(summary_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":summary_prompt}]).message.content
+                    for char in res: yield char
+                except: yield "报告生成异常"
 
         return {
             "sql": sql_query,
