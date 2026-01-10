@@ -4458,6 +4458,34 @@ for msg_idx, msg in enumerate(state.get_messages()):
                     with st.expander("🧐 查看审计细节"):
                         st.write(res_meta.get('critique'))
 
+            # [v3.5.3] 历史回溯：恢复数据分析智能看板
+            if msg.get("is_data_report") and msg.get("data"):
+                try:
+                    import pandas as pd
+                    df_hist = pd.DataFrame(msg["data"])
+                    if not df_hist.empty:
+                        st.markdown("---")
+                        # 渲染指标卡
+                        cols = st.columns(min(len(df_hist.columns), 4))
+                        numeric_cols = df_hist.select_dtypes(include=['number']).columns
+                        for i, col_name in enumerate(numeric_cols[:4]):
+                            with cols[i % 4]:
+                                val = df_hist[col_name].iloc[0]
+                                st.metric(label=col_name, value=f"{val:,.2f}" if isinstance(val, (int, float)) else val)
+                        
+                        # 渲染历史图表
+                        with st.expander("📈 历史可视化视图", expanded=False):
+                            if len(df_hist.columns) >= 2:
+                                st.bar_chart(df_hist.set_index(df_hist.columns[0]))
+                            else:
+                                st.line_chart(df_hist)
+                        
+                        # 渲染历史 SQL
+                        if msg.get("sql"):
+                            with st.expander("🛠️ 历史执行指令", expanded=False):
+                                st.code(msg["sql"], language="sql")
+                except: pass
+
         # 显示角色标签 (v2.7.4)
         if role == "assistant" and msg.get("prompt_role"):
             st.markdown(f"""
@@ -5603,13 +5631,30 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                                 st.code(analysis_res["sql"], language="sql")
                                 st.dataframe(df_res, use_container_width=True)
                             
-                            # 6. 归档到消息列表并阻断 RAG 流程
+                            # 6. [v3.5.3] 生成针对数据分析的追问推荐
+                            try:
+                                from src.chat.unified_suggestion_engine import get_unified_suggestion_engine
+                                engine = get_unified_suggestion_engine(active_kb_name)
+                                context_text = f"用户提问: {final_prompt}\n数据分析结果: {analysis_res['logic']}"
+                                da_sugs = engine.generate_suggestions(
+                                    context=context_text,
+                                    source_type='chat',
+                                    query_engine=st.session_state.chat_engine if st.session_state.get('chat_engine') else None,
+                                    num_questions=3
+                                )
+                                if da_sugs:
+                                    st.session_state.suggestions_history = da_sugs[:3]
+                                    st.session_state.current_suggestions = da_sugs[:3]
+                            except: pass
+
+                            # 7. 归档到消息列表并阻断 RAG 流程
                             st.session_state.messages.append({
                                 "role": "assistant", 
                                 "content": analysis_res["logic"],
                                 "is_data_report": True,
                                 "data": analysis_res["data"],
-                                "sql": analysis_res["sql"]
+                                "sql": analysis_res["sql"],
+                                "suggestions": st.session_state.get('current_suggestions', [])
                             })
                             st.session_state.is_processing = False
                             st.rerun()
