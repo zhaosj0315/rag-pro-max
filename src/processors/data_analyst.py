@@ -88,7 +88,6 @@ class DataAnalystEngine:
     def execute_analysis(self, query: str, model_client, context_text: str = "") -> Dict[str, Any]:
         """
         [主动分析版] 强制执行 SQL 并返回结构化结果
-        v3.5.5 修复缩进错误
         """
         # 0. 数据库自愈检查
         try:
@@ -230,7 +229,7 @@ SQL 指令: {sql_query}
                 file_name = metadata.get("file_name", "")
                 
                 if file_name.endswith('.csv') or (',' in text and '\n' in text):
-                    table_name = os.path.splitext(file_name)[0] if file_name else f"table_{node_id[:8]}"
+                    table_name = os.path.splitext(file_name)[0] if file_name else f"table_{{node_id[:8]}}"
                     table_name = re.sub(r'[^a-zA-Z0-9_]', '_', table_name)
                     
                     try:
@@ -238,7 +237,8 @@ SQL 指令: {sql_query}
                         df.to_sql(table_name, conn, index=False, if_exists='replace')
                         found_data = True
                         if self.logger: self.logger.info(f"✅ [v3.5.2] 已从索引成功找回并恢复表: {table_name}")
-                    except: continue
+                    except:
+                        continue
             
             conn.close()
             if not found_data and self.logger:
