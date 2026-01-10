@@ -49,27 +49,43 @@ class DataAnalystEngine:
         except:
             return {"error": "语义解析失败"}
 
-    def infer_business_blueprint(self, schemas: Dict[str, Any], model_client) -> Dict[str, Any]:
+    def infer_business_blueprint(self, schemas: Any, model_client) -> Dict[str, Any>:
         """
         业务推演：推导出业务场景、关联路径和分析建议。
         """
-        prompt = f"""
+        try:
+            # 1. 安全序列化 schemas (防止 unhashable type 等错误)
+            if isinstance(schemas, str):
+                schemas_str = schemas
+            else:
+                # 使用 default=str 处理无法序列化的对象
+                schemas_str = json.dumps(schemas, indent=2, ensure_ascii=False, default=str)
+            
+            prompt = f"""
 请根据以下数据库结构推导业务全景图：
-{json.dumps(schemas, indent=2, ensure_ascii=False)}
+{schemas_str}
 
 请输出 JSON：
 1. business_scenario: 业务系统描述。
 2. core_logic: 核心业务流转逻辑。
 3. analysis_dimensions: 推荐的 5 个业务分析维度。
 """
-        response = model_client.complete(prompt)
-        try:
+            response = model_client.complete(prompt)
             blueprint = json.loads(response.text.strip().replace("```json", "").replace("```", ""))
+            
             with open(self.blueprint_path, 'w', encoding='utf-8') as f:
                 json.dump(blueprint, f, indent=4, ensure_ascii=False)
             return blueprint
-        except:
-            return {{}}
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"业务推演失败: {e}")
+            # 返回兜底数据，防止下游崩溃
+            return {
+                "business_scenario": "自动推演失败",
+                "core_logic": "无法识别",
+                "analysis_dimensions": ["通用分析"],
+                "error": str(e)
+            }
 
     def execute_analysis(self, query: str, model_client) -> Dict[str, Any]:
         """

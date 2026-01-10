@@ -1,5 +1,10 @@
 # 更新日志 (CHANGELOG)
 
+## [v3.4.6] - 2026-01-10 (Hotfix)
+
+### 🐛 Bug Fixes
+- **🔥 数据分析引擎修复**: 修复了 `DataAnalystEngine` 在业务蓝图推演时因 JSON 序列化异常导致的 `unhashable type: 'dict'` 崩溃问题。增强了 `infer_business_blueprint` 的鲁棒性，增加了兜底返回机制。
+
 ## [v3.4.5] - 2026-01-10
 
 ### 🚀 New Features (底层重构)
