@@ -1,9 +1,10 @@
 {
-  "version": "3.9.1",
+  "version": "3.9.6",
   "release_date": "2026-01-11",
-  "build_number": "20260111.7",
+  "build_number": "20260111.8",
   "status": "stable",
   "major_features": [
+    "Data Analyst 11.0: Manual Data Analysis Control Center",
     "Data Analyst 10.5: Diagnostic & Predictive Insight Engine",
     "Data Analyst 10.0: Gemini Workspace (Twin-Column Layout)",
     "Data Analyst 9.5: Multi-Table Join Path Reconstruction",
