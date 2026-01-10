@@ -1,13 +1,13 @@
 {
-  "version": "3.7.5",
+  "version": "3.9.1",
   "release_date": "2026-01-11",
-  "build_number": "20260111.6",
+  "build_number": "20260111.7",
   "status": "stable",
   "major_features": [
+    "Data Analyst 10.5: Diagnostic & Predictive Insight Engine",
+    "Data Analyst 10.0: Gemini Workspace (Twin-Column Layout)",
     "Data Analyst 9.5: Multi-Table Join Path Reconstruction",
-    "Data Analyst 9.0: Smart Viz 2.0 (Multi-Dimensional Analysis)",
-    "Data Analyst 8.6: Deep Streaming Protocol Compatibility",
-    "Data Analyst 7.5: Auto Data Recovery & SQL Calibration"
+    "Data Analyst 9.0: Smart Viz 3.0 (Plotly High-End Charts)"
   ],
   "compatibility": {
     "python": ">=3.9",

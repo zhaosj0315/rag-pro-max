@@ -1,5 +1,18 @@
 # 更新日志 (CHANGELOG)
 
+## [v3.9.1] - 2026-01-11 (Analysis Lab & Artifacts Release)
+
+### 🚀 New Features
+- **🏛️ Data Analyst 10.0 (分析实验室架构)**: 
+  - **Artifacts 工作台**: 引入双栏“双子座”布局，右侧常驻分析工作台，自动沉淀关键结论与图表，支持跨问题对比。
+  - **决策智能 (AI Insights)**: 报告逻辑从描述性进化为诊断性，新增“异常归因分析 (Why)”与“趋势预测 (What's Next)”模块。
+- **🎨 Smart Viz 3.0 (极光看板)**: 
+  - **Plotly 深度集成**: 全面启用 Plotly 交互式图表，支持渐变色、鼠标悬停、局部缩放及多系列多维展示。
+  - **容器代理渲染**: 采用全新的 Container Proxy 技术，彻底解决长对话流中的 UI 闪烁与缩进崩溃。
+
+### 🐛 Bug Fixes
+- **🛡️ 稳定性加固**: 修复了工作台渲染单列数据时的 `IndexError` 越界问题，及大规模代码重构引发的 `IndentationError`。
+
 ## [v3.7.5] - 2026-01-11 (Multi-Table Deep Dive Release)
 
 ### 🚀 New Features
