@@ -80,6 +80,10 @@ import re
 import subprocess
 from urllib.parse import urlparse
 
+# 引入日志模块 (提前初始化防止后续逻辑报错)
+from src.app_logging import LogManager
+logger = LogManager()
+
 # 🧹 启动时自动清理临时文件
 from src.common.utils import cleanup_temp_files
 
@@ -255,9 +259,6 @@ from llama_index.core.schema import Document
 # 导入自定义嵌入
 from src.custom_embeddings import create_custom_embedding
 
-# 引入日志模块
-from src.app_logging import LogManager
-logger = LogManager()
 # terminal_logger 已被 logger 替代
 from src.chat_utils_improved import generate_follow_up_questions_safe as generate_follow_up_questions
 from src.chat.unified_suggestion_engine import get_unified_suggestion_engine

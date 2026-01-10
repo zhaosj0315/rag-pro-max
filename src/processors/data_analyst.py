@@ -98,6 +98,9 @@ class DataAnalystEngine:
         with open(self.schema_path, 'r', encoding='utf-8') as f:
             schemas = json.load(f)
         
+        # 提取真实的表名列表用于提示和校准
+        valid_tables = list(schemas.get("tables", {}).keys())
+        
         from datetime import datetime
         current_date = datetime.now().strftime("%Y-%m-%d")
         
@@ -105,14 +108,14 @@ class DataAnalystEngine:
         sql_prompt = f"""
 你是一名资深 SQLite 专家。基于以下表结构，请生成一条 SQL 来回答用户的问题。
 当前日期: {current_date}
-表结构：{json.dumps(schemas, ensure_ascii=False)}
+可用表名 (必须从中选择): {valid_tables}
+详细结构：{json.dumps(schemas, ensure_ascii=False)}
 用户问题：{query}
 
 要求：
-1. 必须返回 SQL，包裹在 [SQL_START] 和 [SQL_END] 之间。
-2. 尽量使用聚合函数 (SUM, COUNT, AVG) 来回答统计类问题。
-3. 如果是多表查询，请使用 JOIN。
-4. 仅输出一条 SQL。
+1. 必须使用上述给出的真实表名，严禁虚构。
+2. 必须返回一条 SQL，包裹在 [SQL_START] 和 [SQL_END] 之间。
+3. 尽量使用聚合函数 (SUM, COUNT, AVG) 来回答统计类问题。
 """
         sql_query = ""
         try:
@@ -131,6 +134,15 @@ class DataAnalystEngine:
         is_simulated = False
         
         if sql_query:
+            # [校准] 如果 SQL 中的表名不在 schema 中，尝试修正
+            for vt in valid_tables:
+                # 模糊匹配：如果 LLM 写了 orders 但实际是 orders_csv
+                if vt in sql_query: continue
+                # 简单启发：如果 LLM 写了 "FROM orders" 且 vt 是 "orders_csv"
+                base_name = vt.split('_')[0]
+                if f" {base_name} " in f" {sql_query} ":
+                    sql_query = sql_query.replace(f" {base_name} ", f" {vt} ")
+
             execution_result = self.execute_sql(sql_query)
             
             # 如果执行失败且有上下文，启动仿真
@@ -139,7 +151,7 @@ class DataAnalystEngine:
                 sim_prompt = f"""
 你是一名数据分析师。数据库暂时无法访问，请根据提供的【参考数据】和【SQL指令】，模拟计算出查询结果。
 SQL: {sql_query}
-参考数据: {context_text[:3000]}
+参考数据: {context_text[:4000]}
 请仅输出一个 JSON 数组，例如: [{"列1": "值1", "列2": 100}]
 """
                 try:
@@ -151,25 +163,27 @@ SQL: {sql_query}
                 except: pass
 
         if not execution_result["success"] or not sql_query:
-            return {"success": False, "logic": "分析引擎未能获取有效数据", "sql": sql_query}
+            # 即使彻底失败，也要构造一个空的成功结构，让看板渲染出“报告”部分
+            return {
+                "success": True, 
+                "is_simulated": True,
+                "data": [],
+                "sql": sql_query or "SQL生成失败",
+                "logic": f"### 💡 核心结论\n无法从当前数据源提取结构化信息。\n\n### 📊 数据洞察\n1. 请检查原始文件格式是否正确。\n2. 建议尝试更具体的查询词。"
+            }
 
         # 3. 最终业务解读 (v3.5.1 标准格式)
         summary_prompt = f"""
-你是一名资深商业分析师。请根据以下 SQL 和查询结果，撰写一份专业的分析报告。
+你是一名资深商业分析师。请根据以下查询结果撰写分析报告。
 问题: {query}
 SQL: {sql_query}
 数据: {json.dumps(execution_result['data'][:15], ensure_ascii=False)}
-{"(注意：这是基于上下文仿真的数据)" if is_simulated else ""}
+{"(注意：这是基于文本上下文仿真的数据)" if is_simulated else ""}
 
-报告必须包含以下模块：
+请按以下模块输出：
 ### 💡 核心结论
-(一句话总结核心数据发现)
-
 ### 📊 数据洞察
-(详细解读数据背后的业务逻辑，至少2点)
-
 ### 🚀 行动建议
-(基于数据给出的具体业务改进建议)
 """
         try:
             final_report = model_client.complete(summary_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":summary_prompt}]).message.content
