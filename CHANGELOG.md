@@ -1,5 +1,12 @@
 # 更新日志 (CHANGELOG)
 
+## [v3.5.6] - 2026-01-11 (Generator Protocol Fix)
+
+### 🚀 New Features
+- **🛡️ Data Analyst 8.6 (深度流式协议兼容)**: 
+  - **流式架构对齐**: 修复了 LlamaIndex 模型层级 `stream_chat` 返回生成器协议不一致的问题，确保不同后端模型下流式看板均能稳定打字输出。
+  - **对象智能识别**: 自动识别并解构 `ChatResponse` 与 `delta` 对象，增强了系统对本地 Ollama 及其它 Provider 的鲁棒性。
+
 ## [v3.5.5] - 2026-01-11 (Smart Viz & Streaming Release)
 
 ### 🚀 New Features
