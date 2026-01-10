@@ -17,7 +17,7 @@ class DataAnalystEngine:
         """
         [v3.7.0 企业级升级] 语义化提取：从海量文档中识别表结构及【业务关联图谱】。
         """
-        all_text = "\n".join([d.text for d in docs[:30]]) # 增加采样范围以支持更多表
+        all_text = "\n".join([d.text for d in docs[:30]]) 
         
         prompt = f"""
 你是一名资深首席架构师。请从以下文档中提取数据库模型。
@@ -40,29 +40,55 @@ class DataAnalystEngine:
         except:
             return {"error": "语义模型解析失败"}
 
+    def infer_business_blueprint(self, schemas: Any, model_client) -> Dict[str, Any]:
+        """
+        [接口恢复] 业务蓝图推演：对接 v3.7.0 架构图谱引擎。
+        """
+        try:
+            if isinstance(schemas, str):
+                schemas_str = schemas
+            else:
+                schemas_str = json.dumps(schemas, indent=2, ensure_ascii=False, default=str)
+            
+            prompt = f"""
+请根据以下数据库架构图谱推导业务全景图：
+{schemas_str}
+
+请输出 JSON：
+1. business_scenario: 业务系统描述。
+2. core_logic: 核心业务流转逻辑。
+3. analysis_dimensions: 推荐的 5 个业务分析维度。
+"""
+            response = model_client.complete(prompt)
+            blueprint = json.loads(response.text.strip().replace("```json", "").replace("```", ""))
+            with open(self.blueprint_path, 'w', encoding='utf-8') as f:
+                json.dump(blueprint, f, indent=4, ensure_ascii=False)
+            return blueprint
+        except Exception as e:
+            if self.logger: self.logger.error(f"业务蓝图推演失败: {e}")
+            return {
+                "business_scenario": "自动推演失败",
+                "core_logic": "无法识别",
+                "analysis_dimensions": ["通用数据分析"],
+                "error": str(e)
+            }
+
     def _get_relevant_tables(self, query: str, schemas: Dict[str, Any]) -> List[str]:
-        """[核心黑科技] 针对百表规模的动态剪枝：根据问题筛选最相关的子集表"""
+        """针对百表规模的动态剪枝"""
         all_tables = schemas.get("tables", {})
         if len(all_tables) <= 8:
             return list(all_tables.keys())
-        
-        # 语义过滤逻辑
         relevant = []
         query_words = query.lower()
         for t_name, info in all_tables.items():
             if t_name.lower() in query_words or any(w in info.get("desc", "").lower() for w in query_words if len(w)>1):
                 relevant.append(t_name)
-        
-        # 补全一级关联表
         rels = schemas.get("relationships", [])
         extra = []
         for r in rels:
-            if r["source"] in relevant and r["target"] not in relevant:
-                extra.append(r["target"])
-            elif r["target"] in relevant and r["source"] not in relevant:
-                extra.append(r["source"])
-        
-        return list(set(relevant + extra))[:10] # 限制注意力范围
+            if r["source"] in relevant and r["target"] not in relevant: extra.append(r["target"])
+            elif r["target"] in relevant and r["source"] not in relevant: extra.append(r["source"])
+        return list(set(relevant + extra))[:10]
 
     def execute_analysis(self, query: str, model_client, context_text: str = "") -> Dict[str, Any]:
         """
@@ -74,7 +100,6 @@ class DataAnalystEngine:
         with open(self.schema_path, 'r', encoding='utf-8') as f:
             full_schemas = json.load(f)
         
-        # 1. 动态路由：从上百个表中找出最关键的几个
         relevant_table_names = self._get_relevant_tables(query, full_schemas)
         pruned_schemas = {
             "tables": {name: full_schemas["tables"][name] for name in relevant_table_names if name in full_schemas["tables"]},
@@ -84,19 +109,13 @@ class DataAnalystEngine:
         from datetime import datetime
         current_date = datetime.now().strftime("%Y-%m-%d")
         
-        # 2. 精准 SQL 生成
         sql_prompt = f"""你是一名资深数据专家。
 当前日期: {current_date}
 目标业务子集模型：
 {json.dumps(pruned_schemas, ensure_ascii=False)}
-
 用户问题：{query}
+要求：仅返回一条 SQL，包裹在 [SQL_START] 和 [SQL_END] 之间。"""
 
-要求：
-1. 仅使用上述提供的表名进行 JOIN。
-2. 即使无数据，也请根据字段注释编写逻辑严密的 SQL。
-3. 包裹在 [SQL_START] 和 [SQL_END] 之间。
-"""
         sql_query = ""
         try:
             res = model_client.complete(sql_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":sql_prompt}]).message.content
@@ -108,32 +127,24 @@ class DataAnalystEngine:
                 if match: sql_query = match.group(1).strip()
         except: pass
 
-        # 3. 运行与架构仿真
         execution_result = {"success": False, "data": []}
         is_simulated = False
-        
         if sql_query:
-            # 数据库自愈检查
             try:
                 conn = sqlite3.connect(self.db_path)
                 if not conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall():
                     self._recover_data_from_docstore()
                 conn.close()
             except: pass
-
             execution_result = self.execute_sql(sql_query)
             
-            # 如果没真实数据，启动“架构仿真模式”
             if (not execution_result["success"] or not execution_result["data"]):
                 is_simulated = True
-                sim_prompt = f"""
-你是一名资深建模专家。当前处于【架构仿真模式】。
-数据库无真实数据，请严格根据【表结构】、【业务注释】和【SQL】逻辑，模拟出 5 条符合业务常识的 JSON 数据。
+                sim_prompt = f"""你是一名资深建模专家。当前处于【架构仿真模式】。
+数据库无真实数据，请严格根据【表结构】和【SQL】逻辑，模拟出 5 条符合业务常识的 JSON 数据。
 SQL: {sql_query}
 表模型: {json.dumps(pruned_schemas, ensure_ascii=False)}
-参考养料: {context_text[:2000]}
-请仅输出 JSON 数组。
-"""
+请仅输出 JSON 数组。"""
                 try:
                     sim_res = model_client.complete(sim_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":sim_prompt}]).message.content
                     import re
@@ -145,19 +156,11 @@ SQL: {sql_query}
         if not execution_result["success"] or not sql_query:
              return {"success": False, "logic": "架构推演失败，请完善表结构文档。"}
 
-        # 4. 准备流式报告
-        summary_prompt = f"""
-你是一名资深商业分析师。请针对以下【架构仿真结果】撰写分析报告。
+        summary_prompt = f"""你是一名资深商业分析师。针对以下【架构仿真结果】撰写报告。
 问题: {query}
-SQL逻辑: {sql_query}
+SQL: {sql_query}
 模拟数据: {json.dumps(execution_result['data'][:10], ensure_ascii=False)}
-注意：这是基于业务模型文档进行的【逻辑推演】。
-
-报告必须包含：
-### 💡 核心逻辑推演
-### 📊 模拟指标透视
-### 🚀 业务架构建议
-"""
+按格式输出：### 💡 核心逻辑推演\n### 📊 模拟指标透视\n### 🚀 业务架构建议"""
         
         def report_generator():
             if hasattr(model_client, 'stream_chat'):
@@ -203,11 +206,9 @@ SQL逻辑: {sql_query}
                         df = pd.read_csv(io.StringIO(text))
                         df.to_sql(table_name, conn, index=False, if_exists='replace')
                         found_data = True
-                        if self.logger: self.logger.info(f"✅ [v3.5.2] 已从索引成功找回并恢复表: {table_name}")
                     except: continue
             conn.close()
-        except Exception as e:
-            if self.logger: self.logger.error(f"❌ [v3.5.2] 数据恢复失败: {e}")
+        except: pass
 
     def execute_sql(self, sql: str) -> Dict[str, Any]:
         try:
@@ -226,20 +227,16 @@ SQL逻辑: {sql_query}
     def process_files(self, file_paths: List[str]) -> Dict[str, Any]:
         import re
         try:
-            if os.path.exists(self.db_path):
-                os.remove(self.db_path)
+            if os.path.exists(self.db_path): os.remove(self.db_path)
             conn = sqlite3.connect(self.db_path)
             processed_tables = {}
             for file_path in file_paths:
                 file_name = os.path.basename(file_path)
                 table_name = os.path.splitext(file_name)[0]
                 table_name = re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', table_name)
-                if file_path.endswith('.csv'):
-                    df = pd.read_csv(file_path)
-                elif file_path.endswith(('.xls', '.xlsx')):
-                    df = pd.read_excel(file_path)
-                else:
-                    continue
+                if file_path.endswith('.csv'): df = pd.read_csv(file_path)
+                elif file_path.endswith(('.xls', '.xlsx')): df = pd.read_excel(file_path)
+                else: continue
                 df.columns = [re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', str(c)) for c in df.columns]
                 df.to_sql(table_name, conn, index=False, if_exists='replace')
                 processed_tables[table_name] = {
@@ -251,6 +248,5 @@ SQL逻辑: {sql_query}
                 json.dump({"tables": processed_tables}, f, indent=4, ensure_ascii=False)
             return {"success": True, "tables": list(processed_tables.keys())}
         except Exception as e:
-            if self.logger:
-                self.logger.error(f"文件处理入库失败: {e}")
+            if self.logger: self.logger.error(f"文件处理入库失败: {e}")
             return {"success": False, "error": str(e)}
