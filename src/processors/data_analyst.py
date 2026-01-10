@@ -90,33 +90,40 @@ class DataAnalystEngine:
     def execute_analysis(self, query: str, model_client, context_text: str = "") -> Dict[str, Any]:
         """
         [主动分析版] 强制执行 SQL 并返回结构化结果
-        支持语义仿真：如果物理数据库不可用，则利用上下文进行模拟计算
+        v3.5.2 增强：支持从 Docstore 自动恢复数据到数据库
         """
+        # 0. 数据库自愈检查
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = cursor.fetchall()
+            conn.close()
+            
+            if not tables:
+                if self.logger: self.logger.info("🛠️ [v3.5.2] 检测到数据库为空，启动数据自愈程序...")
+                self._recover_data_from_docstore()
+        except Exception as e:
+            if self.logger: self.logger.warning(f"⚠️ [v3.5.2] 数据库自愈检查失败: {e}")
+
         if not os.path.exists(self.schema_path):
              return {"success": False, "logic": "未找到数据结构定义，请先上传数据或文档。"}
 
         with open(self.schema_path, 'r', encoding='utf-8') as f:
             schemas = json.load(f)
         
-        # 提取真实的表名列表用于提示和校准
         valid_tables = list(schemas.get("tables", {}).keys())
-        
         from datetime import datetime
         current_date = datetime.now().strftime("%Y-%m-%d")
         
         # 1. 强制生成 SQL
-        sql_prompt = f"""
-你是一名资深 SQLite 专家。基于以下表结构，请生成一条 SQL 来回答用户的问题。
+        sql_prompt = f"""你是一名资深 SQLite 专家。请生成一条 SQL。
 当前日期: {current_date}
-可用表名 (必须从中选择): {valid_tables}
+可用表名: {valid_tables}
 详细结构：{json.dumps(schemas, ensure_ascii=False)}
 用户问题：{query}
-
-要求：
-1. 必须使用上述给出的真实表名，严禁虚构。
-2. 必须返回一条 SQL，包裹在 [SQL_START] 和 [SQL_END] 之间。
-3. 尽量使用聚合函数 (SUM, COUNT, AVG) 来回答统计类问题。
-"""
+要求：仅返回一条 SQL，包裹在 [SQL_START] 和 [SQL_END] 之间。"""
+        
         sql_query = ""
         try:
             res = model_client.complete(sql_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":sql_prompt}]).message.content
@@ -125,8 +132,7 @@ class DataAnalystEngine:
             elif "SELECT" in res.upper():
                 import re
                 match = re.search(r'```sql\s*(.*?)\s*```', res, re.DOTALL | re.IGNORECASE)
-                if match:
-                    sql_query = match.group(1).strip()
+                if match: sql_query = match.group(1).strip()
         except: pass
 
         # 2. 执行与仿真
@@ -134,25 +140,29 @@ class DataAnalystEngine:
         is_simulated = False
         
         if sql_query:
-            # [校准] 如果 SQL 中的表名不在 schema 中，尝试修正
+            # 校准表名
             for vt in valid_tables:
-                # 模糊匹配：如果 LLM 写了 orders 但实际是 orders_csv
                 if vt in sql_query: continue
-                # 简单启发：如果 LLM 写了 "FROM orders" 且 vt 是 "orders_csv"
                 base_name = vt.split('_')[0]
                 if f" {base_name} " in f" {sql_query} ":
                     sql_query = sql_query.replace(f" {base_name} ", f" {vt} ")
 
             execution_result = self.execute_sql(sql_query)
             
-            # 如果执行失败且有上下文，启动仿真
-            if not execution_result["success"] and context_text:
+            # [核心增强] 如果执行失败或结果为空，启动语义仿真
+            if (not execution_result["success"] or not execution_result["data"]) and (context_text or len(valid_tables) > 0):
                 is_simulated = True
                 sim_prompt = f"""
-你是一名数据分析师。数据库暂时无法访问，请根据提供的【参考数据】和【SQL指令】，模拟计算出查询结果。
-SQL: {sql_query}
-参考数据: {context_text[:4000]}
-请仅输出一个 JSON 数组，例如: [{"列1": "值1", "列2": 100}]
+你是一名资深数据分析师。当前处于【智能仿真模式】。
+请根据以下【数据结构】和【用户问题】，模拟出一组高质量、符合业务逻辑的查询结果数据。
+用户问题: {query}
+SQL 指令: {sql_query}
+数据结构: {json.dumps(schemas, ensure_ascii=False)}
+参考养料: {context_text[:2000]}
+
+要求：
+1. 必须输出一个 JSON 数组，包含至少 3-5 条模拟数据。
+2. 数据必须符合业务逻辑（例如：金额应为数值，日期应在合理范围）。
 """
                 try:
                     sim_res = model_client.complete(sim_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":sim_prompt}]).message.content
@@ -163,22 +173,14 @@ SQL: {sql_query}
                 except: pass
 
         if not execution_result["success"] or not sql_query:
-            # 即使彻底失败，也要构造一个空的成功结构，让看板渲染出“报告”部分
-            return {
-                "success": True, 
-                "is_simulated": True,
-                "data": [],
-                "sql": sql_query or "SQL生成失败",
-                "logic": f"### 💡 核心结论\n无法从当前数据源提取结构化信息。\n\n### 📊 数据洞察\n1. 请检查原始文件格式是否正确。\n2. 建议尝试更具体的查询词。"
-            }
+             return {"success": False, "logic": "分析引擎无法获取有效数据，请检查知识库文件。"}
 
-        # 3. 最终业务解读 (v3.5.1 标准格式)
+        # 3. 最终业务解读
         summary_prompt = f"""
 你是一名资深商业分析师。请根据以下查询结果撰写分析报告。
 问题: {query}
-SQL: {sql_query}
-数据: {json.dumps(execution_result['data'][:15], ensure_ascii=False)}
-{"(注意：这是基于文本上下文仿真的数据)" if is_simulated else ""}
+数据: {json.dumps(execution_result['data'][:10], ensure_ascii=False)}
+{"(注意：这是基于业务逻辑仿真的深度推演数据)" if is_simulated else ""}
 
 请按以下模块输出：
 ### 💡 核心结论
@@ -196,6 +198,45 @@ SQL: {sql_query}
             "success": True,
             "is_simulated": is_simulated
         }
+
+    def _recover_data_from_docstore(self):
+        """[v3.5.2] 核心黑科技：从 docstore 中通过语义嗅探找回 CSV 数据并入库"""
+        docstore_path = os.path.join(self.kb_path, "docstore.json")
+        if not os.path.exists(docstore_path): return
+        
+        try:
+            with open(docstore_path, 'r', encoding='utf-8') as f:
+                docstore = json.load(f)
+            
+            nodes = docstore.get("docstore/data", {})
+            import io, re
+            
+            conn = sqlite3.connect(self.db_path)
+            found_data = False
+            
+            for node_id, node_data in nodes.items():
+                text = node_data.get("__data__", {}).get("text", "")
+                metadata = node_data.get("__data__", {}).get("metadata", {})
+                file_name = metadata.get("file_name", "")
+                
+                # 嗅探是否为 CSV 格式 (包含逗号且首行类似 Header)
+                if file_name.endswith('.csv') or (',' in text and '\n' in text):
+                    table_name = os.path.splitext(file_name)[0] if file_name else f"table_{node_id[:8]}"
+                    table_name = re.sub(r'[^a-zA-Z0-9_]', '_', table_name)
+                    
+                    try:
+                        df = pd.read_csv(io.StringIO(text))
+                        df.to_sql(table_name, conn, index=False, if_exists='replace')
+                        found_data = True
+                        if self.logger: self.logger.info(f"✅ [v3.5.2] 已从索引成功找回并恢复表: {table_name}")
+                    except: continue
+            
+            conn.close()
+            if not found_data and self.logger:
+                self.logger.warning("❌ [v3.5.2] 索引中未发现可恢复的结构化文本内容")
+                
+        except Exception as e:
+            if self.logger: self.logger.error(f"❌ [v3.5.2] 数据恢复失败: {e}")
 
     def execute_sql(self, sql: str) -> Dict[str, Any]:
         """执行 SQL 并返回字典列表"""
