@@ -7,8 +7,9 @@ import os
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-SUPPORTED_FORMATS = {'.pdf', '.txt', '.docx', '.md', '.xlsx', '.csv', '.json', '.pptx', '.ppt',
-                     '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif'}
+SUPPORTED_FORMATS = {'.pdf', '.txt', '.docx', '.md', '.xlsx', '.xls', '.csv', '.json', '.pptx', '.ppt', 
+                     '.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff', '.webp',
+                     '.html', '.xml', '.py', '.js', '.sh', '.yaml', '.yml', '.sql', '.log'}
 
 class FileProcessResult:
     def __init__(self):
@@ -162,26 +163,30 @@ def _load_single_file(file_info, use_ocr=True):
             read_mode = 'fast'
         
         elif ext in ['.xlsx', '.xls']:
-            # Excel文件：快速读取（只读文本内容，不解析格式）
+            # Excel文件：快速读取（只读文本内容）
             try:
-                import openpyxl
-                wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
-                text_parts = []
-                for sheet in wb.worksheets[:5]:  # 只读前5个sheet
-                    for row in sheet.iter_rows(max_row=1000, values_only=True):  # 每个sheet最多1000行
-                        row_text = ' '.join([str(cell) for cell in row if cell is not None])
-                        if row_text.strip():
-                            text_parts.append(row_text)
-                wb.close()
-                text = '\n'.join(text_parts)
-                # [修改] 注入 base_metadata 并显式设置 doc_id
+                if ext == '.xlsx':
+                    import openpyxl
+                    wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+                    text_parts = []
+                    for sheet in wb.worksheets[:5]:
+                        for row in sheet.iter_rows(max_row=1000, values_only=True):
+                            row_text = ' '.join([str(cell) for cell in row if cell is not None])
+                            if row_text.strip(): text_parts.append(row_text)
+                    wb.close()
+                    text = '\n'.join(text_parts)
+                else:
+                    # .xls 格式使用 pandas/xlrd
+                    import pandas as pd
+                    df = pd.read_excel(file_path)
+                    text = df.to_string(index=False)
+                
                 docs = [Document(text=text, metadata=base_metadata, id_=str(uuid.uuid4()))]
                 read_mode = 'fast'
             except:
-                # 失败则用慢速模式
+                # 失败则用标准 SimpleDirectoryReader
                 from llama_index.core import SimpleDirectoryReader
                 docs = SimpleDirectoryReader(input_files=[file_path]).load_data()
-                # [修改] 注入 base_metadata 并确保 ID
                 for d in docs: 
                     d.metadata.update(base_metadata)
                     if not d.doc_id: d.doc_id = str(uuid.uuid4())
