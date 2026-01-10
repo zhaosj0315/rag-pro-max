@@ -1,31 +1,51 @@
-order_id,user_id,total_amount,status,order_date,payment_method,shipping_fee
-101,1,15500.0,completed,2025-01-20,Credit Card,0.0
-102,1,300.0,shipped,2025-01-21,Alipay,10.0
-103,2,1200.0,completed,2025-01-22,WeChat Pay,50.0
-104,3,150.0,cancelled,2025-01-23,Credit Card,15.0
-105,4,800.0,completed,2025-01-24,Alipay,0.0
-106,5,300.0,completed,2025-01-25,WeChat Pay,10.0
-107,6,500.0,shipped,2025-01-26,Credit Card,20.0
-108,1,150.0,completed,2025-02-01,Alipay,10.0
-109,2,22000.0,completed,2025-02-05,Credit Card,0.0
-110,4,300.0,returned,2025-02-10,WeChat Pay,15.0
-111,7,1300.0,completed,2025-02-12,Alipay,0.0
-112,8,2500.0,pending,2025-02-15,Credit Card,0.0
-113,1,800.0,completed,2025-02-20,Alipay,0.0
-114,2,300.0,shipped,2025-02-22,WeChat Pay,10.0
-115,5,1100.0,completed,2025-02-25,Credit Card,0.0
-116,3,600.0,completed,2025-03-01,Alipay,20.0
-117,4,7000.0,completed,2025-03-02,WeChat Pay,0.0
-118,7,4500.0,shipped,2025-03-03,Credit Card,0.0
-119,8,300.0,completed,2025-03-04,Alipay,10.0
-120,6,2200.0,completed,2025-03-05,WeChat Pay,0.0
-121,11,2500.0,completed,2025-03-06,Alipay,0.0
-122,12,15000.0,completed,2025-03-07,Credit Card,0.0
-123,13,200.0,completed,2025-03-08,Search,10.0
-124,14,3500.0,shipped,2025-03-09,Social,0.0
-125,15,3000.0,completed,2025-03-10,Ads,0.0
-126,20,4500.0,completed,2025-03-11,Direct,0.0
-127,1,2200.0,completed,2025-03-12,Alipay,0.0
-128,2,600.0,completed,2025-03-13,WeChat Pay,10.0
-129,4,3000.0,completed,2025-03-14,Credit Card,0.0
-130,7,800.0,returned,2025-03-15,Alipay,10.0
+order_id,user_id,total_amount,status,order_date,payment_method,shipping_fee,promo_id
+101,1,15500.0,completed,2025-01-20,Credit Card,0.0,PR001
+102,1,300.0,shipped,2025-01-21,Alipay,10.0,
+103,2,1200.0,completed,2025-01-22,WeChat Pay,50.0,PR002
+104,3,150.0,cancelled,2025-01-23,Credit Card,15.0,
+105,4,800.0,completed,2025-01-24,Alipay,0.0,PR002
+106,5,300.0,completed,2025-01-25,WeChat Pay,10.0,
+107,6,500.0,shipped,2025-01-26,Credit Card,20.0,
+108,1,150.0,completed,2025-02-01,Alipay,10.0,
+109,2,22000.0,completed,2025-02-05,Credit Card,0.0,PR001
+110,4,300.0,returned,2025-02-10,WeChat Pay,15.0,
+111,7,1300.0,completed,2025-02-12,Alipay,0.0,PR002
+112,8,2500.0,pending,2025-02-15,Credit Card,0.0,
+113,1,800.0,completed,2025-02-20,Alipay,0.0,
+114,2,300.0,shipped,2025-02-22,WeChat Pay,10.0,
+115,5,1100.0,completed,2025-02-25,Credit Card,0.0,PR002
+116,3,600.0,completed,2025-03-01,Alipay,20.0,PR003
+117,4,7000.0,completed,2025-03-02,WeChat Pay,0.0,PR003
+118,7,4500.0,shipped,2025-03-03,Credit Card,0.0,PR003
+119,8,300.0,completed,2025-03-04,Alipay,10.0,PR003
+120,6,2200.0,completed,2025-03-05,WeChat Pay,0.0,PR003
+121,11,2500.0,completed,2025-03-06,Alipay,0.0,PR003
+122,12,15000.0,completed,2025-03-07,Credit Card,0.0,PR003
+123,13,200.0,completed,2025-03-08,Search,10.0,
+124,14,3500.0,shipped,2025-03-09,Social,0.0,PR003
+125,15,3000.0,completed,2025-03-10,Ads,0.0,PR003
+126,20,4500.0,completed,2025-03-11,Direct,0.0,PR003
+127,21,2200.0,completed,2025-03-12,Alipay,0.0,PR003
+128,22,600.0,completed,2025-03-13,WeChat Pay,10.0,
+129,23,3000.0,completed,2025-03-14,Credit Card,0.0,PR003
+130,24,800.0,returned,2025-03-15,Alipay,10.0,
+131,25,1200.0,completed,2025-03-16,WeChat Pay,0.0,PR003
+132,26,450.0,completed,2025-03-17,Alipay,10.0,
+133,27,15000.0,completed,2025-03-18,Credit Card,0.0,PR003
+134,28,300.0,completed,2025-03-19,WeChat Pay,5.0,
+135,29,2200.0,completed,2025-03-20,Alipay,0.0,PR003
+136,30,1200.0,completed,2025-03-21,Credit Card,0.0,
+137,31,500.0,completed,2025-03-22,Alipay,10.0,
+138,32,3000.0,completed,2025-03-23,WeChat Pay,0.0,PR003
+139,33,15000.0,completed,2025-03-24,Credit Card,0.0,PR003
+140,34,200.0,completed,2025-03-25,Alipay,10.0,
+141,35,4500.0,completed,2025-04-01,Credit Card,0.0,
+142,36,800.0,completed,2025-04-02,Alipay,10.0,
+143,37,1200.0,completed,2025-04-03,WeChat Pay,0.0,
+144,38,300.0,shipped,2025-04-04,Alipay,10.0,
+145,39,2500.0,completed,2025-04-05,Credit Card,0.0,
+146,40,150.0,completed,2025-04-06,WeChat Pay,10.0,
+147,1,1200.0,completed,2025-04-07,Alipay,0.0,
+148,2,450.0,completed,2025-04-08,Credit Card,10.0,
+149,3,200.0,completed,2025-04-09,Alipay,10.0,
+150,4,3500.0,completed,2025-04-10,WeChat Pay,0.0,
