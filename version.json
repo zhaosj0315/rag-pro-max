@@ -1,9 +1,10 @@
 {
-  "version": "3.5.1",
-  "release_date": "2026-01-10",
-  "build_number": "20260110.2",
+  "version": "3.5.2",
+  "release_date": "2026-01-11",
+  "build_number": "20260111.1",
   "status": "stable",
   "major_features": [
+    "Data Analyst 7.5: Auto Data Recovery & SQL Calibration",
     "Data Analyst 7.0: Semantic Sniffing & JIT Activation",
     "Data Analyst 6.0: Active Business Inference & Visualization Dashboard",
     "Data Analyst 5.0: Simulation & Modeling System",
@@ -17,5 +18,5 @@
     "dependencies_updated": "2026-01-08"
   },
   "changelog_url": "CHANGELOG.md",
-  "documentation_updated": "2026-01-08"
+  "documentation_updated": "2026-01-11"
 }

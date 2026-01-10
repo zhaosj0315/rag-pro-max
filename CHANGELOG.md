@@ -1,5 +1,16 @@
 # 更新日志 (CHANGELOG)
 
+## [v3.5.2] - 2026-01-11 (Maintenance Release)
+
+### 🚀 New Features
+- **🛡️ Data Analyst 7.5 (数据自愈与精准校准)**: 
+  - **自动数据恢复 (Auto Recovery)**: 当知识库 .db 文件损坏或为空时，系统能自动从 LlamaIndex 索引中嗅探并找回 CSV 数据，实时重建物理表。
+  - **SQL 表名自动校准**: 引入模糊匹配算法，自动将 LLM 幻觉产生的表名修正为库中真实的物理表名，彻底解决 `no such table` 报错。
+  - **全量仿真看板**: 即使在数据极端缺失的情况下，也能根据 Schema 生成逻辑严密的仿真看板，确保 3.5.1 智能视图的完整性。
+
+### 🐛 Bug Fixes
+- **🔧 日志系统稳定性**: 修复了 `apppro.py` 中全局 `logger` 变量由于初始化顺序导致的 `NameError` 异常。
+
 ## [v3.5.1] - 2026-01-10 (Feature Release)
 
 ### 🚀 New Features
