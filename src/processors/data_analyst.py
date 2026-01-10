@@ -180,7 +180,10 @@ SQL 指令: {sql_query}
         
         def report_generator():
             if hasattr(model_client, 'stream_chat'):
-                response_gen = model_client.stream_chat([{"role": "user", "content": summary_prompt}])
+                # [修复] 使用 ChatMessage 对象替代字典，防止属性访问错误
+                from llama_index.core.base.llms.types import ChatMessage, MessageRole
+                messages = [ChatMessage(role=MessageRole.USER, content=summary_prompt)]
+                response_gen = model_client.stream_chat(messages)
                 for token in response_gen.response_gen:
                     yield token
             elif hasattr(model_client, 'chat') and hasattr(model_client, 'model'):
