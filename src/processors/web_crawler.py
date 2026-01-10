@@ -11,6 +11,7 @@ from typing import List, Optional, Callable, Dict
 # 导入智能优化器
 from .crawl_optimizer import CrawlOptimizer
 from src.utils.file_system_utils import set_where_from_metadata
+from src.utils.html_to_markdown import HtmlToMarkdown
 
 class WebCrawler:
     def __init__(self, output_dir="temp_uploads/web_crawl"):
@@ -298,11 +299,11 @@ class WebCrawler:
         # 生成文件名
         url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
         safe_title = re.sub(r'[^\w\u4e00-\u9fff]+', '_', title)[:50]
-        filename = f"{safe_title}_{url_hash}.txt"
+        filename = f"{safe_title}_{url_hash}.md"
         filepath = os.path.join(self.output_dir, filename)
         
         # 添加元数据头
-        file_content = f"URL: {url}\nTitle: {title}\nCrawl Time: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n{content}"
+        file_content = f"**URL:** {url}\n\n# {title}\n\n**Crawl Time:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n**Content:**\n\n{content}"
         
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(file_content)
@@ -465,11 +466,13 @@ class WebCrawler:
         return saved_files
 
     def _extract_content_by_parser(self, soup, parser_type: str) -> str:
-        """根据解析器类型提取内容"""
+        """根据解析器类型提取内容 (转换为Markdown)"""
         
         # 移除不需要的标签
         for script in soup(["script", "style", "nav", "footer", "header", "aside"]):
             script.decompose()
+        
+        target_element = None
         
         if parser_type == "article":
             # 文章模式：优先提取article、main、content等标签
@@ -482,10 +485,8 @@ class WebCrawler:
             for selector in content_selectors:
                 elements = soup.select(selector)
                 if elements:
-                    text = elements[0].get_text()
-                    clean_text = "\n".join([line.strip() for line in text.splitlines() if line.strip()])
-                    if len(clean_text) > 100:
-                        return clean_text
+                    target_element = elements[0]
+                    break
         
         elif parser_type == "documentation":
             # 文档模式：提取文档特定的内容区域
@@ -498,15 +499,18 @@ class WebCrawler:
             for selector in doc_selectors:
                 elements = soup.select(selector)
                 if elements:
-                    text = elements[0].get_text()
-                    clean_text = "\n".join([line.strip() for line in text.splitlines() if line.strip()])
-                    if len(clean_text) > 100:
-                        return clean_text
+                    target_element = elements[0]
+                    break
         
-        # 默认模式：提取所有文本
-        text = soup.get_text()
-        clean_text = "\n".join([line.strip() for line in text.splitlines() if line.strip()])
-        return clean_text
+        # 如果找到了特定区域，转换该区域
+        if target_element:
+            return HtmlToMarkdown.convert(str(target_element))
+            
+        # 默认模式：转换整个页面 body
+        if soup.body:
+            return HtmlToMarkdown.convert(str(soup.body))
+            
+        return HtmlToMarkdown.convert(str(soup))
 
     def crawl(self, start_url, max_depth=1, max_pages=10, status_callback=None):
         """保持向后兼容的简单接口"""

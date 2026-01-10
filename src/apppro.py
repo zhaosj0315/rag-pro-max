@@ -2270,9 +2270,24 @@ def jump_to_knowledge_base(kb_name: str, output_base: str):
             cleared_count += 1
         st.session_state[f"kb_check_{kb}"] = False
     
+    # --- 核心修复：计算显示名称以匹配侧边栏逻辑 ---
+    display_name = kb_name
+    try:
+        from src.auth.user_auth import load_users
+        all_known_users = load_users()
+        
+        if "_" in kb_name:
+            parts = kb_name.split("_", 1)
+            # 如果前半部分是已知用户，则剥离
+            if parts[0] in all_known_users:
+                display_name = parts[1]
+    except Exception as e:
+        logger.warning(f"无法计算显示名称: {e}")
+
     # 核心修复：在清理完所有状态后，再设置目标知识库的选中状态
     st.session_state[f"kb_check_{kb_name}"] = True
-    st.session_state.current_nav = f"☑️ 📂 {kb_name}"
+    # 使用计算出的 display_name 设置 current_nav
+    st.session_state.current_nav = f"☑️ 📂 {display_name}"
     st.session_state.current_kb_id = kb_name
     st.session_state.chat_engine = None  # 重置聊天引擎，触发重新加载
     
@@ -2441,7 +2456,12 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
         manifest['embed_model'] = embed_model
         manifest['embed_provider'] = embed_provider
         
-        ManifestManager.save(persist_dir, manifest)
+        # 核心修复: 直接保存 JSON 而不是使用错误的 save 方法
+        # ManifestManager.save 误将 manifest 字典当作文件列表处理，导致元数据 key 变成文件条目
+        manifest_path = ManifestManager.get_path(persist_dir)
+        with open(manifest_path, 'w', encoding='utf-8') as f:
+            json.dump(manifest, f, indent=4, ensure_ascii=False)
+            
         logger.info(f"✅ 资产所有权与模型对齐已完成: {owner} | {embed_model}")
     except Exception as e:
         logger.warning(f"⚠️ 元数据补全失败: {e}")
@@ -2760,13 +2780,20 @@ if btn_start:
                     current_generate_summary = st.session_state.get('kb_generate_summary', False)
                     current_force_reindex = st.session_state.get('kb_force_reindex', False)
                     
-                    # 执行知识库创建 - 使用现有的kb_interface方法
-                    from src.kb.kb_interface import KBInterface
+                    # 直接使用 KBProcessor 处理，避免 KBInterface 内部的 rerun 阻断后续逻辑
+                    from src.kb.kb_processor import KBProcessor
+                    from src.config import ConfigLoader
                     
-                    kb_interface = KBInterface()
+                    processor = KBProcessor()
+                    config = ConfigLoader.load()
                     
-                    # 构建选项字典
-                    options = {
+                    # 合并配置
+                    process_options = {
+                        'embed_provider': config.get('embed_provider', 'HuggingFace (本地/极速)'),
+                        'embed_model': config.get('embed_model_hf', 'sentence-transformers/all-MiniLM-L6-v2'),
+                        'embed_key': config.get('embed_key', ''),
+                        'embed_url': config.get('embed_url', ''),
+                        'action_mode': 'NEW',
                         'use_ocr': current_use_ocr,
                         'extract_metadata': current_extract_metadata,
                         'generate_summary': current_generate_summary,
@@ -2776,28 +2803,30 @@ if btn_start:
                     try:
                         logger.log("网页抓取", "info", f"🚀 开始创建知识库: {kb_name}")
                         logger.log("网页抓取", "info", f"📁 目标路径: {target_path}")
-                        logger.log("网页抓取", "info", f"⚙️ 选项: {options}")
                         
-                        kb_interface.create_knowledge_base(target_path, kb_name, options)
+                        success = processor.process_knowledge_base(kb_name, target_path, process_options)
                         
-                        logger.log("网页抓取", "success", f"✅ 知识库创建成功: {kb_name}")
-                        st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
-                        
-                        # 跳转到新创建的知识库
-                        logger.log("网页抓取", "info", f"📍 网页抓取模式: 准备调用跳转函数")
-                        jump_to_knowledge_base(kb_name, output_base)
-                        logger.log("网页抓取", "info", f"📍 网页抓取模式: 跳转函数调用完成")
-                        
-                        # 清理session_state中的网页抓取参数
-                        for key in ['crawl_url', 'crawl_depth', 'max_pages', 'parser_type', 'url_quality_threshold']:
-                            if key in st.session_state:
-                                del st.session_state[key]
-                        
-                        # 设置标记，防止重复执行文件处理逻辑
-                        st.session_state.web_crawl_completed = True
-                        
-                        logger.log("网页抓取", "info", f"🔄 网页抓取模式: 执行页面刷新")
-                        st.rerun()
+                        if success:
+                            logger.log("网页抓取", "success", f"✅ 知识库创建成功: {kb_name}")
+                            st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
+                            
+                            # 跳转到新创建的知识库
+                            logger.log("网页抓取", "info", f"📍 网页抓取模式: 准备调用跳转函数")
+                            jump_to_knowledge_base(kb_name, output_base)
+                            logger.log("网页抓取", "info", f"📍 网页抓取模式: 跳转函数调用完成")
+                            
+                            # 清理session_state中的网页抓取参数
+                            for key in ['crawl_url', 'crawl_depth', 'max_pages', 'parser_type', 'url_quality_threshold']:
+                                if key in st.session_state:
+                                    del st.session_state[key]
+                            
+                            # 设置标记，防止重复执行文件处理逻辑
+                            st.session_state.web_crawl_completed = True
+                            
+                            logger.log("网页抓取", "info", f"🔄 网页抓取模式: 执行页面刷新")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ 知识库创建失败")
                         
                     except Exception as e:
                         logger.log("网页抓取", "error", f"❌ 知识库创建异常: {str(e)}")
@@ -2925,9 +2954,9 @@ if btn_start:
                                     # 清理标题，移除不合法的文件名字符
                                     safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
                                     safe_title = safe_title.replace(' ', '_')[:50]  # 限制长度
-                                    filename = f"{safe_title}_{i+1:03d}.txt"
+                                    filename = f"{safe_title}_{i+1:03d}.md"
                                 else:
-                                    filename = f"quality_content_{i+1:03d}.txt"
+                                    filename = f"quality_content_{i+1:03d}.md"
                                 
                                 filepath = os.path.join(unique_output_dir, filename)
                                 
@@ -2935,10 +2964,10 @@ if btn_start:
                                 from src.utils.file_system_utils import set_where_from_metadata
                                 
                                 with open(filepath, 'w', encoding='utf-8') as f:
-                                    # 🔥 核心修正：添加标准 URL: 头，以便溯源引擎识别
-                                    f.write(f"URL: {result['url']}\n")
-                                    f.write(f"标题: {result['title']}\n")
-                                    f.write(f"内容:\n{result['content']}\n")
+                                    # 🔥 核心修正：使用 Markdown 格式，以便溯源引擎识别和更好展示
+                                    f.write(f"**URL:** {result['url']}\n\n")
+                                    f.write(f"# {result['title']}\n\n")
+                                    f.write(f"**内容:**\n\n{result['content']}\n")
                                 
                                 # 为文件设置 macOS 下载来源元数据
                                 set_where_from_metadata(filepath, result['url'])
@@ -2965,13 +2994,20 @@ if btn_start:
                     current_generate_summary = st.session_state.get('kb_generate_summary', False)
                     current_force_reindex = st.session_state.get('kb_force_reindex', False)
                     
-                    # 执行知识库创建 - 使用现有的kb_interface方法
-                    from src.kb.kb_interface import KBInterface
+                    # 直接使用 KBProcessor 处理，避免 KBInterface 内部的 rerun 阻断后续逻辑
+                    from src.kb.kb_processor import KBProcessor
+                    from src.config import ConfigLoader
                     
-                    kb_interface = KBInterface()
+                    processor = KBProcessor()
+                    config = ConfigLoader.load()
                     
-                    # 构建选项字典
-                    options = {
+                    # 合并配置
+                    process_options = {
+                        'embed_provider': config.get('embed_provider', 'HuggingFace (本地/极速)'),
+                        'embed_model': config.get('embed_model_hf', 'sentence-transformers/all-MiniLM-L6-v2'),
+                        'embed_key': config.get('embed_key', ''),
+                        'embed_url': config.get('embed_url', ''),
+                        'action_mode': 'NEW',
                         'use_ocr': current_use_ocr,
                         'extract_metadata': current_extract_metadata,
                         'generate_summary': current_generate_summary,
@@ -2979,23 +3015,32 @@ if btn_start:
                     }
                     
                     try:
-                        kb_interface.create_knowledge_base(target_path, kb_name, options)
-                        st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
+                        logger.log("智能搜索", "info", f"🚀 开始创建知识库: {kb_name}")
+                        logger.log("智能搜索", "info", f"📁 目标路径: {target_path}")
                         
-                        # 跳转到新创建的知识库
-                        logger.log("智能搜索", "info", f"📍 智能搜索模式: 准备调用跳转函数")
-                        jump_to_knowledge_base(kb_name, output_base)
-                        logger.log("智能搜索", "info", f"📍 智能搜索模式: 跳转函数调用完成")
+                        success = processor.process_knowledge_base(kb_name, target_path, process_options)
                         
-                        # 清理session_state中的搜索参数
-                        for key in ['search_keyword', 'search_crawl_depth', 'search_max_pages', 'search_parser_type', 'quality_threshold']:
-                            if key in st.session_state:
-                                del st.session_state[key]
-                        
-                        # 设置标记，防止重复执行文件处理逻辑
-                        st.session_state.smart_search_completed = True
-                        
-                        st.rerun()
+                        if success:
+                            logger.log("智能搜索", "success", f"✅ 知识库创建成功: {kb_name}")
+                            st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
+                            
+                            # 跳转到新创建的知识库
+                            logger.log("智能搜索", "info", f"📍 智能搜索模式: 准备调用跳转函数")
+                            jump_to_knowledge_base(kb_name, output_base)
+                            logger.log("智能搜索", "info", f"📍 智能搜索模式: 跳转函数调用完成")
+                            
+                            # 清理session_state中的搜索参数
+                            for key in ['search_keyword', 'search_crawl_depth', 'search_max_pages', 'search_parser_type', 'quality_threshold']:
+                                if key in st.session_state:
+                                    del st.session_state[key]
+                            
+                            # 设置标记，防止重复执行文件处理逻辑
+                            st.session_state.smart_search_completed = True
+                            
+                            logger.log("智能搜索", "info", f"🔄 智能搜索模式: 执行页面刷新")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ 知识库创建失败")
                         
                     except Exception as e:
                         st.error(f"❌ 知识库创建失败: {str(e)}")

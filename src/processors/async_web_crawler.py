@@ -23,6 +23,7 @@ import logging
 # 🔥 新增：导入智能优化器
 from .crawl_optimizer import CrawlOptimizer
 from src.utils.file_system_utils import set_where_from_metadata
+from src.utils.html_to_markdown import HtmlToMarkdown
 
 class AsyncWebCrawler:
     def __init__(self, max_concurrent=10, delay_range=(0.5, 2.0), ignore_robots=False):
@@ -200,25 +201,9 @@ class AsyncWebCrawler:
             return []
     
     def extract_content(self, html_content: str) -> str:
-        """提取页面内容"""
+        """提取页面内容 (转换为Markdown)"""
         try:
-            soup = BeautifulSoup(html_content, 'html.parser')
-            
-            # 移除不需要的标签
-            for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
-                tag.decompose()
-            
-            # 优先提取主要内容
-            main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content')
-            
-            if main_content:
-                text = main_content.get_text(separator=' ', strip=True)
-            else:
-                text = soup.get_text(separator=' ', strip=True)
-            
-            # 清理文本
-            lines = [line.strip() for line in text.split('\n') if line.strip()]
-            return '\n'.join(lines)
+            return HtmlToMarkdown.convert(html_content)
         except:
             return ""
     
@@ -407,18 +392,18 @@ class AsyncWebCrawler:
                     # 清理标题，移除不合法的文件名字符
                     safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
                     safe_title = safe_title.replace(' ', '_')[:50]  # 限制长度
-                    filename = f"{safe_title}_{len(saved_files)+1:03d}.txt"
+                    filename = f"{safe_title}_{len(saved_files)+1:03d}.md"
                 else:
-                    filename = f"page_{len(saved_files)+1}_{int(time.time())}.txt"
+                    filename = f"page_{len(saved_files)+1}_{int(time.time())}.md"
                 
                 filepath = output_path / filename
                 
                 async with aiofiles.open(filepath, 'w', encoding='utf-8') as f:
-                    await f.write(f"URL: {result['url']}\n")
-                    await f.write(f"Title: {result['title']}\n")
-                    await f.write(f"Timestamp: {result['timestamp']}\n")
-                    await f.write(f"Content Length: {len(result['content'])}\n")
-                    await f.write(f"\n{result['content']}")
+                    await f.write(f"**URL:** {result['url']}\n\n")
+                    await f.write(f"# {result['title']}\n\n")
+                    await f.write(f"**Timestamp:** {result['timestamp']}\n")
+                    await f.write(f"**Content Length:** {len(result['content'])}\n\n")
+                    await f.write(f"**Content:**\n\n{result['content']}")
                 
                 # 为文件设置 macOS 下载来源元数据
                 set_where_from_metadata(str(filepath), result['url'])
