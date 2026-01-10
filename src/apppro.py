@@ -4458,10 +4458,11 @@ for msg_idx, msg in enumerate(state.get_messages()):
                     with st.expander("🧐 查看审计细节"):
                         st.write(res_meta.get('critique'))
 
-            # [v3.7.5] 历史回溯：恢复企业级深度看板 (Smart Viz 2.0)
+            # [v3.8.0] 历史回溯：恢复极光智能看板 (Smart Viz 3.0)
             if msg.get("is_data_report") and msg.get("data"):
                 try:
                     import pandas as pd
+                    import plotly.express as px
                     df_hist = pd.DataFrame(msg["data"])
                     if not df_hist.empty:
                         st.markdown("---")
@@ -4471,19 +4472,32 @@ for msg_idx, msg in enumerate(state.get_messages()):
                         numeric_cols = df_hist.select_dtypes(include=['number']).columns
                         date_cols = [c for c in df_hist.columns if "date" in c.lower() or "time" in c.lower()]
                         cat_cols = df_hist.select_dtypes(include=['object']).columns
+                        aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A', '#19D3F3', '#FF6692', '#B6E880']
 
-                        # 渲染历史图表 (智能选择 2.0)
-                        with st.expander("📈 历史多维深度视图", expanded=False):
+                        # 渲染历史 Plotly 图表
+                        with st.expander("📈 历史极光深度视图", expanded=False):
                             if len(cat_cols) >= 1 and len(numeric_cols) >= 1:
                                 if len(cat_cols) >= 2:
-                                    pivot_df = df_hist.pivot_table(index=cat_cols[0], columns=cat_cols[1], values=numeric_cols[0], aggfunc='sum').fillna(0)
-                                    st.bar_chart(pivot_df)
+                                    fig = px.bar(df_hist, x=cat_cols[0], y=numeric_cols[0], color=cat_cols[1],
+                                                barmode='group', template="plotly_white",
+                                                color_discrete_sequence=aurora_colors)
+                                    st.plotly_chart(fig, use_container_width=True)
+                                elif len(df_hist) <= 10:
+                                    fig = px.pie(df_hist, names=cat_cols[0], values=numeric_cols[0],
+                                                hole=0.4, template="plotly_white",
+                                                color_discrete_sequence=aurora_colors)
+                                    st.plotly_chart(fig, use_container_width=True)
                                 else:
-                                    st.bar_chart(df_hist.set_index(cat_cols[0])[numeric_cols[0]])
-                            elif len(date_cols) > 0:
-                                st.area_chart(df_hist.set_index(date_cols[0])[numeric_cols[0]])
+                                    fig = px.bar(df_hist, x=cat_cols[0], y=numeric_cols[0],
+                                                color=numeric_cols[0], color_continuous_scale='Viridis',
+                                                template="plotly_white")
+                                    st.plotly_chart(fig, use_container_width=True)
+                            elif len(date_cols) > 0 and len(numeric_cols) > 0:
+                                fig = px.area(df_hist, x=date_cols[0], y=numeric_cols[0],
+                                             template="plotly_white", line_shape="spline")
+                                st.plotly_chart(fig, use_container_width=True)
                             else:
-                                st.line_chart(df_hist[numeric_cols])
+                                st.dataframe(df_hist, use_container_width=True)
                         
                         # 渲染历史 SQL
                         if msg.get("sql"):
@@ -5602,39 +5616,72 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         if analysis_res.get("success", False):
                             logger.success(f"⚡ [Mode: 📊 DataAnalyst] 分析链路贯通，开始渲染 3.5.4 流式看板")
                             
-                            # 1. 瞬时渲染静态部分 (标题、逻辑溯源、图表)
+                            # 1. 瞬时渲染静态部分 (标题、逻辑溯源、图表矩阵)
                             sim_suffix = " (语义仿真)" if analysis_res.get("is_simulated") else ""
-                            st.markdown(f"### 📊 3.7.5 企业级深度看板{sim_suffix}")
+                            st.markdown(f"### 🚀 3.8.0 极光智能看板{sim_suffix}")
                             
                             if analysis_res.get("analysis_path"):
                                 with st.status("🧠 业务血缘推理完成", expanded=True):
                                     st.write(analysis_res["analysis_path"])
                             
                             import pandas as pd
+                            import plotly.express as px
+                            import plotly.graph_objects as go
+                            
                             df_res = pd.DataFrame(analysis_res["data"])
                             
                             if not df_res.empty:
-                                # [v3.7.5] Smart Viz 2.0 引擎
+                                # [v3.8.0] Smart Viz 3.0 极光渲染引擎
                                 numeric_cols = df_res.select_dtypes(include=['number']).columns
                                 date_cols = [c for c in df_res.columns if "date" in c.lower() or "time" in c.lower()]
                                 cat_cols = df_res.select_dtypes(include=['object']).columns
                                 
-                                # A. 多维交叉图表
-                                with st.expander("📈 深度交叉分析视图", expanded=True):
+                                # A. 极光视觉调色盘
+                                aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A', '#19D3F3', '#FF6692', '#B6E880']
+
+                                with st.container():
+                                    # B. 智能看板矩阵
                                     if len(cat_cols) >= 1 and len(numeric_cols) >= 1:
                                         if len(cat_cols) >= 2:
-                                            # 多维透视分析 (例如：地区 + 状态)
-                                            pivot_df = df_res.pivot_table(index=cat_cols[0], columns=cat_cols[1], values=numeric_cols[0], aggfunc='sum').fillna(0)
-                                            st.bar_chart(pivot_df)
+                                            # 多维分组图 (例如：地区 + 状态)
+                                            fig = px.bar(df_res, x=cat_cols[0], y=numeric_cols[0], color=cat_cols[1],
+                                                        barmode='group', template="plotly_white",
+                                                        color_discrete_sequence=aurora_colors,
+                                                        title=f"按{cat_cols[0]}与{cat_cols[1]}的{numeric_cols[0]}分布")
+                                            st.plotly_chart(fig, use_container_width=True)
+                                        elif len(df_res) <= 10:
+                                            # 数据量少时使用环形图展示占比
+                                            fig = px.pie(df_res, names=cat_cols[0], values=numeric_cols[0],
+                                                        hole=0.4, template="plotly_white",
+                                                        color_discrete_sequence=aurora_colors,
+                                                        title=f"{cat_cols[0]}占比分析")
+                                            st.plotly_chart(fig, use_container_width=True)
                                         else:
-                                            st.bar_chart(df_res.set_index(cat_cols[0])[numeric_cols[0]])
-                                    elif len(date_cols) > 0:
-                                        st.area_chart(df_res.set_index(date_cols[0])[numeric_cols[0]])
-                                    else:
-                                        st.line_chart(df_res[numeric_cols])
+                                            # 数据量多使用渐变柱状图
+                                            fig = px.bar(df_res, x=cat_cols[0], y=numeric_cols[0],
+                                                        color=numeric_cols[0], color_continuous_scale='Viridis',
+                                                        template="plotly_white",
+                                                        title=f"各{cat_cols[0]}的{numeric_cols[0]}对比")
+                                            st.plotly_chart(fig, use_container_width=True)
+                                            
+                                    elif len(date_cols) > 0 and len(numeric_cols) > 0:
+                                        # 渐变面积趋势图
+                                        fig = px.area(df_res, x=date_cols[0], y=numeric_cols[0],
+                                                     template="plotly_white", line_shape="spline",
+                                                     color_discrete_sequence=[aurora_colors[0]],
+                                                     title=f"{numeric_cols[0]}随时间变化趋势")
+                                        st.plotly_chart(fig, use_container_width=True)
+                                    
+                                    elif len(numeric_cols) >= 2:
+                                        # 数值相关性散点图
+                                        fig = px.scatter(df_res, x=numeric_cols[0], y=numeric_cols[1],
+                                                        size=numeric_cols[0], color=numeric_cols[1],
+                                                        template="plotly_white",
+                                                        title=f"{numeric_cols[0]}与{numeric_cols[1]}的相关性分布")
+                                        st.plotly_chart(fig, use_container_width=True)
 
-                                # B. 智能汇总表
-                                st.markdown("##### 🧾 核心统计摘要")
+                                # C. 核心统计摘要 (透视表风格)
+                                st.markdown("##### 🧾 数据透视摘要")
                                 st.dataframe(df_res, use_container_width=True)
                             
                             # 2. 流式渲染报告部分
