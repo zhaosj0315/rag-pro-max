@@ -5595,13 +5595,12 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         
                         # 仅当成功生成并执行了 SQL（或仿真成功）时才拦截
                         if analysis_res.get("success", False):
-                            logger.success(f"⚡ [Mode: 📊 DataAnalyst] 分析链路贯通，开始渲染 3.5.1 智能看板")
+                            logger.success(f"⚡ [Mode: 📊 DataAnalyst] 分析链路贯通，开始渲染 3.5.4 流式看板")
                             
-                            # 1. 渲染标题与状态
+                            # 1. 瞬时渲染静态部分 (标题、指标卡、图表)
                             sim_suffix = " (语义仿真)" if analysis_res.get("is_simulated") else ""
-                            st.markdown(f"### 📊 3.5.1 智能数据看板{sim_suffix}")
+                            st.markdown(f"### 📊 3.5.4 智能流式看板{sim_suffix}")
                             
-                            # 2. 核心指标卡 (st.metric)
                             import pandas as pd
                             df_res = pd.DataFrame(analysis_res["data"])
                             
@@ -5613,29 +5612,34 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                                         val = df_res[col_name].iloc[0]
                                         st.metric(label=col_name, value=f"{val:,.2f}" if isinstance(val, (int, float)) else val)
 
-                            # 3. 深度分析报告
-                            with st.container():
-                                st.markdown(analysis_res["logic"])
-                            
-                            # 4. 可视化看板
                             if not df_res.empty and len(df_res) > 0:
                                 with st.expander("📈 数据可视化展现", expanded=True):
                                     if len(df_res.columns) >= 2:
-                                        # 自动推断 X 轴和 Y 轴
                                         st.bar_chart(df_res.set_index(df_res.columns[0]))
                                     else:
                                         st.line_chart(df_res)
                             
-                            # 5. 执行指令与明细
+                            # 2. 流式渲染报告部分
+                            report_placeholder = st.empty()
+                            full_report = ""
+                            
+                            # 使用生成器进行流式输出
+                            for token in analysis_res.get("logic_gen", []):
+                                full_report += token
+                                report_placeholder.markdown(full_report + "▌")
+                            
+                            report_placeholder.markdown(full_report)
+                            
+                            # 3. 后置渲染指令明细
                             with st.expander("🛠️ 执行指令与数据明细", expanded=False):
                                 st.code(analysis_res["sql"], language="sql")
                                 st.dataframe(df_res, use_container_width=True)
                             
-                            # 6. [v3.5.3] 生成针对数据分析的追问推荐
+                            # 4. 生成追问推荐 (在报告完成后)
                             try:
                                 from src.chat.unified_suggestion_engine import get_unified_suggestion_engine
                                 engine = get_unified_suggestion_engine(active_kb_name)
-                                context_text = f"用户提问: {final_prompt}\n数据分析结果: {analysis_res['logic']}"
+                                context_text = f"用户提问: {final_prompt}\n数据分析结果: {full_report}"
                                 da_sugs = engine.generate_suggestions(
                                     context=context_text,
                                     source_type='chat',
@@ -5647,10 +5651,10 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                                     st.session_state.current_suggestions = da_sugs[:3]
                             except: pass
 
-                            # 7. 归档到消息列表并阻断 RAG 流程
+                            # 5. 归档到消息列表
                             st.session_state.messages.append({
                                 "role": "assistant", 
-                                "content": analysis_res["logic"],
+                                "content": full_report,
                                 "is_data_report": True,
                                 "data": analysis_res["data"],
                                 "sql": analysis_res["sql"],
