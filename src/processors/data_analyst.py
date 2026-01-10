@@ -162,7 +162,7 @@ SQL: {sql_query}
 """
                 try:
                     sim_res = model_client.complete(sim_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":sim_prompt}]).message.content
-                    import re, json
+                    import re
                     json_match = re.search(r'(\[.*\])', sim_res, re.DOTALL)
                     if json_match:
                         execution_result = {"success": True, "data": json.loads(json_match.group(1))}
