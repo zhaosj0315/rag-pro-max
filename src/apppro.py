@@ -5801,13 +5801,21 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     logger.info(f"🔧 推荐引擎返回 {len(initial_sugs)} 个问题")
                     
                     if initial_sugs:
-                        st.session_state.suggestions_history = initial_sugs[:3]
+                        sug_list = initial_sugs[:3]
+                        st.session_state.suggestions_history = sug_list
+                        st.session_state.current_suggestions = sug_list # 确保双重缓存同步
+                        
+                        # [关键修复] 将建议直接注入到最后一条消息中，确保渲染器能抓取到
+                        if st.session_state.messages and st.session_state.messages[-1]['role'] == 'assistant':
+                            st.session_state.messages[-1]['suggestions'] = sug_list
+                            
                         logger.info(f"✨ 生成 {len(initial_sugs)} 个推荐问题")
-                        for i, q in enumerate(initial_sugs[:3], 1):
+                        for i, q in enumerate(sug_list, 1):
                             logger.info(f"   {i}. {q}")
                     else:
                         logger.warning("⚠️ 推荐引擎未返回任何问题 (严格模式)")
                         st.session_state.suggestions_history = []
+                        st.session_state.current_suggestions = []
                     
                     # 延迟保存：确认所有步骤都成功后再保存
                     if active_kb_name: HistoryManager.save_session(active_kb_name, state.get_messages(), st.session_state.get('current_session_id'))
