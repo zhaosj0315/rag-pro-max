@@ -49,7 +49,7 @@ class DataAnalystEngine:
         except:
             return {"error": "语义解析失败"}
 
-    def infer_business_blueprint(self, schemas: Any, model_client) -> Dict[str, Any>:
+    def infer_business_blueprint(self, schemas: Any, model_client) -> Dict[str, Any]:
         """
         业务推演：推导出业务场景、关联路径和分析建议。
         """
@@ -91,13 +91,20 @@ class DataAnalystEngine:
         """
         [主动分析版] 强制执行 SQL 并返回结构化结果
         """
+        if not os.path.exists(self.schema_path):
+             return {"success": False, "logic": "未找到数据结构定义，请先上传数据或文档。"}
+
         with open(self.schema_path, 'r', encoding='utf-8') as f:
             schemas = json.load(f)
         
-        # 1. 强制生成 SQL (哪怕问题模糊)
+        # 获取当前时间，辅助 SQL 生成
+        from datetime import datetime
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        
+        # 1. 强制生成 SQL
         sql_prompt = f"""
-你是一名资深 SQL 专家。基于以下表结构，请生成一条 SQL 来回答用户的问题。
-如果问题未指定具体个体（如“某个用户”），请默认查询“所有个体的汇总统计”或“前10名排行”。
+你是一名资深 SQLite 专家。基于以下表结构，请生成一条 SQL 来回答用户的问题。
+当前日期: {current_date}
 
 表结构：{json.dumps(schemas, ensure_ascii=False)}
 
@@ -107,22 +114,51 @@ class DataAnalystEngine:
 1. 必须返回 SQL，不要反问用户。
 2. SQL 必须包裹在 [SQL_START] 和 [SQL_END] 之间。
 3. 如果需要计算总额，请使用 SUM()；如果需要计数，请使用 COUNT()。
+4. 使用 SQLite 语法。
+5. **重要**：如果用户查询"最近"、"上周"等时间范围，请优先基于表中的数据时间分布生成查询（例如：如果数据都是2024年的，不要只查2026年）。可以先查询 MAX(date) 作为参考锚点。
+6. 如果问题涉及表中不存在的字段（如单价），请尝试用现有字段计算（如 总额/数量）或仅查询现有字段。
 """
-        sql_res = model_client.complete(sql_prompt).text
+        try:
+            # 兼容不同类型的 model_client
+            if hasattr(model_client, 'complete'):
+                sql_res = model_client.complete(sql_prompt).text
+            else:
+                # ChatClient 适配
+                msgs = [{"role": "user", "content": sql_prompt}]
+                sql_res = model_client.chat(model=model_client.model, messages=msgs).message.content
+        except Exception as e:
+            return {"success": False, "logic": f"模型调用失败: {e}"}
+
         sql_query = ""
         if "[SQL_START]" in sql_res:
             sql_query = sql_res.split("[SQL_START]")[1].split("[SQL_END]")[0].strip()
+        elif "SELECT" in sql_res.upper():
+             # Fallback regex
+             import re
+             match = re.search(r'```sql\s*(.*?)\s*```', sql_res, re.DOTALL | re.IGNORECASE)
+             if match:
+                 sql_query = match.group(1).strip()
+             else:
+                 # 尝试直接提取 Select 开头
+                 lines = sql_res.split('\n')
+                 for line in lines:
+                     if line.strip().upper().startswith('SELECT'):
+                         sql_query = line.strip()
+                         break
         
         # 2. 尝试执行
-        execution_result = {"success": False}
+        execution_result = {"success": False, "data": []}
         if sql_query:
             execution_result = self.execute_sql(sql_query)
+        else:
+            # 如果没生成 SQL，可能是不需要查库的闲聊
+            return {"success": False, "logic": sql_res, "sql": ""}
         
         # 3. 最终业务解读
         summary_prompt = f"""
 根据以下 SQL 执行结果，请为用户提供一份简洁的业务分析报告：
 SQL: {sql_query}
-结果数据: {json.dumps(execution_result.get('data', [])[:10], ensure_ascii=False)}
+结果数据: {json.dumps(execution_result.get('data', [])[:20], ensure_ascii=False, default=str)}
 问题: {query}
 
 报告结构：
@@ -130,7 +166,14 @@ SQL: {sql_query}
 - [📊 核心发现]：用一句话总结数据发现。
 - [📈 仿真建议]：说明后续可以关注的业务指标。
 """
-        final_report = model_client.complete(summary_prompt).text
+        try:
+            if hasattr(model_client, 'complete'):
+                final_report = model_client.complete(summary_prompt).text
+            else:
+                msgs = [{"role": "user", "content": summary_prompt}]
+                final_report = model_client.chat(model=model_client.model, messages=msgs).message.content
+        except:
+            final_report = "无法生成分析报告"
         
         return {
             "sql": sql_query,
@@ -139,6 +182,70 @@ SQL: {sql_query}
             "success": execution_result.get('success', False)
         }
 
-    def process_files(self, file_paths: List[str]):
-        # 保留原有的 CSV/Excel 处理能力供 fallback
-        pass
+    def execute_sql(self, sql: str) -> Dict[str, Any]:
+        """执行 SQL 并返回字典列表"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            # 配置 row_factory 以返回字典
+            conn.row_factory = lambda c, r: dict([(col[0], r[idx]) for idx, col in enumerate(c.description)])
+            cursor = conn.cursor()
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            conn.close()
+            return {"success": True, "data": rows}
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"SQL 执行失败: {sql} | Error: {e}")
+            return {"success": False, "error": str(e), "data": []}
+
+    def process_files(self, file_paths: List[str]) -> Dict[str, Any]:
+        """
+        物理文件入库：读取 CSV/Excel 并构建 SQLite 数据库
+        """
+        import re
+        try:
+            # 重置数据库
+            if os.path.exists(self.db_path):
+                os.remove(self.db_path)
+            
+            conn = sqlite3.connect(self.db_path)
+            processed_tables = {}
+            
+            for file_path in file_paths:
+                file_name = os.path.basename(file_path)
+                # 清洗表名: 只保留字母数字和中文
+                table_name = os.path.splitext(file_name)[0]
+                table_name = re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', table_name)
+                
+                # 读取数据
+                if file_path.endswith('.csv'):
+                    df = pd.read_csv(file_path)
+                elif file_path.endswith(('.xls', '.xlsx')):
+                    df = pd.read_excel(file_path)
+                else:
+                    continue
+                
+                # 清洗列名
+                df.columns = [re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', str(c)) for c in df.columns]
+                
+                # 入库
+                df.to_sql(table_name, conn, index=False, if_exists='replace')
+                
+                # 记录 Schema (用于后续分析)
+                processed_tables[table_name] = {
+                    "description": f"数据来源: {file_name}",
+                    "columns": [{"name": c, "type": str(t)} for c, t in df.dtypes.items()]
+                }
+            
+            conn.close()
+            
+            # 保存基础 Schema
+            with open(self.schema_path, 'w', encoding='utf-8') as f:
+                json.dump({"tables": processed_tables}, f, indent=4, ensure_ascii=False)
+                
+            return {"success": True, "tables": list(processed_tables.keys())}
+            
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"文件处理入库失败: {e}")
+            return {"success": False, "error": str(e)}

@@ -2399,6 +2399,29 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
         status_container.update(label="❌ 路径无效", state="error")
         raise ValueError(f"路径无效: {current_target_path}")
 
+    # [v3.5.0] 自动归档数据文件 (支持 JIT 分析)
+    # 无论是否开启分析模式，都将结构化数据拷贝到知识库目录，以便后续随时激活分析功能
+    import shutil
+    import glob
+    try:
+        if not os.path.exists(persist_dir):
+            os.makedirs(persist_dir)
+            
+        source_data_files = glob.glob(os.path.join(current_target_path, "**/*.csv"), recursive=True) + \
+                            glob.glob(os.path.join(current_target_path, "**/*.xlsx"), recursive=True) + \
+                            glob.glob(os.path.join(current_target_path, "**/*.xls"), recursive=True)
+                            
+        if source_data_files:
+            status_container.write(f"📦 正在归档 {len(source_data_files)} 个数据源文件...")
+            for f in source_data_files:
+                # 仅拷贝文件名，不包含目录结构
+                dest = os.path.join(persist_dir, os.path.basename(f))
+                if not os.path.exists(dest): # 避免覆盖
+                     shutil.copy2(f, dest)
+            logger.info(f"✅ 已归档 {len(source_data_files)} 个数据文件至知识库目录")
+    except Exception as e:
+        logger.warning(f"⚠️ 数据文件归档失败 (不影响主流程): {e}")
+
     # --- 核心增强：数据分析 5.0 业务推演 ---
     is_da_mode = st.session_state.get('is_data_analysis_mode', False)
     if is_da_mode:
@@ -2409,18 +2432,44 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
         da_engine = DataAnalystEngine(persist_dir, logger)
         llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
         
+        # [新增] 结构化数据优先处理 (Excel/CSV)
+        import glob
+        data_files = []
+        if current_target_path and os.path.exists(current_target_path):
+             data_files.extend(glob.glob(os.path.join(current_target_path, "**/*.csv"), recursive=True))
+             data_files.extend(glob.glob(os.path.join(current_target_path, "**/*.xlsx"), recursive=True))
+             data_files.extend(glob.glob(os.path.join(current_target_path, "**/*.xls"), recursive=True))
+
+        if data_files:
+             status_container.write(f"📊 检测到 {len(data_files)} 个结构化数据表，正在进行物理建模...")
+             res = da_engine.process_files(data_files)
+             if res['success']:
+                 status_container.success(f"✅ 物理数据入库完成 (已导入 {len(res['tables'])} 张表)")
+             else:
+                 status_container.error(f"❌ 数据入库失败: {res.get('error')}")
+
         # 1. 执行 RAG 预扫描以获取文本（用于非结构化建模）
         # 这里先运行 builder._scan_files 和 _read_documents 以获取 docs 对象
         docs, _ = builder._read_documents(current_target_path, 0, None)
         
         # 2. 深度 Schema 建模 (核心升级：从文档推导演算法)
-        status_container.write("🧠 正在从文档中提取数据字典与表结构...")
-        schemas = da_engine.extract_schema_from_docs(docs, llm)
+        # 仅当没有结构化数据导入时，或者需要补充文档信息时才执行
+        if docs:
+            status_container.write("🧠 正在从文档中提取数据字典与表结构...")
+            # 注意：如果已有 schema (来自Excel)，这里可能会覆盖或需要合并。
+            # 简单策略：如果 DataAnalystEngine 内部处理了合并最好，或者这里仅在无 Schema 时提取
+            if not os.path.exists(da_engine.schema_path):
+                schemas = da_engine.extract_schema_from_docs(docs, llm)
+            else:
+                # 即使有了物理表，也尝试读一下文档补充上下文？暂且跳过防止冲突
+                status_container.write("⏩ 已存在物理表结构，跳过纯文档提取...")
+                with open(da_engine.schema_path, 'r') as f:
+                    schemas = json.load(f)
         
-        # 3. 业务蓝图推演
-        status_container.write("🌐 正在构建业务全景图与关联路径...")
-        blueprint = da_engine.infer_business_blueprint(schemas, llm)
-        status_container.info(f"📍 识别业务场景: {blueprint.get('business_scenario', '未知业务')}")
+            # 3. 业务蓝图推演
+            status_container.write("🌐 正在构建业务全景图与关联路径...")
+            blueprint = da_engine.infer_business_blueprint(schemas, llm)
+            status_container.info(f"📍 识别业务场景: {blueprint.get('business_scenario', '未知业务')}")
         
         status_container.write("✅ 业务语义建模已就绪 (去RAG纯分析模式已激活)")
         allow_empty_docs = True
@@ -5430,6 +5479,23 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     db_path = os.path.join(output_base, active_kb_name)
                     schema_path = os.path.join(db_path, "business_schema.json")
                     
+                    # [JIT自动激活] 如果未找到 Schema 但存在数据文件，自动构建分析引擎
+                    import glob
+                    if not os.path.exists(schema_path):
+                        data_files = glob.glob(os.path.join(db_path, "*.csv")) + \
+                                     glob.glob(os.path.join(db_path, "*.xlsx")) + \
+                                     glob.glob(os.path.join(db_path, "*.xls"))
+                        
+                        if data_files:
+                            try:
+                                logger.info(f"🔄 检测到结构化数据，正在自动升级知识库至 v3.5.0 分析模式...")
+                                from src.processors.data_analyst import DataAnalystEngine
+                                da_engine = DataAnalystEngine(db_path, logger)
+                                da_engine.process_files(data_files)
+                                logger.success("✅ 自动建模完成")
+                            except Exception as e:
+                                logger.warning(f"⚠️ 自动升级分析模式失败: {e}")
+
                     if os.path.exists(schema_path):
                         from src.processors.data_analyst import DataAnalystEngine
                         from src.utils.model_manager import load_llm_model
@@ -5439,11 +5505,12 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                         # 执行业务推演与 SQL 统计
                         analysis_res = da_engine.execute_analysis(final_prompt, llm)
                         
-                        # 1. 显示逻辑推演报告
-                        st.markdown("### 📊 业务分析报告")
-                        st.markdown(analysis_res["logic"])
-                        
-                        if analysis_res["success"]:
+                        # 仅当成功生成并执行了 SQL 时才拦截
+                        if analysis_res.get("success", False):
+                            # 1. 显示逻辑推演报告
+                            st.markdown("### 📊 业务分析报告")
+                            st.markdown(analysis_res["logic"])
+                            
                             # 2. 显示执行的 SQL
                             with st.expander("🛠️ 查看执行指令 (SQL)", expanded=False):
                                 st.code(analysis_res["sql"], language="sql")
@@ -5458,15 +5525,14 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                             if len(df_res.columns) >= 2 and len(df_res) > 1:
                                 with st.expander("📈 数据看板", expanded=True):
                                     st.bar_chart(df_res.set_index(df_res.columns[0]))
-                        else:
-                            st.warning("⚠️ 无法执行实时统计，已为您提供逻辑推演建议。")
-                        
-                        # 归档并彻底阻断 RAG 流程
-                        st.session_state.messages.append({"role": "assistant", "content": analysis_res["logic"]})
-                        st.session_state.is_processing = False
-                        st.rerun()
+                            
+                            # 归档并彻底阻断 RAG 流程
+                            st.session_state.messages.append({"role": "assistant", "content": analysis_res["logic"]})
+                            st.session_state.is_processing = False
+                            st.rerun()
+                        # else: 失败或无SQL，自动回退到下方 RAG 流程
 
-                    # --- 原始 RAG 逻辑 (仅当不是分析模式时执行) ---
+                    # --- 原始 RAG 逻辑 (仅当不是分析模式或分析失败时执行) ---
                     start_time = time.time()
                     
                     # 显示启用的检索增强功能
