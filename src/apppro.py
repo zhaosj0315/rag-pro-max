@@ -4678,14 +4678,14 @@ if workspace_col:
 
 # 极简工具栏：模型与设置
 with st.container():
-    # Tools: Leading Spacer | Provider | Model | Deep | Web | Research | Filter | Clear | Stop/Trailing Spacer
-    # 调整比例以容纳 智能研究 (v2.9)
+    # Tools: Leading Spacer | Provider | Model | Deep | Web | Research | DataAnalyst | Filter | Clear | Stop/Trailing Spacer
+    # 调整比例以容纳 数据分析 强制开关 (v3.9.6)
     if st.session_state.get('is_processing'):
-        cols = st.columns([0.03, 0.12, 0.22, 0.11, 0.11, 0.11, 0.04, 0.04, 0.12], gap="small")
-        c_lead, c_prov, c_model, c_deep, c_web, c_research, c_filter, c_clear, c_stop = cols
+        cols = st.columns([0.03, 0.12, 0.20, 0.10, 0.10, 0.10, 0.10, 0.04, 0.04, 0.07], gap="small")
+        c_lead, c_prov, c_model, c_deep, c_web, c_research, c_data, c_filter, c_clear, c_stop = cols
     else:
-        cols = st.columns([0.03, 0.12, 0.22, 0.11, 0.11, 0.11, 0.04, 0.04, 0.12], gap="small")
-        c_lead, c_prov, c_model, c_deep, c_web, c_research, c_filter, c_clear, c_spacer = cols
+        cols = st.columns([0.03, 0.12, 0.20, 0.10, 0.10, 0.10, 0.10, 0.04, 0.04, 0.07], gap="small")
+        c_lead, c_prov, c_model, c_deep, c_web, c_research, c_data, c_filter, c_clear, c_spacer = cols
     
     # --- 0. 前置留白 (c_lead 不放置内容) ---
 
@@ -4870,6 +4870,11 @@ with st.container():
     with c_research:
         research_on = st.toggle("智能研究", value=st.session_state.get('enable_deep_research', False), help="启用深度研究模式 (v2.9)")
         st.session_state.enable_deep_research = research_on
+
+    with c_data:
+        # [v3.9.6] 数据分析强制开关
+        data_analyst_on = st.toggle("数据分析", value=st.session_state.get('force_data_analyst', False), help="强制开启 3.5.x 数据分析/架构推演模式")
+        st.session_state.force_data_analyst = data_analyst_on
 
     # --- 4. 操作按钮 (Popover/Button) ---
     if st.session_state.get('is_processing'):
@@ -5586,49 +5591,47 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     db_path = os.path.join(output_base, active_kb_name)
                     schema_path = os.path.join(db_path, "business_schema.json")
                     
-                    # [JIT/语义嗅探] 激活 3.5.0 分析引擎
-                    if not os.path.exists(schema_path):
+                    # [v3.9.6] 数据分析引擎唤醒逻辑 (支持手动强制与自动嗅探)
+                    is_forced_da = st.session_state.get('force_data_analyst', False)
+                    schema_path = os.path.join(db_path, "business_schema.json")
+                    
+                    if not os.path.exists(schema_path) or is_forced_da:
                         import glob
-                        # 扫描知识库目录下的原始数据文件
                         data_files = glob.glob(os.path.join(db_path, "*.csv")) + \
                                      glob.glob(os.path.join(db_path, "*.xlsx")) + \
                                      glob.glob(os.path.join(db_path, "*.xls"))
                         
-                        # 判定逻辑：有物理文件，或者名称中带有数据特征
                         is_data_kb = "csv" in active_kb_name.lower() or "excel" in active_kb_name.lower()
                         
-                        if data_files or is_data_kb:
+                        # 如果手动开启或嗅探到特征
+                        if is_forced_da or data_files or is_data_kb:
                             try:
                                 from src.processors.data_analyst import DataAnalystEngine
                                 from src.utils.model_manager import load_llm_model
                                 
-                                logger.info(f"🔎 [v3.5.1] 发现数据特征，尝试唤醒分析引擎...")
+                                logger.info(f"🔎 [v3.9.6] {'手动强制' if is_forced_da else '自动嗅探'} 唤醒分析引擎...")
                                 da_engine = DataAnalystEngine(db_path, logger)
                                 llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
                                 
                                 if data_files:
-                                    logger.info(f"📂 [v3.5.1] 正在对物理文件进行建模: {data_files}")
                                     da_engine.process_files(data_files)
                                 else:
-                                    # 如果没物理文件，尝试从已有的语义索引中恢复 (使用临时 Reader)
-                                    logger.info(f"🧩 [v3.5.1] 物理文件缺失，尝试通过语义嗅探恢复结构...")
+                                    # [架构优先] 物理文件缺失，尝试通过检索出的 Context 进行建模
                                     from llama_index.core import SimpleDirectoryReader
                                     try:
-                                        # 尝试读取 persist_dir 里的文本 (如果有缓存)
                                         reader = SimpleDirectoryReader(input_dir=db_path)
                                         docs = reader.load_data()
-                                        if docs:
-                                            da_engine.extract_schema_from_docs(docs, llm)
-                                    except:
-                                        pass
+                                        if docs: da_engine.extract_schema_from_docs(docs, llm)
+                                    except: pass
                                 
-                                if os.path.exists(schema_path):
-                                    logger.success(f"✨ [v3.5.1] 数据分析引擎激活成功")
-                                    st.toast("✅ 已成功激活 3.5.0 分析模式", icon="📊")
+                                if os.path.exists(schema_path) or is_forced_da:
+                                    logger.success(f"✨ [v3.9.6] 数据分析模式激活")
+                                    if is_forced_da: st.toast("📊 已强制开启数据分析模式", icon="⚙️")
                             except Exception as e:
-                                logger.warning(f"❌ [v3.5.1] 引擎唤醒失败: {e}")
+                                logger.warning(f"❌ [v3.9.6] 引擎唤醒失败: {e}")
 
-                    if os.path.exists(schema_path):
+                    # 触发执行逻辑 (只要有 schema 或者是强制模式就执行)
+                    if os.path.exists(schema_path) or is_forced_da:
                         from src.processors.data_analyst import DataAnalystEngine
                         from src.utils.model_manager import load_llm_model
                         da_engine = DataAnalystEngine(db_path, logger)
