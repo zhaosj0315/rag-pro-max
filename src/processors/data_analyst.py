@@ -17,9 +17,7 @@ class DataAnalystEngine:
         """
         [核心升级] 语义化提取：从自然语言文档（PDF/Word）中识别表结构、数据字典。
         """
-        # 合并所有文档的文本片段进行分析
-        all_text = "\n".join([d.text for d in docs[:20]]) # 取前20个片段防止Token溢出
-        
+        all_text = "\n".join([d.text for d in docs[:20]])
         prompt = f"""
 你是一名顶级的数据库架构师。请从以下文档内容中提取出所有的数据库表结构、字段说明、数据字典及表间关联关系：
 {all_text}
@@ -54,7 +52,6 @@ class DataAnalystEngine:
         业务推演：推导出业务场景、关联路径和分析建议。
         """
         try:
-            # 1. 安全序列化 schemas
             if isinstance(schemas, str):
                 schemas_str = schemas
             else:
@@ -71,7 +68,6 @@ class DataAnalystEngine:
 """
             response = model_client.complete(prompt)
             blueprint = json.loads(response.text.strip().replace("```json", "").replace("```", ""))
-            
             with open(self.blueprint_path, 'w', encoding='utf-8') as f:
                 json.dump(blueprint, f, indent=4, ensure_ascii=False)
             return blueprint
@@ -122,7 +118,7 @@ class DataAnalystEngine:
 要求：仅返回一条 SQL，包裹在 [SQL_START] 和 [SQL_END] 之间。"""
         
         sql_query = ""
-try:
+        try:
             res = model_client.complete(sql_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":sql_prompt}]).message.content
             if "[SQL_START]" in res:
                 sql_query = res.split("[SQL_START]")[1].split("[SQL_END]")[0].strip()
@@ -130,7 +126,8 @@ try:
                 import re
                 match = re.search(r'```sql\s*(.*?)\s*```', res, re.DOTALL | re.IGNORECASE)
                 if match: sql_query = match.group(1).strip()
-        except: pass
+        except:
+            pass
 
         # 2. 执行与仿真
         execution_result = {"success": False, "data": []}
@@ -162,7 +159,8 @@ SQL 指令: {sql_query}
                     json_match = re.search(r'(\[.*\])', sim_res, re.DOTALL)
                     if json_match:
                         execution_result = {"success": True, "data": json.loads(json_match.group(1))}
-                except: pass
+                except:
+                    pass
 
         if not execution_result["success"] or not sql_query:
              return {"success": False, "logic": "分析引擎无法获取有效数据，请检查知识库文件。"}
@@ -212,38 +210,27 @@ SQL 指令: {sql_query}
     def _recover_data_from_docstore(self):
         docstore_path = os.path.join(self.kb_path, "docstore.json")
         if not os.path.exists(docstore_path): return
-        
         try:
             with open(docstore_path, 'r', encoding='utf-8') as f:
                 docstore = json.load(f)
-            
             nodes = docstore.get("docstore/data", {})
             import io, re
-            
             conn = sqlite3.connect(self.db_path)
             found_data = False
-            
             for node_id, node_data in nodes.items():
                 text = node_data.get("__data__", {}).get("text", "")
                 metadata = node_data.get("__data__", {}).get("metadata", {})
                 file_name = metadata.get("file_name", "")
-                
                 if file_name.endswith('.csv') or (',' in text and '\n' in text):
                     table_name = os.path.splitext(file_name)[0] if file_name else f"table_{{node_id[:8]}}"
                     table_name = re.sub(r'[^a-zA-Z0-9_]', '_', table_name)
-                    
                     try:
                         df = pd.read_csv(io.StringIO(text))
                         df.to_sql(table_name, conn, index=False, if_exists='replace')
                         found_data = True
                         if self.logger: self.logger.info(f"✅ [v3.5.2] 已从索引成功找回并恢复表: {table_name}")
-                    except:
-                        continue
-            
+                    except: continue
             conn.close()
-            if not found_data and self.logger:
-                self.logger.warning("❌ [v3.5.2] 索引中未发现可恢复的结构化文本内容")
-                
         except Exception as e:
             if self.logger: self.logger.error(f"❌ [v3.5.2] 数据恢复失败: {e}")
 
@@ -266,36 +253,28 @@ SQL 指令: {sql_query}
         try:
             if os.path.exists(self.db_path):
                 os.remove(self.db_path)
-            
             conn = sqlite3.connect(self.db_path)
             processed_tables = {}
-            
             for file_path in file_paths:
                 file_name = os.path.basename(file_path)
                 table_name = os.path.splitext(file_name)[0]
                 table_name = re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', table_name)
-                
                 if file_path.endswith('.csv'):
                     df = pd.read_csv(file_path)
                 elif file_path.endswith(('.xls', '.xlsx')):
                     df = pd.read_excel(file_path)
                 else:
                     continue
-                
                 df.columns = [re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', str(c)) for c in df.columns]
                 df.to_sql(table_name, conn, index=False, if_exists='replace')
-                
                 processed_tables[table_name] = {
                     "description": f"数据来源: {file_name}",
                     "columns": [{"name": c, "type": str(t)} for c, t in df.dtypes.items()]
                 }
-            
             conn.close()
             with open(self.schema_path, 'w', encoding='utf-8') as f:
                 json.dump({"tables": processed_tables}, f, indent=4, ensure_ascii=False)
-                
             return {"success": True, "tables": list(processed_tables.keys())}
-            
         except Exception as e:
             if self.logger:
                 self.logger.error(f"文件处理入库失败: {e}")
