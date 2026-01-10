@@ -15,108 +15,88 @@ class DataAnalystEngine:
 
     def extract_schema_from_docs(self, docs: List[Any], model_client) -> Dict[str, Any]:
         """
-        [核心升级] 语义化提取：从自然语言文档（PDF/Word）中识别表结构、数据字典。
+        [v3.7.0 企业级升级] 语义化提取：从海量文档中识别表结构及【业务关联图谱】。
         """
-        all_text = "\n".join([d.text for d in docs[:20]])
+        all_text = "\n".join([d.text for d in docs[:30]]) # 增加采样范围以支持更多表
+        
         prompt = f"""
-你是一名顶级的数据库架构师。请从以下文档内容中提取出所有的数据库表结构、字段说明、数据字典及表间关联关系：
-{all_text}
+你是一名资深首席架构师。请从以下文档中提取数据库模型。
+文档内容：{all_text}
 
-请输出一个标准的 JSON 对象，格式如下：
-{{
-  "tables": {{
-    "表名": {{
-      "description": "业务含义",
-      "columns": [
-        {{"name": "字段名", "type": "类型", "comment": "业务解释", "is_primary": true/false}}
-      ],
-      "foreign_keys": [
-        {{"column": "本表字段", "ref_table": "关联表", "ref_column": "关联字段"}}
-      ]
-    }}
-  }}
-}}
-请仅输出 JSON。
+要求输出标准的 JSON，必须包含：
+1. "tables": {{ "表名": {{ "desc": "业务含义", "cols": [{{ "name": "字段名", "type": "类型", "comment": "解释" }}] }} }}
+2. "relationships": [ {{ "source": "表A", "target": "表B", "on": "关联字段", "logic": "业务场景" }} ]
+3. "business_domains": {{ "领域名": ["相关表名"] }}
+
+即使文档中没有外键约束，也请根据业务常识推断隐含的逻辑关联。
 """
         response = model_client.complete(prompt)
         try:
-            schema_data = json.loads(response.text.strip().replace("```json", "").replace("```", ""))
+            content = response.text.strip().replace("```json", "").replace("```", "")
+            schema_data = json.loads(content)
             with open(self.schema_path, 'w', encoding='utf-8') as f:
                 json.dump(schema_data, f, indent=4, ensure_ascii=False)
             return schema_data
         except:
-            return {"error": "语义解析失败"}
+            return {"error": "语义模型解析失败"}
 
-    def infer_business_blueprint(self, schemas: Any, model_client) -> Dict[str, Any]:
-        """
-        业务推演：推导出业务场景、关联路径和分析建议。
-        """
-        try:
-            if isinstance(schemas, str):
-                schemas_str = schemas
-            else:
-                schemas_str = json.dumps(schemas, indent=2, ensure_ascii=False, default=str)
-            
-            prompt = f"""
-请根据以下数据库结构推导业务全景图：
-{schemas_str}
-
-请输出 JSON：
-1. business_scenario: 业务系统描述。
-2. core_logic: 核心业务流转逻辑。
-3. analysis_dimensions: 推荐的 5 个业务分析维度。
-"""
-            response = model_client.complete(prompt)
-            blueprint = json.loads(response.text.strip().replace("```json", "").replace("```", ""))
-            with open(self.blueprint_path, 'w', encoding='utf-8') as f:
-                json.dump(blueprint, f, indent=4, ensure_ascii=False)
-            return blueprint
-        except Exception as e:
-            if self.logger:
-                self.logger.error(f"业务推演失败: {e}")
-            return {
-                "business_scenario": "自动推演失败",
-                "core_logic": "无法识别",
-                "analysis_dimensions": ["通用分析"],
-                "error": str(e)
-            }
+    def _get_relevant_tables(self, query: str, schemas: Dict[str, Any]) -> List[str]:
+        """[核心黑科技] 针对百表规模的动态剪枝：根据问题筛选最相关的子集表"""
+        all_tables = schemas.get("tables", {})
+        if len(all_tables) <= 8:
+            return list(all_tables.keys())
+        
+        # 语义过滤逻辑
+        relevant = []
+        query_words = query.lower()
+        for t_name, info in all_tables.items():
+            if t_name.lower() in query_words or any(w in info.get("desc", "").lower() for w in query_words if len(w)>1):
+                relevant.append(t_name)
+        
+        # 补全一级关联表
+        rels = schemas.get("relationships", [])
+        extra = []
+        for r in rels:
+            if r["source"] in relevant and r["target"] not in relevant:
+                extra.append(r["target"])
+            elif r["target"] in relevant and r["source"] not in relevant:
+                extra.append(r["source"])
+        
+        return list(set(relevant + extra))[:10] # 限制注意力范围
 
     def execute_analysis(self, query: str, model_client, context_text: str = "") -> Dict[str, Any]:
         """
-        [主动分析版] 强制执行 SQL 并返回结构化结果
+        [企业分析版] 支持海量表结构的路由分析与架构仿真
         """
-        # 0. 数据库自愈检查
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-            tables = cursor.fetchall()
-            conn.close()
-            
-            if not tables:
-                if self.logger: self.logger.info("🛠️ [v3.5.2] 检测到数据库为空，启动数据自愈程序...")
-                self._recover_data_from_docstore()
-        except Exception as e:
-            if self.logger: self.logger.warning(f"⚠️ [v3.5.2] 数据库自愈检查失败: {e}")
-
         if not os.path.exists(self.schema_path):
-             return {"success": False, "logic": "未找到数据结构定义，请先上传数据或文档。"}
+             return {"success": False, "logic": "未找到数据结构定义，请上传文档或表单。"}
 
         with open(self.schema_path, 'r', encoding='utf-8') as f:
-            schemas = json.load(f)
+            full_schemas = json.load(f)
         
-        valid_tables = list(schemas.get("tables", {}).keys())
+        # 1. 动态路由：从上百个表中找出最关键的几个
+        relevant_table_names = self._get_relevant_tables(query, full_schemas)
+        pruned_schemas = {
+            "tables": {name: full_schemas["tables"][name] for name in relevant_table_names if name in full_schemas["tables"]},
+            "relationships": [r for r in full_schemas.get("relationships", []) if r["source"] in relevant_table_names or r["target"] in relevant_table_names]
+        }
+        
         from datetime import datetime
         current_date = datetime.now().strftime("%Y-%m-%d")
         
-        # 1. 强制生成 SQL
-        sql_prompt = f"""你是一名资深 SQLite 专家。请生成一条 SQL。
+        # 2. 精准 SQL 生成
+        sql_prompt = f"""你是一名资深数据专家。
 当前日期: {current_date}
-可用表名: {valid_tables}
-详细结构：{json.dumps(schemas, ensure_ascii=False)}
+目标业务子集模型：
+{json.dumps(pruned_schemas, ensure_ascii=False)}
+
 用户问题：{query}
-要求：仅返回一条 SQL，包裹在 [SQL_START] 和 [SQL_END] 之间。"""
-        
+
+要求：
+1. 仅使用上述提供的表名进行 JOIN。
+2. 即使无数据，也请根据字段注释编写逻辑严密的 SQL。
+3. 包裹在 [SQL_START] 和 [SQL_END] 之间。
+"""
         sql_query = ""
         try:
             res = model_client.complete(sql_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":sql_prompt}]).message.content
@@ -126,32 +106,33 @@ class DataAnalystEngine:
                 import re
                 match = re.search(r'```sql\s*(.*?)\s*```', res, re.DOTALL | re.IGNORECASE)
                 if match: sql_query = match.group(1).strip()
-        except:
-            pass
+        except: pass
 
-        # 2. 执行与仿真
+        # 3. 运行与架构仿真
         execution_result = {"success": False, "data": []}
         is_simulated = False
         
         if sql_query:
-            for vt in valid_tables:
-                if vt in sql_query: continue
-                base_name = vt.split('_')[0]
-                if f" {base_name} " in f" {sql_query} ":
-                    sql_query = sql_query.replace(f" {base_name} ", f" {vt} ")
+            # 数据库自愈检查
+            try:
+                conn = sqlite3.connect(self.db_path)
+                if not conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall():
+                    self._recover_data_from_docstore()
+                conn.close()
+            except: pass
 
             execution_result = self.execute_sql(sql_query)
             
-            if (not execution_result["success"] or not execution_result["data"]) and (context_text or len(valid_tables) > 0):
+            # 如果没真实数据，启动“架构仿真模式”
+            if (not execution_result["success"] or not execution_result["data"]):
                 is_simulated = True
                 sim_prompt = f"""
-你是一名资深数据分析师。当前处于【智能仿真模式】。
-请根据以下【数据结构】和【用户问题】，模拟出一组高质量、符合业务逻辑的查询结果数据。
-用户问题: {query}
-SQL 指令: {sql_query}
-数据结构: {json.dumps(schemas, ensure_ascii=False)}
+你是一名资深建模专家。当前处于【架构仿真模式】。
+数据库无真实数据，请严格根据【表结构】、【业务注释】和【SQL】逻辑，模拟出 5 条符合业务常识的 JSON 数据。
+SQL: {sql_query}
+表模型: {json.dumps(pruned_schemas, ensure_ascii=False)}
 参考养料: {context_text[:2000]}
-要求：必须输出一个 JSON 数组，包含至少 3-5 条模拟数据。
+请仅输出 JSON 数组。
 """
                 try:
                     sim_res = model_client.complete(sim_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":sim_prompt}]).message.content
@@ -159,57 +140,39 @@ SQL 指令: {sql_query}
                     json_match = re.search(r'(\[.*\])', sim_res, re.DOTALL)
                     if json_match:
                         execution_result = {"success": True, "data": json.loads(json_match.group(1))}
-                except:
-                    pass
+                except: pass
 
         if not execution_result["success"] or not sql_query:
-             return {"success": False, "logic": "分析引擎无法获取有效数据，请检查知识库文件。"}
+             return {"success": False, "logic": "架构推演失败，请完善表结构文档。"}
 
-        # 3. 准备流式报告生成器
+        # 4. 准备流式报告
         summary_prompt = f"""
-你是一名资深商业分析师。请根据以下查询结果撰写分析报告。
+你是一名资深商业分析师。请针对以下【架构仿真结果】撰写分析报告。
 问题: {query}
-数据: {json.dumps(execution_result['data'][:10], ensure_ascii=False)}
-{" (注意：这是基于业务逻辑仿真的深度推演数据)" if is_simulated else ""}
+SQL逻辑: {sql_query}
+模拟数据: {json.dumps(execution_result['data'][:10], ensure_ascii=False)}
+注意：这是基于业务模型文档进行的【逻辑推演】。
 
-请按以下模块输出：
-### 💡 核心结论
-### 📊 数据洞察
-### 🚀 行动建议
+报告必须包含：
+### 💡 核心逻辑推演
+### 📊 模拟指标透视
+### 🚀 业务架构建议
 """
         
         def report_generator():
             if hasattr(model_client, 'stream_chat'):
-                # [修复] LLM.stream_chat 返回的是生成器，直接迭代即可
                 from llama_index.core.base.llms.types import ChatMessage, MessageRole
                 messages = [ChatMessage(role=MessageRole.USER, content=summary_prompt)]
                 try:
                     response_gen = model_client.stream_chat(messages)
                     for chunk in response_gen:
-                        # 兼容不同 LlamaIndex 版本的返回对象
-                        if hasattr(chunk, 'delta') and chunk.delta:
-                            yield chunk.delta
-                        elif hasattr(chunk, 'message') and hasattr(chunk.message, 'content'):
-                            yield chunk.message.content
-                        else:
-                            yield str(chunk)
-                except Exception as e:
-                    yield f"\n流式输出异常: {e}"
-            elif hasattr(model_client, 'chat') and hasattr(model_client, 'model'):
-                try:
-                    import ollama
-                    if "ollama" in str(type(model_client)).lower():
-                        stream = ollama.chat(model=model_client.model, messages=[{'role': 'user', 'content': summary_prompt}], stream=True)
-                        for chunk in stream:
-                            yield chunk['message']['content']
-                    else:
-                        res = model_client.complete(summary_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":summary_prompt}]).message.content
-                        for char in res:
-                            yield char
-                except:
-                    yield "分析报告生成异常"
+                        if hasattr(chunk, 'delta') and chunk.delta: yield chunk.delta
+                        elif hasattr(chunk, 'message') and hasattr(chunk.message, 'content'): yield chunk.message.content
+                        else: yield str(chunk)
+                except: yield "报告生成异常"
             else:
-                yield "模型配置暂不支持流式报告"
+                res = model_client.complete(summary_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":summary_prompt}]).message.content
+                for char in res: yield char
 
         return {
             "sql": sql_query,
