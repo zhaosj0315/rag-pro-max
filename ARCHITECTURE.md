@@ -1,206 +1,20 @@
-# RAG Pro Max v3.2.6 企业级系统架构文档
+# RAG Pro Max v3.4.5 企业级系统架构文档
 
-**版本**: v3.2.6  
-**更新日期**: 2026-01-04  
+**版本**: v3.4.5  
+**更新日期**: 2026-01-10  
 **适用范围**: 企业级部署与运维  
 **架构层级**: 4层企业级架构  
 **核心特性**: 多语言国际化、企业级安全、离线部署、智能研究
 
 ---
-
-## 🏗️ 企业级总体架构
-
-RAG Pro Max v3.2.6 采用现代化四层企业级架构，支持完全离线部署、多语言国际化和企业级安全特性。
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                表现层 (Presentation Layer)               │
-│     Streamlit Web界面 + 多语言支持 + 企业级UI设计        │
-│     • 中英文双语界面                                    │
-│     • 企业级安全配置                                    │
-│     • 响应式设计                                        │
-└─────────────────┬───────────────────────────────────────┘
-                  │
-┌─────────────────▼───────────────────────────────────────┐
-│                服务层 (Service Layer)                    │
-│    业务逻辑服务 + 企业级功能 + 安全控制                  │
-│    • 知识库管理服务                                     │
-│    • 文档处理服务                                       │
-│    • 配置管理服务                                       │
-│    • 安全审计服务                                       │
-└─────────────────┬───────────────────────────────────────┘
-                  │
-┌─────────────────▼───────────────────────────────────────┐
-│                公共层 (Common Layer)                     │
-│      通用工具模块 + 企业级组件 + 监控系统                │
-│      • 统一日志管理                                     │
-│      • 性能监控                                         │
-│      • 错误处理                                         │
-│      • 缓存管理                                         │
-└─────────────────┬───────────────────────────────────────┘
-                  │
-┌─────────────────▼───────────────────────────────────────┐
-│                工具层 (Utils Layer)                      │
-│     底层工具函数 + 数据处理 + 外部集成                   │
-│     • 文档解析引擎                                      │
-│     • 向量数据库                                        │
-│     • 本地LLM集成                                       │
-│     • 网络爬虫                                          │
-└─────────────────────────────────────────────────────────┘
-```
-
-## 🏢 企业级核心特性
-
-### 🔒 安全架构
-- **完全离线**: 支持内网环境独立运行
-- **本地存储**: 所有数据本地ChromaDB存储
-- **零上传**: 文档内容100%本地处理
-- **加密保护**: 支持数据库和文件加密
-
-### 🌍 国际化架构
-- **多语言支持**: 中英文双语界面
-- **文档国际化**: docs/zh, docs/en 结构
-- **自动检查**: GitHub Actions 持续验证
-- **扩展性**: 支持添加更多语言
-
-### 📊 企业级监控
-- **性能监控**: 实时CPU、内存、磁盘监控
-- **业务监控**: 查询量、响应时间统计
-- **错误追踪**: 完整的错误日志系统
-- **审计日志**: 用户操作完整记录
-│   ├── extract_header_url()             # 文件头URL提取
-│   ├── set_where_from_metadata()        # 溯源元数据注入
-│   └── reveal_in_file_manager()         # 跨平台文件管理器调用
-```
-├── file_service.py              # 文件处理服务
-│   ├── validate_file()          # 文件验证
-│   ├── process_file()           # 文件处理
-│   └── SUPPORTED_EXTENSIONS     # 支持格式
-├── knowledge_base_service.py    # 知识库管理服务
-│   ├── list_knowledge_bases()   # 列出知识库
-│   ├── create_knowledge_base()  # 创建知识库
-│   └── delete_knowledge_base()  # 删除知识库
-└── config_service.py            # 配置管理服务
-    ├── get_default_model()      # 获取默认模型
-    ├── update_model_config()    # 更新模型配置
-    └── get_config_value()       # 获取配置值
-```
-
-### 公共层 (Common Layer)
-```
-src/common/
-├── business.py                  # 业务逻辑
-├── config.py                    # 配置管理
-└── utils.py                     # 通用工具函数
-```
-
-### 用户界面层 (UI Layer)
-```
-src/ui/                          # 39个界面组件
-├── config_forms.py              # 配置表单
-├── sidebar_config.py            # 侧边栏配置
-├── page_style.py                # 页面样式
-├── kb_management_ui.py          # 知识库管理界面
-├── web_to_kb_interface.py       # 网页抓取界面
-├── search_ui.py                 # 搜索界面
-├── chat_interface.py            # 聊天界面
-├── progress_monitor.py          # 进度监控
-├── monitoring_dashboard.py      # 监控面板
-└── ...                          # 其他UI组件
-```
-
-### 文档处理层 (Processors)
-```
-src/processors/                  # 23个处理器
-├── web_crawler.py               # 网页爬虫
-├── async_web_crawler.py         # 异步爬虫
-├── concurrent_crawler.py        # 并发爬虫
-├── content_analyzer.py          # 内容分析
-├── crawl_stats_manager.py       # 爬虫统计
-├── index_builder.py             # 索引构建
-├── multimodal_processor.py      # 多模态处理
-├── upload_handler.py            # 上传处理
-└── ...                          # 其他处理器
-```
-
-### 查询引擎层 (Query Layer)
-```
-src/query/                       # 查询处理引擎
-├── multi_kb_query_engine.py     # 多知识库联合查询引擎 (多进程优化)
-├── query_handler.py             # 核心查询处理器
-├── query_processor.py           # 查询预处理
-└── query_rewriter.py            # 查询重写优化
-```
-
+...
 ### 工具层 (Utils Layer)
 ```
-src/utils/                       # 60个工具模块
+src/utils/                       # 61个工具模块
+├── html_to_markdown.py          # HTML清洗与Markdown转换
 ├── model_manager.py             # 模型管理
 ├── ocr_optimizer.py             # OCR优化
-├── gpu_ocr_accelerator.py       # GPU加速OCR
-├── performance_monitor.py       # 性能监控
-├── memory_optimizer.py          # 内存优化
-├── batch_operations.py          # 批量操作
-├── search_engine.py             # 搜索引擎
-├── export_manager.py            # 导出管理
-├── alert_system.py              # 告警系统
-└── ...                          # 其他工具
-```
-
-### 核心控制层 (Core)
-```
-src/core/                        # 15个核心模块
-├── version.py                   # 版本管理
-├── app_config.py                # 应用配置
-├── environment.py               # 环境初始化
-├── state_manager.py             # 状态管理
-├── main_controller.py           # 主控制器
-├── optimization_manager.py      # 优化管理
-└── ...                          # 其他核心模块
-```
-
-## 🔄 数据流架构
-
-### 文档处理流程
-```
-用户上传文件
-    ↓
-FileService.validate_file()      # 文件验证
-    ↓
-文档处理器选择                    # 根据文件类型
-    ↓
-OCR/文本提取                     # GPU加速处理
-    ↓
-文本分块                         # 智能分块
-    ↓
-向量化                          # 嵌入模型
-    ↓
-存储到ChromaDB                   # 向量数据库
-    ↓
-更新知识库索引                   # 索引更新
-```
-
-### 查询处理流程
-```
-用户输入问题
-    ↓
-问题预处理                       # 清理和标准化
-    ↓
-向量检索                        # 语义相似度
-    ↓
-BM25检索                        # 关键词匹配
-    ↓
-混合重排序                      # Cross-Encoder
-    ↓
-上下文构建                      # 检索增强
-    ↓
-LLM生成回答                     # 大语言模型
-    ↓
-后处理和格式化                  # 结果优化
-    ↓
-返回给用户                      # 流式输出
-```
-
+...
 ### 网页抓取流程
 ```
 用户输入URL
@@ -212,6 +26,12 @@ URL验证和修复                   # 智能URL处理
 参数推荐                       # 最佳抓取参数
     ↓
 并发抓取                       # 异步多线程
+    ↓
+HtmlToMarkdown清洗             # 智能去噪 (Wikipedia/广告)
+    ↓
+Markdown结构化                 # 转换为 .md
+    ↓
+元数据注入                     # 注入 URL/Timestamp
     ↓
 内容质量筛选                   # 智能过滤
     ↓
