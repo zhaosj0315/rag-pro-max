@@ -4648,14 +4648,22 @@ if workspace_col:
         st.markdown("### 🏛️ 分析工作台 (Artifacts)")
         st.caption("本次分析产生的关键结论与动态看板将在此处沉淀")
         if st.session_state.get('artifacts'):
+            aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A', '#19D3F3', '#FF6692', '#B6E880']
             for art_idx, art in enumerate(reversed(st.session_state.artifacts[-5:])):
                 with st.expander(f"📊 {art['title']} ({art['timestamp']})", expanded=(art_idx==0)):
                     import plotly.express as px
                     df_art = pd.DataFrame(art["data"])
                     if not df_art.empty:
-                        fig = px.bar(df_art, x=df_art.columns[0], y=df_art.columns[1], template="plotly_white")
+                        # 智能适配列数
+                        if len(df_art.columns) >= 2:
+                            fig = px.bar(df_art, x=df_art.columns[0], y=df_art.columns[1], 
+                                        template="plotly_white", color_discrete_sequence=[aurora_colors[0]])
+                        else:
+                            fig = px.bar(df_art, y=df_art.columns[0], 
+                                        template="plotly_white", color_discrete_sequence=[aurora_colors[0]])
+                            
                         fig.update_layout(margin=dict(l=0, r=0, t=20, b=0), height=250)
-                        st.plotly_chart(fig, use_container_width=True, key=f"art_chart_{art_idx}")
+                        st.plotly_chart(fig, use_container_width=True, key=f"art_chart_v2_{art_idx}")
                     st.caption("核心摘要")
                     st.markdown(art["summary"])
         else:
