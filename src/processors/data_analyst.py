@@ -54,11 +54,10 @@ class DataAnalystEngine:
         业务推演：推导出业务场景、关联路径和分析建议。
         """
         try:
-            # 1. 安全序列化 schemas (防止 unhashable type 等错误)
+            # 1. 安全序列化 schemas
             if isinstance(schemas, str):
                 schemas_str = schemas
             else:
-                # 使用 default=str 处理无法序列化的对象
                 schemas_str = json.dumps(schemas, indent=2, ensure_ascii=False, default=str)
             
             prompt = f"""
@@ -79,7 +78,6 @@ class DataAnalystEngine:
         except Exception as e:
             if self.logger:
                 self.logger.error(f"业务推演失败: {e}")
-            # 返回兜底数据，防止下游崩溃
             return {
                 "business_scenario": "自动推演失败",
                 "core_logic": "无法识别",
@@ -90,7 +88,7 @@ class DataAnalystEngine:
     def execute_analysis(self, query: str, model_client, context_text: str = "") -> Dict[str, Any]:
         """
         [主动分析版] 强制执行 SQL 并返回结构化结果
-        v3.5.4 升级：支持流式报告生成
+        v3.5.5 修复缩进错误
         """
         # 0. 数据库自愈检查
         try:
@@ -117,14 +115,12 @@ class DataAnalystEngine:
         current_date = datetime.now().strftime("%Y-%m-%d")
         
         # 1. 强制生成 SQL
-        sql_prompt = f"""
-你是一名资深 SQLite 专家。请生成一条 SQL。
+        sql_prompt = f"""你是一名资深 SQLite 专家。请生成一条 SQL。
 当前日期: {current_date}
 可用表名: {valid_tables}
 详细结构：{json.dumps(schemas, ensure_ascii=False)}
 用户问题：{query}
-要求：仅返回一条 SQL，包裹在 [SQL_START] 和 [SQL_END] 之间。
-"""
+要求：仅返回一条 SQL，包裹在 [SQL_START] 和 [SQL_END] 之间。"""
         
         sql_query = ""
 try:
@@ -142,7 +138,6 @@ try:
         is_simulated = False
         
         if sql_query:
-            # 校准表名
             for vt in valid_tables:
                 if vt in sql_query: continue
                 base_name = vt.split('_')[0]
@@ -151,7 +146,6 @@ try:
 
             execution_result = self.execute_sql(sql_query)
             
-            # [核心增强] 如果执行失败或结果为空，启动语义仿真
             if (not execution_result["success"] or not execution_result["data"]) and (context_text or len(valid_tables) > 0):
                 is_simulated = True
                 sim_prompt = f"""
@@ -188,16 +182,12 @@ SQL 指令: {sql_query}
 """
         
         def report_generator():
-            # 这里返回一个生成器，供前端展示流式效果
             if hasattr(model_client, 'stream_chat'):
-                # 如果模型支持流式输出 (LlamaIndex 标准)
                 response_gen = model_client.stream_chat([{"role": "user", "content": summary_prompt}])
                 for token in response_gen.response_gen:
                     yield token
             elif hasattr(model_client, 'chat') and hasattr(model_client, 'model'):
-                # Ollama/OpenAI 原始流式适配
-                full_text = ""
-try:
+                try:
                     import ollama
                     if "ollama" in str(type(model_client)).lower():
                         stream = ollama.chat(model=model_client.model, messages=[{'role': 'user', 'content': summary_prompt}], stream=True)
@@ -215,13 +205,12 @@ try:
         return {
             "sql": sql_query,
             "data": execution_result['data'],
-            "logic_gen": report_generator(), # 返回生成器
+            "logic_gen": report_generator(),
             "success": True,
             "is_simulated": is_simulated
         }
 
     def _recover_data_from_docstore(self):
-        """[v3.5.2] 核心黑科技：从 docstore 中通过语义嗅探找回 CSV 数据并入库"""
         docstore_path = os.path.join(self.kb_path, "docstore.json")
         if not os.path.exists(docstore_path): return
         
@@ -240,9 +229,8 @@ try:
                 metadata = node_data.get("__data__", {}).get("metadata", {})
                 file_name = metadata.get("file_name", "")
                 
-                # 嗅探是否为 CSV 格式
                 if file_name.endswith('.csv') or (',' in text and '\n' in text):
-                    table_name = os.path.splitext(file_name)[0] if file_name else f"table_{{node_id[:8]}}"
+                    table_name = os.path.splitext(file_name)[0] if file_name else f"table_{node_id[:8]}"
                     table_name = re.sub(r'[^a-zA-Z0-9_]', '_', table_name)
                     
                     try:
@@ -260,10 +248,8 @@ try:
             if self.logger: self.logger.error(f"❌ [v3.5.2] 数据恢复失败: {e}")
 
     def execute_sql(self, sql: str) -> Dict[str, Any]:
-        """执行 SQL 并返回字典列表"""
         try:
             conn = sqlite3.connect(self.db_path)
-            # 配置 row_factory 以返回字典
             conn.row_factory = lambda c, r: dict([(col[0], r[idx]) for idx, col in enumerate(c.description)])
             cursor = conn.cursor()
             cursor.execute(sql)
@@ -276,12 +262,8 @@ try:
             return {"success": False, "error": str(e), "data": []}
 
     def process_files(self, file_paths: List[str]) -> Dict[str, Any]:
-        """
-        物理文件入库：读取 CSV/Excel 并构建 SQLite 数据库
-        """
         import re
         try:
-            # 重置数据库
             if os.path.exists(self.db_path):
                 os.remove(self.db_path)
             

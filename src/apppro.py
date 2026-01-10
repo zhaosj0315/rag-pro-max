@@ -4458,27 +4458,34 @@ for msg_idx, msg in enumerate(state.get_messages()):
                     with st.expander("🧐 查看审计细节"):
                         st.write(res_meta.get('critique'))
 
-            # [v3.5.3] 历史回溯：恢复数据分析智能看板
+            # [v3.5.5] 历史回溯：恢复数据分析智能看板 (Smart Viz)
             if msg.get("is_data_report") and msg.get("data"):
                 try:
                     import pandas as pd
                     df_hist = pd.DataFrame(msg["data"])
                     if not df_hist.empty:
                         st.markdown("---")
-                        # 渲染指标卡
-                        cols = st.columns(min(len(df_hist.columns), 4))
                         numeric_cols = df_hist.select_dtypes(include=['number']).columns
+                        date_cols = [c for c in df_hist.columns if "date" in c.lower() or "time" in c.lower()]
+                        cat_cols = df_hist.select_dtypes(include=['object']).columns
+
+                        # 渲染指标卡
+                        cols = st.columns(min(len(numeric_cols) if not numeric_cols.empty else 1, 4))
                         for i, col_name in enumerate(numeric_cols[:4]):
                             with cols[i % 4]:
                                 val = df_hist[col_name].iloc[0]
                                 st.metric(label=col_name, value=f"{val:,.2f}" if isinstance(val, (int, float)) else val)
                         
-                        # 渲染历史图表
+                        # 渲染历史图表 (智能选择)
                         with st.expander("📈 历史可视化视图", expanded=False):
-                            if len(df_hist.columns) >= 2:
-                                st.bar_chart(df_hist.set_index(df_hist.columns[0]))
-                            else:
-                                st.line_chart(df_hist)
+                            if len(date_cols) > 0 and len(numeric_cols) > 0:
+                                st.area_chart(df_hist.set_index(date_cols[0])[numeric_cols[0]])
+                            elif len(cat_cols) > 0 and len(numeric_cols) > 0:
+                                st.bar_chart(df_hist.set_index(cat_cols[0])[numeric_cols[0]])
+                            elif len(numeric_cols) >= 2:
+                                st.line_chart(df_hist[numeric_cols[:2]])
+                            elif not numeric_cols.empty:
+                                st.bar_chart(df_hist[numeric_cols[0]])
                         
                         # 渲染历史 SQL
                         if msg.get("sql"):
@@ -5599,25 +5606,37 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                             
                             # 1. 瞬时渲染静态部分 (标题、指标卡、图表)
                             sim_suffix = " (语义仿真)" if analysis_res.get("is_simulated") else ""
-                            st.markdown(f"### 📊 3.5.4 智能流式看板{sim_suffix}")
+                            st.markdown(f"### 📊 3.5.5 智能流式看板 (Smart Viz){sim_suffix}")
                             
                             import pandas as pd
                             df_res = pd.DataFrame(analysis_res["data"])
                             
                             if not df_res.empty:
-                                cols = st.columns(min(len(df_res.columns), 4))
+                                # [v3.5.5] 智能渲染引擎
                                 numeric_cols = df_res.select_dtypes(include=['number']).columns
+                                date_cols = [c for c in df_res.columns if "date" in c.lower() or "time" in c.lower()]
+                                cat_cols = df_res.select_dtypes(include=['object']).columns
+                                
+                                # A. 核心指标卡 (首选前两个数值)
+                                cols = st.columns(min(len(numeric_cols) if not numeric_cols.empty else 1, 4))
                                 for i, col_name in enumerate(numeric_cols[:4]):
                                     with cols[i % 4]:
                                         val = df_res[col_name].iloc[0]
                                         st.metric(label=col_name, value=f"{val:,.2f}" if isinstance(val, (int, float)) else val)
 
-                            if not df_res.empty and len(df_res) > 0:
+                                # B. 智能可视化 (根据特征切换)
                                 with st.expander("📈 数据可视化展现", expanded=True):
-                                    if len(df_res.columns) >= 2:
-                                        st.bar_chart(df_res.set_index(df_res.columns[0]))
-                                    else:
-                                        st.line_chart(df_res)
+                                    if len(date_cols) > 0 and len(numeric_cols) > 0:
+                                        # 时间趋势图
+                                        st.area_chart(df_res.set_index(date_cols[0])[numeric_cols[0]])
+                                    elif len(cat_cols) > 0 and len(numeric_cols) > 0:
+                                        # 分类对比图
+                                        st.bar_chart(df_res.set_index(cat_cols[0])[numeric_cols[0]])
+                                    elif len(numeric_cols) >= 2:
+                                        # 数值相关图
+                                        st.line_chart(df_res[numeric_cols[:2]])
+                                    elif not numeric_cols.empty:
+                                        st.bar_chart(df_res[numeric_cols[0]])
                             
                             # 2. 流式渲染报告部分
                             report_placeholder = st.empty()
