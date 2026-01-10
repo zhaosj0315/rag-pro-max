@@ -180,12 +180,21 @@ SQL 指令: {sql_query}
         
         def report_generator():
             if hasattr(model_client, 'stream_chat'):
-                # [修复] 使用 ChatMessage 对象替代字典，防止属性访问错误
+                # [修复] LLM.stream_chat 返回的是生成器，直接迭代即可
                 from llama_index.core.base.llms.types import ChatMessage, MessageRole
                 messages = [ChatMessage(role=MessageRole.USER, content=summary_prompt)]
-                response_gen = model_client.stream_chat(messages)
-                for token in response_gen.response_gen:
-                    yield token
+                try:
+                    response_gen = model_client.stream_chat(messages)
+                    for chunk in response_gen:
+                        # 兼容不同 LlamaIndex 版本的返回对象
+                        if hasattr(chunk, 'delta') and chunk.delta:
+                            yield chunk.delta
+                        elif hasattr(chunk, 'message') and hasattr(chunk.message, 'content'):
+                            yield chunk.message.content
+                        else:
+                            yield str(chunk)
+                except Exception as e:
+                    yield f"\n流式输出异常: {e}"
             elif hasattr(model_client, 'chat') and hasattr(model_client, 'model'):
                 try:
                     import ollama
