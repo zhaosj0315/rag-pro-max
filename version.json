@@ -1,7 +1,7 @@
 {
-  "version": "3.4.6",
+  "version": "3.5.0",
   "release_date": "2026-01-10",
-  "build_number": "20260110.1",
+  "build_number": "20260110.2",
   "status": "stable",
   "major_features": [
     "Data Analyst 6.0: Active Business Inference & Visualization Dashboard",

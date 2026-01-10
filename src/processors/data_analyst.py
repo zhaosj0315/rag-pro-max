@@ -2,6 +2,7 @@ import os
 import json
 import pandas as pd
 import sqlite3
+import re
 from typing import List, Dict, Any
 import hashlib
 
@@ -15,123 +16,171 @@ class DataAnalystEngine:
 
     def extract_schema_from_docs(self, docs: List[Any], model_client) -> Dict[str, Any]:
         """
-        [核心升级] 语义化提取：从自然语言文档（PDF/Word）中识别表结构、数据字典。
+        [Phase 2: 语义建模]
+        从文档中提取 Schema 并推导 ER 关联关系。
         """
-        # 合并所有文档的文本片段进行分析
-        all_text = "\n".join([d.text for d in docs[:20]]) # 取前20个片段防止Token溢出
-        
-        prompt = f"""
-你是一名顶级的数据库架构师。请从以下文档内容中提取出所有的数据库表结构、字段说明、数据字典及表间关联关系：
-{all_text}
+        print(f"\n[DA DEBUG] >>> 开始提取 Schema, 文档片段数: {len(docs)}")
+        try:
+            # 1. 准备上下文 (合并前 20 个片段)
+            all_text = "\n".join([d.text for d in docs[:20] if hasattr(d, 'text') and d.text])
+            
+            if not all_text.strip():
+                print("[DA DEBUG] !!! 警告: 文档内容为空，无法提取 Schema")
+                return {"error": "empty_content"}
 
-请输出一个标准的 JSON 对象，格式如下：
+            prompt = f"""
+你是一名资深数据库架构师。请分析以下内容，识别出数据库表结构及其关联关系（外键）。
+
+内容摘要：
+{all_text[:3500]}
+
+要求：
+1. 识别表名、字段名、类型。
+2. 识别表间关联 (如 Orders.user_id -> Users.user_id)。
+3. 必须输出标准 JSON 格式。
+
+输出示例：
 {{
-  "tables": {{
-    "表名": {{
-      "description": "业务含义",
-      "columns": [
-        {{"name": "字段名", "type": "类型", "comment": "业务解释", "is_primary": true/false}}
-      ],
-      "foreign_keys": [
-        {{"column": "本表字段", "ref_table": "关联表", "ref_column": "关联字段"}}
-      ]
-    }}
-  }}
+  "tables": {{ "Users": {{ "description": "用户表", "columns": [...] }} }},
+  "relationships": ["Users.user_id -> Orders.user_id"]
 }}
 请仅输出 JSON。
 """
-        response = model_client.complete(prompt)
-        try:
-            schema_data = json.loads(response.text.strip().replace("```json", "").replace("```", ""))
+            print("[DA DEBUG] 正在请求 LLM 提取 Schema...")
+            response = model_client.complete(prompt)
+            raw_text = response.text.strip()
+            print(f"[DA DEBUG] LLM 响应内容: {raw_text[:200]}...")
+            
+            # 使用正则暴力提取 JSON 块
+            json_str = raw_text
+            json_match = re.search(r'(\{.*\})', raw_text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+            
+            schema_data = json.loads(json_str)
+            print(f"[DA DEBUG] ✅ Schema 解析成功: 识别到 {len(schema_data.get('tables', {}))} 张表")
+            
+            # 持久化
+            os.makedirs(self.kb_path, exist_ok=True)
             with open(self.schema_path, 'w', encoding='utf-8') as f:
                 json.dump(schema_data, f, indent=4, ensure_ascii=False)
+            print(f"[DA DEBUG] ✅ Schema 已保存至: {self.schema_path}")
+            
+            # 自动构建数据库
+            self._auto_build_db_from_csv()
+                
             return schema_data
-        except:
-            return {"error": "语义解析失败"}
+        except Exception as e:
+            print(f"[DA DEBUG] ❌ Schema 提取失败: {e}")
+            return {"error": str(e), "tables": {}, "relationships": []}
 
-    def infer_business_blueprint(self, schemas: Any, model_client) -> Dict[str, Any>:
+    def infer_business_blueprint(self, schemas: Any, model_client) -> Dict[str, Any]:
         """
-        业务推演：推导出业务场景、关联路径和分析建议。
+        [Phase 3: 业务推演]
+        基于 Schema 推导业务场景和 KPI。
         """
+        print("\n[DA DEBUG] >>> 开始业务蓝图推演...")
         try:
-            # 1. 安全序列化 schemas (防止 unhashable type 等错误)
+            # 安全序列化
             if isinstance(schemas, str):
                 schemas_str = schemas
             else:
-                # 使用 default=str 处理无法序列化的对象
                 schemas_str = json.dumps(schemas, indent=2, ensure_ascii=False, default=str)
             
             prompt = f"""
 请根据以下数据库结构推导业务全景图：
 {schemas_str}
 
-请输出 JSON：
-1. business_scenario: 业务系统描述。
-2. core_logic: 核心业务流转逻辑。
-3. analysis_dimensions: 推荐的 5 个业务分析维度。
+请推演并输出 JSON：
+{{
+  "business_scenario": "业务场景描述",
+  "core_logic": "业务流转逻辑",
+  "metrics": [
+    {{"name": "指标", "definition": "逻辑"}}
+  ]
+}}
+请仅输出 JSON。
 """
             response = model_client.complete(prompt)
-            blueprint = json.loads(response.text.strip().replace("```json", "").replace("```", ""))
+            raw_text = response.text.strip()
+            
+            json_str = raw_text
+            json_match = re.search(r'(\{.*\})', raw_text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+                
+            blueprint = json.loads(json_str)
+            print(f"[DA DEBUG] ✅ 业务识别成功: {blueprint.get('business_scenario')}")
             
             with open(self.blueprint_path, 'w', encoding='utf-8') as f:
                 json.dump(blueprint, f, indent=4, ensure_ascii=False)
+                
             return blueprint
         except Exception as e:
-            if self.logger:
-                self.logger.error(f"业务推演失败: {e}")
-            # 返回兜底数据，防止下游崩溃
-            return {
-                "business_scenario": "自动推演失败",
-                "core_logic": "无法识别",
-                "analysis_dimensions": ["通用分析"],
-                "error": str(e)
-            }
+            print(f"[DA DEBUG] ❌ 业务推演失败: {e}")
+            return {"business_scenario": "通用数据分析", "core_logic": "未知", "metrics": []}
 
     def execute_analysis(self, query: str, model_client) -> Dict[str, Any]:
         """
-        [主动分析版] 强制执行 SQL 并返回结构化结果
+        [Phase 4: 执行与决策]
+        Query -> SQL -> Execution -> Insight
         """
-        with open(self.schema_path, 'r', encoding='utf-8') as f:
-            schemas = json.load(f)
+        print(f"\n[DA DEBUG] >>> 收到分析请求: {query}")
+        # 1. 加载上下文
+        schemas = {}
+        blueprint = {}
+        try:
+            if os.path.exists(self.schema_path):
+                with open(self.schema_path, 'r', encoding='utf-8') as f: schemas = json.load(f)
+            if os.path.exists(self.blueprint_path):
+                with open(self.blueprint_path, 'r', encoding='utf-8') as f: blueprint = json.load(f)
+        except: pass
         
-        # 1. 强制生成 SQL (哪怕问题模糊)
+        # 2. 生成 SQL
+        rel_hint = "\n".join(schemas.get("relationships", []))
         sql_prompt = f"""
-你是一名资深 SQL 专家。基于以下表结构，请生成一条 SQL 来回答用户的问题。
-如果问题未指定具体个体（如“某个用户”），请默认查询“所有个体的汇总统计”或“前10名排行”。
+你是一名资深数据分析专家。请基于以下结构生成 SQLite 查询语句。
 
-表结构：{json.dumps(schemas, ensure_ascii=False)}
+【表结构】：{json.dumps(schemas.get('tables', {}), ensure_ascii=False)}
+【关联关系】：{rel_hint}
 
 用户问题：{query}
 
 要求：
-1. 必须返回 SQL，不要反问用户。
-2. SQL 必须包裹在 [SQL_START] 和 [SQL_END] 之间。
-3. 如果需要计算总额，请使用 SUM()；如果需要计数，请使用 COUNT()。
+1. 必须使用标准 SQL。
+2. 优先使用 GROUP BY 语句以展示数据的分布对比（除非用户明确要求单条记录）。
+3. 结果包裹在 [SQL_START] 和 [SQL_END] 之间。
 """
+        print("[DA DEBUG] 正在生成 SQL...")
         sql_res = model_client.complete(sql_prompt).text
         sql_query = ""
         if "[SQL_START]" in sql_res:
             sql_query = sql_res.split("[SQL_START]")[1].split("[SQL_END]")[0].strip()
         
-        # 2. 尝试执行
-        execution_result = {"success": False}
+        # 3. 执行 SQL
+        execution_result = {"success": False, "data": [], "error": None}
         if sql_query:
             execution_result = self.execute_sql(sql_query)
         
-        # 3. 最终业务解读
-        summary_prompt = f"""
-根据以下 SQL 执行结果，请为用户提供一份简洁的业务分析报告：
-SQL: {sql_query}
-结果数据: {json.dumps(execution_result.get('data', [])[:10], ensure_ascii=False)}
-问题: {query}
+        # 4. 生成洞察
+        if execution_result['success']:
+            data_sample = execution_result['data'][:20] 
+            insight_prompt = f"""
+作为首席业务分析师，请根据数据结果回答用户问题。
 
-报告结构：
-- [💡 逻辑推演]：说明查询了哪些表及字段。
-- [📊 核心发现]：用一句话总结数据发现。
-- [📈 仿真建议]：说明后续可以关注的业务指标。
+【用户问题】：{query}
+【数据结果】：{json.dumps(data_sample, ensure_ascii=False)}
+
+请输出简洁的报告 (Markdown)：
+1. **💡 核心结论**: 一句话直接回答提问。
+2. **📊 数据解读**: 简要分析数据中的关键点。
+3. **🚀 行动建议**: 给出 1-2 条建议。
 """
-        final_report = model_client.complete(summary_prompt).text
-        
+            print("[DA DEBUG] 正在生成业务洞察报告...")
+            final_report = model_client.complete(insight_prompt).text
+        else:
+            final_report = f"执行失败：{execution_result.get('error')}"
+
         return {
             "sql": sql_query,
             "data": execution_result.get('data', []),
@@ -139,6 +188,45 @@ SQL: {sql_query}
             "success": execution_result.get('success', False)
         }
 
+    def execute_sql(self, sql: str) -> Dict[str, Any]:
+        """执行 SQL 并返回结果"""
+        print(f"[DA DEBUG] 执行 SQL: {sql}")
+        try:
+            if not os.path.exists(self.db_path):
+                self._auto_build_db_from_csv()
+            
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = lambda c, r: dict([(col[0], r[idx]) for idx, col in enumerate(c.description)])
+            cursor = conn.cursor()
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            conn.close()
+            
+            print(f"[DA DEBUG] ✅ 查询完成，返回 {len(rows)} 行")
+            return {"success": True, "data": rows}
+        except Exception as e:
+            print(f"[DA DEBUG] ❌ SQL 错误: {e}")
+            return {"success": False, "error": str(e), "data": []}
+
+    def _auto_build_db_from_csv(self):
+        """物理构建 SQLite 数据库"""
+        print("[DA DEBUG] 正在同步构建 SQLite 数据库...")
+        try:
+            from src.config.manifest_manager import ManifestManager
+            manifest = ManifestManager.load(self.kb_path)
+            files_count = 0
+            for f_info in manifest.get('files', []):
+                f_path = f_info.get('file_path')
+                if f_path and os.path.exists(f_path) and f_path.endswith('.csv'):
+                    t_name = os.path.splitext(f_info['name'])[0].replace('.', '_')
+                    df = pd.read_csv(f_path)
+                    conn = sqlite3.connect(self.db_path)
+                    df.to_sql(t_name, conn, index=False, if_exists='replace')
+                    conn.close()
+                    files_count += 1
+            print(f"[DA DEBUG] ✅ 数据库就绪，导入 {files_count} 张表")
+        except Exception as e:
+            print(f"[DA DEBUG] ❌ 物理入库失败: {e}")
+
     def process_files(self, file_paths: List[str]):
-        # 保留原有的 CSV/Excel 处理能力供 fallback
-        pass
+        self._auto_build_db_from_csv()

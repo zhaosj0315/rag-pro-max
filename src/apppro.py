@@ -2402,28 +2402,53 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
     # --- 核心增强：数据分析 5.0 业务推演 ---
     is_da_mode = st.session_state.get('is_data_analysis_mode', False)
     if is_da_mode:
-        status_container.write("📂 [专项] 启动业务语义大脑引擎...")
-        from src.processors.data_analyst import DataAnalystEngine
-        from src.utils.model_manager import load_llm_model
-        
-        da_engine = DataAnalystEngine(persist_dir, logger)
-        llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
-        
-        # 1. 执行 RAG 预扫描以获取文本（用于非结构化建模）
-        # 这里先运行 builder._scan_files 和 _read_documents 以获取 docs 对象
-        docs, _ = builder._read_documents(current_target_path, 0, None)
-        
-        # 2. 深度 Schema 建模 (核心升级：从文档推导演算法)
-        status_container.write("🧠 正在从文档中提取数据字典与表结构...")
-        schemas = da_engine.extract_schema_from_docs(docs, llm)
-        
-        # 3. 业务蓝图推演
-        status_container.write("🌐 正在构建业务全景图与关联路径...")
-        blueprint = da_engine.infer_business_blueprint(schemas, llm)
-        status_container.info(f"📍 识别业务场景: {blueprint.get('business_scenario', '未知业务')}")
-        
-        status_container.write("✅ 业务语义建模已就绪 (去RAG纯分析模式已激活)")
-        allow_empty_docs = True
+        try:
+            status_container.write("📂 [专项] 启动业务语义大脑引擎...")
+            
+            # 强制热重载以应用 Hotfix
+            import importlib
+            import src.processors.data_analyst
+            importlib.reload(src.processors.data_analyst)
+            from src.processors.data_analyst import DataAnalystEngine
+            from src.utils.model_manager import load_llm_model
+            
+            da_engine = DataAnalystEngine(persist_dir, logger)
+            llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
+            
+            # 1. 执行 RAG 预扫描以获取文本（用于非结构化建模）
+            # 这里先运行 builder._scan_files 和 _read_documents 以获取 docs 对象
+            docs, _ = builder._read_documents(current_target_path, 0, None)
+            
+            # 2. 深度 Schema 建模 (核心升级：从文档推导演算法)
+            status_container.write("🧠 正在从文档中提取数据字典与表结构...")
+            schemas = da_engine.extract_schema_from_docs(docs, llm)
+            
+            # 3. 业务蓝图推演
+            status_container.write("🌐 正在构建业务全景图与关联路径...")
+            try:
+                # 增加类型检查日志
+                logger.info(f"DEBUG: Schemas type: {type(schemas)}")
+                blueprint = da_engine.infer_business_blueprint(schemas, llm)
+            except Exception as e:
+                logger.error(f"❌ 业务蓝图推演严重错误: {e}")
+                # 兜底防止崩溃
+                blueprint = {
+                    "business_scenario": "推演中断",
+                    "core_logic": "系统错误",
+                    "metrics": []
+                }
+            status_container.info(f"📍 识别业务场景: {blueprint.get('business_scenario', '未知业务')}")
+            
+            status_container.write("✅ 业务语义建模已就绪 (去RAG纯分析模式已激活)")
+            allow_empty_docs = True
+            
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            logger.error(f"❌ 数据分析模式崩溃: {error_details}")
+            status_container.error(f"数据分析引擎初始化失败: {str(e)}")
+            st.expander("🔍 错误详情").code(error_details)
+            allow_empty_docs = False # 回退到普通模式
     else:
         allow_empty_docs = False
 
@@ -4359,6 +4384,37 @@ for msg_idx, msg in enumerate(state.get_messages()):
     role = msg["role"]
     avatar = "🤖" if role == "assistant" else "🧑‍💻"
     with st.chat_message(role, avatar=avatar):
+        # --- [新增] 渲染历史中的数据分析结果 ---
+        if role == "assistant" and msg.get("da_sql"):
+            # 如果包含数据分析结果，优先渲染结构化内容
+            if msg.get("prompt_role"):
+                st.markdown(f"<span style='background:#f5f5f5; padding:2px 6px; border-radius:4px; font-size:0.8rem; color:#666;'>🎭 {msg['prompt_role']}</span>", unsafe_allow_html=True)
+            
+            with st.expander("🛠️ 查看执行指令 (SQL)", expanded=False):
+                st.code(msg["da_sql"], language="sql")
+            
+            if msg.get("da_data"):
+                import pandas as pd
+                df_history = pd.DataFrame(msg["da_data"])
+                st.markdown(f"✅ **查询结果**：返回 {len(df_history)} 条数据")
+                st.dataframe(df_history, use_container_width=True)
+                
+                if len(df_history.columns) >= 2 and len(df_history) > 1:
+                    # 增加防呆检查：必须有数值列
+                    numeric_cols_hist = df_history.select_dtypes(include=['number']).columns.tolist()
+                    if numeric_cols_hist:
+                        with st.expander("📈 数据可视化", expanded=True):
+                            st.bar_chart(df_history.set_index(df_history.columns[0]))
+            
+            # 最后显示 AI 结论文字
+            st.markdown(msg["content"]) 
+            
+            # 渲染引用按钮
+            if st.button("📌 引用此回复", key=f"quote_{msg_idx}"):
+                st.session_state.quote_content = msg["content"]
+                st.rerun()
+            continue
+
         # --- 渲染持久化研究详情 (v2.9.4) ---
         if role == "assistant":
             # 1. 联网搜索历史结果
@@ -5426,48 +5482,91 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             # 使用一个连贯的spinner包装整个问答流程
             with st.spinner("🧠 正在进行深度业务逻辑推演..."):
                 try:
-                    # --- 核心增强：数据分析 5.0 (业务语义模式) ---
+                    # --- 核心增强：数据分析 7.0 (自愈式业务语义模式) ---
                     db_path = os.path.join(output_base, active_kb_name)
                     schema_path = os.path.join(db_path, "business_schema.json")
                     
-                    if os.path.exists(schema_path):
-                        from src.processors.data_analyst import DataAnalystEngine
-                        from src.utils.model_manager import load_llm_model
-                        da_engine = DataAnalystEngine(db_path, logger)
-                        llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
+                    # 1. 初始化引擎
+                    from src.processors.data_analyst import DataAnalystEngine
+                    da_engine = DataAnalystEngine(db_path, logger)
+                    
+                    # 2. 自愈逻辑：如果发现是 CSV 库但缺少 Schema，现场补建
+                    if not os.path.exists(schema_path):
+                        from src.config.manifest_manager import ManifestManager
+                        manifest = ManifestManager.load(db_path)
+                        has_csv = any(f.get('name', '').endswith('.csv') for f in manifest.get('files', []))
                         
-                        # 执行业务推演与 SQL 统计
+                        if has_csv:
+                            logger.info("🧪 发现 CSV 资产但缺少 Schema，启动实时自愈建模...")
+                            st.toast("🔍 正在初始化数据分析引擎...")
+                            
+                            # 尝试获取文档对象用于建模
+                            from llama_index.core import StorageContext, load_index_from_storage
+                            try:
+                                # 简单的文本提取用于 Schema 建模
+                                from src.file_processor import scan_directory_safe
+                                # 找到原始文件的存放位置 (通常在 manifest 记录里)
+                                sample_docs = []
+                                for f_info in manifest.get('files', []):
+                                    f_p = f_info.get('file_path')
+                                    if f_p and os.path.exists(f_p):
+                                        from llama_index.core import Document
+                                        with open(f_p, 'r', encoding='utf-8', errors='ignore') as f:
+                                            sample_docs.append(Document(text=f.read()[:5000], metadata={"file_name": f_info['name']}))
+                                
+                                if sample_docs:
+                                    # 传递当前使用的 LLM
+                                    current_llm = Settings.llm
+                                    da_engine.extract_schema_from_docs(sample_docs, current_llm)
+                                    da_engine.infer_business_blueprint("自动触发自愈建模", current_llm)
+                                    logger.success("✅ 数据分析自愈建模完成")
+                            except Exception as se:
+                                logger.error(f"自愈建模失败: {se}")
+
+                    # 3. 执行分析 (如果此时 schema 存在了)
+                    if os.path.exists(schema_path):
+                        # 获取当前使用的 LLM
+                        llm = Settings.llm
                         analysis_res = da_engine.execute_analysis(final_prompt, llm)
                         
-                        # 1. 显示逻辑推演报告
-                        st.markdown("### 📊 业务分析报告")
-                        st.markdown(analysis_res["logic"])
-                        
-                        if analysis_res["success"]:
-                            # 2. 显示执行的 SQL
+                        # 只有在真正成功拿到 SQL 且有结果时才拦截 RAG 流程
+                        if analysis_res.get("success") and analysis_res.get("sql"):
+                            # --- [UI 调整] 数据优先：SQL 和表格放在最上面 ---
                             with st.expander("🛠️ 查看执行指令 (SQL)", expanded=False):
                                 st.code(analysis_res["sql"], language="sql")
                             
-                            # 3. 显示结果数据
-                            import pandas as pd
-                            df_res = pd.DataFrame(analysis_res["data"])
-                            st.markdown(f"✅ **实时查询成功**：返回 {len(df_res)} 条数据")
-                            st.dataframe(df_res, use_container_width=True)
+                            if analysis_res["data"]:
+                                import pandas as pd
+                                df_res = pd.DataFrame(analysis_res["data"])
+                                st.markdown(f"✅ **实时查询成功**：返回 {len(df_res)} 条数据")
+                                st.dataframe(df_res, use_container_width=True)
+                                
+                                # 自动可视化 (增加防呆检查：必须有数值列)
+                                numeric_cols = df_res.select_dtypes(include=['number']).columns.tolist()
+                                if len(df_res.columns) >= 2 and len(df_res) > 1 and numeric_cols:
+                                    with st.expander("📈 数据可视化", expanded=True):
+                                        st.bar_chart(df_res.set_index(df_res.columns[0]))                            
+                            # 1. 最后显示逻辑推演报告
+                            st.markdown(analysis_res["logic"])
                             
-                            # 4. 自动可视化
-                            if len(df_res.columns) >= 2 and len(df_res) > 1:
-                                with st.expander("📈 数据看板", expanded=True):
-                                    st.bar_chart(df_res.set_index(df_res.columns[0]))
+                            # 归档消息并彻底阻断后续 RAG 流程
+                            st.session_state.messages.append({
+                                "role": "assistant", 
+                                "content": analysis_res["logic"],
+                                "prompt_role": role_name,
+                                "da_sql": analysis_res.get("sql"),
+                                "da_data": analysis_res.get("data"),
+                                "da_success": analysis_res.get("success")
+                            })
+                            st.session_state.is_processing = False
+                            st.rerun() 
                         else:
-                            st.warning("⚠️ 无法执行实时统计，已为您提供逻辑推演建议。")
-                        
-                        # 归档并彻底阻断 RAG 流程
-                        st.session_state.messages.append({"role": "assistant", "content": analysis_res["logic"]})
-                        st.session_state.is_processing = False
-                        st.rerun()
-
-                    # --- 原始 RAG 逻辑 (仅当不是分析模式时执行) ---
+                            logger.warning("数据分析引擎未产生有效结果，回退至普通 RAG 模式")                    
+                    # --- 如果没进入数据分析，继续执行原始 RAG 逻辑 ---
                     start_time = time.time()
+                except Exception as e:
+                    logger.error(f"数据分析流程异常 (回退 RAG): {e}")
+                    start_time = time.time() # 确保 RAG 计时器初始化
                     
                     # 显示启用的检索增强功能
                     enhancements = []
