@@ -4419,157 +4419,147 @@ if active_kb_name and active_kb_name != "pure_chat" and st.session_state.chat_en
                     logger.error(f"❌ 摘要生成失败: {e}")
                 st.session_state.messages.append({"role": "assistant", "content": "👋 知识库已就绪。"})
 
-# 渲染消息
-for msg_idx, msg in enumerate(state.get_messages()):
-    role = msg["role"]
-    avatar = "🤖" if role == "assistant" else "🧑‍💻"
-    with st.chat_message(role, avatar=avatar):
-        # --- 渲染持久化研究详情 (v2.9.4) ---
-        if role == "assistant":
+# --- 主界面布局：双子座双栏架构 (v3.9.0) ---
+if st.session_state.get('main_mode', 'rag') == 'sql' or st.session_state.get('is_data_report_active'):
+    chat_col, workspace_col = st.columns([1.8, 1.2], gap="medium")
+else:
+    chat_col = st.container()
+    workspace_col = None
+
+with chat_col:
+    # 渲染消息
+    for msg_idx, msg in enumerate(state.get_messages()):
+            role = msg["role"]
+            avatar = "🤖" if role == "assistant" else "🧑‍💻"
+        with st.chat_message(role, avatar=avatar):
+            # --- 渲染持久化研究详情 (v2.9.4) ---
+            if role == "assistant":
             # 1. 联网搜索历史结果
             if msg.get("search_results"):
-                search_meta = msg["search_results"]
-                # 兼容旧版本格式 (如果 search_results 直接是列表)
-                if isinstance(search_meta, list):
-                    results_list = search_meta
-                    opt_query = msg.get('optimized_query', '未知')
-                    status_label = f"✅ 已获取 {len(results_list)} 条联网结果"
-                else:
-                    results_list = search_meta.get('results', [])
-                    opt_query = search_meta.get('optimized_query', '未知')
-                    status_label = f"✅ 已精选 {search_meta.get('selected')} 条高分联网结果 (检索 {search_meta.get('total_raw')} 条, 耗时 {search_meta.get('duration')}s)"
-                
-                with st.status(status_label, expanded=False, state="complete"):
-                    st.caption(f"🎯 搜索关键词：{opt_query}")
-                    for i, res in enumerate(results_list, 1):
-                        emoji, label = res.get('quality_label', ("⭐", "中等质量"))
-                        st.markdown(f"**{i}. {emoji} {res.get('title')}**")
-                        st.caption(f"{res.get('summary', '')[:150]}...")
-                        st.markdown(f"🔗 [{urlparse(res.get('href', '')).netloc}]({res.get('href')})")
-                        if i < len(results_list): st.divider()
-            
-            # 2. 专家会审历史详情
+            search_meta = msg["search_results"]
+            # 兼容旧版本格式 (如果 search_results 直接是列表)
+            if isinstance(search_meta, list):
+            results_list = search_meta
+            opt_query = msg.get('optimized_query', '未知')
+            status_label = f"✅ 已获取 {len(results_list)} 条联网结果"
+            else:
+            results_list = search_meta.get('results', [])
+            opt_query = search_meta.get('optimized_query', '未知')
+            status_label = f"✅ 已精选 {search_meta.get('selected')} 条高分联网结果 (检索 {search_meta.get('total_raw')} 条, 耗时 {search_meta.get('duration')}s)"
+                        with st.status(status_label, expanded=False, state="complete"):
+            st.caption(f"🎯 搜索关键词：{opt_query}")
+            for i, res in enumerate(results_list, 1):
+            emoji, label = res.get('quality_label', ("⭐", "中等质量"))
+            st.markdown(f"**{i}. {emoji} {res.get('title')}**")
+            st.caption(f"{res.get('summary', '')[:150]}...")
+            st.markdown(f"🔗 [{urlparse(res.get('href', '')).netloc}]({res.get('href')})")
+            if i < len(results_list): st.divider()
+                        # 2. 专家会审历史详情
             if msg.get("research_details"):
-                res_meta = msg["research_details"]
-                with st.status(f"✅ 专家会审已完成 (专家组: {res_meta.get('roles')})", expanded=False, state="complete"):
-                    st.write(f"👥 **专家组**: {res_meta.get('roles')}")
-                    st.markdown("**💡 专业洞察视角:**")
-                    st.write(res_meta.get('perspectives'))
-                    with st.expander("🧐 查看审计细节"):
-                        st.write(res_meta.get('critique'))
-
-            # [v3.8.0] 历史回溯：恢复极光智能看板 (Smart Viz 3.0)
+            res_meta = msg["research_details"]
+            with st.status(f"✅ 专家会审已完成 (专家组: {res_meta.get('roles')})", expanded=False, state="complete"):
+            st.write(f"👥 **专家组**: {res_meta.get('roles')}")
+            st.markdown("**💡 专业洞察视角:**")
+            st.write(res_meta.get('perspectives'))
+            with st.expander("🧐 查看审计细节"):
+            st.write(res_meta.get('critique'))
+                        # [v3.8.0] 历史回溯：恢复极光智能看板 (Smart Viz 3.0)
             if msg.get("is_data_report") and msg.get("data"):
-                try:
-                    import pandas as pd
-                    import plotly.express as px
-                    df_hist = pd.DataFrame(msg["data"])
-                    if not df_hist.empty:
-                        st.markdown("---")
-                        if msg.get("analysis_path"):
-                            st.caption(f"🧠 逻辑溯源: {msg['analysis_path']}")
-                        
+            try:
+            import pandas as pd
+            import plotly.express as px
+            df_hist = pd.DataFrame(msg["data"])
+            if not df_hist.empty:
+            st.markdown("---")
+            if msg.get("analysis_path"):
+            st.caption(f"🧠 逻辑溯源: {msg['analysis_path']}")
                         numeric_cols = df_hist.select_dtypes(include=['number']).columns
-                        date_cols = [c for c in df_hist.columns if "date" in c.lower() or "time" in c.lower()]
-                        cat_cols = df_hist.select_dtypes(include=['object']).columns
-                        aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A', '#19D3F3', '#FF6692', '#B6E880']
-
+            date_cols = [c for c in df_hist.columns if "date" in c.lower() or "time" in c.lower()]
+            cat_cols = df_hist.select_dtypes(include=['object']).columns
+            aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A', '#19D3F3', '#FF6692', '#B6E880']
                         # 渲染历史 Plotly 图表
-                        with st.expander("📈 历史极光深度视图", expanded=False):
-                            if len(cat_cols) >= 1 and len(numeric_cols) >= 1:
-                                if len(cat_cols) >= 2:
-                                    fig = px.bar(df_hist, x=cat_cols[0], y=numeric_cols[0], color=cat_cols[1],
-                                                barmode='group', template="plotly_white",
-                                                color_discrete_sequence=aurora_colors)
-                                    st.plotly_chart(fig, use_container_width=True)
-                                elif len(df_hist) <= 10:
-                                    fig = px.pie(df_hist, names=cat_cols[0], values=numeric_cols[0],
-                                                hole=0.4, template="plotly_white",
-                                                color_discrete_sequence=aurora_colors)
-                                    st.plotly_chart(fig, use_container_width=True)
-                                else:
-                                    fig = px.bar(df_hist, x=cat_cols[0], y=numeric_cols[0],
-                                                color=numeric_cols[0], color_continuous_scale='Viridis',
-                                                template="plotly_white")
-                                    st.plotly_chart(fig, use_container_width=True)
-                            elif len(date_cols) > 0 and len(numeric_cols) > 0:
-                                fig = px.area(df_hist, x=date_cols[0], y=numeric_cols[0],
-                                             template="plotly_white", line_shape="spline")
-                                st.plotly_chart(fig, use_container_width=True)
-                            else:
-                                st.dataframe(df_hist, use_container_width=True)
-                        
+            with st.expander("📈 历史极光深度视图", expanded=False):
+            if len(cat_cols) >= 1 and len(numeric_cols) >= 1:
+            if len(cat_cols) >= 2:
+            fig = px.bar(df_hist, x=cat_cols[0], y=numeric_cols[0], color=cat_cols[1],
+            barmode='group', template="plotly_white",
+            color_discrete_sequence=aurora_colors)
+            st.plotly_chart(fig, use_container_width=True)
+            elif len(df_hist) <= 10:
+            fig = px.pie(df_hist, names=cat_cols[0], values=numeric_cols[0],
+            hole=0.4, template="plotly_white",
+            color_discrete_sequence=aurora_colors)
+            st.plotly_chart(fig, use_container_width=True)
+            else:
+            fig = px.bar(df_hist, x=cat_cols[0], y=numeric_cols[0],
+            color=numeric_cols[0], color_continuous_scale='Viridis',
+            template="plotly_white")
+            st.plotly_chart(fig, use_container_width=True)
+            elif len(date_cols) > 0 and len(numeric_cols) > 0:
+            fig = px.area(df_hist, x=date_cols[0], y=numeric_cols[0],
+            template="plotly_white", line_shape="spline")
+            st.plotly_chart(fig, use_container_width=True)
+            else:
+            st.dataframe(df_hist, use_container_width=True)
                         # 渲染历史 SQL
-                        if msg.get("sql"):
-                            with st.expander("🛠️ 历史执行指令", expanded=False):
-                                st.code(msg["sql"], language="sql")
-                except: pass
-
-        # 显示角色标签 (v2.7.4)
-        if role == "assistant" and msg.get("prompt_role"):
+            if msg.get("sql"):
+            with st.expander("🛠️ 历史执行指令", expanded=False):
+            st.code(msg["sql"], language="sql")
+            except: pass
+                        # 显示角色标签 (v2.7.4)
+            if role == "assistant" and msg.get("prompt_role"):
             st.markdown(f"""
             <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                <span style="background-color: rgba(0,0,0,0.05); padding: 2px 8px; border-radius: 4px; color: #666; font-size: 0.8rem; border: 1px solid rgba(0,0,0,0.1);">
-                    🎭 {msg['prompt_role']}
-                </span>
+            <span style="background-color: rgba(0,0,0,0.05); padding: 2px 8px; border-radius: 4px; color: #666; font-size: 0.8rem; border: 1px solid rgba(0,0,0,0.1);">
+            🎭 {msg['prompt_role']}
+            </span>
             </div>
             """, unsafe_allow_html=True)
-            
-        st.markdown(msg["content"])
-        
-        # 显示统计信息（如果有）- 使用新组件 (Stage 3.1)
-        if "stats" in msg and msg["stats"]:
+                        st.markdown(msg["content"])
+                        # 显示统计信息（如果有）- 使用新组件 (Stage 3.1)
+            if "stats" in msg and msg["stats"]:
             render_message_stats(msg["stats"])
-        
-        # 渲染引用源 - 使用新组件 (Stage 3.1)
-        if "sources" in msg and msg["sources"]:
+                        # 渲染引用源 - 使用新组件 (Stage 3.1)
+            if "sources" in msg and msg["sources"]:
             render_source_references(msg["sources"], expanded=False)
-        
-        # 引用按钮 (P2 恢复功能)
-        if role == "assistant":
+                        # 引用按钮 (P2 恢复功能)
+            if role == "assistant":
             if st.button("📌 引用此回复", key=f"quote_{msg_idx}"):
-                st.session_state.quote_content = msg["content"]
-                st.rerun()
-
-        # 渲染静态建议 (仅用于自动摘要)
-        is_last_message = msg_idx == len(state.get_messages()) - 1
-        if "suggestions" in msg and msg["suggestions"] and is_last_message and not st.session_state.suggestions_history:
+            st.session_state.quote_content = msg["content"]
+            st.rerun()
+                        # 渲染静态建议 (仅用于自动摘要)
+            is_last_message = msg_idx == len(state.get_messages()) - 1
+            if "suggestions" in msg and msg["suggestions"] and is_last_message and not st.session_state.suggestions_history:
             st.write("")
             for idx, q in enumerate(msg["suggestions"]):
-                if st.button(f"👉 {q}", key=f"sug_{msg_idx}_{idx}", use_container_width=True):
-                    click_btn(q)
-    
-    # 在最后一条 assistant 消息之后显示动态追问推荐（在 chat_message 容器外）
-    is_last_message = msg_idx == len(state.get_messages()) - 1
-    
-    # 调试信息
-    debug_info = {
-        'is_last_message': is_last_message,
-        'role': msg.get("role"),
-        'active_kb_name': bool(active_kb_name),
-        'chat_engine': bool(st.session_state.get('chat_engine')),
-        'suggestions_count': len(st.session_state.get('suggestions_history', []))
-    }
-    
-    if is_last_message and msg["role"] == "assistant":
-        import hashlib
-        msg_hash = hashlib.md5(msg['content'][:100].encode()).hexdigest()[:8]
-        
-        st.divider()
-        
-        @st.fragment
-        def suggestions_fragment():
+            if st.button(f"👉 {q}", key=f"sug_{msg_idx}_{idx}", use_container_width=True):
+            click_btn(q)
+                        # 在最后一条 assistant 消息之后显示动态追问推荐（在 chat_message 容器外）
+            is_last_message = msg_idx == len(state.get_messages()) - 1
+                        # 调试信息
+            debug_info = {
+            'is_last_message': is_last_message,
+            'role': msg.get("role"),
+            'active_kb_name': bool(active_kb_name),
+            'chat_engine': bool(st.session_state.get('chat_engine')),
+            'suggestions_count': len(st.session_state.get('suggestions_history', []))
+            }
+                        if is_last_message and msg["role"] == "assistant":
+            import hashlib
+            msg_hash = hashlib.md5(msg['content'][:100].encode()).hexdigest()[:8]
+                        st.divider()
+                        @st.fragment
+            def suggestions_fragment():
             # 1. 状态指示与快捷操作栏 (v2.9)
             cols = st.columns([0.25, 0.15, 0.15, 0.15, 0.15, 0.15])
             with cols[0]:
-                st.markdown("🔍 **追问推荐**")
-            
-            # 显示当前开启的功能状态 (作为美观的标签)
+            st.markdown("🔍 **追问推荐**")
+                        # 显示当前开启的功能状态 (作为美观的标签)
             with cols[1]:
-                if st.session_state.get('enable_query_optimization'):
-                    st.caption("🧠 思考中")
-                else:
-                    st.caption("⚪ 思考")
+            if st.session_state.get('enable_query_optimization'):
+            st.caption("🧠 思考中")
+            else:
+            st.caption("⚪ 思考")
             
             with cols[2]:
                 if st.session_state.get('enable_web_search'):
@@ -4631,6 +4621,31 @@ for msg_idx, msg in enumerate(state.get_messages()):
                 st.caption("暂无更多推荐，您可以尝试开启'深度思考'或'联网搜索'来获取更深入的追问。")
 
         suggestions_fragment()
+
+# --- 渲染分析工作台 (v3.9.0) ---
+if workspace_col:
+    with workspace_col:
+        st.markdown("### 🏛️ 分析工作台 (Artifacts)")
+        st.caption("本次分析产生的关键结论与动态看板将在此处沉淀")
+        
+        # 渲染工作台内容 (镜像显示最后一次或精选的看板)
+        if st.session_state.get('artifacts'):
+            for art_idx, art in enumerate(reversed(st.session_state.artifacts[-5:])): # 显示最近5个精华
+                with st.expander(f"📊 {art['title']} ({art['timestamp']})", expanded=(art_idx==0)):
+                    import plotly.express as px
+                    df_art = pd.DataFrame(art["data"])
+                    if not df_art.empty:
+                        numeric_cols = df_art.select_dtypes(include=['number']).columns
+                        cat_cols = df_art.select_dtypes(include=['object']).columns
+                        if len(cat_cols) >= 1 and len(numeric_cols) >= 1:
+                            fig = px.bar(df_art, x=cat_cols[0], y=numeric_cols[0], template="plotly_white", 
+                                        color_discrete_sequence=['#636EFA'])
+                            fig.update_layout(margin=dict(l=0, r=0, t=20, b=0), height=250)
+                            st.plotly_chart(fig, use_container_width=True, key=f"art_chart_{art_idx}")
+                    st.caption("核心摘要")
+                    st.markdown(art["summary"])
+        else:
+            st.info("💡 提问一个数据问题，关键看板会自动推送到此处。")
 
 # 极简工具栏：模型与设置
 with st.container():
@@ -5726,6 +5741,21 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                                 "analysis_path": analysis_res.get("analysis_path"),
                                 "suggestions": st.session_state.get('current_suggestions', [])
                             })
+                            
+                            # [v3.9.0] 推送到 Artifact 工作台
+                            if 'artifacts' not in st.session_state:
+                                st.session_state.artifacts = []
+                            
+                            # 提取核心结论作为标题
+                            art_title = final_prompt[:15] + "..."
+                            st.session_state.artifacts.append({
+                                "title": art_title,
+                                "data": analysis_res["data"],
+                                "summary": full_report[:200] + "...",
+                                "timestamp": datetime.now().strftime("%H:%M")
+                            })
+                            st.session_state.is_data_report_active = True
+                            
                             st.session_state.is_processing = False
                             st.rerun()
 

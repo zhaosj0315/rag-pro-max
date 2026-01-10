@@ -173,25 +173,25 @@ SQL: {sql_query}
         if not execution_result["success"] or not sql_query:
              return {"success": False, "logic": "多表分析推演失败，请检查文档关联说明。"}
 
-        # 5. 准备流式报告 (融入分析逻辑)
+        # 5. 准备流式报告 (融入归因与预测)
         summary_prompt = f"""
-你是一名资深商业分析师。请针对以下结果撰写深度报告。
+你是一名顶级商业决策专家。请针对以下结果撰写【极光分析报告】。
 用户问题: {query}
-分析路径: {analysis_path}
-结果数据: {json.dumps(execution_result['data'][:10], ensure_ascii=False)}
+SQL逻辑: {sql_query}
+结果数据: {json.dumps(execution_result['data'][:15], ensure_ascii=False)}
 
-报告要求：
-1. 必须解读跨表关联带来的业务价值。
-2. 指出数据中的关键趋势或异常。
-3. 给出的行动建议必须具有可落地性。
+报告结构（严格执行）：
+### 🧭 分析路径
+(简述关联逻辑)
 
-格式：
-### 🧭 分析逻辑溯源
-(解释为何如此联接数据)
+### 💡 核心结论
+(用一句话定调)
 
-### 💡 核心业务结论
-### 📊 数据深度洞察
-### 🚀 架构/业务建议
+### 🔍 异常归因与诊断 (Diagnostic)
+(分析数据波动的原因，指出潜在的业务风险或机会点)
+
+### 🔮 趋势预测与建议 (Predictive)
+(基于当前数据推演未来的走势，并给出 3 条可落地的商业行动建议)
 """
         
         def report_generator():
