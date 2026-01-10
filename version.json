@@ -1,13 +1,14 @@
 {
-  "version": "3.3.9",
-  "release_date": "2026-01-08",
-  "build_number": "20260108",
+  "version": "3.4.5",
+  "release_date": "2026-01-10",
+  "build_number": "20260110",
   "status": "stable",
   "major_features": [
-    "Ultimate All-in-One Asset Export (Full Mirror)",
-    "Cross-System Migration Support for Vector DB & Chats",
-    "Header-Integrated Compact Export UI",
-    "Unified Performance & Data Ownership Alignment"
+    "Data Analyst 6.0: Active Business Inference & Visualization Dashboard",
+    "Data Analyst 4.0: Simulation & Modeling System",
+    "Thematic Batch Authorization & Guest KB Empowerment",
+    "Role 2.0 Permission Middle-end",
+    "Industrial-grade Security Audit Logging"
   ],
   "compatibility": {
     "python": ">=3.9",
