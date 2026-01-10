@@ -1,11 +1,12 @@
 {
-  "version": "3.4.6",
+  "version": "3.5.1",
   "release_date": "2026-01-10",
-  "build_number": "20260110.1",
+  "build_number": "20260110.2",
   "status": "stable",
   "major_features": [
+    "Data Analyst 7.0: Semantic Sniffing & JIT Activation",
     "Data Analyst 6.0: Active Business Inference & Visualization Dashboard",
-    "Data Analyst 4.0: Simulation & Modeling System",
+    "Data Analyst 5.0: Simulation & Modeling System",
     "Thematic Batch Authorization & Guest KB Empowerment",
     "Role 2.0 Permission Middle-end",
     "Industrial-grade Security Audit Logging"
