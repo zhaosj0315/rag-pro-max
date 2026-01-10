@@ -1,14 +1,13 @@
 {
-  "version": "3.5.6",
+  "version": "3.7.5",
   "release_date": "2026-01-11",
-  "build_number": "20260111.5",
+  "build_number": "20260111.6",
   "status": "stable",
   "major_features": [
+    "Data Analyst 9.5: Multi-Table Join Path Reconstruction",
+    "Data Analyst 9.0: Smart Viz 2.0 (Multi-Dimensional Analysis)",
     "Data Analyst 8.6: Deep Streaming Protocol Compatibility",
-    "Data Analyst 8.5: Smart Viz Intelligent Charting Engine",
-    "Data Analyst 8.0: Hybrid Streaming Dashboard Rendering",
-    "Data Analyst 7.5: Auto Data Recovery & SQL Calibration",
-    "Data Analyst 7.0: Semantic Sniffing & JIT Activation"
+    "Data Analyst 7.5: Auto Data Recovery & SQL Calibration"
   ],
   "compatibility": {
     "python": ">=3.9",

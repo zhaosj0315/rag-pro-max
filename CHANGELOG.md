@@ -1,5 +1,18 @@
 # 更新日志 (CHANGELOG)
 
+## [v3.7.5] - 2026-01-11 (Multi-Table Deep Dive Release)
+
+### 🚀 New Features
+- **🧬 Data Analyst 9.5 (多表血缘推理)**: 
+  - **路径自动补全**: 系统现在能自动识别跨表查询的最短 Join 路径，支持通过中间表联接孤立实体。
+  - **分析逻辑透明化**: 在报告中显式输出 SQL 联接逻辑，增强业务可理解性。
+- **📊 Data Analyst 9.0 (Smart Viz 2.0)**: 
+  - **多维交叉渲染**: 支持堆叠图、多系列趋势图及智能透视汇总表。
+  - **可视化自适应**: 自动根据查询结果的列数和类型选择最优的多维展现方案。
+
+### 🐛 Bug Fixes
+- **🛡️ 接口兼容性**: 恢复并加固了 `infer_business_blueprint` 历史接口。
+
 ## [v3.5.6] - 2026-01-11 (Generator Protocol Fix)
 
 ### 🚀 New Features
