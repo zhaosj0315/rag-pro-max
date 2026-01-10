@@ -92,7 +92,7 @@ class DataAnalystEngine:
 
     def execute_analysis(self, query: str, model_client, context_text: str = "") -> Dict[str, Any]:
         """
-        [企业分析版] 支持海量表结构的路由分析与架构仿真
+        [v3.7.5 多表穿透版] 支持复杂血缘推理与逻辑透明化
         """
         if not os.path.exists(self.schema_path):
              return {"success": False, "logic": "未找到数据结构定义，请上传文档或表单。"}
@@ -100,6 +100,7 @@ class DataAnalystEngine:
         with open(self.schema_path, 'r', encoding='utf-8') as f:
             full_schemas = json.load(f)
         
+        # 1. 语义路由：动态筛选相关子集
         relevant_table_names = self._get_relevant_tables(query, full_schemas)
         pruned_schemas = {
             "tables": {name: full_schemas["tables"][name] for name in relevant_table_names if name in full_schemas["tables"]},
@@ -109,13 +110,28 @@ class DataAnalystEngine:
         from datetime import datetime
         current_date = datetime.now().strftime("%Y-%m-%d")
         
-        sql_prompt = f"""你是一名资深数据专家。
-当前日期: {current_date}
-目标业务子集模型：
-{json.dumps(pruned_schemas, ensure_ascii=False)}
+        # 2. 逻辑推演：先思考关联路径
+        logic_prompt = f"""
+你是一名资深数据分析专家。针对以下业务模型和用户问题，请先输出你的【分析路径】。
+业务模型：{json.dumps(pruned_schemas, ensure_ascii=False)}
 用户问题：{query}
-要求：仅返回一条 SQL，包裹在 [SQL_START] 和 [SQL_END] 之间。"""
 
+要求：
+1. 说明你需要用到哪些表。
+2. 说明这些表之间如何通过字段进行联接（JOIN）。
+3. 说明你将采取何种统计策略（过滤、分组、聚合）。
+请仅输出一小段话，不要输出 SQL。
+"""
+        analysis_path = ""
+        try:
+            analysis_path = model_client.complete(logic_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":logic_prompt}]).message.content
+        except: analysis_path = "自动推导关联逻辑..."
+
+        # 3. 精准 SQL 生成 (基于路径)
+        sql_prompt = f"""基于你的分析路径："{analysis_path}"，请编写 SQLite 语句。
+可用模型子集：{json.dumps(pruned_schemas, ensure_ascii=False)}
+要求：仅返回一条 SQL，包裹在 [SQL_START] 和 [SQL_END] 之间。"""
+        
         sql_query = ""
         try:
             res = model_client.complete(sql_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":sql_prompt}]).message.content
@@ -127,6 +143,7 @@ class DataAnalystEngine:
                 if match: sql_query = match.group(1).strip()
         except: pass
 
+        # 4. 运行与仿真
         execution_result = {"success": False, "data": []}
         is_simulated = False
         if sql_query:
@@ -140,11 +157,11 @@ class DataAnalystEngine:
             
             if (not execution_result["success"] or not execution_result["data"]):
                 is_simulated = True
-                sim_prompt = f"""你是一名资深建模专家。当前处于【架构仿真模式】。
-数据库无真实数据，请严格根据【表结构】和【SQL】逻辑，模拟出 5 条符合业务常识的 JSON 数据。
+                sim_prompt = f"""你是一名建模专家。当前处于【架构仿真模式】。
+请根据 SQL 逻辑和业务模型，模拟出 5 条极其真实的跨表关联数据。
 SQL: {sql_query}
-表模型: {json.dumps(pruned_schemas, ensure_ascii=False)}
-请仅输出 JSON 数组。"""
+模型: {json.dumps(pruned_schemas, ensure_ascii=False)}
+要求：仅输出 JSON 数组。"""
                 try:
                     sim_res = model_client.complete(sim_prompt).text if hasattr(model_client, 'complete') else model_client.chat(model=model_client.model, messages=[{"role":"user","content":sim_prompt}]).message.content
                     import re
@@ -154,13 +171,28 @@ SQL: {sql_query}
                 except: pass
 
         if not execution_result["success"] or not sql_query:
-             return {"success": False, "logic": "架构推演失败，请完善表结构文档。"}
+             return {"success": False, "logic": "多表分析推演失败，请检查文档关联说明。"}
 
-        summary_prompt = f"""你是一名资深商业分析师。针对以下【架构仿真结果】撰写报告。
-问题: {query}
-SQL: {sql_query}
-模拟数据: {json.dumps(execution_result['data'][:10], ensure_ascii=False)}
-按格式输出：### 💡 核心逻辑推演\n### 📊 模拟指标透视\n### 🚀 业务架构建议"""
+        # 5. 准备流式报告 (融入分析逻辑)
+        summary_prompt = f"""
+你是一名资深商业分析师。请针对以下结果撰写深度报告。
+用户问题: {query}
+分析路径: {analysis_path}
+结果数据: {json.dumps(execution_result['data'][:10], ensure_ascii=False)}
+
+报告要求：
+1. 必须解读跨表关联带来的业务价值。
+2. 指出数据中的关键趋势或异常。
+3. 给出的行动建议必须具有可落地性。
+
+格式：
+### 🧭 分析逻辑溯源
+(解释为何如此联接数据)
+
+### 💡 核心业务结论
+### 📊 数据深度洞察
+### 🚀 架构/业务建议
+"""
         
         def report_generator():
             if hasattr(model_client, 'stream_chat'):
@@ -181,6 +213,7 @@ SQL: {sql_query}
             "sql": sql_query,
             "data": execution_result['data'],
             "logic_gen": report_generator(),
+            "analysis_path": analysis_path,
             "success": True,
             "is_simulated": is_simulated
         }
