@@ -4419,12 +4419,9 @@ if active_kb_name and active_kb_name != "pure_chat" and st.session_state.chat_en
                     logger.error(f"❌ 摘要生成失败: {e}")
                 st.session_state.messages.append({"role": "assistant", "content": "👋 知识库已就绪。"})
 
-# --- 主界面布局：双子座双栏架构 (v3.9.0) ---
-if st.session_state.get('main_mode', 'rag') == 'sql' or st.session_state.get('is_data_report_active'):
-    chat_layout, workspace_col = st.columns([1.8, 1.2], gap="medium")
-else:
-    chat_layout = st.container()
-    workspace_col = None
+# --- 主界面布局：单栏流水架构 (v4.2.3) ---
+chat_layout = st.container()
+workspace_col = None
 
 # 使用渲染容器代理
 chat_col = chat_layout.container()
@@ -4642,32 +4639,61 @@ for msg_idx, msg in enumerate(state.get_messages()):
 
         suggestions_fragment()
 
-# --- 渲染分析工作台 (v3.9.0) ---
-if workspace_col:
-    with workspace_col:
-        st.markdown("### 🏛️ 分析工作台 (Artifacts)")
-        st.caption("本次分析产生的关键结论与动态看板将在此处沉淀")
-        if st.session_state.get('artifacts'):
-            aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A', '#19D3F3', '#FF6692', '#B6E880']
-            for art_idx, art in enumerate(reversed(st.session_state.artifacts[-5:])):
-                with st.expander(f"📊 {art['title']} ({art['timestamp']})", expanded=(art_idx==0)):
+# --- 🚀 极致全宽分析工作台 (v4.2.4) ---
+if st.session_state.get('artifacts'):
+    st.divider()
+    with st.container():
+        st.markdown("### 🏛️ 深度分析成果库 (Artifacts)")
+        
+        # 强制主内容区与图表全宽的 CSS 补丁
+        st.markdown("""
+            <style>
+                /* 核心：主内容区 100% 宽度 */
+                .main .block-container {
+                    max-width: 100% !important;
+                    padding-left: 5rem !important; /* 增加边距感 */
+                    padding-right: 5rem !important;
+                }
+                /* 强制 Plotly 容器撑满 */
+                .stPlotlyChart {
+                    width: 100% !important;
+                }
+                /* 聊天消息气泡也全宽 */
+                [data-testid="stChatMessage"] {
+                    max-width: 100% !important;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+        
+        # 改为单列全宽遍历，确保空间利用率 100%
+        artifacts_data = list(reversed(st.session_state.artifacts[-5:])) # 显示最近5个
+        for idx, art in enumerate(artifacts_data):
+            with st.container(border=True):
+                col_text, col_chart = st.columns([1, 3], gap="large") # 内部比例：结论占小部分，图表占大部分
+                
+                with col_text:
+                    st.markdown(f"##### 📊 {art['title']}")
+                    st.caption(f"🕒 {art['timestamp']}")
+                    st.markdown(art["summary"])
+                    with st.expander("📝 查看详细结论", expanded=False):
+                        st.write("此处可根据需要展示更多技术细节或 SQL 脚本。")
+                
+                with col_chart:
                     import plotly.express as px
                     df_art = pd.DataFrame(art["data"])
                     if not df_art.empty:
-                        # 智能适配列数
-                        if len(df_art.columns) >= 2:
-                            fig = px.bar(df_art, x=df_art.columns[0], y=df_art.columns[1], 
-                                        template="plotly_white", color_discrete_sequence=[aurora_colors[0]])
-                        else:
-                            fig = px.bar(df_art, y=df_art.columns[0], 
-                                        template="plotly_white", color_discrete_sequence=[aurora_colors[0]])
-                            
-                        fig.update_layout(margin=dict(l=0, r=0, t=20, b=0), height=250)
-                        st.plotly_chart(fig, use_container_width=True, key=f"art_chart_v2_{art_idx}")
-                    st.caption("核心摘要")
-                    st.markdown(art["summary"])
-        else:
-            st.info("💡 提问一个数据问题，关键看板会自动推送到此处。")
+                        aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA']
+                        # 自动选择最合适的列进行展示
+                        fig = px.bar(df_art, x=df_art.columns[0], y=df_art.columns[1] if len(df_art.columns)>1 else df_art.columns[0],
+                                    template="plotly_white",
+                                    color_discrete_sequence=[aurora_colors[idx % len(aurora_colors)]])
+                        
+                        fig.update_layout(
+                            margin=dict(l=10, r=10, t=30, b=10), 
+                            height=350, # 全宽模式下，高度提升到 350px 视觉更佳
+                            hovermode="x unified"
+                        )
+                        st.plotly_chart(fig, use_container_width=True, key=f"v424_art_{idx}")
 
 # 极简工具栏：模型与设置
 with st.container():

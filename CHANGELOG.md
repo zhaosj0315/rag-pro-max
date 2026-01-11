@@ -1,6 +1,17 @@
-# 更新日志 (CHANGELOG)
+# Changelog
+
+## [v4.3.0] - 2026-01-11 (Stable Data Analysis Edition)
+### 🏛️ 核心重构：分析工作台 2.0 (Artifacts)
+- **全宽流水布局**: 彻底重构了 Artifacts 的展示方式，由侧边栏模式切换为对话下方的“全宽报告模式”，解决图表拥挤问题。
+- **1:3 黄金比例**: 采用左侧结论摘要、右侧大型图表的横向排布，实现 100% 的屏幕空间利用率。
+- **极致适配**: 针对 macOS 大屏进行了 CSS 优化，确保主问答区与分析成果库均能横向撑满。
+
+### 🚀 稳定性与性能
+- **并发优化**: 完成了多线程 (ThreadPool) 对多进程 (ProcessPool) 的全面替换，彻底解决 macOS 下智能搜索崩溃的顽疾。
+- **UI 固化**: 锁定了 850px 的专业工具栏宽度，优化了 Streamlit 页面在 Wide 模式下的响应速度。
 
 ## [v3.9.1] - 2026-01-11 (Analysis Lab & Artifacts Release)
+
 
 ### 🚀 New Features
 - **🏛️ Data Analyst 10.0 (分析实验室架构)**: 

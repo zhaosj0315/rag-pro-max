@@ -1,13 +1,14 @@
 {
-  "version": "3.9.1",
+  "version": "4.3.0",
   "release_date": "2026-01-11",
-  "build_number": "20260111.7",
+  "build_number": "20260111.10",
   "status": "stable",
   "major_features": [
-    "Data Analyst 10.5: Diagnostic & Predictive Insight Engine",
-    "Data Analyst 10.0: Gemini Workspace (Twin-Column Layout)",
-    "Data Analyst 9.5: Multi-Table Join Path Reconstruction",
-    "Data Analyst 9.0: Smart Viz 3.0 (Plotly High-End Charts)"
+    "🏛️ Analysis Lab 2.0: Full-Width Fluid Artifacts Workspace",
+    "📊 Data Analyst 11.0: Professional Report-Style Dashboard",
+    "🚀 Performance: Thread-Safe I/O Concurrency for macOS",
+    "🎨 UI/UX: Ultra-Compact Sidebar (850px) & Wide-Screen Chat",
+    "🧠 Diagnostic Intelligence: Automated SQL & Logic Calibration"
   ],
   "compatibility": {
     "python": ">=3.9",
