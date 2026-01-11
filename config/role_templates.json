@@ -14,6 +14,8 @@
             "chat",
             "kb_create",
             "kb_delete_own",
+            "kb_rename",
+            "kb_filesystem_access",
             "upload_files",
             "paste_text",
             "use_crawler",
@@ -21,7 +23,8 @@
             "summary_gen",
             "kb_export_report",
             "data_analysis",
-            "download_knowledge_base"
+            "download_knowledge_base",
+            "deep_research"
         ],
         "default_quota_mb": 1024
     },
@@ -35,8 +38,7 @@
             "upload_files",
             "paste_text",
             "summary_gen",
-            "kb_export_report",
-            "data_analysis"
+            "kb_export_report"
         ],
         "default_quota_mb": 200
     },
@@ -50,7 +52,8 @@
             "kb_export_report",
             "kb_export_full",
             "data_analysis",
-            "download_knowledge_base"
+            "download_knowledge_base",
+            "deep_research"
         ],
         "default_quota_mb": 50
     },

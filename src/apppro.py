@@ -3510,8 +3510,16 @@ elif active_kb_name:
                 
                 st.info("💡 提示：全量包可直接用于系统迁移或永久离线归档。")
 
-        if rename_col.button("✏️", help="重命名"): 
-            st.session_state.renaming = True
+        # 权限检查：重命名
+        from src.auth.permission_manager import permission_manager
+        current_user = st.session_state.get('user', 'guest_user')
+        can_rename = permission_manager.has_permission(current_user, "kb_rename")
+        
+        if can_rename:
+            if rename_col.button("✏️", help="重命名"): 
+                st.session_state.renaming = True
+        else:
+            rename_col.button("🔒", disabled=True, help="无重命名权限")
     
     # 文件管理
     with st.container(key="kb_details_container"):
@@ -3624,27 +3632,38 @@ elif active_kb_name:
             # 快速操作按钮组 - 合并为单行
             op_col1, op_col2, op_col3, op_col4 = st.columns(4)
             
+            # 权限检查：文件系统访问
+            from src.auth.permission_manager import permission_manager
+            current_user = st.session_state.get('user', 'guest_user')
+            can_access_fs = permission_manager.has_permission(current_user, "kb_filesystem_access")
+            
             # 1. 打开知识库目录
             with op_col1:
-                if st.button("📂 打开目录", use_container_width=True, help="在Finder中打开知识库文件夹"):
-                    import webbrowser
-                    import urllib.parse
-                    try:
-                        file_url = 'file://' + urllib.parse.quote(os.path.abspath(db_path))
-                        webbrowser.open(file_url)
-                        st.toast("✅ 已在Finder中打开")
-                    except Exception as e:
-                        st.error(f"打开失败: {e}")
+                if can_access_fs:
+                    if st.button("📂 打开目录", use_container_width=True, help="在Finder中打开知识库文件夹"):
+                        import webbrowser
+                        import urllib.parse
+                        try:
+                            file_url = 'file://' + urllib.parse.quote(os.path.abspath(db_path))
+                            webbrowser.open(file_url)
+                            st.toast("✅ 已在Finder中打开")
+                        except Exception as e:
+                            st.error(f"打开失败: {e}")
+                else:
+                    st.button("📂 打开目录", use_container_width=True, disabled=True, help="无文件系统访问权限")
             
             # 2. 复制路径
             with op_col2:
-                if st.button("📋 复制路径", use_container_width=True, help="复制知识库路径到剪贴板"):
-                    try:
-                        import subprocess
-                        subprocess.run(["pbcopy"], input=db_path.encode(), check=True)
-                        st.toast(f"✅ 已复制")
-                    except Exception as e:
-                        st.info(f"📁 路径: {db_path}")
+                if can_access_fs:
+                    if st.button("📋 复制路径", use_container_width=True, help="复制知识库路径到剪贴板"):
+                        try:
+                            import subprocess
+                            subprocess.run(["pbcopy"], input=db_path.encode(), check=True)
+                            st.toast(f"✅ 已复制")
+                        except Exception as e:
+                            st.info(f"📁 路径: {db_path}")
+                else:
+                    st.button("📋 复制路径", use_container_width=True, disabled=True, help="无文件系统访问权限")
             
             # 准备摘要数据
             files_without_summary = [f for f in doc_manager.manifest['files'] if not f.get('summary') and f.get('doc_ids')]
@@ -4910,8 +4929,17 @@ with st.container():
         st.session_state.enable_web_search = web_search_on
 
     with c_research:
-        research_on = st.toggle("智能研究", value=st.session_state.get('enable_deep_research', False), help="启用深度研究模式 (v2.9)")
-        st.session_state.enable_deep_research = research_on
+        # 权限检查：智能研究
+        from src.auth.permission_manager import permission_manager
+        current_user = st.session_state.get('user', 'guest_user')
+        can_research = permission_manager.has_permission(current_user, "deep_research")
+        
+        if not can_research:
+            st.toggle("智能研究 (🔒)", value=False, disabled=True, help="请联系管理员开启深度研究权限")
+            st.session_state.enable_deep_research = False
+        else:
+            research_on = st.toggle("智能研究", value=st.session_state.get('enable_deep_research', False), help="启用深度研究模式 (v2.9)")
+            st.session_state.enable_deep_research = research_on
 
     with c_da:
         # 权限检查：数据分析
