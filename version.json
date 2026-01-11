@@ -1,14 +1,14 @@
 {
-  "version": "4.3.0",
+  "version": "5.3.3",
   "release_date": "2026-01-11",
-  "build_number": "20260111.10",
+  "build_number": "20260111.15",
   "status": "stable",
   "major_features": [
-    "🏛️ Analysis Lab 2.0: Full-Width Fluid Artifacts Workspace",
-    "📊 Data Analyst 11.0: Professional Report-Style Dashboard",
-    "🚀 Performance: Thread-Safe I/O Concurrency for macOS",
-    "🎨 UI/UX: Ultra-Compact Sidebar (850px) & Wide-Screen Chat",
-    "🧠 Diagnostic Intelligence: Automated SQL & Logic Calibration"
+    "💎 Universal Modeling Analysis: PDF/MD/CSV Unified Strategic Brain",
+    "🚧 Strategic Sandbox: Automated Golden Mock Data Generation",
+    "🛡️ Logic Guard: Physical Separation of Data Analysis and RAG Routing",
+    "🚀 Zero-Crash Environment: Optimized Scope Initialization for Logger/Time/Re",
+    "📍 Business Blueprint: Automated Domain Identification from Raw Schemas"
   ],
   "compatibility": {
     "python": ">=3.9",

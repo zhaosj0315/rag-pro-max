@@ -1,25 +1,25 @@
 # 初始化环境配置
 import warnings
-# 极其早地抑制 Pydantic 警告，防止第三方库加载时触发
+import os
+import sys
+import time
+import json
+import glob
+import re
+
+# 极其早地初始化日志，防止任何模块在加载时触发
+from src.app_logging import LogManager
+logger = LogManager()
+
+# 极其早地抑制 Pydantic 警告
 warnings.filterwarnings("ignore", category=UserWarning, message=".*UnsupportedFieldAttributeWarning.*")
 warnings.filterwarnings("ignore", message=".*validate_default.*")
 
 # 环境变量设置 - 减少启动警告
 __version__ = "4.5.2"
-
-import os
-import glob
 os.environ['DISABLE_MODEL_SOURCE_CHECK'] = 'True'
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
-# 抑制烦人的 Pydantic 警告
-import warnings
-warnings.filterwarnings("ignore", message=".*UnsupportedFieldAttributeWarning.*")
-
-
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.core.environment import initialize_environment
 initialize_environment()
 
@@ -2416,13 +2416,17 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
         source_data_files = []
         if current_target_path and os.path.exists(current_target_path):
             if os.path.isdir(current_target_path):
-                source_data_files.extend(glob.glob(os.path.join(current_target_path, "**/*.csv"), recursive=True))
-                source_data_files.extend(glob.glob(os.path.join(current_target_path, "**/*.xlsx"), recursive=True))
-                source_data_files.extend(glob.glob(os.path.join(current_target_path, "**/*.xls"), recursive=True))
+                csvs = glob.glob(os.path.join(current_target_path, "**/*.csv"), recursive=True)
+                excels = glob.glob(os.path.join(current_target_path, "**/*.xlsx"), recursive=True) + glob.glob(os.path.join(current_target_path, "**/*.xls"), recursive=True)
+                mds = glob.glob(os.path.join(current_target_path, "**/*.md"), recursive=True) + glob.glob(os.path.join(current_target_path, "**/*.markdown"), recursive=True)
+                source_data_files = csvs + excels + mds
+                logger.info(f"🔍 [DEBUG] Scan Result - CSV: {len(csvs)}, Excel: {len(excels)}, MD: {len(mds)}")
             else:
                 # 如果单文件上传
-                if current_target_path.endswith(('.csv', '.xlsx', '.xls')):
+                if current_target_path.lower().endswith(('.csv', '.xlsx', '.xls', '.md', '.markdown')):
                     source_data_files.append(current_target_path)
+        
+        logger.info(f"🔍 [DEBUG] Total source_data_files found: {len(source_data_files)}")
                             
         if source_data_files:
             status_container.write(f"📦 正在归档 {len(source_data_files)} 个数据源文件至核心库...")
@@ -2435,7 +2439,9 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
 
     # --- 核心增强：数据分析 5.0 业务推演 ---
     is_da_mode = st.session_state.get('is_data_analysis_mode', False)
-    if is_da_mode:
+    data_files = source_data_files
+    
+    if is_da_mode or data_files:
         status_container.write("📂 [专项] 启动业务语义大脑引擎...")
         from src.processors.data_analyst import DataAnalystEngine
         from src.utils.model_manager import load_llm_model
@@ -2443,53 +2449,24 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
         da_engine = DataAnalystEngine(persist_dir, logger)
         llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
         
-        # [新增] 结构化数据与架构字典优先处理 (Excel/CSV/MD)
-        import glob
-        data_files = []
-        if current_target_path and os.path.exists(current_target_path):
-            if os.path.isdir(current_target_path):
-                # 扫描表格与 Markdown 字典
-                data_files.extend(glob.glob(os.path.join(current_target_path, "**/*.csv"), recursive=True))
-                data_files.extend(glob.glob(os.path.join(current_target_path, "**/*.xlsx"), recursive=True))
-                data_files.extend(glob.glob(os.path.join(current_target_path, "**/*.xls"), recursive=True))
-                data_files.extend(glob.glob(os.path.join(current_target_path, "**/*.md"), recursive=True))
-            else:
-                # 修复单文件识别逻辑
-                if current_target_path.lower().endswith(('.csv', '.xlsx', '.xls', '.md', '.markdown')):
-                    data_files.append(current_target_path)
-
         if data_files:
              status_container.write(f"📊 检测到 {len(data_files)} 个业务源文件，正在执行物理归档与战略建模...")
-             # 物理拷贝一份到持久化目录，防止临时文件丢失
-             for f in data_files:
-                 shutil.copy2(f, os.path.join(persist_dir, os.path.basename(f)))
-             
-             # 使用持久化后的文件进行建模
-             persistent_data_files = [os.path.join(persist_dir, os.path.basename(f)) for f in data_files]
-             res = da_engine.process_files(persistent_data_files)
+             logger.info(f"📊 [Strategic Workshop] 检测到 {len(data_files)} 个业务源文件，启动战略建模...")
+             res = da_engine.process_files(data_files, llm)
              if res['success']:
-                 # [v4.5.3] 如果包含 Markdown，强制触发一次语义提取
-                 if res.get('has_schema_doc'):
-                     status_container.write("🧠 正在从 Markdown 字典中脑补宏观业务逻辑...")
-                     docs, _ = builder._read_documents(persist_dir, 0, None)
-                     da_engine.extract_schema_from_docs(docs, llm)
-                 
                  status_container.success(f"✅ 战略大脑初始化完成 (已归档并导入 {len(res['tables'])} 张表)")
+                 logger.success(f"✅ [Strategic Workshop] 战略大脑初始化完成 (已导入 {len(res['tables'])} 张表)")
 
         # 1. 执行 RAG 预扫描以获取文本（用于非结构化建模）
-        # 这里先运行 builder._scan_files 和 _read_documents 以获取 docs 对象
         docs, _ = builder._read_documents(current_target_path, 0, None)
         
         # 2. 深度 Schema 建模 (核心升级：从文档推导演算法)
-        # 仅当没有结构化数据导入时，或者需要补充文档信息时才执行
         if docs:
-            status_container.write("🧠 正在从文档中提取数据字典与表结构...")
-            # 注意：如果已有 schema (来自Excel)，这里可能会覆盖或需要合并。
-            # 简单策略：如果 DataAnalystEngine 内部处理了合并最好，或者这里仅在无 Schema 时提取
+            status_container.write("🧠 正在执行深度业务语义建模...")
+            logger.info("🧠 [Strategic Workshop] 正在从源材料中提取业务元模型与逻辑通路...")
             if not os.path.exists(da_engine.schema_path):
                 schemas = da_engine.extract_schema_from_docs(docs, llm)
             else:
-                # 即使有了物理表，也尝试读一下文档补充上下文？暂且跳过防止冲突
                 status_container.write("⏩ 已存在物理表结构，跳过纯文档提取...")
                 with open(da_engine.schema_path, 'r') as f:
                     schemas = json.load(f)
@@ -2497,9 +2474,12 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
             # 3. 业务蓝图推演
             status_container.write("🌐 正在构建业务全景图与关联路径...")
             blueprint = da_engine.infer_business_blueprint(schemas, llm)
-            status_container.info(f"📍 识别业务场景: {blueprint.get('business_scenario', '未知业务')}")
+            scenario = blueprint.get('business_scenario', '未知业务')
+            status_container.info(f"📍 识别业务场景: {scenario}")
+            logger.info(f"📍 [Strategic Workshop] 业务蓝图识别完成: {scenario}")
         
-        status_container.write("✅ 业务语义建模已就绪 (去RAG纯分析模式已激活)")
+        status_container.write("✅ 业务语义建模已就绪")
+        logger.success("✨ [Strategic Workshop] 全域业务语义建模就绪")
         allow_empty_docs = True
     else:
         allow_empty_docs = False
