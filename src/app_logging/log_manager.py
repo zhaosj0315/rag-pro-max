@@ -55,6 +55,13 @@ class LogManager:
         self.enable_terminal = enable_terminal
         
         self.log_file = os.path.join(log_dir, f"log_{datetime.now().strftime('%Y%m%d')}.jsonl")
+        
+        # Initialize metrics and tracking
+        self.metrics: Dict[str, List[float]] = {}
+        self.timers: Dict[str, float] = {}
+        self._recent_logs: List[str] = []
+        self._max_recent: int = 100
+        
         self._cleanup_old_logs()
     
     def _cleanup_old_logs(self, days: int = 30):
