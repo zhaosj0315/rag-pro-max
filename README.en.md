@@ -12,10 +12,17 @@
 
 # RAG Pro Max - Intelligent Document Q&A System
 
-**Version**: v5.3.3  
-![Version](https://img.shields.io/badge/version-v5.3.3-brightgreen)
+**Version**: v5.5.8  
+![Version](https://img.shields.io/badge/version-v5.5.8-brightgreen)
 ![Status](https://img.shields.io/badge/status-Stable-blue)
-![Last Update](https://img.shields.io/badge/last%20update-2026--01--11-orange)
+![Last Update](https://img.shields.io/badge/last%20update-2026--01--12-orange)
+
+## 🚀 RAG Pro Max v5.5.8
+### 📦 Data Sovereignty & Full Export (v5.5.8 Update)
+- **Ultimate Asset Package**: One-click export of 01-06 structure, including raw documents, chat history (MD), strategic models, and vector snapshots.
+- **Cross-Directory Salvage**: Automated retrieval of search results from temporary folders to ensure complete data portability.
+- **Admin Asset Inventory**: New 'Asset Hub' in admin dashboard for cross-user batch filtering and deep cleanup.
+- **Self-Healing Infrastructure**: Optimized log system with automated fallback to user home directory, bypassing macOS permission issues.
 
 ## 🚀 RAG Pro Max v5.3.3
 ### 💎 Universal Strategic Modeling (v5.3.3 Major Update)

@@ -1,20 +1,20 @@
 {
-  "version": "5.3.3",
-  "release_date": "2026-01-11",
-  "build_number": "20260111.15",
+  "version": "5.5.8",
+  "release_date": "2026-01-12",
+  "build_number": "20260112.01",
   "status": "stable",
   "major_features": [
-    "💎 Universal Modeling Analysis: PDF/MD/CSV Unified Strategic Brain",
-    "🚧 Strategic Sandbox: Automated Golden Mock Data Generation",
-    "🛡️ Logic Guard: Physical Separation of Data Analysis and RAG Routing",
-    "🚀 Zero-Crash Environment: Optimized Scope Initialization for Logger/Time/Re",
-    "📍 Business Blueprint: Automated Domain Identification from Raw Schemas"
+    "📦 Ultimate Full Export: 01-06 complete structure including raw files, history and logic models",
+    "🕵️ Cross-Directory Salvage: Automated retrieval of smart search and crawl results",
+    "🛡️ Unified KB Logic: Standardized processing pipeline for all data ingestion modes",
+    "🛠️ Admin Asset Hub: Batch filtering, auditing and physical cleanup of all user KBs",
+    "🧼 Permission Self-Healing: Intelligent log directory failsafe and scope optimization"
   ],
   "compatibility": {
     "python": ">=3.9",
     "platforms": ["macOS", "Linux", "Windows"],
-    "dependencies_updated": "2026-01-11"
+    "dependencies_updated": "2026-01-12"
   },
   "changelog_url": "CHANGELOG.md",
-  "documentation_updated": "2026-01-11"
+  "documentation_updated": "2026-01-12"
 }
