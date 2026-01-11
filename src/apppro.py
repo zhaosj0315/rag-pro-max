@@ -4455,21 +4455,10 @@ for msg_idx, msg in enumerate(state.get_messages()):
             # 1. 联网搜索历史结果
             if msg.get("search_results"):
                 search_meta = msg["search_results"]
-                # 兼容旧版本格式 (如果 search_results 直接是列表)
-                if isinstance(search_meta, list):
-                    results_list = search_meta
-                    opt_query = msg.get('optimized_query', '未知')
-                    status_label = f"✅ 已获取 {len(results_list)} 条联网结果"
-                else:
-                    results_list = search_meta.get('results', [])
-                    opt_query = search_meta.get('optimized_query', '未知')
-                    status_label = f"✅ 已精选 {search_meta.get('selected')} 条高分联网结果 (检索 {search_meta.get('total_raw')} 条, 耗时 {search_meta.get('duration')}s)"
-                
-                with st.status(status_label, expanded=False, state="complete"):
-                    st.caption(f"🎯 搜索关键词：{opt_query}")
+                results_list = search_meta.get('results', []) if isinstance(search_meta, dict) else search_meta
+                with st.status(f"✅ 已获取 {len(results_list)} 条联网结果", expanded=False, state="complete"):
                     for i, res in enumerate(results_list, 1):
-                        emoji, label = res.get('quality_label', ("⭐", "中等质量"))
-                        st.markdown(f"**{i}. {emoji} {res.get('title')}**")
+                        st.markdown(f"**{i}. {res.get('title')}**")
                         st.caption(f"{res.get('summary', '')[:150]}...")
                         st.markdown(f"🔗 [{urlparse(res.get('href', '')).netloc}]({res.get('href')})")
                         if i < len(results_list): st.divider()
@@ -4484,52 +4473,27 @@ for msg_idx, msg in enumerate(state.get_messages()):
                     with st.expander("🧐 查看审计细节"):
                         st.write(res_meta.get('critique'))
 
-            # [v3.8.0] 历史回溯：恢复极光智能看板 (Smart Viz 3.0)
-            if msg.get("is_data_report") and msg.get("data"):
-                try:
-                    import pandas as pd
-                    import plotly.express as px
-                    df_hist = pd.DataFrame(msg["data"])
-                    if not df_hist.empty:
-                        st.markdown("---")
-                        if msg.get("analysis_path"):
-                            st.caption(f"🧠 逻辑溯源: {msg['analysis_path']}")
-                        
-                        numeric_cols = df_hist.select_dtypes(include=['number']).columns
-                        date_cols = [c for c in df_hist.columns if "date" in c.lower() or "time" in c.lower()]
-                        cat_cols = df_hist.select_dtypes(include=['object']).columns
-                        aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A', '#19D3F3', '#FF6692', '#B6E880']
-
-                        # 渲染历史 Plotly 图表
-                        with st.expander("📈 历史极光深度视图", expanded=False):
-                            if len(cat_cols) >= 1 and len(numeric_cols) >= 1:
-                                if len(cat_cols) >= 2:
-                                    fig = px.bar(df_hist, x=cat_cols[0], y=numeric_cols[0], color=cat_cols[1],
-                                                barmode='group', template="plotly_white",
-                                                color_discrete_sequence=aurora_colors)
-                                    st.plotly_chart(fig, use_container_width=True)
-                                elif len(df_hist) <= 10:
-                                    fig = px.pie(df_hist, names=cat_cols[0], values=numeric_cols[0],
-                                                hole=0.4, template="plotly_white",
-                                                color_discrete_sequence=aurora_colors)
-                                    st.plotly_chart(fig, use_container_width=True)
-                                else:
-                                    fig = px.bar(df_hist, x=cat_cols[0], y=numeric_cols[0],
-                                                color=numeric_cols[0], color_continuous_scale='Viridis',
-                                                template="plotly_white")
-                                    st.plotly_chart(fig, use_container_width=True)
-                            elif len(date_cols) > 0 and len(numeric_cols) > 0:
-                                fig = px.area(df_hist, x=date_cols[0], y=numeric_cols[0],
-                                             template="plotly_white", line_shape="spline")
-                                st.plotly_chart(fig, use_container_width=True)
-                            else:
-                                st.dataframe(df_hist, use_container_width=True)
-                        
-                        # 渲染历史 SQL
-                        if msg.get("sql"):
-                            with st.expander("🛠️ 历史执行指令", expanded=False):
-                                st.code(msg["sql"], language="sql")
-                except: pass
+            # 3. [v5.0 补丁] 渲染历史数据分析报告
+            if msg.get("is_data_report"):
+                st.markdown("---")
+                st.markdown("#### 🏦 5.0 极光战略推演工作台 (History)")
+                for stage_h in msg.get("stages", []):
+                    m_h = stage_h["meta"]
+                    with st.expander(f"📍 Stage {m_h['stage_id']}: {m_h['title']}", expanded=False):
+                        import pandas as pd
+                        import plotly.express as px
+                        df_h = pd.DataFrame(stage_h["data"])
+                        if not df_h.empty:
+                            v_tabs_h = st.tabs(["📊 对比", "📈 趋势", "🍰 占比"])
+                            h_key_base = f"hist_{msg_idx}_{m_h['stage_id']}"
+                            with v_tabs_h[0]:
+                                st.plotly_chart(px.bar(df_h, x=df_h.columns[0], y=df_h.columns[-1], template="plotly_white"), use_container_width=True, key=f"{h_key_base}_bar")
+                        st.markdown("**💻 DataWorks SQL**")
+                        st.code(stage_h.get("sqls", {}).get("dataworks", "-- N/A"), language="sql")
+                        st.markdown("**🧪 SQLite (Local)**")
+                        st.code(stage_h.get("sqls", {}).get("sqlite", "-- N/A"), language="sql")
+                        if stage_h.get("is_simulated"):
+                            st.info("✨ 此阶段基于业务模型仿真推演")
 
         # 显示角色标签 (v2.7.4)
         if role == "assistant" and msg.get("prompt_role"):
@@ -5722,58 +5686,83 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                                 meta = stage["meta"]
                                 with st.expander(f"📍 Stage {meta['stage_id']}: {meta['title']}", expanded=True):
                                     st.markdown(f"**分析目标**: {meta['goal']}")
-                                    st.caption(f"**业务逻辑**: {meta['logic']}")
                                     
-                                    # --- 阶段 A: 多视角可视化 ---
-                                    import pandas as pd
-                                    import plotly.express as px
-                                    df_stage = pd.DataFrame(stage["data"])
-                                    
-                                    if not df_stage.empty:
-                                        # 提取本阶段列特征
-                                        num_cols = df_stage.select_dtypes(include=['number']).columns
-                                        cat_cols = df_stage.select_dtypes(include=['object']).columns
-                                        date_cols = [c for c in df_stage.columns if "date" in c.lower() or "time" in c.lower()]
+                                    # --- [v5.2] 数据流转全演示 ---
+                                    with st.container(border=True):
+                                        st.markdown("##### 🧬 数据演进演示 (Lineage Demo)")
                                         
-                                        v_tabs = st.tabs(["📊 综合对比", "📈 趋势洞察", "🍰 占比分析"])
-                                        aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA']
+                                        # A. 查询前：原始数据
+                                        st.markdown("**1. 查询前：业务表采样 (Before)**")
+                                        if stage.get("source_samples"):
+                                            s_tabs = st.tabs(list(stage["source_samples"].keys()))
+                                            for idx, t_name in enumerate(stage["source_samples"]):
+                                                with s_tabs[idx]:
+                                                    st.dataframe(pd.DataFrame(stage["source_samples"][t_name]), use_container_width=True)
                                         
-                                        with v_tabs[0]:
-                                            if len(cat_cols) >= 1 and len(num_cols) >= 1:
-                                                fig = px.bar(df_stage, x=cat_cols[0], y=num_cols[0], template="plotly_white", color_discrete_sequence=aurora_colors)
-                                                st.plotly_chart(fig, use_container_width=True, key=f"stage_bar_{meta['stage_id']}_{time.time()}")
-                                        with v_tabs[1]:
-                                            if len(date_cols) > 0 and len(num_cols) > 0:
-                                                fig = px.line(df_stage, x=date_cols[0], y=num_cols[0], template="plotly_white")
-                                                st.plotly_chart(fig, use_container_width=True, key=f"stage_line_{meta['stage_id']}_{time.time()}")
-                                        with v_tabs[2]:
-                                            if len(cat_cols) >= 1 and len(num_cols) >= 1 and len(df_stage) <= 15:
-                                                fig = px.pie(df_stage, names=cat_cols[0], values=num_cols[0], hole=0.4)
-                                                st.plotly_chart(fig, use_container_width=True, key=f"stage_pie_{meta['stage_id']}_{time.time()}")
-
-                                    # --- 阶段 B: 多方言 SQL ---
-                                    s_tabs = st.tabs(["🧪 SQLite", "🐘 Standard", "💻 DataWorks"])
-                                    sqls = stage.get("sqls", {})
-                                    with s_tabs[0]: st.code(sqls.get("sqlite", ""), language="sql")
-                                    with s_tabs[1]: st.code(sqls.get("standard", ""), language="sql")
-                                    with s_tabs[2]: 
-                                        st.code(sqls.get("dataworks", ""), language="sql")
-                                        st.caption("注：已自动注入 ${bizdate} 与项目前缀")
+                                        # B. 加工中：逻辑脚本
+                                        st.markdown("**2. 执行中：工程逻辑 (The Logic)**")
+                                        sqls = stage.get("sqls", {})
+                                        sql_tabs = st.tabs(["🧪 SQLite (本地验证)", "🐘 Standard SQL", "💻 DataWorks (生产)"])
+                                        with sql_tabs[0]:
+                                            st.caption("SQL 语言: SQLite (Local Sim)")
+                                            st.code(sqls.get("sqlite", ""), language="sql")
+                                        with sql_tabs[1]:
+                                            st.caption("SQL 语言: Standard ANSI SQL")
+                                            st.code(sqls.get("standard", ""), language="sql")
+                                        with sql_tabs[2]:
+                                            st.caption("SQL 语言: MaxCompute / DataWorks")
+                                            st.code(sqls.get("dataworks", ""), language="sql")
+                                        
+                                        # C. 查询后：结果产出
+                                        st.markdown("**3. 查询后：汇聚结果表 (After)**")
+                                        df_s = pd.DataFrame(stage["data"])
+                                        if not df_s.empty:
+                                            st.dataframe(df_s, use_container_width=True)
+                                            
+                                            # --- 可视化画板 ---
+                                            st.markdown("---")
+                                            v_tabs = st.tabs(["📊 对比", "📈 趋势", "🍰 占比"])
+                                            aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA']
+                                            with v_tabs[0]:
+                                                st.plotly_chart(px.bar(df_s, x=df_s.columns[0], y=df_s.columns[-1], template="plotly_white", color_discrete_sequence=aurora_colors), use_container_width=True, key=f"bar_{meta['stage_id']}_{time.time()}")
+                                            if len(df_s.columns) >= 2:
+                                                with v_tabs[1]: st.plotly_chart(px.line(df_s, x=df_s.columns[0], y=df_s.columns[-1], template="plotly_white"), use_container_width=True, key=f"line_{meta['stage_id']}_{time.time()}")
+                                                with v_tabs[2]: st.plotly_chart(px.pie(df_s, names=df_s.columns[0], values=df_s.columns[-1], hole=0.4), use_container_width=True, key=f"pie_{meta['stage_id']}_{time.time()}")
                                     
-                                    if stage.get("is_simulated"):
-                                        st.warning("✨ 本阶段结果基于战略业务模型仿真得出")
+                                        if stage.get("is_simulated"):
+                                            st.warning("✨ 本阶段结果基于战略业务模型仿真得出")
 
-                            # 归档到消息列表
-                            st.session_state.messages.append({
-                                "role": "assistant", 
-                                "content": full_report,
-                                "is_data_report": True,
-                                "stages": analysis_res["stages"],
-                                "macro_context": analysis_res.get("macro_context")
-                            })
-                            
-                            st.session_state.is_processing = False
-                            st.rerun()
+                                # 3. [v5.2.3 恢复] 生成最新的战略建议追问
+                                try:
+                                    from src.chat.unified_suggestion_engine import get_unified_suggestion_engine
+                                    sug_engine = get_unified_suggestion_engine(active_kb_name)
+                                    # 结合提问与最终报告内容作为生成上下文
+                                    suggestion_context = f"用户提问: {final_prompt}\n战略推演报告: {full_rep}"
+                                    new_sugs = sug_engine.generate_suggestions(
+                                        context=suggestion_context,
+                                        source_type='chat',
+                                        query_engine=st.session_state.chat_engine,
+                                        num_questions=3
+                                    )
+                                    if new_sugs:
+                                        st.session_state.suggestions_history = new_sugs[:3]
+                                        st.session_state.current_suggestions = new_sugs[:3]
+                                except Exception as e:
+                                    logger.warning(f"⚠️ 战略追问生成失败: {e}")
+
+                                # 归档并中断
+                                st.session_state.messages.append({
+                                    "role": "assistant", 
+                                    "content": full_rep, 
+                                    "is_data_report": True, 
+                                    "stages": analysis_res["stages"], 
+                                    "macro_context": analysis_res.get("macro_context"),
+                                    "suggestions": st.session_state.get('current_suggestions', [])
+                                })
+                                st.session_state.is_processing = False
+                                st.rerun()
+
+
 
                     # --- 原始 RAG 逻辑 (仅当不是分析模式或分析失败时执行) ---
                     start_time = time.time()

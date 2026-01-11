@@ -139,12 +139,23 @@ class DataAnalystEngine:
         full_analysis_context = ""
 
         for meta in stages_meta:
-            # A. 针对本阶段生成多方言 SQL
-            sql_prompt = f"""针对分析阶段【{meta['title']}】编写多方言 SQL。
-子目标：{meta['goal']}
+            # 2. 多方言 SQL 生成 (含 DataWorks 适配与业务注释)
+            sql_prompt = f"""基于分析路径："{analysis_path}"，请编写高度可读、带有详细业务注释的多方言 SQL。
 业务背景：{pruned_schemas['macro_context']}
 模型：{json.dumps(pruned_schemas['tables'], ensure_ascii=False)}
-要求返回 JSON：{{ "sqlite": "...", "dataworks": "...", "standard": "..." }}"""
+
+要求：
+1. **必须包含详细注释**：使用 '--' 对每一段逻辑进行说明。
+2. **注释内容**：
+   - 标注使用的原始表业务含义。
+   - 标注关键字段或计算公式的业务逻辑。
+   - 标注 JOIN 关联的血缘依据。
+3. 返回一个 JSON 对象，包含三个字段：
+   - "sqlite": "带有注释的本地验证 SQL"
+   - "dataworks": "带有注释的适配 MaxCompute 语法的 SQL，包含 ${{bizdate}} 变量"
+   - "standard": "带有注释 de ANSI SQL"
+
+仅返回 JSON，不要有其他解释。"""
             
             sqls = {"sqlite": "", "dataworks": "", "standard": ""}
             try:
@@ -155,6 +166,17 @@ class DataAnalystEngine:
             # B. 执行与仿真 (制造闭环数据)
             execution_res = {"success": False, "data": []}
             is_simulated = False
+            source_samples = {} # [v5.2] 存储原始表采样
+            
+            # 捕获原始表结构预览 (查询前)
+            for t_name in relevant_table_names:
+                s_res = self.execute_sql(f"SELECT * FROM {t_name} LIMIT 3")
+                if s_res["success"] and s_res["data"]:
+                    source_samples[t_name] = s_res["data"]
+                else:
+                    # 仿真模式下的原始表伪造
+                    source_samples[t_name] = [{"info": f"正在基于 {t_name} 模型进行逻辑模拟..."}]
+
             if sqls.get("sqlite"):
                 execution_res = self.execute_sql(sqls["sqlite"])
                 if not execution_res["success"] or not execution_res["data"]:
@@ -180,6 +202,7 @@ class DataAnalystEngine:
                 "meta": meta,
                 "sqls": sqls,
                 "data": execution_res.get("data", []),
+                "source_samples": source_samples, # [v5.2]
                 "is_simulated": is_simulated
             }
             final_stages_data.append(stage_entry)
@@ -187,17 +210,17 @@ class DataAnalystEngine:
 
         # 3. 综合研判层：准备最终报告生成器
         summary_prompt = f"""
-你是一名首席战略官。请基于以下【多阶段链式推演】结果撰写最终战略报告。
+你是一名首席战略官。请基于以下【多阶段链式推演】的实际结果撰写最终战略报告。
 用户原始需求: {query}
 业务宏观背景: {pruned_schemas['macro_context']}
 各阶段推演数据摘要:
 {full_analysis_context}
 
-报告要求：
-1. 整合各阶段发现，给出一个贯穿式的宏观结论。
-2. 针对每一个阶段的技术实现（SQL）给出工程落地建议。
-3. 结合知识库背景，指出未来 3-6 个月的战略预警点。
-报告结构包含：### 🗺️ 全局战略地图、### 🔬 阶段性洞察汇编、### 💻 工程落地指南、### 🚀 首席执行建议。
+要求（严格执行）：
+1. **真实性第一**：报告中的每一个百分比、每一个地区名称必须与“推演数据摘要”中提供的 JSON 内容完全一致。
+2. **严禁编造**：如果数据摘要中只有 East/West，严禁在报告中提到北美、欧洲等虚假信息。
+3. 如果数据是仿真的，请在开头明确标注：“当前分析基于业务架构模型仿真得出”。
+4. 报告结构包含：### 🗺️ 全局战略地图、### 🔬 阶段性洞察汇编、### 💻 工程落地指南、### 🚀 首席执行建议。
 """
         
         def report_generator():
