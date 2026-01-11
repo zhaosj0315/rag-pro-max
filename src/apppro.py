@@ -5635,109 +5635,80 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                             analysis_res = da_engine.execute_analysis(final_prompt, llm)
                             
                             if analysis_res.get("success", False):
-                                st.markdown(f"### 🏦 5.0 极光战略工作坊")
+                                st.markdown(f"### 🏗️ 5.2.4 极光战略工作坊 (工程化闭环)")
                                 if analysis_res.get("macro_context"):
-                                    st.caption(f"🎯 **宏观战略目标**: {analysis_res['macro_context']}")
-
-                                # 1. 流式报告
-                                report_p = st.empty()
-                                full_rep = ""
-                                if analysis_res.get("logic_gen"):
-                                    for t in analysis_res["logic_gen"]:
-                                        full_rep += t
-                                        report_p.markdown(full_rep + "▌")
-                                report_p.markdown(full_rep)
-
-                                st.divider()
-                                # 2. 多阶段渲染
+                                    st.info(f"🎯 **核心战略目标**: {analysis_res['macro_context']}")
+                                    
+                                # 1. 核心推演报告 (总领全文)
+                                report_placeholder = st.empty()
+                                full_report = ""
+                                logic_stream = analysis_res.get("logic_gen")
+                                if logic_stream:
+                                    for token in logic_stream:
+                                        full_report += token
+                                        report_placeholder.markdown(full_report + "▌")
+                                
+                                report_placeholder.markdown(full_report)
+                                # 2. 循环渲染每个逻辑阶段
                                 for stage in analysis_res.get("stages", []):
                                     meta = stage["meta"]
                                     with st.expander(f"📍 Stage {meta['stage_id']}: {meta['title']}", expanded=True):
                                         st.markdown(f"**分析目标**: {meta['goal']}")
-                                        import pandas as pd
-                                        import plotly.express as px
-                                        df_s = pd.DataFrame(stage["data"])
-                                        if not df_s.empty:
-                                            v_tabs = st.tabs(["📊 对比", "📈 趋势", "🍰 占比"])
-                                            with v_tabs[0]: st.plotly_chart(px.bar(df_s, x=df_s.columns[0], y=df_s.columns[-1], template="plotly_white"), use_container_width=True, key=f"bar_{msg_idx}_{meta['stage_id']}")
                                         
-                                        s_tabs = st.tabs(["🧪 SQLite", "🐘 Standard", "💻 DataWorks"])
-                                        with s_tabs[0]: st.code(stage["sqls"].get("sqlite"), language="sql")
-                                        with s_tabs[1]: st.code(stage["sqls"].get("standard"), language="sql")
-                                        with s_tabs[2]: st.code(stage["sqls"].get("dataworks"), language="sql")
-
-                                # 归档并中断
-                                st.session_state.messages.append({"role": "assistant", "content": full_rep, "is_data_report": True, "stages": analysis_res["stages"], "macro_context": analysis_res.get("macro_context")})
-                                st.session_state.is_processing = False
-                                st.rerun()
-
-                            # 1. 核心推演报告 (总领全文)
-                            report_placeholder = st.empty()
-                            full_report = ""
-                            logic_stream = analysis_res.get("logic_gen")
-                            if logic_stream:
-                                for token in logic_stream:
-                                    full_report += token
-                                    report_placeholder.markdown(full_report + "▌")
-                            
-                            report_placeholder.markdown(full_report)
-                            # 2. 循环渲染每个逻辑阶段
-                            for stage in analysis_res.get("stages", []):
-                                meta = stage["meta"]
-                                with st.expander(f"📍 Stage {meta['stage_id']}: {meta['title']}", expanded=True):
-                                    st.markdown(f"**分析目标**: {meta['goal']}")
-                                    
-                                    # --- [v5.2] 数据流转全演示 ---
-                                    with st.container(border=True):
-                                        st.markdown("##### 🧬 数据演进演示 (Lineage Demo)")
-                                        
-                                        # A. 查询前：原始数据
-                                        st.markdown("**1. 查询前：业务表采样 (Before)**")
-                                        if stage.get("source_samples"):
-                                            s_tabs = st.tabs(list(stage["source_samples"].keys()))
-                                            for idx, t_name in enumerate(stage["source_samples"]):
-                                                with s_tabs[idx]:
-                                                    st.dataframe(pd.DataFrame(stage["source_samples"][t_name]), use_container_width=True)
-                                        
-                                        # B. 加工中：逻辑脚本
-                                        st.markdown("**2. 执行中：工程逻辑 (The Logic)**")
-                                        sqls = stage.get("sqls", {})
-                                        sql_tabs = st.tabs(["🧪 SQLite (本地验证)", "🐘 Standard SQL", "💻 DataWorks (生产)"])
-                                        with sql_tabs[0]:
-                                            st.caption("SQL 语言: SQLite (Local Sim)")
-                                            st.code(sqls.get("sqlite", ""), language="sql")
-                                        with sql_tabs[1]:
-                                            st.caption("SQL 语言: Standard ANSI SQL")
-                                            st.code(sqls.get("standard", ""), language="sql")
-                                        with sql_tabs[2]:
-                                            st.caption("SQL 语言: MaxCompute / DataWorks")
-                                            st.code(sqls.get("dataworks", ""), language="sql")
-                                        
-                                        # C. 查询后：结果产出
-                                        st.markdown("**3. 查询后：汇聚结果表 (After)**")
-                                        df_s = pd.DataFrame(stage["data"])
-                                        if not df_s.empty:
-                                            st.dataframe(df_s, use_container_width=True)
+                                        # --- [v5.2] 数据流转全演示 ---
+                                        with st.container(border=True):
+                                            st.markdown("##### 🧬 数据演进演示 (Lineage Demo)")
                                             
-                                            # --- 可视化画板 ---
-                                            st.markdown("---")
-                                            v_tabs = st.tabs(["📊 对比", "📈 趋势", "🍰 占比"])
-                                            aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA']
-                                            with v_tabs[0]:
-                                                st.plotly_chart(px.bar(df_s, x=df_s.columns[0], y=df_s.columns[-1], template="plotly_white", color_discrete_sequence=aurora_colors), use_container_width=True, key=f"bar_{meta['stage_id']}_{time.time()}")
-                                            if len(df_s.columns) >= 2:
-                                                with v_tabs[1]: st.plotly_chart(px.line(df_s, x=df_s.columns[0], y=df_s.columns[-1], template="plotly_white"), use_container_width=True, key=f"line_{meta['stage_id']}_{time.time()}")
-                                                with v_tabs[2]: st.plotly_chart(px.pie(df_s, names=df_s.columns[0], values=df_s.columns[-1], hole=0.4), use_container_width=True, key=f"pie_{meta['stage_id']}_{time.time()}")
-                                    
-                                        if stage.get("is_simulated"):
-                                            st.warning("✨ 本阶段结果基于战略业务模型仿真得出")
+                                            # A. 查询前：原始数据
+                                            st.markdown("**1. 查询前：业务表采样 (Before)**")
+                                            if stage.get("source_samples"):
+                                                s_tabs = st.tabs(list(stage["source_samples"].keys()))
+                                                for idx, t_name in enumerate(stage["source_samples"]):
+                                                    with s_tabs[idx]:
+                                                        import pandas as pd
+                                                        st.dataframe(pd.DataFrame(stage["source_samples"][t_name]), use_container_width=True)
+                                            
+                                            # B. 加工中：逻辑脚本
+                                            st.markdown("**2. 执行中：工程逻辑 (The Logic)**")
+                                            sqls = stage.get("sqls", {})
+                                            sql_tabs = st.tabs(["🧪 SQLite (本地验证)", "🐘 Standard SQL", "💻 DataWorks (生产)"])
+                                            with sql_tabs[0]:
+                                                st.caption("SQL 语言: SQLite (Local Sim)")
+                                                st.code(sqls.get("sqlite", ""), language="sql")
+                                            with sql_tabs[1]:
+                                                st.caption("SQL 语言: Standard ANSI SQL")
+                                                st.code(sqls.get("standard", ""), language="sql")
+                                            with sql_tabs[2]:
+                                                st.caption("SQL 语言: MaxCompute / DataWorks")
+                                                st.code(sqls.get("dataworks", ""), language="sql")
+                                            
+                                            # C. 查询后：结果产出
+                                            st.markdown("**3. 查询后：汇聚结果表 (After)**")
+                                            import pandas as pd
+                                            import plotly.express as px
+                                            df_s = pd.DataFrame(stage["data"])
+                                            if not df_s.empty:
+                                                st.dataframe(df_s, use_container_width=True)
+                                                
+                                                # --- 可视化画板 ---
+                                                st.markdown("---")
+                                                v_tabs = st.tabs(["📊 对比", "📈 趋势", "🍰 占比"])
+                                                aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA']
+                                                with v_tabs[0]:
+                                                    st.plotly_chart(px.bar(df_s, x=df_s.columns[0], y=df_s.columns[-1], template="plotly_white", color_discrete_sequence=aurora_colors), use_container_width=True, key=f"bar_{meta['stage_id']}_{time.time()}")
+                                                if len(df_s.columns) >= 2:
+                                                    with v_tabs[1]: st.plotly_chart(px.line(df_s, x=df_s.columns[0], y=df_s.columns[-1], template="plotly_white"), use_container_width=True, key=f"line_{meta['stage_id']}_{time.time()}")
+                                                    with v_tabs[2]: st.plotly_chart(px.pie(df_s, names=df_s.columns[0], values=df_s.columns[-1], hole=0.4), use_container_width=True, key=f"pie_{meta['stage_id']}_{time.time()}")
+                                        
+                                            if stage.get("is_simulated"):
+                                                st.warning("✨ 本阶段结果基于战略业务模型仿真得出")
 
                                 # 3. [v5.2.3 恢复] 生成最新的战略建议追问
                                 try:
                                     from src.chat.unified_suggestion_engine import get_unified_suggestion_engine
                                     sug_engine = get_unified_suggestion_engine(active_kb_name)
                                     # 结合提问与最终报告内容作为生成上下文
-                                    suggestion_context = f"用户提问: {final_prompt}\n战略推演报告: {full_rep}"
+                                    suggestion_context = f"用户提问: {final_prompt}\n战略推演报告: {full_report}"
                                     new_sugs = sug_engine.generate_suggestions(
                                         context=suggestion_context,
                                         source_type='chat',
@@ -5753,7 +5724,7 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                                 # 归档并中断
                                 st.session_state.messages.append({
                                     "role": "assistant", 
-                                    "content": full_rep, 
+                                    "content": full_report, 
                                     "is_data_report": True, 
                                     "stages": analysis_res["stages"], 
                                     "macro_context": analysis_res.get("macro_context"),

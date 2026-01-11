@@ -116,7 +116,7 @@ class DataAnalystEngine:
             "relationships": [r for r in full_schemas.get("relationships", []) if r["source"] in relevant_table_names or r["target"] in relevant_table_names]
         }
 
-        # 1. 战略拆解层：将复杂需求拆解为 2-3 个阶段
+        # 1. 战略拆解层：将复杂需求拆解为 2-3 个逻辑阶段
         decomposition_prompt = f"""
 你是一名顶级商业技术顾问。针对用户需求，请将其拆解为 2 个逻辑递进的分析阶段。
 需求：{query}
@@ -124,7 +124,14 @@ class DataAnalystEngine:
 
 请返回标准的 JSON 数组，格式如下：
 [
-  {{ "stage_id": 1, "title": "阶段标题", "goal": "本阶段要解决的子问题", "logic": "分析逻辑说明" }},
+  {{ 
+    "stage_id": 1, 
+    "title": "阶段标题", 
+    "requirement": "【需求理解】本阶段要解决的业务核心痛点是什么",
+    "transformation": "【技术转化】本阶段将如何通过数据加工（逻辑、表、指标）来满足上述需求",
+    "goal": "具体执行目标", 
+    "logic": "核心算法说明" 
+  }},
   ...
 ]
 """
