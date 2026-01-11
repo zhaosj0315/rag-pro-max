@@ -12,14 +12,18 @@
 
 # RAG Pro Max - Intelligent Document Q&A System
 
-**Version**: v4.3.0  
-![Version](https://img.shields.io/badge/version-v4.3.0-brightgreen)
+**Version**: v5.3.3  
+![Version](https://img.shields.io/badge/version-v5.3.3-brightgreen)
 ![Status](https://img.shields.io/badge/status-Stable-blue)
-![Last Update](https://img.shields.io/badge/last%20update-2026--01--03-orange)
+![Last Update](https://img.shields.io/badge/last%20update-2026--01--11-orange)
 
-> **Enterprise-grade RAG (Retrieval Augmented Generation) Knowledge Base System - Ultimate Evolution of Intelligent Recommendations & Ultra-fast Retrieval**
-
-**🎯 Core Advantages**: Modern Configuration Center • Plugin-based Custom Vendors • Semantic Firewall • Expert-level Intelligent Research
+## 🚀 RAG Pro Max v5.3.3
+### 💎 Universal Strategic Modeling (v5.3.3 Major Update)
+- **Multi-modal Alignment**: Supports mixed input of PDF/MD dictionaries and CSV/Excel tables, automatically locking business definitions to physical table structures.
+- **Virtual Strategic Sandbox**: Introducing the "Golden Mock Data" engine, enabling one-click simulation of 20 closed-loop data records even with only data dictionaries.
+- **Forced Routing Guard**: Completely isolates Data Analysis and RAG pipelines, ensuring professional analysis dashboard outputs via `st.rerun()`.
+- **Zero-Crash Stability**: Deeply optimized initialization scopes, eliminating `NameError` for critical variables like `logger` and `time` under extreme loads.
+- **Auto-Format Sensing**: System automatically triggers the "Business Semantic Brain" whenever tables or dictionary files are detected.
 
 ---
 
