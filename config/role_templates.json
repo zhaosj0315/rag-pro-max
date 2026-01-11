@@ -20,7 +20,8 @@
             "smart_search",
             "summary_gen",
             "kb_export_report",
-            "data_analysis"
+            "data_analysis",
+            "download_knowledge_base"
         ],
         "default_quota_mb": 1024
     },
@@ -47,7 +48,9 @@
             "smart_search",
             "summary_gen",
             "kb_export_report",
-            "kb_export_full"
+            "kb_export_full",
+            "data_analysis",
+            "download_knowledge_base"
         ],
         "default_quota_mb": 50
     },

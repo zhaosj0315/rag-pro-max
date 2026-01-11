@@ -22,7 +22,15 @@ class PermissionManager:
         users = load_users()
         user_info = users.get(username, {})
         
-        # 访客处理
+        # 1. 检查用户特有权限覆盖 (User-Specific Overrides)
+        # 支持 "custom_permissions": ["data_analysis", "-download_files"]
+        custom_perms = user_info.get("custom_permissions", [])
+        if f"-{permission}" in custom_perms:
+            return False  # 明确禁止
+        if permission in custom_perms:
+            return True   # 明确允许
+        
+        # 2. 访客处理
         if username == "guest_user":
             user_role = "guest"
         else:

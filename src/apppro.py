@@ -3318,7 +3318,12 @@ elif active_kb_name:
                 import pandas as pd
                 import json
                 from datetime import datetime
+                from src.auth.permission_manager import permission_manager
                 
+                # 获取当前用户
+                current_user = st.session_state.get('user', 'guest_user')
+                can_download = permission_manager.has_permission(current_user, "download_knowledge_base")
+
                 # --- A. 快速资产导出 ---
                 st.markdown("**🧠 核心知识 (轻量)**")
                 if doc_manager.manifest.get('files'):
@@ -3336,14 +3341,22 @@ elif active_kb_name:
                             })
                         df = pd.DataFrame(df_data)
                         csv_data = df.to_csv(index=False).encode('utf-8-sig')
-                        st.download_button(label="📊 CSV 索引", data=csv_data, file_name=f"{active_kb_name}_索引.csv", mime='text/csv', use_container_width=True, key=f"dl_csv_h_{active_kb_name}")
+                        
+                        if can_download:
+                            st.download_button(label="📊 CSV 索引", data=csv_data, file_name=f"{active_kb_name}_索引.csv", mime='text/csv', use_container_width=True, key=f"dl_csv_h_{active_kb_name}")
+                        else:
+                            st.button("📊 CSV 索引", disabled=True, key=f"dl_csv_h_{active_kb_name}_disabled", help="无下载权限")
 
                     with col_rpt:
                         # 2. Markdown 报告内容生成
                         report_md = f"# 知识库全量报告: {active_kb_name}\n\n- 导出时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                         for info in doc_manager.manifest['files']:
                             report_md += f"## 📄 {info.get('name')}\n- **分类**: {info.get('category', '未分类')}\n- **摘要**: {info.get('summary', '暂无摘要')}\n\n---\n"
-                        st.download_button(label="📝 MD 报告", data=report_md, file_name=f"{active_kb_name}_报告.md", mime='text/markdown', use_container_width=True, key=f"dl_md_h_{active_kb_name}")
+                        
+                        if can_download:
+                            st.download_button(label="📝 MD 报告", data=report_md, file_name=f"{active_kb_name}_报告.md", mime='text/markdown', use_container_width=True, key=f"dl_md_h_{active_kb_name}")
+                        else:
+                            st.button("📝 MD 报告", disabled=True, key=f"dl_md_h_{active_kb_name}_disabled", help="无下载权限")
 
                 st.divider()
                 
@@ -3352,16 +3365,14 @@ elif active_kb_name:
                 st.caption("包含报告、索引、元数据、原始文档及全量向量数据库")
                 
                 # 权限拦截逻辑 (实时校验 - 颗粒化)
-                from src.auth.permission_manager import permission_manager
-                current_user = st.session_state.get('user', 'guest_user')
-                
                 can_export_full = permission_manager.has_permission(current_user, "kb_export_full")
-                can_export_report = permission_manager.has_permission(current_user, "kb_export_report")
+                # can_download 也是必要条件之一 (逻辑上全量导出包含下载)
+                final_export_permission = can_export_full and can_download
                 
-                if not can_export_full:
+                if not final_export_permission:
                     st.warning("🔒 权限不足：当前角色无法导出全量镜像。")
                 
-                if st.button("🌟 一键生成全量资产包 (ZIP)", use_container_width=True, key=f"dl_all_in_one_{active_kb_name}", type="primary", disabled=not can_export_full):
+                if st.button("🌟 一键生成全量资产包 (ZIP)", use_container_width=True, key=f"dl_all_in_one_{active_kb_name}", type="primary", disabled=not final_export_permission):
                     from src.auth.audit_logger import AuditLogger
                     AuditLogger.log(current_user, "EXPORT_FULL_SNAPSHOT", f"导出知识库全量镜像: {active_kb_name}")
                     with st.status("正在进行全量数据打包 (含历史对话)...", expanded=True) as status:
@@ -3633,11 +3644,19 @@ elif active_kb_name:
 
             # 4. 导出清单
             with op_col4:
-                if st.button("📥 导出清单", use_container_width=True, help="导出当前文件列表"):
-                    export_data = f"知识库: {active_kb_name}\n文件数: {stats['file_cnt']}\n片段数: {stats['total_chunks']}\n\n文件列表:\n"
-                    for f in doc_manager.manifest['files']:
-                        export_data += f"- {f['name']} ({f['type']}, {len(f.get('doc_ids', []))} 片段)\n"
-                    st.download_button("下载", export_data, f"{active_kb_name}_清单.txt", use_container_width=True)
+                # 权限检查
+                from src.auth.permission_manager import permission_manager
+                current_user = st.session_state.get('user', 'guest_user')
+                can_download = permission_manager.has_permission(current_user, "download_knowledge_base")
+                
+                if can_download:
+                    if st.button("📥 导出清单", use_container_width=True, help="导出当前文件列表"):
+                        export_data = f"知识库: {active_kb_name}\n文件数: {stats['file_cnt']}\n片段数: {stats['total_chunks']}\n\n文件列表:\n"
+                        for f in doc_manager.manifest['files']:
+                            export_data += f"- {f['name']} ({f['type']}, {len(f.get('doc_ids', []))} 片段)\n"
+                        st.download_button("下载", export_data, f"{active_kb_name}_清单.txt", use_container_width=True)
+                else:
+                    st.button("📥 导出清单", use_container_width=True, disabled=True, help="无下载权限")
 
             # 执行摘要生成逻辑
             if run_summary and files_without_summary:
@@ -4876,8 +4895,17 @@ with st.container():
         st.session_state.enable_deep_research = research_on
 
     with c_da:
-        da_on = st.toggle("数据分析", value=st.session_state.get('is_data_analysis_mode', False), help="手动触发宏观数据分析与推演 (v4.5)")
-        st.session_state.is_data_analysis_mode = da_on
+        # 权限检查：数据分析
+        from src.auth.permission_manager import permission_manager
+        current_user = st.session_state.get('user', 'guest_user')
+        can_analyze = permission_manager.has_permission(current_user, "data_analysis")
+        
+        if not can_analyze:
+            st.toggle("数据分析 (🔒)", value=False, disabled=True, help="请联系管理员开启数据分析权限")
+            st.session_state.is_data_analysis_mode = False
+        else:
+            da_on = st.toggle("数据分析", value=st.session_state.get('is_data_analysis_mode', False), help="手动触发宏观数据分析与推演 (v4.5)")
+            st.session_state.is_data_analysis_mode = da_on
 
     # --- 4. 操作按钮 (Popover/Button) ---
     if st.session_state.get('is_processing'):
