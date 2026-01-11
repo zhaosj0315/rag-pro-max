@@ -62,7 +62,7 @@ def render_admin_management():
     
     st.divider()
     
-    tab_batch, tab_users, tab_kbs, tab_roles, tab_audit = st.tabs(["⚡ 批量授权", "👤 用户台账", "📂 知识库分发", "🎭 角色定义", "📜 审计记录"])
+    tab_batch, tab_users, tab_kbs, tab_assets, tab_roles, tab_audit = st.tabs(["⚡ 批量授权", "👤 用户台账", "📂 知识库分发", "🗄️ 资产全览", "🎭 角色定义", "📜 审计记录"])
     
     with tab_batch:
         st.caption("一键管理多名用户的权限与访问权")
@@ -241,6 +241,115 @@ def render_admin_management():
                     if st.button(f"重置该库权限", key=f"reset_{kb}"):
                         # 复用上面的单库重置逻辑
                         pass
+
+    with tab_assets:
+        st.caption("知识库全资产画像：深度审计所有物理存储与元数据模型")
+        from src.config.manifest_manager import ManifestManager
+        import pandas as pd
+        from datetime import datetime
+        from src.auth.session_manager import format_size
+
+        # 1. 深度扫描与数据准备
+        asset_data = []
+        for kb in all_kbs:
+            kb_path = os.path.join(kb_storage_root, kb)
+            manifest = ManifestManager.load(kb_path)
+            
+            # 计算物理大小
+            total_size = 0
+            file_count = 0
+            try:
+                for root, dirs, files in os.walk(kb_path):
+                    for f in files:
+                        total_size += os.path.getsize(os.path.join(root, f))
+                        file_count += 1
+            except: pass
+            
+            # 获取时间
+            c_time_raw = manifest.get('created_at', '2025-01-01 00:00:00')
+            try:
+                c_date = datetime.strptime(c_time_raw[:10], '%Y-%m-%d').date()
+            except: c_date = datetime.now().date()
+
+            asset_data.append({
+                "☑️ 选择": False,
+                "知识库名称": kb,
+                "所有人": manifest.get('owner', 'admin'),
+                "文件数": file_count,
+                "存储占用": total_size,
+                "格式化大小": format_size(total_size),
+                "创建日期": c_date,
+                "完整时间": c_time_raw
+            })
+
+        df_assets = pd.DataFrame(asset_data)
+
+        # 2. 筛选矩阵
+        with st.container(border=True):
+            f_col1, f_col2, f_col3 = st.columns([1.5, 2, 1.5])
+            with f_col1:
+                u_filter = st.multiselect("👤 按所有人筛选", options=df_assets['所有人'].unique())
+            with f_col2:
+                d_filter = st.date_input("📅 按创建时间段筛选", value=(df_assets['创建日期'].min(), df_assets['创建日期'].max()))
+            with f_col3:
+                k_filter = st.text_input("🔍 搜索名称/所有人", placeholder="如: 外贸")
+
+        # 应用筛选逻辑
+        filtered_df = df_assets.copy()
+        if u_filter:
+            filtered_df = filtered_df[filtered_df['所有人'].isin(u_filter)]
+        if len(d_filter) == 2:
+            filtered_df = filtered_df[(filtered_df['创建日期'] >= d_filter[0]) & (filtered_df['创建日期'] <= d_filter[1])]
+        if k_filter:
+            filtered_df = filtered_df[filtered_df['知识库名称'].str.contains(k_filter, case=False) | filtered_df['所有人'].str.contains(k_filter, case=False)]
+
+        # 3. 结果展示与批量操作
+        if filtered_df.empty:
+            st.warning("未找到匹配的知识库资产")
+        else:
+            # 统计栏
+            st.info(f"📊 筛选结果: {len(filtered_df)} 个库 | 总占用: {format_size(filtered_df['存储占用'].sum())}")
+            
+            # 利用 st.data_editor 实现多选
+            edited_df = st.data_editor(
+                filtered_df[["☑️ 选择", "知识库名称", "所有人", "文件数", "格式化大小", "创建日期"]],
+                use_container_width=True,
+                hide_index=True,
+                disabled=["知识库名称", "所有人", "文件数", "格式化大小", "创建日期"],
+                key="asset_editor"
+            )
+
+            # 批量操作逻辑
+            selected_to_delete = edited_df[edited_df["☑️ 选择"] == True]["知识库名称"].tolist()
+            
+            if selected_to_delete:
+                st.warning(f"⚠️ 警告：即将物理删除 {len(selected_to_delete)} 个知识库及其所有关联数据（不可恢复）！")
+                if st.button("🚨 确认批量物理删除", type="primary", use_container_width=True):
+                    from src.kb.kb_processor import KBProcessor
+                    from src.auth.audit_logger import AuditLogger
+                    
+                    with st.status(f"正在深度清理 {len(selected_to_delete)} 个资产...") as status:
+                        for target_kb in selected_to_delete:
+                            st.write(f"正在清除: {target_kb}")
+                            # 1. 物理目录删除
+                            target_path = os.path.join(kb_storage_root, target_kb)
+                            if os.path.exists(target_path):
+                                import shutil
+                                shutil.rmtree(target_path)
+                            
+                            # 2. 对话历史删除
+                            hist_file = os.path.join("chat_histories", f"{target_kb}.json")
+                            if os.path.exists(hist_file): os.remove(hist_file)
+                            
+                            # 3. 推荐配置删除
+                            sug_file = os.path.join("suggestion_config", f"{target_kb}_config.json")
+                            if os.path.exists(sug_file): os.remove(sug_file)
+                            
+                            AuditLogger.log(st.session_state.get('user'), "BATCH_DELETE_KB", f"物理删除了知识库: {target_kb}")
+                        
+                        status.update(label="✅ 资产批量清理完成", state="complete")
+                    
+                    time.sleep(1); st.rerun()
 
     with tab_roles:
         st.caption("角色权限中台：定义角色的底层功能矩阵与默认资源配额")
