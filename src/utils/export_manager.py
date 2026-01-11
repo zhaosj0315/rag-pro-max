@@ -123,7 +123,7 @@ class ExportManager:
             "kb_name": kb_name,
             "backup_time": datetime.now().isoformat(),
             "original_path": kb_path,
-            "backup_version": "v3.2.2"
+            "backup_version": "v4.3.0"
         }
         
         with open(backup_path / "backup_info.json", 'w', encoding='utf-8') as f:

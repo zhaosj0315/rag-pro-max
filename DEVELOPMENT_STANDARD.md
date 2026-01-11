@@ -1,11 +1,18 @@
 # RAG Pro Max 开发规范标准
-**版本**: v3.2.2  
-**更新日期**: 2025-12-30  
-**更新日期**: 2025-12-19
+**版本**: v4.3.0  
+**更新日期**: 2026-01-11  
 
 
 ## 🎯 核心原则
 **标准化开发 - 确保代码质量、文档同步、安全合规的开发流程**
+
+---
+
+## 📋 并发编程准则 (v4.3.0 新增)
+针对 v4.3.0 的架构调整，开发者必须遵循以下并发选择逻辑：
+1. **CPU 密集型任务**: 使用 `ProcessPoolExecutor`。注意 worker 函数必须在模块顶层以支持 pickle。
+2. **I/O 密集型/混合型任务**: 在 macOS (Darwin) 下必须使用 `ThreadPoolExecutor`，以避免 Streamlit 环境下的进程分叉崩溃。
+3. **Streamlit 安全**: 禁止在子进程中直接访问 `st.session_state` 或执行 `st.*` 命令。
 
 ---
 
@@ -16,174 +23,38 @@
 #### 1. 环境准备
 ```bash
 # 检查开发环境
-python --version  # 确保 Python 3.8+
-git --version     # 确保 Git 可用
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 运行基础测试
-python tests/factory_test.py --quick
+python --version  # 必须 Python 3.9+
 ```
 
 #### 2. 分支管理
-```bash
-# 从主分支创建功能分支
-git checkout main
-git pull origin main
-git checkout -b feature/功能名称
-
-# 分支命名规范
-feature/新功能名称     # 新功能开发
-fix/问题描述          # Bug修复  
-refactor/重构内容     # 代码重构
-docs/文档更新         # 文档更新
-```
-
-### 🔧 开发过程规范
-
-#### 代码开发标准
-```python
-# 1. 文件头注释
-"""
-RAG Pro Max - 模块名称
-功能描述: 简要说明模块功能
-作者: 开发者名称
-创建时间: YYYY-MM-DD
-"""
-
-# 2. 函数注释
-def function_name(param1: str, param2: int) -> bool:
-    """
-    函数功能描述
-    
-    Args:
-        param1: 参数1说明
-        param2: 参数2说明
-        
-    Returns:
-        返回值说明
-        
-    Raises:
-        异常说明
-    """
-    pass
-
-# 3. 类注释
-class ClassName:
-    """
-    类功能描述
-    
-    Attributes:
-        attr1: 属性1说明
-        attr2: 属性2说明
-    """
-    pass
-```
-
-#### 代码质量要求
-- ✅ **PEP 8 规范**: 遵循Python代码风格
-- ✅ **类型注解**: 重要函数添加类型提示
-- ✅ **异常处理**: 合理的try-catch结构
-- ✅ **日志记录**: 关键操作添加日志
-- ✅ **性能考虑**: 避免明显的性能问题
-
+...
 ### 📝 文档同步规范
 
-#### 开发过程中必须同步的文档
-```bash
-# 每次功能开发完成后检查
-python scripts/check_documentation_sync.py
-
-# 需要同步的文档
+#### 需要同步的文档
 - README.md          # 新功能说明
 - CHANGELOG.md       # 版本变更记录
-- API_DOCUMENTATION.md            # 新增API接口
+- ARCHITECTURE.md    # 架构演进说明
 - USER_MANUAL.md     # 使用说明更新
-- FAQ.md            # 新问题解答
+- DEPLOYMENT.md      # 部署环境变化
 ```
-
-#### 文档更新标准
-- ✅ **及时更新**: 功能完成立即更新文档
-- ✅ **内容准确**: 文档与代码实现一致
-- ✅ **用户友好**: 使用简洁易懂的语言
-- ✅ **示例完整**: 提供完整的使用示例
 
 ### 🧪 测试规范
-
-#### 测试要求
-```bash
-# 开发过程中的测试
-python tests/factory_test.py          # 完整测试
-python tests/factory_test.py --quick  # 快速测试
-
-# 测试覆盖率要求
-- 核心功能: 100%覆盖
-- 工具函数: 90%+覆盖  
-- UI组件: 80%+覆盖
-- 总体覆盖率: 85%+
-```
-
-#### 测试类型
-- ✅ **单元测试**: 测试单个函数/类
-- ✅ **集成测试**: 测试模块间交互
-- ✅ **功能测试**: 测试完整功能流程
-- ✅ **性能测试**: 测试关键性能指标
+- ✅ **测试覆盖率**: 核心逻辑要求 100% 覆盖，UI 组件要求 80% 覆盖。
+- ✅ **macOS 验证**: 涉及文件系统或 OCR 的功能必须在 macOS 环境下验证 native 能力。
 
 ---
 
 ## 🔒 安全开发规范
-
-### 代码安全
-```python
-# 1. 敏感信息处理
-# ❌ 错误做法
-api_key = "sk-1234567890abcdef"
-
-# ✅ 正确做法  
-api_key = os.getenv("API_KEY", "")
-if not api_key:
-    raise ValueError("API_KEY environment variable not set")
-
-# 2. 输入验证
-def process_file(file_path: str):
-    # 验证文件路径
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"File not found: {file_path}")
-    
-    # 验证文件类型
-    allowed_extensions = ['.pdf', '.txt', '.docx']
-    if not any(file_path.endswith(ext) for ext in allowed_extensions):
-        raise ValueError(f"Unsupported file type: {file_path}")
-```
-
-### 数据安全
-- ✅ **用户数据**: 本地存储，不推送远程
-- ✅ **配置文件**: 敏感配置使用环境变量
-- ✅ **日志安全**: 不记录敏感信息
-- ✅ **文件权限**: 合理设置文件访问权限
-
-### 依赖安全
-```bash
-# 定期检查依赖安全
-pip audit
-
-# 更新依赖版本
-pip list --outdated
-pip install --upgrade package_name
-```
-
----
-
+...
 ## 📊 版本管理规范
 
 ### 版本号规范
 ```json
 // version.json
 {
-    "version": "2.4.4",
-    "build": "20251217",
-    "stage": "production"
+    "version": "4.3.0",
+    "build_number": "20260111.10",
+    "status": "stable"
 }
 ```
 

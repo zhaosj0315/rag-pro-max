@@ -2,8 +2,8 @@
 
 
 
-**版本**: v3.2.2 (Expert Reviewed)  
-**更新日期**: 2025-12-30
+**版本**: v4.3.0 (Data Analysis Optimized)  
+**更新日期**: 2026-01-11
 **类型**: 工程管理规范
 **适用阶段**: 开发完成 (Code Freeze) 后，发布/推送前
 **执行角色**: Release Manager / Tech Lead
@@ -127,17 +127,17 @@
 
 确保以下三处使用的术语完全一致（100% Match）：
 
-- **UI 界面**: 用户看到的 Label (e.g., "联网搜索", "深度思考").
-- **代码变量**: 关键配置项 Key (e.g., `enable_web_search`, `enable_deep_think`).
-- **文档描述**: 用户手册中的用词 (e.g., "联网搜索 (Web Search)", "深度思考 (Deep Think)").
+- **UI 界面**: 用户看到的 Label (e.g., "分析实验室", "全宽布局").
+- **代码变量**: 关键配置项 Key (e.g., `analysis_lab_enabled`, `fluid_layout_mode`).
+- **文档描述**: 用户手册中的用词 (e.g., "分析实验室 (Analysis Lab)", "分析成果工作台 (Artifacts)").
 
-**v2.8.0 核心术语检查清单 (示例/当前版本重点)**:
+**v4.3.0 核心术语检查清单 (当前版本重点)**:
 *(注：新版本发布时需在此处更新当期核心功能的关键术语)*
 
--  联网搜索 / Web Search / enable_web_search
--  深度思考 / Deep Think / enable_deep_think
--  功能工具栏 / Function Toolbar / toolbar_enabled
--  动态配置 / Dynamic Config / dynamic_model_selection
+-  分析实验室 / Analysis Lab / analysis_lab_enabled
+-  分析成果 / Artifacts / artifacts_proxy_enabled
+-  全宽布局 / Fluid Layout / fluid_layout_active
+-  线程并发 / ThreadPool Concurrency / concurr_strategy_darwin
 
 #### 2. 深度清理 (Standardized Cleanup)
 
@@ -235,7 +235,7 @@
 ```
 ### ✅ 全量同步与清理报告 (Expert Reviewed)
 
-**版本**: [vX.Y.Z] (当前: v3.2.2)
+**版本**: [vX.Y.Z] (当前: v4.3.0)
 **执行人**: [Role/Name]
 
 #### 1. 变更摘要 (Summary)

@@ -12,25 +12,13 @@
 
 # RAG Pro Max - 智能文档问答系统
 
-**版本**: v3.4.5  
-**更新日期**: 2026-01-10  
-**适用范围**: 企业级部署与运维
+**版本**: v4.3.0  
+![Version](https://img.shields.io/badge/version-v4.3.0-brightgreen)
 
-![Version](https://img.shields.io/badge/version-v3.4.5-brightgreen)
-![Status](https://img.shields.io/badge/status-Stable-blue)
-![Last Update](https://img.shields.io/badge/last%20update-2026--01--10-orange)
-
-# 🚀 RAG Pro Max v3.4.5
-
-> **企业级 RAG (Retrieval Augmented Generation) 知识库系统 - 智能推荐与极速检索的终极进化**
-...
-**🎯 核心优势**: 现代化配置中心 • 插件式自定义厂商 • 语义防火墙 • 专家级智能研究
-
----
-
-## ✨ 核心功能
-
-### 🕷️ 纯净 Markdown 爬虫 (v3.4.5 重构)
+# 🚀 RAG Pro Max v4.3.0
+### 🏛️ 分析实验室 2.0 (v4.3.0 重构)
+- **全宽流式布局**: Artifacts 看板支持 1:3 黄金比例展示。
+- **macOS 性能模式**: 自动启用线程池并发，彻底解决 Fork 崩溃。
 - **结构化引擎**: 摒弃传统文本抓取，自动将网页转换为层级清晰的 Markdown 格式，保留标题、列表与表格结构。
 - **智能去噪**: 内置 Wikipedia/新闻/技术文档专属清洗规则，自动剥离侧边栏、广告与无关导航。
 - **双重溯源**: 文件头部注入 `**URL:**` 元数据，同时写入 macOS 系统级扩展属性 (Extended Attributes)。

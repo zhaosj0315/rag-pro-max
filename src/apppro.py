@@ -1958,7 +1958,7 @@ with st.sidebar:
         # 版本信息
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.info("📦 **版本**: v3.2.2")
+            st.info("📦 **版本**: v4.3.0")
         with col2:
             st.info("🚀 **状态**: 稳定版")
         with col3:
