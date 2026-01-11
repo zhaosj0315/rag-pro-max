@@ -14,6 +14,37 @@ def render_admin_management():
     
     users = load_users()
     sharing_config = load_sharing_config()
+    
+    # [v4.5.2 核心增强] 物理一致性实时审计器
+    kb_storage_root = os.path.join(os.getcwd(), "vector_db_storage")
+    physical_kbs = set()
+    if os.path.exists(kb_storage_root):
+        physical_kbs = {d for d in os.listdir(kb_storage_root) if os.path.isdir(os.path.join(kb_storage_root, d)) and not d.startswith('.')}
+    
+    # 自动修复 sharing_config
+    original_public_count = len(sharing_config.get("public_kbs", []))
+    sharing_config["public_kbs"] = [kb for kb in sharing_config.get("public_kbs", []) if kb in physical_kbs]
+    
+    # 自动修复 role_sharing
+    for role in sharing_config.get("role_sharing", {}):
+        sharing_config["role_sharing"][role] = [kb for kb in sharing_config["role_sharing"][role] if kb in physical_kbs]
+    
+    # 自动修复用户白名单 (kb_whitelist)
+    users_modified = False
+    for username in users:
+        if "kb_whitelist" in users[username]:
+            orig_list = users[username]["kb_whitelist"]
+            new_list = [kb for kb in orig_list if kb in physical_kbs]
+            if len(orig_list) != len(new_list):
+                users[username]["kb_whitelist"] = new_list
+                users_modified = True
+    
+    # 如果检测到差异，执行静默修复
+    if len(sharing_config.get("public_kbs", [])) != original_public_count or users_modified:
+        save_sharing_config(sharing_config)
+        if users_modified: save_users(users)
+        st.toast("🧹 已自动清理消失的物理知识库关联记录", icon="🧼")
+
     public_kbs = sharing_config.get("public_kbs", [])
     
     # 提前加载角色配置，供各标签页共享

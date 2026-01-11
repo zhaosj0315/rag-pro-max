@@ -5,9 +5,10 @@ warnings.filterwarnings("ignore", category=UserWarning, message=".*UnsupportedFi
 warnings.filterwarnings("ignore", message=".*validate_default.*")
 
 # 环境变量设置 - 减少启动警告
-__version__ = "3.2.7"
+__version__ = "4.5.2"
 
 import os
+import glob
 os.environ['DISABLE_MODEL_SOURCE_CHECK'] = 'True'
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
@@ -1078,10 +1079,11 @@ with st.sidebar:
             if source_mode == "📊 数据分析":
                 st.info("💡 **数据分析模式**: 适合上传 CSV、Excel 或包含报表的文档。系统将自动提取表格结构并支持复杂的 SQL 统计查询。")
                 da_files = st.file_uploader(
-                    "上传数据文件", 
-                    type=['csv', 'xlsx', 'xls', 'pdf', 'docx'],
-                    accept_multiple_files=True,
-                    key="data_analyst_uploader"
+                    "上传业务表单或数据字典", 
+                    accept_multiple_files=True, 
+                    type=['csv', 'xlsx', 'xls', 'md', 'markdown'],
+                    key="da_uploader",
+                    label_visibility="collapsed"
                 )
                 if da_files:
                     st.session_state.is_data_analysis_mode = True
@@ -1107,8 +1109,8 @@ with st.sidebar:
                     accept_multiple_files=True, 
                     key="uploader",
                     label_visibility="collapsed",
-                    help="支持格式: PDF, DOCX, TXT, MD, Excel, CSV",
-                    type=['pdf', 'docx', 'txt', 'md', 'xlsx', 'xls', 'csv', 'pptx', 'jpg', 'png', 'jpeg'],
+                    help="支持格式: PDF, DOCX, TXT, MD, Excel, CSV, 图片",
+                    type=['pdf', 'docx', 'txt', 'md', 'markdown', 'xlsx', 'xls', 'csv', 'pptx', 'jpg', 'png', 'jpeg'],
                     disabled=not can_upload
                 )
                 
@@ -2147,8 +2149,8 @@ if st.session_state.get('main_mode', 'rag') == 'sql':
         st.markdown("###### 📁 数据导入")
         
         uploaded_data = st.file_uploader(
-            "上传Excel/CSV文件", 
-            type=['xlsx', 'csv'],
+            "上传Excel/CSV/MD字典文件", 
+            type=['xlsx', 'csv', 'md', 'markdown'],
             key="main_data_uploader"
         )
         
@@ -2441,21 +2443,38 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
         da_engine = DataAnalystEngine(persist_dir, logger)
         llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
         
-        # [新增] 结构化数据优先处理 (Excel/CSV)
+        # [新增] 结构化数据与架构字典优先处理 (Excel/CSV/MD)
         import glob
         data_files = []
         if current_target_path and os.path.exists(current_target_path):
-             data_files.extend(glob.glob(os.path.join(current_target_path, "**/*.csv"), recursive=True))
-             data_files.extend(glob.glob(os.path.join(current_target_path, "**/*.xlsx"), recursive=True))
-             data_files.extend(glob.glob(os.path.join(current_target_path, "**/*.xls"), recursive=True))
+            if os.path.isdir(current_target_path):
+                # 扫描表格与 Markdown 字典
+                data_files.extend(glob.glob(os.path.join(current_target_path, "**/*.csv"), recursive=True))
+                data_files.extend(glob.glob(os.path.join(current_target_path, "**/*.xlsx"), recursive=True))
+                data_files.extend(glob.glob(os.path.join(current_target_path, "**/*.xls"), recursive=True))
+                data_files.extend(glob.glob(os.path.join(current_target_path, "**/*.md"), recursive=True))
+            else:
+                # 修复单文件识别逻辑
+                if current_target_path.lower().endswith(('.csv', '.xlsx', '.xls', '.md', '.markdown')):
+                    data_files.append(current_target_path)
 
         if data_files:
-             status_container.write(f"📊 检测到 {len(data_files)} 个结构化数据表，正在进行物理建模...")
-             res = da_engine.process_files(data_files)
+             status_container.write(f"📊 检测到 {len(data_files)} 个业务源文件，正在执行物理归档与战略建模...")
+             # 物理拷贝一份到持久化目录，防止临时文件丢失
+             for f in data_files:
+                 shutil.copy2(f, os.path.join(persist_dir, os.path.basename(f)))
+             
+             # 使用持久化后的文件进行建模
+             persistent_data_files = [os.path.join(persist_dir, os.path.basename(f)) for f in data_files]
+             res = da_engine.process_files(persistent_data_files)
              if res['success']:
-                 status_container.success(f"✅ 物理数据入库完成 (已导入 {len(res['tables'])} 张表)")
-             else:
-                 status_container.error(f"❌ 数据入库失败: {res.get('error')}")
+                 # [v4.5.3] 如果包含 Markdown，强制触发一次语义提取
+                 if res.get('has_schema_doc'):
+                     status_container.write("🧠 正在从 Markdown 字典中脑补宏观业务逻辑...")
+                     docs, _ = builder._read_documents(persist_dir, 0, None)
+                     da_engine.extract_schema_from_docs(docs, llm)
+                 
+                 status_container.success(f"✅ 战略大脑初始化完成 (已归档并导入 {len(res['tables'])} 张表)")
 
         # 1. 执行 RAG 预扫描以获取文本（用于非结构化建模）
         # 这里先运行 builder._scan_files 和 _read_documents 以获取 docs 对象
@@ -4699,12 +4718,13 @@ if st.session_state.get('artifacts'):
 with st.container():
     # Tools: Leading Spacer | Provider | Model | Deep | Web | Research | Filter | Clear | Stop/Trailing Spacer
     # 调整比例以容纳 智能研究 (v2.9)
+    # 计算动态列宽
     if st.session_state.get('is_processing'):
-        cols = st.columns([0.03, 0.12, 0.22, 0.11, 0.11, 0.11, 0.04, 0.04, 0.12], gap="small")
-        c_lead, c_prov, c_model, c_deep, c_web, c_research, c_filter, c_clear, c_stop = cols
+        cols = st.columns([0.5, 1.2, 1.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8])
+        c_lead, c_prov, c_model, c_deep, c_web, c_research, c_da, c_filter, c_clear, c_stop = cols
     else:
-        cols = st.columns([0.03, 0.12, 0.22, 0.11, 0.11, 0.11, 0.04, 0.04, 0.12], gap="small")
-        c_lead, c_prov, c_model, c_deep, c_web, c_research, c_filter, c_clear, c_spacer = cols
+        cols = st.columns([0.5, 1.2, 1.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8])
+        c_lead, c_prov, c_model, c_deep, c_web, c_research, c_da, c_filter, c_clear, c_spacer = cols
     
     # --- 0. 前置留白 (c_lead 不放置内容) ---
 
@@ -4889,6 +4909,10 @@ with st.container():
     with c_research:
         research_on = st.toggle("智能研究", value=st.session_state.get('enable_deep_research', False), help="启用深度研究模式 (v2.9)")
         st.session_state.enable_deep_research = research_on
+
+    with c_da:
+        da_on = st.toggle("数据分析", value=st.session_state.get('is_data_analysis_mode', False), help="手动触发宏观数据分析与推演 (v4.5)")
+        st.session_state.is_data_analysis_mode = da_on
 
     # --- 4. 操作按钮 (Popover/Button) ---
     if st.session_state.get('is_processing'):
@@ -5602,204 +5626,151 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             with st.spinner("🧠 正在进行深度业务逻辑推演..."):
                 try:
                     # --- 核心增强：数据分析 5.0 (业务语义模式) ---
-                    db_path = os.path.join(output_base, active_kb_name)
-                    schema_path = os.path.join(db_path, "business_schema.json")
+                    manual_da_on = st.session_state.get('is_data_analysis_mode', False)
                     
-                    # [JIT/语义嗅探] 激活 3.5.0 分析引擎
-                    if not os.path.exists(schema_path):
-                        import glob
-                        # 扫描知识库目录下的原始数据文件
-                        data_files = glob.glob(os.path.join(db_path, "*.csv")) + \
-                                     glob.glob(os.path.join(db_path, "*.xlsx")) + \
-                                     glob.glob(os.path.join(db_path, "*.xls"))
+                    if active_kb_name and active_kb_name not in ["pure_chat", "multi_kb_mode"]:
+                        db_path = os.path.join(output_base, active_kb_name)
+                        schema_path = os.path.join(db_path, "business_schema.json")
                         
-                        # 判定逻辑：有物理文件，或者名称中带有数据特征
-                        is_data_kb = "csv" in active_kb_name.lower() or "excel" in active_kb_name.lower()
-                        
-                        if data_files or is_data_kb:
-                            try:
-                                from src.processors.data_analyst import DataAnalystEngine
-                                from src.utils.model_manager import load_llm_model
-                                
-                                logger.info(f"🔎 [v3.5.1] 发现数据特征，尝试唤醒分析引擎...")
-                                da_engine = DataAnalystEngine(db_path, logger)
-                                llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
-                                
-                                if data_files:
-                                    logger.info(f"📂 [v3.5.1] 正在对物理文件进行建模: {data_files}")
-                                    da_engine.process_files(data_files)
-                                else:
-                                    # 如果没物理文件，尝试从已有的语义索引中恢复 (使用临时 Reader)
-                                    logger.info(f"🧩 [v3.5.1] 物理文件缺失，尝试通过语义嗅探恢复结构...")
-                                    from llama_index.core import SimpleDirectoryReader
-                                    try:
-                                        # 尝试读取 persist_dir 里的文本 (如果有缓存)
+                        # A. 唤醒与脑补逻辑 (仅当 Schema 缺失时)
+                        if not os.path.exists(schema_path):
+                            import glob
+                            data_files = glob.glob(os.path.join(db_path, "*.csv")) + \
+                                         glob.glob(os.path.join(db_path, "*.xlsx")) + \
+                                         glob.glob(os.path.join(db_path, "*.md"))
+                            
+                            is_data_kb = any(k in active_kb_name.lower() for k in ["csv", "excel", "spec", "dict", "schema", "mapping"])
+                            
+                            if data_files or is_data_kb or manual_da_on:
+                                try:
+                                    from src.processors.data_analyst import DataAnalystEngine
+                                    from src.utils.model_manager import load_llm_model
+                                    da_engine = DataAnalystEngine(db_path, logger)
+                                    llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
+                                    
+                                    if data_files:
+                                        da_engine.process_files(data_files)
+                                    
+                                    # 如果还是没 schema (纯 MD 或手动开启)，强制触发一次脑补
+                                    if not os.path.exists(schema_path):
+                                        from llama_index.core import SimpleDirectoryReader
                                         reader = SimpleDirectoryReader(input_dir=db_path)
                                         docs = reader.load_data()
-                                        if docs:
-                                            da_engine.extract_schema_from_docs(docs, llm)
-                                    except:
-                                        pass
-                                
-                                if os.path.exists(schema_path):
-                                    logger.success(f"✨ [v3.5.1] 数据分析引擎激活成功")
-                                    st.toast("✅ 已成功激活 3.5.0 分析模式", icon="📊")
-                            except Exception as e:
-                                logger.warning(f"❌ [v3.5.1] 引擎唤醒失败: {e}")
+                                        if docs: da_engine.extract_schema_from_docs(docs, llm)
+                                except Exception as e:
+                                    logger.warning(f"⚠️ 引擎唤醒异常: {e}")
 
-                    if os.path.exists(schema_path):
-                        from src.processors.data_analyst import DataAnalystEngine
-                        from src.utils.model_manager import load_llm_model
-                        da_engine = DataAnalystEngine(db_path, logger)
-                        llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
-                        
-                        # [核心修复] 兼容性获取仿真养料
-                        context_text = ""
-                        try:
-                            ce = st.session_state.get('chat_engine')
-                            if ce:
-                                # 针对 ContextChatEngine 的特殊提取方式
-                                if hasattr(ce, "_context_builder"):
-                                    nodes = ce._context_builder.get_nodes(final_prompt)
-                                    context_text = "\n".join([n.get_content() for n in nodes])
-                                elif hasattr(ce, "retrieve"):
-                                    nodes = ce.retrieve(final_prompt)
-                                    context_text = "\n".join([n.node.get_text() for n in nodes])
-                                
-                                if context_text:
-                                    logger.info(f"🧬 [Mode: 📊 DataAnalyst] 已抓取到 {len(context_text)} 字符的仿真养料")
-                        except Exception as e:
-                            logger.warning(f"⚠️ [Mode: 📊 DataAnalyst] 仿真上下文获取异常: {e}")
-                        
-                        # 执行业务推演与 SQL 统计
-                        logger.info(f"🔮 [Mode: 📊 DataAnalyst] 启动深度分析逻辑推演...")
-                        analysis_res = da_engine.execute_analysis(final_prompt, llm, context_text=context_text)
-                        
-                        # 仅当成功生成并执行了 SQL（或仿真成功）时才拦截
-                        if analysis_res.get("success", False):
-                            logger.success(f"⚡ [Mode: 📊 DataAnalyst] 分析链路贯通，开始渲染 3.5.4 流式看板")
+                        # B. 战略推演工作坊逻辑
+                        if os.path.exists(schema_path) and (manual_da_on or "is_data_kb" in locals()):
+                            from src.processors.data_analyst import DataAnalystEngine
+                            from src.utils.model_manager import load_llm_model
+                            da_engine = DataAnalystEngine(db_path, logger)
+                            llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
                             
-                            # 1. 瞬时渲染静态部分 (标题、逻辑溯源、图表矩阵)
-                            sim_suffix = " (语义仿真)" if analysis_res.get("is_simulated") else ""
-                            st.markdown(f"### 🚀 3.8.0 极光智能看板{sim_suffix}")
+                            logger.info(f"🔮 [Strategic Workshop] 启动链式推演...")
+                            analysis_res = da_engine.execute_analysis(final_prompt, llm)
                             
-                            if analysis_res.get("analysis_path"):
-                                with st.status("🧠 业务血缘推理完成", expanded=True):
-                                    st.write(analysis_res["analysis_path"])
-                            
-                            import pandas as pd
-                            import plotly.express as px
-                            import plotly.graph_objects as go
-                            
-                            df_res = pd.DataFrame(analysis_res["data"])
-                            
-                            if not df_res.empty:
-                                # [v3.8.0] Smart Viz 3.0 极光渲染引擎
-                                numeric_cols = df_res.select_dtypes(include=['number']).columns
-                                date_cols = [c for c in df_res.columns if "date" in c.lower() or "time" in c.lower()]
-                                cat_cols = df_res.select_dtypes(include=['object']).columns
-                                
-                                # A. 极光视觉调色盘
-                                aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A', '#19D3F3', '#FF6692', '#B6E880']
+                            if analysis_res.get("success", False):
+                                st.markdown(f"### 🏦 5.0 极光战略工作坊")
+                                if analysis_res.get("macro_context"):
+                                    st.caption(f"🎯 **宏观战略目标**: {analysis_res['macro_context']}")
 
-                                with st.container():
-                                    # B. 智能看板矩阵
-                                    if len(cat_cols) >= 1 and len(numeric_cols) >= 1:
-                                        if len(cat_cols) >= 2:
-                                            # 多维分组图 (例如：地区 + 状态)
-                                            fig = px.bar(df_res, x=cat_cols[0], y=numeric_cols[0], color=cat_cols[1],
-                                                        barmode='group', template="plotly_white",
-                                                        color_discrete_sequence=aurora_colors,
-                                                        title=f"按{cat_cols[0]}与{cat_cols[1]}的{numeric_cols[0]}分布")
-                                            st.plotly_chart(fig, use_container_width=True)
-                                        elif len(df_res) <= 10:
-                                            # 数据量少时使用环形图展示占比
-                                            fig = px.pie(df_res, names=cat_cols[0], values=numeric_cols[0],
-                                                        hole=0.4, template="plotly_white",
-                                                        color_discrete_sequence=aurora_colors,
-                                                        title=f"{cat_cols[0]}占比分析")
-                                            st.plotly_chart(fig, use_container_width=True)
-                                        else:
-                                            # 数据量多使用渐变柱状图
-                                            fig = px.bar(df_res, x=cat_cols[0], y=numeric_cols[0],
-                                                        color=numeric_cols[0], color_continuous_scale='Viridis',
-                                                        template="plotly_white",
-                                                        title=f"各{cat_cols[0]}的{numeric_cols[0]}对比")
-                                            st.plotly_chart(fig, use_container_width=True)
-                                            
-                                    elif len(date_cols) > 0 and len(numeric_cols) > 0:
-                                        # 渐变面积趋势图
-                                        fig = px.area(df_res, x=date_cols[0], y=numeric_cols[0],
-                                                     template="plotly_white", line_shape="spline",
-                                                     color_discrete_sequence=[aurora_colors[0]],
-                                                     title=f"{numeric_cols[0]}随时间变化趋势")
-                                        st.plotly_chart(fig, use_container_width=True)
-                                    
-                                    elif len(numeric_cols) >= 2:
-                                        # 数值相关性散点图
-                                        fig = px.scatter(df_res, x=numeric_cols[0], y=numeric_cols[1],
-                                                        size=numeric_cols[0], color=numeric_cols[1],
-                                                        template="plotly_white",
-                                                        title=f"{numeric_cols[0]}与{numeric_cols[1]}的相关性分布")
-                                        st.plotly_chart(fig, use_container_width=True)
+                                # 1. 流式报告
+                                report_p = st.empty()
+                                full_rep = ""
+                                if analysis_res.get("logic_gen"):
+                                    for t in analysis_res["logic_gen"]:
+                                        full_rep += t
+                                        report_p.markdown(full_rep + "▌")
+                                report_p.markdown(full_rep)
 
-                                # C. 核心统计摘要 (透视表风格)
-                                st.markdown("##### 🧾 数据透视摘要")
-                                st.dataframe(df_res, use_container_width=True)
-                            
-                            # 2. 流式渲染报告部分
+                                st.divider()
+                                # 2. 多阶段渲染
+                                for stage in analysis_res.get("stages", []):
+                                    meta = stage["meta"]
+                                    with st.expander(f"📍 Stage {meta['stage_id']}: {meta['title']}", expanded=True):
+                                        st.markdown(f"**分析目标**: {meta['goal']}")
+                                        import pandas as pd
+                                        import plotly.express as px
+                                        df_s = pd.DataFrame(stage["data"])
+                                        if not df_s.empty:
+                                            v_tabs = st.tabs(["📊 对比", "📈 趋势", "🍰 占比"])
+                                            with v_tabs[0]: st.plotly_chart(px.bar(df_s, x=df_s.columns[0], y=df_s.columns[-1], template="plotly_white"), use_container_width=True, key=f"bar_{msg_idx}_{meta['stage_id']}")
+                                        
+                                        s_tabs = st.tabs(["🧪 SQLite", "🐘 Standard", "💻 DataWorks"])
+                                        with s_tabs[0]: st.code(stage["sqls"].get("sqlite"), language="sql")
+                                        with s_tabs[1]: st.code(stage["sqls"].get("standard"), language="sql")
+                                        with s_tabs[2]: st.code(stage["sqls"].get("dataworks"), language="sql")
+
+                                # 归档并中断
+                                st.session_state.messages.append({"role": "assistant", "content": full_rep, "is_data_report": True, "stages": analysis_res["stages"], "macro_context": analysis_res.get("macro_context")})
+                                st.session_state.is_processing = False
+                                st.rerun()
+
+                            # 1. 核心推演报告 (总领全文)
                             report_placeholder = st.empty()
                             full_report = ""
-                            
-                            # 使用生成器进行流式输出
-                            for token in analysis_res.get("logic_gen", []):
-                                full_report += token
-                                report_placeholder.markdown(full_report + "▌")
+                            logic_stream = analysis_res.get("logic_gen")
+                            if logic_stream:
+                                for token in logic_stream:
+                                    full_report += token
+                                    report_placeholder.markdown(full_report + "▌")
                             
                             report_placeholder.markdown(full_report)
-                            
-                            # 3. 后置渲染指令明细
-                            with st.expander("🛠️ 执行指令与数据明细", expanded=False):
-                                st.code(analysis_res["sql"], language="sql")
-                                st.dataframe(df_res, use_container_width=True)
-                            
-                            # 4. 生成追问推荐 (在报告完成后)
-                            try:
-                                from src.chat.unified_suggestion_engine import get_unified_suggestion_engine
-                                engine = get_unified_suggestion_engine(active_kb_name)
-                                context_text = f"用户提问: {final_prompt}\n数据分析结果: {full_report}"
-                                da_sugs = engine.generate_suggestions(
-                                    context=context_text,
-                                    source_type='chat',
-                                    query_engine=st.session_state.chat_engine if st.session_state.get('chat_engine') else None,
-                                    num_questions=3
-                                )
-                                if da_sugs:
-                                    st.session_state.suggestions_history = da_sugs[:3]
-                                    st.session_state.current_suggestions = da_sugs[:3]
-                            except: pass
+                            # 2. 循环渲染每个逻辑阶段
+                            for stage in analysis_res.get("stages", []):
+                                meta = stage["meta"]
+                                with st.expander(f"📍 Stage {meta['stage_id']}: {meta['title']}", expanded=True):
+                                    st.markdown(f"**分析目标**: {meta['goal']}")
+                                    st.caption(f"**业务逻辑**: {meta['logic']}")
+                                    
+                                    # --- 阶段 A: 多视角可视化 ---
+                                    import pandas as pd
+                                    import plotly.express as px
+                                    df_stage = pd.DataFrame(stage["data"])
+                                    
+                                    if not df_stage.empty:
+                                        # 提取本阶段列特征
+                                        num_cols = df_stage.select_dtypes(include=['number']).columns
+                                        cat_cols = df_stage.select_dtypes(include=['object']).columns
+                                        date_cols = [c for c in df_stage.columns if "date" in c.lower() or "time" in c.lower()]
+                                        
+                                        v_tabs = st.tabs(["📊 综合对比", "📈 趋势洞察", "🍰 占比分析"])
+                                        aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA']
+                                        
+                                        with v_tabs[0]:
+                                            if len(cat_cols) >= 1 and len(num_cols) >= 1:
+                                                fig = px.bar(df_stage, x=cat_cols[0], y=num_cols[0], template="plotly_white", color_discrete_sequence=aurora_colors)
+                                                st.plotly_chart(fig, use_container_width=True, key=f"stage_bar_{meta['stage_id']}_{time.time()}")
+                                        with v_tabs[1]:
+                                            if len(date_cols) > 0 and len(num_cols) > 0:
+                                                fig = px.line(df_stage, x=date_cols[0], y=num_cols[0], template="plotly_white")
+                                                st.plotly_chart(fig, use_container_width=True, key=f"stage_line_{meta['stage_id']}_{time.time()}")
+                                        with v_tabs[2]:
+                                            if len(cat_cols) >= 1 and len(num_cols) >= 1 and len(df_stage) <= 15:
+                                                fig = px.pie(df_stage, names=cat_cols[0], values=num_cols[0], hole=0.4)
+                                                st.plotly_chart(fig, use_container_width=True, key=f"stage_pie_{meta['stage_id']}_{time.time()}")
 
-                            # 5. 归档到消息列表
+                                    # --- 阶段 B: 多方言 SQL ---
+                                    s_tabs = st.tabs(["🧪 SQLite", "🐘 Standard", "💻 DataWorks"])
+                                    sqls = stage.get("sqls", {})
+                                    with s_tabs[0]: st.code(sqls.get("sqlite", ""), language="sql")
+                                    with s_tabs[1]: st.code(sqls.get("standard", ""), language="sql")
+                                    with s_tabs[2]: 
+                                        st.code(sqls.get("dataworks", ""), language="sql")
+                                        st.caption("注：已自动注入 ${bizdate} 与项目前缀")
+                                    
+                                    if stage.get("is_simulated"):
+                                        st.warning("✨ 本阶段结果基于战略业务模型仿真得出")
+
+                            # 归档到消息列表
                             st.session_state.messages.append({
                                 "role": "assistant", 
                                 "content": full_report,
                                 "is_data_report": True,
-                                "data": analysis_res["data"],
-                                "sql": analysis_res["sql"],
-                                "analysis_path": analysis_res.get("analysis_path"),
-                                "suggestions": st.session_state.get('current_suggestions', [])
+                                "stages": analysis_res["stages"],
+                                "macro_context": analysis_res.get("macro_context")
                             })
-                            
-                            # [v3.9.0] 推送到分析工作台
-                            if 'artifacts' not in st.session_state:
-                                st.session_state.artifacts = []
-                            st.session_state.artifacts.append({
-                                "title": final_prompt[:15] + "...",
-                                "data": analysis_res["data"],
-                                "summary": full_report[:200] + "...",
-                                "timestamp": datetime.now().strftime("%H:%M")
-                            })
-                            st.session_state.is_data_report_active = True
                             
                             st.session_state.is_processing = False
                             st.rerun()
