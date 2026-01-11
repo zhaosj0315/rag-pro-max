@@ -7,6 +7,25 @@ import json
 import glob
 import re
 
+# --- Monkey Patch: 修复 Streamlit FileWatcher Race Condition ---
+# 捕获 watchdog 线程中的 FileNotFoundError (通常由临时文件快速删除引起)
+try:
+    import streamlit.watcher.util
+    _original_path_modification_time = streamlit.watcher.util.path_modification_time
+    
+    def _safe_path_modification_time(path, allow_nonexistent=False):
+        try:
+            return _original_path_modification_time(path, allow_nonexistent)
+        except FileNotFoundError:
+            return 0.0
+        except OSError:
+            return 0.0
+            
+    streamlit.watcher.util.path_modification_time = _safe_path_modification_time
+except ImportError:
+    pass
+# -----------------------------------------------------------
+
 # 极其早地初始化日志，防止任何模块在加载时触发
 from src.app_logging import LogManager
 logger = LogManager()
