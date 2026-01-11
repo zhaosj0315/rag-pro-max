@@ -16,6 +16,7 @@
             "kb_delete_own",
             "kb_rename",
             "kb_filesystem_access",
+            "kb_rebuild_index",
             "upload_files",
             "paste_text",
             "use_crawler",
@@ -65,7 +66,6 @@
             "kb_create",
             "upload_files",
             "paste_text",
-            "use_crawler",
             "smart_search"
         ],
         "default_quota_mb": 50

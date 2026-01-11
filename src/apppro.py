@@ -1254,13 +1254,21 @@ with st.sidebar:
             with manage_title_col1:
                 st.markdown("📤 **添加文档**")
             with manage_title_col2:
-                if st.button("🔄", help="重建索引 (覆盖该库)", use_container_width=True):
-                    # 触发重建逻辑
-                    st.session_state.uploaded_path = os.path.join("vector_db_storage", current_kb_name)
-                    # 这里需要一种方式标记为 NEW 模式，并通过 trigger_btn_start 强制触发
-                    st.session_state.trigger_rebuild = True
-                    st.session_state.trigger_btn_start = True
-                    st.rerun()
+                # 权限检查：重建索引
+                from src.auth.permission_manager import permission_manager
+                current_user = st.session_state.get('user', 'guest_user')
+                can_rebuild = permission_manager.has_permission(current_user, "kb_rebuild_index")
+                
+                if can_rebuild:
+                    if st.button("🔄", help="重建索引 (覆盖该库)", use_container_width=True):
+                        # 触发重建逻辑
+                        st.session_state.uploaded_path = os.path.join("vector_db_storage", current_kb_name)
+                        # 这里需要一种方式标记为 NEW 模式，并通过 trigger_btn_start 强制触发
+                        st.session_state.trigger_rebuild = True
+                        st.session_state.trigger_btn_start = True
+                        st.rerun()
+                else:
+                    st.button("🔒", help="无重建索引权限", disabled=True, use_container_width=True)
 
             # 追加模式的文件上传
             action_mode = "APPEND"
@@ -1775,7 +1783,16 @@ with st.sidebar:
                 # 选项布局：如果非新建模式，显示强制重建索引
                 # 新建模式下隐藏强制重建（本身就是新建）
                 if not is_create_mode:
-                    force_reindex = st.checkbox("🔄 强制重建索引", value=default_val, key="kb_force_reindex", help="删除现有索引，重新构建")
+                    # 权限检查
+                    from src.auth.permission_manager import permission_manager
+                    current_user = st.session_state.get('user', 'guest_user')
+                    can_rebuild = permission_manager.has_permission(current_user, "kb_rebuild_index")
+                    
+                    if can_rebuild:
+                        force_reindex = st.checkbox("🔄 强制重建索引", value=default_val, key="kb_force_reindex", help="删除现有索引，重新构建")
+                    else:
+                        st.checkbox("🔄 强制重建索引 (🔒)", value=False, disabled=True, help="无重建索引权限")
+                        force_reindex = False
                 else:
                     force_reindex = False
 
@@ -4870,7 +4887,17 @@ with st.container():
             
         idx = available_models.index(current_model) if current_model in available_models else 0
 
+        # 权限检查：管理系统配置 (v4.5.2)
+        from src.auth.permission_manager import permission_manager
+        current_user = st.session_state.get('user', 'guest_user')
+        can_manage_config = permission_manager.has_permission(current_user, "manage_system_config")
+
         def on_model_change():
+            # 二次权限校验
+            if not can_manage_config:
+                st.toast("⚠️ 权限不足：只有管理员可修改系统全局模型配置", icon="🔒")
+                return
+
             new_model = st.session_state.toolbar_model_selector
             if new_model not in ["未配置模型", ""]:
                 if update_all_model_configs(new_model):
@@ -4897,7 +4924,9 @@ with st.container():
                 index=idx,
                 key="toolbar_model_selector",
                 on_change=on_model_change,
-                label_visibility="collapsed"
+                label_visibility="collapsed",
+                disabled=not can_manage_config,
+                help="系统全局模型配置 (仅管理员可修改)" if not can_manage_config else None
             )
         with col_refresh:
             if st.button("🔄", key="toolbar_model_refresh", help="刷新模型列表"):
