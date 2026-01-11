@@ -2402,44 +2402,39 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
         status_container.update(label="❌ 路径无效", state="error")
         raise ValueError(f"路径无效: {current_target_path}")
 
-    # [v3.5.0] 自动归档数据文件 (支持 JIT 分析)
-    # 无论是否开启分析模式，都将结构化数据拷贝到知识库目录
-    import shutil
-    import glob
+    # [v5.5.5] 全量物理归档：确保所有原始材料（PDF/Word/CSV等）永久留存
     try:
-        # 统一获取目标路径：手动输入路径优先，否则取自动生成的临时上传目录
-        # 注意：st.file_uploader 的文件通常先被 save_uploaded_files 保存到一个 batch 目录下
-        if not os.path.exists(persist_dir):
-            os.makedirs(persist_dir)
+        raw_sources_dir = os.path.join(persist_dir, "raw_sources")
+        if not os.path.exists(raw_sources_dir):
+            os.makedirs(raw_sources_dir)
             
-        # 扫描源目录中的所有数据文件
-        source_data_files = []
         if current_target_path and os.path.exists(current_target_path):
+            status_container.write("📦 正在执行原始文献的物理归档与持久化...")
             if os.path.isdir(current_target_path):
-                csvs = glob.glob(os.path.join(current_target_path, "**/*.csv"), recursive=True)
-                excels = glob.glob(os.path.join(current_target_path, "**/*.xlsx"), recursive=True) + glob.glob(os.path.join(current_target_path, "**/*.xls"), recursive=True)
-                mds = glob.glob(os.path.join(current_target_path, "**/*.md"), recursive=True) + glob.glob(os.path.join(current_target_path, "**/*.markdown"), recursive=True)
-                source_data_files = csvs + excels + mds
-                logger.info(f"🔍 [DEBUG] Scan Result - CSV: {len(csvs)}, Excel: {len(excels)}, MD: {len(mds)}")
+                # 递归拷贝整个上传目录
+                for root, dirs, files in os.walk(current_target_path):
+                    for file in files:
+                        if file.startswith('.'): continue
+                        src_file = os.path.join(root, file)
+                        shutil.copy2(src_file, os.path.join(raw_sources_dir, file))
             else:
-                # 如果单文件上传
-                if current_target_path.lower().endswith(('.csv', '.xlsx', '.xls', '.md', '.markdown')):
-                    source_data_files.append(current_target_path)
-        
-        logger.info(f"🔍 [DEBUG] Total source_data_files found: {len(source_data_files)}")
-                            
-        if source_data_files:
-            status_container.write(f"📦 正在归档 {len(source_data_files)} 个数据源文件至核心库...")
-            for f in source_data_files:
-                dest = os.path.join(persist_dir, os.path.basename(f))
-                shutil.copy2(f, dest)
-            logger.info(f"✅ 已物理归档 {len(source_data_files)} 个数据文件至: {persist_dir}")
+                shutil.copy2(current_target_path, os.path.join(raw_sources_dir, os.path.basename(current_target_path)))
+            
+            logger.info(f"✅ [Data Sovereignty] 所有源材料已安全归档至: {raw_sources_dir}")
     except Exception as e:
-        logger.warning(f"⚠️ 数据文件归档异常 (不影响主流程): {e}")
+        logger.warning(f"⚠️ 原始文件归档失败: {e}")
 
     # --- 核心增强：数据分析 5.0 业务推演 ---
     is_da_mode = st.session_state.get('is_data_analysis_mode', False)
-    data_files = source_data_files
+    
+    # 扫描数据文件用于建模 (CSV/XLSX/MD)
+    import glob
+    data_files = []
+    if os.path.exists(raw_sources_dir):
+        csvs = glob.glob(os.path.join(raw_sources_dir, "**/*.csv"), recursive=True)
+        excels = glob.glob(os.path.join(raw_sources_dir, "**/*.xlsx"), recursive=True) + glob.glob(os.path.join(raw_sources_dir, "**/*.xls"), recursive=True)
+        mds = glob.glob(os.path.join(raw_sources_dir, "**/*.md"), recursive=True) + glob.glob(os.path.join(raw_sources_dir, "**/*.markdown"), recursive=True)
+        data_files = csvs + excels + mds
     
     if is_da_mode or data_files:
         status_container.write("📂 [专项] 启动业务语义大脑引擎...")
@@ -2858,38 +2853,30 @@ if btn_start:
                     }
                     
                     try:
-                        logger.log("网页抓取", "info", f"🚀 开始创建知识库: {kb_name}")
-                        logger.log("网页抓取", "info", f"📁 目标路径: {target_path}")
+                        logger.log("网页抓取", "info", f"🚀 正在通过标准逻辑创建知识库: {kb_name}")
+                        # [v5.5.7] 强制锚定路径，确保物理归档生效
+                        st.session_state.uploaded_path = target_path
                         
-                        success = processor.process_knowledge_base(kb_name, target_path, process_options)
+                        process_knowledge_base_logic(
+                            kb_name=kb_name,
+                            action_mode='NEW',
+                            use_ocr=current_use_ocr,
+                            extract_metadata=current_extract_metadata,
+                            generate_summary=current_generate_summary,
+                            force_reindex=current_force_reindex,
+                            owner=st.session_state.get('user', 'admin')
+                        )
                         
-                        if success:
-                            logger.log("网页抓取", "success", f"✅ 知识库创建成功: {kb_name}")
-                            st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
-                            
-                            # 跳转到新创建的知识库
-                            logger.log("网页抓取", "info", f"📍 网页抓取模式: 准备调用跳转函数")
-                            jump_to_knowledge_base(kb_name, output_base)
-                            logger.log("网页抓取", "info", f"📍 网页抓取模式: 跳转函数调用完成")
-                            
-                            # 清理session_state中的网页抓取参数
-                            for key in ['crawl_url', 'crawl_depth', 'max_pages', 'parser_type', 'url_quality_threshold']:
-                                if key in st.session_state:
-                                    del st.session_state[key]
-                            
-                            # 设置标记，防止重复执行文件处理逻辑
-                            st.session_state.web_crawl_completed = True
-                            
-                            logger.log("网页抓取", "info", f"🔄 网页抓取模式: 执行页面刷新")
-                            st.rerun()
-                        else:
-                            st.error(f"❌ 知识库创建失败")
+                        logger.log("网页抓取", "success", f"✅ 知识库创建并归档成功: {kb_name}")
+                        st.success(f"🎉 网页抓取知识库 '{kb_name}' 创建成功！")
+                        
+                        # 设置标记，防止重复执行
+                        st.session_state.web_crawl_completed = True
+                        time.sleep(1); st.rerun()
                         
                     except Exception as e:
-                        logger.log("网页抓取", "error", f"❌ 知识库创建异常: {str(e)}")
-                        logger.log("网页抓取", "error", f"🔍 异常类型: {type(e).__name__}")
                         st.error(f"❌ 知识库创建失败: {str(e)}")
-                        logger.error(f"知识库创建错误: {str(e)}")
+                        logger.error(f"知识库创建异常: {str(e)}")
                     
                 else:
                     st.error("❌ 网页抓取失败，未获取到任何文件")
@@ -3072,36 +3059,28 @@ if btn_start:
                     }
                     
                     try:
-                        logger.log("智能搜索", "info", f"🚀 开始创建知识库: {kb_name}")
-                        logger.log("智能搜索", "info", f"📁 目标路径: {target_path}")
+                        logger.log("智能搜索", "info", f"🚀 正在通过标准逻辑创建知识库: {kb_name}")
+                        # [v5.5.7] 强制锚定搜索路径
+                        st.session_state.uploaded_path = target_path
                         
-                        success = processor.process_knowledge_base(kb_name, target_path, process_options)
+                        process_knowledge_base_logic(
+                            kb_name=kb_name,
+                            action_mode='NEW',
+                            use_ocr=current_use_ocr,
+                            extract_metadata=current_extract_metadata,
+                            generate_summary=current_generate_summary,
+                            force_reindex=current_force_reindex,
+                            owner=st.session_state.get('user', 'admin')
+                        )
                         
-                        if success:
-                            logger.log("智能搜索", "success", f"✅ 知识库创建成功: {kb_name}")
-                            st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
-                            
-                            # 跳转到新创建的知识库
-                            logger.log("智能搜索", "info", f"📍 智能搜索模式: 准备调用跳转函数")
-                            jump_to_knowledge_base(kb_name, output_base)
-                            logger.log("智能搜索", "info", f"📍 智能搜索模式: 跳转函数调用完成")
-                            
-                            # 清理session_state中的搜索参数
-                            for key in ['search_keyword', 'search_crawl_depth', 'search_max_pages', 'search_parser_type', 'quality_threshold']:
-                                if key in st.session_state:
-                                    del st.session_state[key]
-                            
-                            # 设置标记，防止重复执行文件处理逻辑
-                            st.session_state.smart_search_completed = True
-                            
-                            logger.log("智能搜索", "info", f"🔄 智能搜索模式: 执行页面刷新")
-                            st.rerun()
-                        else:
-                            st.error(f"❌ 知识库创建失败")
+                        logger.log("智能搜索", "success", f"✅ 知识库创建并归档成功: {kb_name}")
+                        st.success(f"🎉 智能搜索知识库 '{kb_name}' 创建成功！")
                         
+                        st.session_state.smart_search_completed = True
+                        time.sleep(1); st.rerun()
                     except Exception as e:
                         st.error(f"❌ 知识库创建失败: {str(e)}")
-                        logger.error(f"知识库创建错误: {str(e)}")
+                        logger.error(f"知识库创建异常: {str(e)}")
                         
                 else:
                     st.error("❌ 智能搜索失败，未获取到任何文件")
@@ -3397,57 +3376,99 @@ elif active_kb_name:
 
                         zip_buffer = io.BytesIO()
                         with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
-                            # 1. 知识报告与索引
-                            status.write("正在生成知识报告与索引...")
+                            # [1] 核心资产报告与索引
+                            status.write("正在打包 [1/6] 知识报告与索引清单...")
                             zip_file.writestr("01_核心资产/知识摘要报告.md", report_md)
                             zip_file.writestr("01_核心资产/结构化资产清单.csv", csv_data)
                             
-                            # 2. 对话历史导出
-                            status.write("正在检索并格式化对话历史...")
-                            user_name = st.session_state.get('user', 'guest')
-                            history_dir = os.path.join("chat_histories", user_name)
+                            # [2] 对话历史备份 (MD 级)
+                            status.write("正在打包 [2/6] 历史对话纪要...")
+                            user_name_folder = st.session_state.get('user', 'admin')
+                            history_dir = os.path.join("chat_histories", user_name_folder)
                             chat_history_md = f"# 对话历史备份: {active_kb_name}\n\n"
-                            
                             has_chats = False
+                            
                             if os.path.exists(history_dir):
                                 for chat_file in os.listdir(history_dir):
-                                    if chat_file.endswith(".json"):
+                                    if chat_file.endswith(".json") and (active_kb_name in chat_file):
                                         try:
                                             with open(os.path.join(history_dir, chat_file), 'r', encoding='utf-8') as f:
                                                 chat_data = json.load(f)
-                                                # 仅备份与当前知识库相关的对话
-                                                if chat_data.get('kb_name') == active_kb_name or active_kb_name in chat_file:
-                                                    has_chats = True
-                                                    # 存入原始 JSON 供迁移
-                                                    zip_file.write(os.path.join(history_dir, chat_file), arcname=f"02_历史对话/raw_json/{chat_file}")
-                                                    # 格式化 MD 供阅读
-                                                    chat_history_md += f"### 📅 会话: {chat_file.replace('.json','')}\n"
-                                                    for msg in chat_data.get('messages', []):
-                                                        role = "👤 用户" if msg['role'] == 'user' else "🤖 AI"
-                                                        chat_history_md += f"**{role}**: {msg['content']}\n\n"
-                                                    chat_history_md += "---\n\n"
+                                                has_chats = True
+                                                zip_file.write(os.path.join(history_dir, chat_file), arcname=f"02_历史对话/raw_json/{chat_file}")
+                                                chat_history_md += f"### 📅 会话: {chat_file.replace('.json','')}\n"
+                                                for msg in chat_data.get('messages', []):
+                                                    role_tag = "👤 用户" if msg['role'] == 'user' else "🤖 AI"
+                                                    chat_history_md += f"**{role_tag}**: {msg['content']}\n\n"
+                                                chat_history_md += "---\n\n"
                                         except: continue
                             
-                            if has_chats:
-                                zip_file.writestr("02_历史对话/对话纪要_可阅读.md", chat_history_md)
+                            if not has_chats:
+                                chat_history_md += "(当前无相关对话历史)"
+                            zip_file.writestr("02_历史对话/对话纪要_可阅读.md", chat_history_md)
                             
-                            # 3. 系统底层元数据
-                            zip_file.writestr("03_系统配置文件/底层元数据.json", manifest_json)
+                            # [3] 战略大脑模型
+                            status.write("正在打包 [3/6] 战略业务模型...")
+                            schema_file = os.path.join(db_path, "business_schema.json")
+                            blueprint_file = os.path.join(db_path, "business_blueprint.json")
+                            if os.path.exists(schema_file):
+                                zip_file.write(schema_file, arcname="03_战略大脑/表结构模型_schema.json")
+                            else:
+                                zip_file.writestr("03_战略大脑/说明.txt", "未在此知识库中检测到战略建模数据")
+                            if os.path.exists(blueprint_file):
+                                zip_file.write(blueprint_file, arcname="03_战略大脑/业务蓝图_blueprint.json")
                             
-                            # 4. 递归写入整个数据库目录 (包含向量库和源文件)
-                            status.write("正在打包向量数据库与物理文件...")
-                            target_dir = db_path
-                            for root, dirs, files in os.walk(target_dir):
+                            # [4] 系统配置文件
+                            status.write("正在打包 [4/6] 底层系统元数据...")
+                            zip_file.writestr("04_系统配置文件/底层元数据_manifest.json", manifest_json)
+                            
+                            # [5] 原始文档库 (v5.5.8 跨目录全量打捞)
+                            status.write("正在打包 [5/6] 原始文档库 (全格式检索)...")
+                            raw_dir_path = os.path.join(db_path, "raw_sources")
+                            found_any_raw = False
+                            
+                            # 策略 A: 标准归档目录
+                            if os.path.exists(raw_dir_path):
+                                for root, dirs, files in os.walk(raw_dir_path):
+                                    for file in files:
+                                        if file.startswith('.'): continue
+                                        abs_path = os.path.join(root, file)
+                                        zip_file.write(abs_path, arcname=os.path.join("05_原始文档库", os.path.relpath(abs_path, raw_dir_path)))
+                                        found_any_raw = True
+                            
+                            # 策略 B: 跨目录深度打捞 (针对智能搜索残留件)
+                            if not found_any_raw:
+                                logger.info(f"📍 [Rescue] 知识库 {active_kb_name} 触发深度打捞逻辑...")
+                                # 从 manifest 中提取可能存在的原始目录线索
+                                for f_meta in doc_manager.manifest.get('files', []):
+                                    src_p = f_meta.get('file_path') or f_meta.get('local_path')
+                                    if src_p and os.path.exists(src_p):
+                                        found_any_raw = True
+                                        zip_file.write(src_p, arcname=os.path.join("05_原始文档库", os.path.basename(src_p)))
+                                    elif 'Search_' in str(src_p):
+                                        # 针对路径中包含 Search 的特殊打捞 (即使原始路径已变)
+                                        base_name = os.path.basename(src_p)
+                                        # 尝试在 temp_uploads 下全域搜索同名文件
+                                        for root, _, files in os.walk("temp_uploads"):
+                                            if base_name in files:
+                                                abs_p = os.path.join(root, base_name)
+                                                zip_file.write(abs_p, arcname=os.path.join("05_原始文档库", base_name))
+                                                found_any_raw = True
+                                                break
+                            
+                            if not found_any_raw:
+                                zip_file.writestr("05_原始文档库/说明.txt", "未发现可导出的原始源文件原件。")
+
+                            # [6] 向量引擎快照
+                            status.write("正在打包 [6/6] 向量引擎快照...")
+                            for root, dirs, files in os.walk(db_path):
                                 for file in files:
-                                    abs_path = os.path.join(root, file)
-                                    rel_path = os.path.relpath(abs_path, target_dir)
-                                    if "raw_files" in rel_path:
-                                        arc_path = os.path.join("04_原始文档", os.path.basename(rel_path))
-                                    else:
-                                        arc_path = os.path.join("05_向量引擎数据", rel_path)
-                                    zip_file.write(abs_path, arcname=arc_path)
+                                    if file in ["docstore.json", "index_store.json", "vector_store.json", "data_level.db", "business_data.db"]:
+                                        abs_path = os.path.join(root, file)
+                                        rel_path = os.path.relpath(abs_path, db_path)
+                                        zip_file.write(abs_path, arcname=os.path.join("06_向量引擎快照", rel_path))
                         
-                        status.update(label="✅ 终极全量打包完成 (含对话记录)！", state="complete")
+                        status.update(label="✅ 终极六福资产包打包完成！信息已全量就绪。", state="complete")
                         st.download_button(
                             label=f"⬇️ 立即下载全量资产包 (.zip)",
                             data=zip_buffer.getvalue(),

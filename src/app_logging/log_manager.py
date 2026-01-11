@@ -35,18 +35,24 @@ class LogManager:
             return
         self._initialized = True
         
-        self.log_dir = log_dir
+        # [v5.5.4] 权限自愈补丁：探测目录是否可写
+        try:
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir, exist_ok=True)
+            # 测试写入权限
+            test_file = os.path.join(log_dir, ".write_test")
+            with open(test_file, 'w') as f: f.write("test")
+            os.remove(test_file)
+            self.log_dir = log_dir
+        except Exception:
+            # 降级到用户主目录
+            fallback_dir = os.path.expanduser("~/.rag_pro_max/app_logs")
+            os.makedirs(fallback_dir, exist_ok=True)
+            self.log_dir = fallback_dir
+            if enable_terminal:
+                print(f"⚠️ [WARNING] 默认日志目录 {log_dir} 无写入权限，已降级至 {fallback_dir}")
+
         self.enable_terminal = enable_terminal
-        self.timers = {}
-        self.perf_stack = []
-        self.metrics = {}
-        
-        # 日志去重功能
-        self._recent_logs = []
-        self._max_recent = 5
-        
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
         
         self.log_file = os.path.join(log_dir, f"log_{datetime.now().strftime('%Y%m%d')}.jsonl")
         self._cleanup_old_logs()
