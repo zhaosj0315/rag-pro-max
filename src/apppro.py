@@ -1916,12 +1916,19 @@ with st.sidebar:
                             st.rerun()
                 
                 with op_row1[1]:
-                    if st.button("🧹 清空", use_container_width=True, disabled=len(state.get_messages()) == 0, help="清空当前对话记录"):
+                    if st.button("➕ 新对话", use_container_width=True, disabled=len(state.get_messages()) == 0, help="保存当前记录并开始新对话"):
+                        import uuid
+                        # 生成新会话ID
+                        new_id = str(uuid.uuid4())[:8]
+                        # 切换到新会话 (旧会话已自动保存)
+                        st.session_state.current_session_id = new_id
                         st.session_state.messages = []
                         st.session_state.suggestions_history = []
+                        # 初始化存储
                         if current_kb_name:
-                            HistoryManager.save_session(current_kb_name, [], st.session_state.get('current_session_id'))
-                        st.toast("✅ 已清空")
+                            HistoryManager.save_session(current_kb_name, [], new_id)
+                        
+                        st.toast("✅ 已开启新会话，旧记录可在左侧历史中查看")
                         time.sleep(0.5)
                         st.rerun()
                 
@@ -2732,14 +2739,13 @@ if active_kb_name and active_kb_name != st.session_state.current_kb_id:
     if not st.session_state.get('is_processing', False):
         st.session_state.current_kb_id = active_kb_name
         st.session_state.chat_engine = None
+        
+        # [关键修复] 切换库时，自动获取该库最近活跃的会话 ID
+        latest_id = HistoryManager.get_latest_session_id(active_kb_name)
+        st.session_state.current_session_id = latest_id
+        
         with st.spinner("📜 正在加载对话历史..."):
-            # 自动恢复最近会话 (如果未指定)
-            if not st.session_state.get('current_session_id'):
-                latest_id = HistoryManager.get_latest_session_id(active_kb_name)
-                if latest_id:
-                    st.session_state.current_session_id = latest_id
-            
-            st.session_state.messages = HistoryManager.load_session(active_kb_name, st.session_state.get('current_session_id'))
+            st.session_state.messages = HistoryManager.load_session(active_kb_name, st.session_state.current_session_id)
         
         # 恢复状态：从最后一条消息恢复建议列表
         st.session_state.suggestions_history = []
@@ -2747,6 +2753,12 @@ if active_kb_name and active_kb_name != st.session_state.current_kb_id:
             last_msg = st.session_state.messages[-1]
             if isinstance(last_msg, dict) and last_msg.get('suggestions'):
                 st.session_state.suggestions_history = last_msg['suggestions']
+        
+        # [关键修复] 如果已有历史记录，禁止触发自动摘要/引导，防止覆盖旧状态
+        if st.session_state.messages and len(st.session_state.messages) > 0:
+            st.session_state.skip_auto_summary = True
+        else:
+            st.session_state.skip_auto_summary = False
     else:
         st.warning("⚠️ 正在处理问题，请等待完成后再切换知识库")
         st.session_state.current_nav = f"📂 {st.session_state.current_kb_id}"
@@ -4501,7 +4513,7 @@ if active_kb_name:
     st.divider()
 
 # 自动摘要 (仅在知识库首次加载且无历史消息时触发，排除纯对话模式)
-if active_kb_name and active_kb_name != "pure_chat" and st.session_state.chat_engine and not st.session_state.messages:
+if active_kb_name and active_kb_name != "pure_chat" and st.session_state.chat_engine and not st.session_state.messages and not st.session_state.get('skip_auto_summary'):
     with st.chat_message("assistant", avatar="🤖"):
         summary_placeholder = st.empty()
         with st.status("✨ 正在分析文档生成摘要...", expanded=True) as status:
