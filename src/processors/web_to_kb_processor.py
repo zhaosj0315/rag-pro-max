@@ -230,27 +230,38 @@ class WebToKBProcessor:
                             max_pages=max_pages // len(search_results),
                             status_callback=status_callback
                         )
-                        # 过滤逻辑增强：排除搜索结果页本身，且正文必须高相关
+                        # 过滤逻辑增强 (v5.5.8 最终方案)
                         relevant_files = []
                         for f_path in files:
                             try:
                                 with open(f_path, 'r', encoding='utf-8') as f:
                                     content = f.read()
-                                    # 排除搜索结果页和系统页面
-                                    is_search_page = "Special:Search" in content or "search?" in content or "百度搜索" in content
-                                    # 统计关键词频率
+                                    lines = content.split('\n')
+                                    # 提取 Markdown 标题 (通常是第 3 行，因为第 1 行是 URL，第 2 行是空行)
+                                    title = ""
+                                    for line in lines:
+                                        if line.startswith('# '):
+                                            title = line.replace('# ', '').strip()
+                                            break
+                                    
+                                    # 1. 识别并排除搜索结果页、系统页、门户页
+                                    is_noise_page = any(p in content for p in ["Special:Search", "search?", "维基百科:", "Portal:", "帮助:"])
+                                    # 2. 检查标题相关性 (强校验)
+                                    # 允许部分匹配，例如关键词是 "Google技巧"，标题是 "Google搜索使用攻略"
+                                    is_title_relevant = clean_kw.lower() in title.lower() or any(part in title for part in clean_kw.split())
+                                    # 3. 统计关键词频率 (弱校验)
                                     kw_count = content.lower().count(clean_kw.lower())
                                     
-                                    if not is_search_page and kw_count >= 1:
+                                    # 最终判定逻辑：不能是噪音页，且 (标题相关 OR 高频提到)
+                                    if not is_noise_page and (is_title_relevant or kw_count >= 5):
                                         relevant_files.append(f_path)
                                         from src.app_logging import LogManager
-                                        LogManager().info(f"✅ [RELEVANT] Saved: {os.path.basename(f_path)} (Matches: {kw_count})")
+                                        LogManager().info(f"✅ [RELEVANT] Saved: {title} (Matches: {kw_count})")
                                     else:
                                         os.remove(f_path) 
                                         from src.app_logging import LogManager
-                                        reason = "SEARCH_PAGE" if is_search_page else "NO_KEYWORDS"
-                                        LogManager().warning(f"🗑️ [FILTERED] Discarded: {f_path} | Reason: {reason}")
-                            except:
+                                        LogManager().warning(f"🗑️ [FILTERED] Discarded: {title if title else f_path} | Reason: Low Relevance")
+                            except Exception as e:
                                 continue
                         crawled_files.extend(relevant_files)
                     except Exception as e:
