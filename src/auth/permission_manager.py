@@ -8,11 +8,22 @@ class PermissionManager:
 
     def _load_templates(self):
         if os.path.exists(self.templates_path):
-            with open(self.templates_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+            try:
+                with open(self.templates_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"❌ Error loading role templates: {e}")
+                # Fallback to hardcoded defaults
+        
         return {
             "admin": {"name": "管理员", "permissions": ["*"]},
-            "standard_user": {"name": "注册用户", "permissions": ["create_kb", "upload_files", "chat"]},
+            "standard_user": {
+                "name": "注册用户", 
+                "permissions": [
+                    "create_kb", "upload_files", "chat", 
+                    "data_analysis", "download_knowledge_base", "kb_export_full", "kb_export_report", "summary_gen", "kb_delete_own", "paste_text"
+                ]
+            },
             "guest": {"name": "访客", "permissions": ["chat"]}
         }
 
