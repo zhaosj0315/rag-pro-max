@@ -5568,6 +5568,10 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                 st.session_state.messages.append({"role": "user", "content": final_prompt})
                 st.session_state.messages.append({"role": "assistant", "content": integrated_answer})
                 
+                # [关键修复] 立即保存会话历史 (Multi-KB)
+                if active_kb_name: 
+                    HistoryManager.save_session(active_kb_name, st.session_state.messages, st.session_state.get('current_session_id'))
+                
             else:
                 st.error("❌ 所有知识库查询都失败了")
             
@@ -5866,6 +5870,11 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                                     "macro_context": analysis_res.get("macro_context"),
                                     "suggestions": st.session_state.get('current_suggestions', [])
                                 })
+                                
+                                # [关键修复] 立即保存会话历史 (Data Analysis)
+                                if active_kb_name: 
+                                    HistoryManager.save_session(active_kb_name, st.session_state.messages, st.session_state.get('current_session_id'))
+                                
                                 st.session_state.is_processing = False
                                 st.rerun()
 
