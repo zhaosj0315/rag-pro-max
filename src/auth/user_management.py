@@ -363,33 +363,69 @@ def render_admin_management():
             selected_to_delete = edited_df[edited_df["☑️ 选择"] == True]["知识库名称"].tolist()
             
             if selected_to_delete:
-                st.warning(f"⚠️ 警告：即将物理删除 {len(selected_to_delete)} 个知识库及其所有关联数据（不可恢复）！")
-                if st.button("🚨 确认批量物理删除", type="primary", use_container_width=True):
-                    from src.kb.kb_processor import KBProcessor
-                    from src.auth.audit_logger import AuditLogger
-                    
-                    with st.status(f"正在深度清理 {len(selected_to_delete)} 个资产...") as status:
-                        for target_kb in selected_to_delete:
-                            st.write(f"正在清除: {target_kb}")
-                            # 1. 物理目录删除
-                            target_path = os.path.join(kb_storage_root, target_kb)
-                            if os.path.exists(target_path):
-                                import shutil
-                                shutil.rmtree(target_path)
+                st.divider()
+                st.markdown(f"**⚡ 批量操作 ({len(selected_to_delete)} 项)**")
+                
+                # 操作类型选择
+                batch_op_type = st.radio("选择批量操作类型", ["👤 移交所有权", "🗑️ 物理删除"], horizontal=True, label_visibility="collapsed")
+                
+                if batch_op_type == "👤 移交所有权":
+                    c_trans1, c_trans2 = st.columns([2, 1])
+                    with c_trans1:
+                        target_new_owner = st.selectbox("选择新所有者", options=list(users.keys()), key="batch_new_owner_sel")
+                    with c_trans2:
+                        if st.button("➡️ 确认移交", type="primary", use_container_width=True):
+                            from src.auth.audit_logger import AuditLogger
+                            success_cnt = 0
+                            for kb_name in selected_to_delete:
+                                try:
+                                    kb_path = os.path.join(kb_storage_root, kb_name)
+                                    manifest = ManifestManager.load(kb_path)
+                                    old_owner = manifest.get('owner', 'unknown')
+                                    manifest['owner'] = target_new_owner
+                                    
+                                    # 保存 Manifest
+                                    mf_path = os.path.join(kb_path, "manifest.json")
+                                    with open(mf_path, 'w', encoding='utf-8') as f:
+                                        json.dump(manifest, f, indent=4, ensure_ascii=False)
+                                    
+                                    # 自动更新白名单（如果旧用户有白名单，可能需要处理，这里简化为只改所有权）
+                                    success_cnt += 1
+                                    AuditLogger.log(st.session_state.get('user'), "BATCH_TRANSFER", f"将 {kb_name} 所有权从 {old_owner} 移交给 {target_new_owner}")
+                                except Exception as e:
+                                    st.error(f"{kb_name} 移交失败: {e}")
                             
-                            # 2. 对话历史删除
-                            hist_file = os.path.join("chat_histories", f"{target_kb}.json")
-                            if os.path.exists(hist_file): os.remove(hist_file)
-                            
-                            # 3. 推荐配置删除
-                            sug_file = os.path.join("suggestion_config", f"{target_kb}_config.json")
-                            if os.path.exists(sug_file): os.remove(sug_file)
-                            
-                            AuditLogger.log(st.session_state.get('user'), "BATCH_DELETE_KB", f"物理删除了知识库: {target_kb}")
+                            st.success(f"✅ 已成功移交 {success_cnt} 个知识库")
+                            time.sleep(1); st.rerun()
+
+                elif batch_op_type == "🗑️ 物理删除":
+                    st.warning(f"⚠️ 警告：即将物理删除 {len(selected_to_delete)} 个知识库及其所有关联数据（不可恢复）！")
+                    if st.button("🚨 确认批量物理删除", type="primary", use_container_width=True):
+                        from src.kb.kb_processor import KBProcessor
+                        from src.auth.audit_logger import AuditLogger
                         
-                        status.update(label="✅ 资产批量清理完成", state="complete")
-                    
-                    time.sleep(1); st.rerun()
+                        with st.status(f"正在深度清理 {len(selected_to_delete)} 个资产...") as status:
+                            for target_kb in selected_to_delete:
+                                st.write(f"正在清除: {target_kb}")
+                                # 1. 物理目录删除
+                                target_path = os.path.join(kb_storage_root, target_kb)
+                                if os.path.exists(target_path):
+                                    import shutil
+                                    shutil.rmtree(target_path)
+                                
+                                # 2. 对话历史删除
+                                hist_file = os.path.join("chat_histories", f"{target_kb}.json")
+                                if os.path.exists(hist_file): os.remove(hist_file)
+                                
+                                # 3. 推荐配置删除
+                                sug_file = os.path.join("suggestion_config", f"{target_kb}_config.json")
+                                if os.path.exists(sug_file): os.remove(sug_file)
+                                
+                                AuditLogger.log(st.session_state.get('user'), "BATCH_DELETE_KB", f"物理删除了知识库: {target_kb}")
+                            
+                            status.update(label="✅ 资产批量清理完成", state="complete")
+                        
+                        time.sleep(1); st.rerun()
 
     with tab_roles:
         st.caption("角色权限中台：定义角色的底层功能矩阵与默认资源配额")
