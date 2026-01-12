@@ -62,7 +62,7 @@ def render_admin_management():
     
     st.divider()
     
-    tab_batch, tab_users, tab_kbs, tab_assets, tab_roles, tab_audit = st.tabs(["⚡ 批量授权", "👤 用户台账", "📂 知识库分发", "🗄️ 资产全览", "🎭 角色定义", "📜 审计记录"])
+    tab_batch, tab_users, tab_kbs, tab_assets, tab_roles, tab_sessions, tab_audit = st.tabs(["⚡ 批量授权", "👤 用户台账", "📂 知识库分发", "🗄️ 资产全览", "🎭 角色定义", "🍪 会话控制", "📜 审计记录"])
     
     with tab_batch:
         st.caption("一键管理多名用户的权限与访问权")
@@ -106,6 +106,46 @@ def render_admin_management():
                             AuditLogger.log(st.session_state.get('user'), "BATCH_LOCK", f"批量封禁了 {len(selected_batch_users)} 名用户")
                             st.toast("账号已批量封禁")
                             time.sleep(1); st.rerun()
+
+    with tab_sessions:
+        st.caption("管理用户登录会话的有效期与强制下线策略")
+        from src.auth.session_manager import get_session_settings, set_session_setting, revoke_user_sessions
+        
+        settings = get_session_settings()
+        
+        # 1. 全局策略
+        with st.container(border=True):
+            st.markdown("**🌍 全局会话策略**")
+            global_days = settings.get("global_default", 7)
+            new_global = st.number_input("默认登录保持天数", min_value=1, max_value=365, value=global_days, help="所有用户的默认设置")
+            if st.button("保存全局设置"):
+                set_session_setting("global_default", new_global)
+                st.success("全局策略已更新")
+                time.sleep(1); st.rerun()
+                
+        # 2. 用户级策略
+        with st.container(border=True):
+            st.markdown("**👤 用户级特权设置**")
+            target_user = st.selectbox("选择用户", [u for u in users.keys()])
+            current_user_days = settings.get(target_user, global_days)
+            
+            c1, c2 = st.columns([2, 1])
+            with c1:
+                new_user_days = st.number_input(f"设置 {target_user} 的保持天数", min_value=1, max_value=365, value=current_user_days)
+            with c2:
+                st.write("") # Spacer
+                if st.button("应用到该用户"):
+                    set_session_setting(target_user, new_user_days)
+                    st.success(f"{target_user} 的设置已更新")
+                    time.sleep(1); st.rerun()
+            
+            st.divider()
+            
+            # 3. 强制操作
+            st.markdown("**🚨 风险操作**")
+            if st.button(f"强制注销 {target_user} 的所有会话", type="primary"):
+                count = revoke_user_sessions(target_user)
+                st.success(f"已清除 {count} 个有效会话，用户下次需重新登录")
 
     with tab_users:
         st.caption("管理账号生命周期、角色及存储配额")

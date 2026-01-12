@@ -2667,6 +2667,31 @@ st.markdown("""
 # 初始化状态
 initialize_session_state()
 
+# --- 自动登录逻辑 (v4.5.2) ---
+if not st.session_state.get("logged_in"):
+    # 尝试从 URL 获取 Token
+    token = st.query_params.get("session_token")
+    if token:
+        try:
+            from src.auth.session_manager import validate_session
+            from src.auth.user_auth import load_users
+            
+            username = validate_session(token)
+            if username:
+                users = load_users()
+                user_info = users.get(username)
+                if user_info and user_info.get('is_active', True):
+                    st.session_state.logged_in = True
+                    st.session_state.user = username
+                    st.session_state.role = user_info.get('role', 'standard_user')
+                    logger.info(f"自动登录成功: {username}")
+                    st.toast(f"👋 欢迎回来, {username}", icon="✨")
+                else:
+                    # 用户无效，清除 Token (仅在无法登录时)
+                    pass
+        except Exception as e:
+            logger.warning(f"自动登录失败: {e}")
+
 # 首次使用引导
 if not st.session_state.first_time_guide_shown and len(existing_kbs) == 0:
     st.info("""

@@ -75,10 +75,15 @@ def render_login_page():
                             from src.auth.audit_logger import AuditLogger
                             success, info = authenticate_user(user, pwd)
                             if success:
+                                # 生成持久化 Token
+                                from src.auth.session_manager import create_session
+                                token, days = create_session(user)
+                                st.query_params["session_token"] = token
+                                
                                 st.session_state.logged_in = True
                                 st.session_state.user = user
                                 st.session_state.role = info.get('role', 'standard_user')
-                                AuditLogger.log(user, "LOGIN", "登录成功")
+                                AuditLogger.log(user, "LOGIN", f"登录成功 (保持 {days} 天)")
                                 st.success(f"验证通过！")
                                 time.sleep(0.5)
                                 st.rerun()
