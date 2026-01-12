@@ -306,10 +306,41 @@ def render_admin_management():
             except: pass
             
             # 获取时间
-            c_time_raw = manifest.get('created_at', '2025-01-01 00:00:00')
+            c_time_val = manifest.get('created_at')
+            c_date = datetime.now().date()
+            c_time_str = "未知"
+            
             try:
-                c_date = datetime.strptime(c_time_raw[:10], '%Y-%m-%d').date()
-            except: c_date = datetime.now().date()
+                if c_time_val:
+                    if isinstance(c_time_val, (int, float)):
+                        dt = datetime.fromtimestamp(c_time_val)
+                        c_date = dt.date()
+                        c_time_str = dt.strftime('%Y-%m-%d %H:%M:%S')
+                    elif isinstance(c_time_val, str):
+                        # 尝试解析字符串格式
+                        try:
+                            dt = datetime.strptime(c_time_val[:19], '%Y-%m-%d %H:%M:%S')
+                        except:
+                            try:
+                                dt = datetime.fromisoformat(c_time_val)
+                            except:
+                                dt = datetime.now()
+                        c_date = dt.date()
+                        c_time_str = c_time_val
+                else:
+                    # Fallback: 使用目录创建时间
+                    try:
+                        stat = os.stat(kb_path)
+                        # 在Unix上 st_ctime 可能是元数据变更时间，st_birthtime 是创建时间(macOS)
+                        # 为了跨平台，优先用 st_birthtime (if available), else st_ctime
+                        ts = getattr(stat, 'st_birthtime', stat.st_ctime)
+                        dt = datetime.fromtimestamp(ts)
+                        c_date = dt.date()
+                        c_time_str = dt.strftime('%Y-%m-%d %H:%M:%S')
+                    except:
+                        pass
+            except Exception:
+                pass
 
             asset_data.append({
                 "☑️ 选择": False,
@@ -319,7 +350,7 @@ def render_admin_management():
                 "存储占用": total_size,
                 "格式化大小": format_size(total_size),
                 "创建日期": c_date,
-                "完整时间": c_time_raw
+                "完整时间": c_time_str
             })
 
         df_assets = pd.DataFrame(asset_data)
