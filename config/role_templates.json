@@ -31,7 +31,7 @@
     },
     "standard_user": {
         "name": "标准用户",
-        "description": "日常文档构建与问答",
+        "description": "日常文档构建、数据分析与资产下载",
         "permissions": [
             "chat",
             "kb_create",
