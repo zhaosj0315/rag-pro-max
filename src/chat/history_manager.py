@@ -127,10 +127,13 @@ class HistoryManager:
             try:
                 with open(path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    if isinstance(data, list):
-                        return data
-                    return data.get("messages", [])
-            except: pass
+                    messages = data if isinstance(data, list) else data.get("messages", [])
+                    from src.app_logging import LogManager
+                    LogManager().info(f"📜 [History] 加载历史成功: {path} (消息: {len(messages)} 条)")
+                    return messages
+            except Exception as e:
+                from src.app_logging import LogManager
+                LogManager().error(f"❌ [History] 加载历史失败: {path} - {e}")
         return []
 
     @classmethod
@@ -149,30 +152,32 @@ class HistoryManager:
                 except: pass
             
             if isinstance(existing_data, list):
-                # 升级旧格式
                 data = {
                     "meta": {"created_at": datetime.now().isoformat()},
                     "messages": messages
                 }
             else:
-                # 保留现有元数据
                 data = existing_data
                 data["messages"] = messages
                 if "meta" not in data: data["meta"] = {}
                 data["meta"]["updated_at"] = datetime.now().isoformat()
             
-            # [核心增强] 自动标题生成：如果还没手动改名，且已有消息，自动从第一句话提取标题
+            # 自动标题生成
             if messages and (not data["meta"].get("title") or data["meta"].get("title") == "默认会话"):
                 first_msg = next((m['content'] for m in messages if m['role'] == 'user'), None)
                 if first_msg:
-                    # 提取前 30 个字作为标题
                     clean_title = first_msg.strip()[:30].replace('\n', ' ')
                     data["meta"]["title"] = clean_title
             
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
+            
+            from src.app_logging import LogManager
+            LogManager().success(f"💾 [History] 持久化成功: {path} (总计 {len(messages)} 条消息)")
             return True
-        except:
+        except Exception as e:
+            from src.app_logging import LogManager
+            LogManager().error(f"❌ [History] 写入失败: {path} - {e}")
             return False
             
     @classmethod

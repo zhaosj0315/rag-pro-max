@@ -588,19 +588,31 @@ def render_admin_management():
             if sel_status:
                 filtered_logs = [l for l in filtered_logs if l.get('status', 'success') in sel_status]
 
-            # 2. 统计概览
-            st.info(f"📊 匹配结果: {len(filtered_logs)} 条记录")
+            # 2. 统计概览与全局操作
+            col_stat, col_clear = st.columns([3, 1])
+            with col_stat:
+                st.info(f"📊 匹配结果: {len(filtered_logs)} 条记录")
+            with col_clear:
+                if st.button("🗑️ 清空所有审计", use_container_width=True, type="secondary", help="永久删除所有审计日志文件"):
+                    if AuditLogger.clear_logs():
+                        st.toast("✅ 审计日志已清空")
+                        time.sleep(0.5); st.rerun()
 
             # 3. 渲染记录
             for l in filtered_logs[:100]: # 限制显示前100条
                 status_color = "#10b981" if l.get('status') == 'success' else "#ef4444" if l.get('status') == 'failed' else "#f59e0b"
+                ts = l.get('timestamp', '')
                 
                 with st.container(border=True):
-                    header_col1, header_col2 = st.columns([3, 1])
+                    header_col1, header_col2, header_col3 = st.columns([3, 1, 0.3])
                     with header_col1:
                         st.markdown(f"**{l['action']}** | `{l['user']}`")
                     with header_col2:
-                        st.markdown(f"<div style='text-align:right; font-size:0.8rem; color:#666;'>{l['timestamp'][:19].replace('T', ' ')}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='text-align:right; font-size:0.8rem; color:#666;'>{ts[:19].replace('T', ' ')}</div>", unsafe_allow_html=True)
+                    with header_col3:
+                        if st.button("❌", key=f"del_audit_{ts}", help="删除此条记录"):
+                            if AuditLogger.delete_log(ts):
+                                st.rerun()
                     
                     st.caption(l['details'])
                     

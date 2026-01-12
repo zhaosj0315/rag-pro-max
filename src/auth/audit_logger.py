@@ -57,3 +57,34 @@ class AuditLogger:
             except:
                 return []
         return []
+
+    @staticmethod
+    def delete_log(timestamp):
+        """删除特定时间戳的记录"""
+        with AuditLogger._lock:
+            try:
+                if os.path.exists(AUDIT_LOG_PATH):
+                    with open(AUDIT_LOG_PATH, 'r', encoding='utf-8') as f:
+                        logs = json.load(f)
+                    
+                    # 过滤掉目标时间戳的记录
+                    new_logs = [l for l in logs if l.get('timestamp') != timestamp]
+                    
+                    with open(AUDIT_LOG_PATH, 'w', encoding='utf-8') as f:
+                        json.dump(new_logs, f, indent=4, ensure_ascii=False)
+                    return True
+            except:
+                return False
+        return False
+
+    @staticmethod
+    def clear_logs():
+        """清空所有记录"""
+        with AuditLogger._lock:
+            try:
+                if os.path.exists(AUDIT_LOG_PATH):
+                    os.remove(AUDIT_LOG_PATH)
+                return True
+            except:
+                return False
+        return False

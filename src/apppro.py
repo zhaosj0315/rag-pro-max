@@ -2078,147 +2078,115 @@ with st.sidebar:
             perf_monitor.render_panel()
     
     with tab_help:
-        st.markdown("### 📖 RAG Pro Max 帮助中心")
+        st.markdown("### 📖 RAG Pro Max 智能门户")
         
-        # 版本信息
+        # 1. 搜索栏
+        help_search = st.text_input("🔍 搜索功能、配置或疑难解答...", placeholder="例如：GPU 加速、API、部署...", key="help_search_input")
+        
+        if help_search:
+            # 简单的关键词检索逻辑
+            from src.utils.doc_search import search_docs
+            results = search_docs(help_search)
+            if results:
+                st.markdown(f"**找到 {len(results)} 条相关结果:**")
+                for res in results:
+                    with st.expander(f"📄 {res['title']}", expanded=True):
+                        st.markdown(res['preview'])
+                        if st.button(f"查看完整文档: {res['file']}", key=f"view_full_{res['file']}"):
+                            st.session_state.full_doc_to_show = res['file']
+                st.divider()
+            else:
+                st.warning("未找到匹配内容，请尝试更简单的关键词。")
+
+        # 2. 动态导航与快速入口
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.info("📦 **版本**: v4.3.0")
+            if st.button("🚀 快速上手", use_container_width=True):
+                st.session_state.help_active_tab = "onboarding"
         with col2:
-            st.info("🚀 **状态**: 稳定版")
+            if st.button("🔌 API 文档", use_container_width=True):
+                st.session_state.help_active_tab = "api"
         with col3:
-            st.info("📅 **更新**: 2026-01-03")
+            if st.button("❓ 常见问题", use_container_width=True):
+                st.session_state.help_active_tab = "faq"
+
+        # 3. 核心内容区
+        active_tab = st.session_state.get('help_active_tab', 'onboarding')
         
-        # 快速导航
-        st.markdown("#### 🧭 快速导航")
-        
-        help_tabs = st.tabs(["🚀 快速开始", "💡 使用技巧", "🔧 功能说明", "❓ 常见问题", "📞 获取支持"])
-        
-        with help_tabs[0]:  # 快速开始
-            st.markdown("##### 🚀 快速开始指南")
+        if active_tab == "onboarding":
+            st.markdown("#### 🚀 快速上手指南")
+            # 引入部署检查清单
+            with st.container(border=True):
+                st.markdown("**✅ 启动检查清单**")
+                cols = st.columns(2)
+                cols[0].checkbox("Python 3.10+ 环境就绪", value=True, disabled=True)
+                cols[0].checkbox("Ollama / OpenAI API 配置完成", value=True, disabled=True)
+                cols[1].checkbox("向量数据库 (ChromaDB) 正常", value=True, disabled=True)
+                cols[1].checkbox("GPU 加速已感应 (MPS/CUDA)", value=True, disabled=True)
             
-            st.markdown("""
-            **第一步：创建知识库**
-            1. 点击左侧 "➕ 新建知识库..."
-            2. 选择创建方式：文件上传、粘贴文本、网址抓取
-            3. 输入知识库名称，点击 "立即创建"
-            
-            **第二步：开始对话**
-            1. 选择已创建的知识库
-            2. 在下方输入框输入问题
-            3. 系统自动检索并生成回答
-            
-            **第三步：高级功能**
-            - 🌐 开启 "联网搜索" 获取最新信息
-            - 🧠 启用 "智能研究" 进行深度分析
-            - 🎭 切换不同角色获得专业回答
-            """)
-            
-            if st.button("🎯 立即开始创建知识库"):
-                st.success("💡 请点击左侧 '➕ 新建知识库...' 开始！")
-        
-        with help_tabs[1]:  # 使用技巧
-            st.markdown("##### 💡 使用技巧")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("""
-                **📝 提问技巧**
-                - 问题越具体，回答越准确
-                - 可以要求"详细解释"或"简要概括"
-                - 支持多轮对话，可以追问细节
-                
-                **🔍 搜索优化**
-                - 联网搜索适合时效性问题
-                - 智能研究适合复杂分析
-                - 组合使用效果更佳
-                
-                **📚 知识库管理**
-                - 定期更新文档内容
-                - 合理命名便于识别
-                - 删除过时的知识库
-                """)
-            
-            with col2:
-                st.markdown("""
-                **⚡ 性能优化**
-                - 文档大小控制在50MB以内
-                - PDF文档效果最佳
-                - 避免重复上传相同内容
-                
-                **🎭 角色切换**
-                - 技术问题选择"技术专家"
-                - 商务问题选择"商务顾问"
-                - 学术问题选择"学术研究员"
-                
-                **🛠️ 故障排除**
-                - 清空浏览器缓存
-                - 检查网络连接
-                - 重新启动应用
-                """)
-        
-        with help_tabs[2]:  # 功能说明
-            st.markdown("##### 🔧 功能说明")
-            
-            features = [
-                ("🌐 联网搜索", "自动搜索互联网最新信息，补充知识库内容", "适用于时效性强的问题"),
-                ("🧠 智能研究", "Deep Research模式，多专家视角深度分析", "适用于复杂问题的全面分析"),
-                ("🎭 角色切换", "不同专业角色提供专业化回答", "根据问题类型选择合适角色"),
-                ("📊 实时监控", "系统性能和资源使用监控", "了解系统运行状态"),
-                ("📈 进度追踪", "任务处理进度和历史记录", "跟踪文档处理状态"),
-                ("⚙️ 智能调度", "自动优化系统资源配置", "提升处理效率")
-            ]
-            
-            for icon_name, description, usage in features:
-                with st.expander(f"{icon_name}"):
-                    st.write(f"**功能**: {description}")
-                    st.write(f"**适用场景**: {usage}")
-        
-        with help_tabs[3]:  # 常见问题
-            st.markdown("##### ❓ 常见问题")
-            
+            guide_tabs = st.tabs(["创建与上传", "智能问答", "资产治理"])
+            with guide_tabs[0]:
+                st.info("💡 **提示**: 点击左侧 '➕ 新建知识库'，支持 PDF/Excel 拖拽和网址深度抓取。")
+                st.image("https://img.icons8.com/clouds/100/database.png", width=60)
+            with guide_tabs[1]:
+                st.info("💡 **深度思考**: 开启该模式可自动优化您的提问，获得更专业的回答。")
+            with guide_tabs[2]:
+                st.info("💡 **数据主权**: 支持 01-06 全量资产包一键带走，确保企业数据完全私有化。")
+
+        elif active_tab == "api":
+            st.markdown("#### 🔌 开发者与 API 集成")
+            st.code("""
+# 快速查询示例
+import requests
+resp = requests.post("http://localhost:8000/query", 
+                     json={"query": "核心逻辑是什么?", "kb_name": "tech_doc"})
+print(resp.json()["answer"])
+            """, language="python")
+            st.caption("详细接口说明请参考根目录下的 `API_DOCUMENTATION.md`")
+
+        elif active_tab == "faq":
+            st.markdown("#### ❓ 常见问题汇总")
             faqs = [
-                ("为什么上传文档后没有反应？", "请检查文档格式是否支持，文件大小是否超限，网络连接是否正常。支持的格式：PDF、DOCX、TXT、MD等。"),
-                ("联网搜索没有结果怎么办？", "请检查网络连接，尝试更换关键词，或者关闭后重新开启联网搜索功能。"),
-                ("如何提高回答质量？", "1) 上传高质量的相关文档 2) 使用具体明确的问题 3) 开启智能研究模式 4) 选择合适的角色"),
-                ("系统运行缓慢怎么办？", "1) 检查系统资源使用情况 2) 清理临时文件 3) 重启应用 4) 减少同时处理的任务数量"),
-                ("如何备份知识库？", "知识库数据存储在 vector_db_storage 目录中，可以直接备份该目录。"),
-                ("支持哪些文档格式？", "PDF、DOCX、XLSX、TXT、MD、HTML、RTF等主流格式，以及图片中的文字（OCR）。")
+                ("为什么分析图表无法显示？", "请确保查询涉及结构化数据。系统会自动感应数据特征并切换模式。"),
+                ("如何迁移知识库？", "导出“终极五福资产包” ZIP，在目标机器解压至 `vector_db_storage` 即可。"),
+                ("GPU 占用过高怎么办？", "可在配置中心调低“并发工作进程数”或切换至 CPU 模式。")
             ]
-            
-            for question, answer in faqs:
-                with st.expander(f"❓ {question}"):
-                    st.write(answer)
-        
-        with help_tabs[4]:  # 获取支持
-            st.markdown("##### 📞 获取支持")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("""
-                **📚 文档资源**
-                - [用户手册](USER_MANUAL.md) - 详细使用说明
-                - [API文档](API_DOCUMENTATION.md) - 开发者接口
-                - [更新日志](CHANGELOG.md) - 版本更新记录
-                - [常见问题](FAQ.md) - 问题解答集合
-                """)
-                
-                if st.button("📖 打开用户手册"):
-                    st.info("💡 请查看项目根目录的 USER_MANUAL.md 文件")
-            
-            with col2:
-                st.markdown("""
-                **🛠️ 技术支持**
-                - GitHub Issues - 报告问题和建议
-                - 社区论坛 - 用户交流讨论
-                - 技术文档 - 深入了解系统
-                - 开发指南 - 二次开发参考
-                """)
-                
-                if st.button("🐛 报告问题"):
-                    st.info("💡 请在GitHub仓库中创建Issue，描述具体问题和复现步骤")
+            for q, a in faqs:
+                with st.expander(f"Q: {q}"):
+                    st.write(f"A: {a}")
+
+        # 4. 底部快捷文档访问
+        st.divider()
+        st.markdown("**📚 完整技术文档库**")
+        doc_cols = st.columns(4)
+        docs = [
+            ("架构设计", "ARCHITECTURE.md"),
+            ("用户手册", "USER_MANUAL.md"),
+            ("部署指南", "DEPLOYMENT.md"),
+            ("更新日志", "CHANGELOG.md")
+        ]
+        for i, (label, file) in enumerate(docs):
+            with doc_cols[i % 4]:
+                if st.button(label, key=f"doc_btn_{i}", use_container_width=True):
+                    # 联动侧边栏的文档查看逻辑
+                    try:
+                        with open(file, 'r', encoding='utf-8') as f:
+                            st.toast(f"正在加载 {file}...")
+                            # 这里可以触发一个 dialog 显示内容
+                            st.session_state.full_doc_content = f.read()
+                            st.session_state.show_doc_dialog = True
+                    except:
+                        st.error("文档读取失败")
+
+    # 全局文档弹窗
+    if st.session_state.get('show_doc_dialog'):
+        @st.dialog("📄 技术文档预览", width="large")
+        def show_doc():
+            st.markdown(st.session_state.full_doc_content)
+            if st.button("关闭", use_container_width=True):
+                st.session_state.show_doc_dialog = False
+                st.rerun()
+        show_doc()
         
         # 系统信息
         st.markdown("---")
