@@ -246,21 +246,22 @@ class WebToKBProcessor:
                                     
                                     # 1. 识别并排除搜索结果页、系统页、门户页
                                     is_noise_page = any(p in content for p in ["Special:Search", "search?", "维基百科:", "Portal:", "帮助:"])
-                                    # 2. 检查标题相关性 (强校验)
-                                    # 允许部分匹配，例如关键词是 "Google技巧"，标题是 "Google搜索使用攻略"
-                                    is_title_relevant = clean_kw.lower() in title.lower() or any(part in title for part in clean_kw.split())
-                                    # 3. 统计关键词频率 (弱校验)
-                                    kw_count = content.lower().count(clean_kw.lower())
+                                    # 3. 统计核心主语频率 (v5.5.8 强制实体校验)
+                                    import re
+                                    parts = re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z0-9]+', clean_kw)
+                                    core_subject = max(parts, key=len).lower() if parts else clean_kw.lower()
                                     
-                                    # 最终判定逻辑：不能是噪音页，且 (标题相关 OR 高频提到)
-                                    if not is_noise_page and (is_title_relevant or kw_count >= 5):
+                                    kw_count = content.lower().count(core_subject)
+                                    
+                                    # 最终判定逻辑：不能是噪音页，且标题相关，且核心词频 >= 3
+                                    if not is_noise_page and (is_title_relevant or kw_count >= 3):
                                         relevant_files.append(f_path)
                                         from src.app_logging import LogManager
-                                        LogManager().info(f"✅ [RELEVANT] Saved: {title} (Matches: {kw_count})")
+                                        LogManager().info(f"✅ [RELEVANT] {title} | Entity '{core_subject}' matches: {kw_count}")
                                     else:
                                         os.remove(f_path) 
                                         from src.app_logging import LogManager
-                                        LogManager().warning(f"🗑️ [FILTERED] Discarded: {title if title else f_path} | Reason: Low Relevance")
+                                        LogManager().warning(f"🗑️ [PURGED] {title if title else f_path} | Matches: {kw_count} (Too Low)")
                             except Exception as e:
                                 continue
                         crawled_files.extend(relevant_files)

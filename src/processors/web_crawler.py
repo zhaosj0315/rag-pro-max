@@ -232,18 +232,23 @@ class WebCrawler:
         return False
 
     def _extract_links(self, soup, base_url: str, exclude_patterns: List[str] = None, keyword: str = None) -> List[str]:
-        """提取页面中的所有链接，并根据关键词进行严格的语义筛选"""
+        """提取页面中的所有链接，并根据关键词进行极其严格的语义筛选"""
         links = []
         base_domain = urlparse(base_url).netloc
         
-        # 关键词词根化，例如“如何使用Google” -> ["google", "使用"]
-        kw_parts = []
+        # --- v5.5.8 核心锚定逻辑 ---
+        core_subject = ""
         if keyword:
             import re
-            # 提取中文和英文词根
-            kw_parts = [w.lower() for w in re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z0-9]+', keyword) if len(w) >= 2]
+            # 找到关键词中最长的一个词（通常是主语，如 Google）
+            all_parts = re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z0-9]+', keyword)
+            if all_parts:
+                core_subject = max(all_parts, key=len).lower()
 
-        for link in soup.find_all('a', href=True):
+        # 预先剔除导航栏、侧边栏、页脚，只在正文区找链接
+        search_area = soup.find('div', {'id': 'content'}) or soup.find('main') or soup.find('article') or soup
+        
+        for link in search_area.find_all('a', href=True):
             href = link.get('href')
             link_text = link.get_text().strip().lower()
             if not href:
@@ -253,21 +258,16 @@ class WebCrawler:
             full_url = urljoin(base_url, href)
             parsed_url = urlparse(full_url)
             
-            # --- v5.5.8 语义铁甲：全程链接相关性校验 ---
-            if keyword:
-                kw = keyword.lower()
-                # 检查链接文字、URL路径或 Title 属性
-                # 必须包含至少一个核心词根
-                is_related = any(part in link_text or part in parsed_url.path.lower() for part in kw_parts)
+            # --- v5.5.8 语义铁闸：核心主语强制校验 ---
+            if core_subject:
+                # 检查链接文字或URL路径是否包含【核心主语】
+                # 如果搜 Google，链接里必须有 google，只有“如何使用”是不够的
+                is_core_match = (core_subject in link_text) or (core_subject in parsed_url.path.lower())
                 
-                # 物理屏蔽所有维基百科/系统的干扰项
-                is_system_link = any(p in full_url for p in ['Special:', 'Help:', 'File:', 'Category:', 'Talk:', 'Template:', 'Main_Page', 'Portal:', 'Wikipedia:', 'index.php'])
+                # 屏蔽维基百科系统路径
+                is_system = any(p in full_url for p in ['Special:', 'Help:', 'File:', 'Category:', 'Talk:', 'Template:', 'Portal:'])
                 
-                if is_system_link:
-                    continue
-                
-                # [核心改动]：不再仅限于搜索引擎，所有页面的链接都必须经过关键词校验
-                if not is_related:
+                if is_system or not is_core_match:
                     continue
             # ---------------------------------------
 
