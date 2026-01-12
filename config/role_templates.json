@@ -39,7 +39,10 @@
             "upload_files",
             "paste_text",
             "summary_gen",
-            "kb_export_report"
+            "kb_export_report",
+            "data_analysis",
+            "download_knowledge_base",
+            "kb_export_full"
         ],
         "default_quota_mb": 200
     },

@@ -18,6 +18,9 @@ class PermissionManager:
 
     def has_permission(self, username, permission):
         """实时检查用户权限"""
+        # 强制重新加载角色配置，确保热更新生效
+        self.roles = self._load_templates()
+
         from src.auth.user_auth import load_users
         users = load_users()
         user_info = users.get(username, {})
