@@ -232,10 +232,17 @@ class WebCrawler:
         return False
 
     def _extract_links(self, soup, base_url: str, exclude_patterns: List[str] = None, keyword: str = None) -> List[str]:
-        """提取页面中的所有链接，并根据关键词进行语义筛选"""
+        """提取页面中的所有链接，并根据关键词进行严格的语义筛选"""
         links = []
         base_domain = urlparse(base_url).netloc
         
+        # 关键词词根化，例如“如何使用Google” -> ["google", "使用"]
+        kw_parts = []
+        if keyword:
+            import re
+            # 提取中文和英文词根
+            kw_parts = [w.lower() for w in re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z0-9]+', keyword) if len(w) >= 2]
+
         for link in soup.find_all('a', href=True):
             href = link.get('href')
             link_text = link.get_text().strip().lower()
@@ -246,24 +253,21 @@ class WebCrawler:
             full_url = urljoin(base_url, href)
             parsed_url = urlparse(full_url)
             
-            # --- v5.5.8 语义加固：链接相关性校验 ---
+            # --- v5.5.8 语义铁甲：全程链接相关性校验 ---
             if keyword:
                 kw = keyword.lower()
-                # 检查链接文字或URL路径是否包含关键词
-                is_related = (kw in link_text) or (kw in parsed_url.path.lower())
+                # 检查链接文字、URL路径或 Title 属性
+                # 必须包含至少一个核心词根
+                is_related = any(part in link_text or part in parsed_url.path.lower() for part in kw_parts)
                 
-                # 排除维基百科常见的系统性噪音链接
-                # 增加了 Special, Help, File, Portal, Category 等更全面的屏蔽
-                is_system_link = any(p in full_url for p in ['Special:', 'Help:', 'File:', 'Category:', 'Talk:', 'Template:', 'Main_Page', 'Portal:', 'Wikipedia:'])
+                # 物理屏蔽所有维基百科/系统的干扰项
+                is_system_link = any(p in full_url for p in ['Special:', 'Help:', 'File:', 'Category:', 'Talk:', 'Template:', 'Main_Page', 'Portal:', 'Wikipedia:', 'index.php'])
                 
-                # 强制屏蔽“随机条目”这种高偏移链接
-                is_drift_link = "Random" in full_url or "index.php" in full_url
-                
-                if is_system_link or is_drift_link:
+                if is_system_link:
                     continue
                 
-                # 如果当前是搜索引擎结果页，且链接不相关，则跳过
-                if not is_related and any(se in base_domain for se in ['wikipedia.org', 'baidu.com', 'zhihu.com']):
+                # [核心改动]：不再仅限于搜索引擎，所有页面的链接都必须经过关键词校验
+                if not is_related:
                     continue
             # ---------------------------------------
 
@@ -435,13 +439,31 @@ class WebCrawler:
                     
                     soup = BeautifulSoup(response.text, 'html.parser')
                     
-                    # 根据解析器类型提取内容
-                    content = self._extract_content_by_parser(soup, parser_type)
-                    if status_callback:
-                        status_callback(f"📝 内容提取: {len(content)} 字符 ({parser_type}模式)")
-                    
+                    # --- v5.5.8 铁甲逻辑：标题强制校验 ---
                     title = soup.title.string if soup.title else "No Title"
                     title = self._clean_text(title)
+                    
+                    current_kw = getattr(self, '_current_keyword', None)
+                    if current_kw:
+                        import re
+                        kw_parts = [w.lower() for w in re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z0-9]+', current_kw) if len(w) >= 2]
+                        # 检查标题是否包含任何关键词部分
+                        is_title_relevant = any(part in title.lower() for part in kw_parts)
+                        
+                        # 特殊处理：如果是起始页（第一页），允许通过（为了提取链接）
+                        is_start_page = (url == start_url)
+                        
+                        if not is_title_relevant and not is_start_page:
+                            if status_callback:
+                                status_callback(f"🗑️ 标题不相关，已丢弃: {title}")
+                            # 虽然丢弃内容，但仍允许从该页提取链接（如果是搜索结果页的话，逻辑在 _extract_links 里处理）
+                            content = ""
+                        else:
+                            # 根据解析器类型提取内容
+                            content = self._extract_content_by_parser(soup, parser_type)
+                    else:
+                        content = self._extract_content_by_parser(soup, parser_type)
+                    # ------------------------------------
                     
                     # 保存内容
                     filepath = self._save_content(url, title, content)
