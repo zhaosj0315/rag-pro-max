@@ -1043,19 +1043,71 @@ with st.sidebar:
                     sess_id = sess['id']
                     label = sess['title']
                     is_active = (sess_id == st.session_state.get('current_session_id'))
+                    is_pinned = sess.get('pinned', False)
                     
-                    # 移除强制覆盖默认会话标题的逻辑，显示实际内容摘要
-                    # if sess.get('is_default'):
-                    #    label = "📝 默认会话"
+                    # 使用列布局放置操作按钮 [标题(6), 置顶(1), 重命名(1), 删除(1)]
+                    c_title, c_pin, c_edit, c_del = st.columns([5.5, 1.2, 1.2, 1.2])
                     
-                    btn_type = "primary" if is_active else "secondary"
-                    icon = "📂" if is_active else "📄"
+                    with c_title:
+                        icon = "📌" if is_pinned else ("📂" if is_active else "📄")
+                        btn_type = "primary" if is_active else "secondary"
+                        # 确保 key 唯一
+                        safe_sess_id = str(sess_id) if sess_id else "default"
+                        
+                        if st.button(f"{icon} {label}", key=f"sess_btn_{safe_sess_id}", use_container_width=True, type=btn_type, help=label):
+                            st.session_state.current_session_id = sess_id
+                            st.session_state.messages = HistoryManager.load_session(current_active_kb, sess_id)
+                            # 恢复建议
+                            st.session_state.suggestions_history = []
+                            if st.session_state.messages:
+                                last_msg = st.session_state.messages[-1]
+                                if isinstance(last_msg, dict) and last_msg.get('suggestions'):
+                                    st.session_state.suggestions_history = last_msg['suggestions']
+                            st.rerun()
+                            
+                    with c_pin:
+                        pin_icon = "🔓" if is_pinned else "📌"
+                        pin_help = "取消置顶" if is_pinned else "置顶会话"
+                        if st.button(pin_icon, key=f"sess_pin_{safe_sess_id}", help=pin_help):
+                            HistoryManager.toggle_pin_session(current_active_kb, sess_id)
+                            st.rerun()
+                            
+                    with c_edit:
+                        if st.button("✏️", key=f"sess_edit_{safe_sess_id}", help="重命名"):
+                            st.session_state[f"renaming_sess_{safe_sess_id}"] = True
                     
-                    if st.button(f"{icon} {label}", key=f"sess_{sess_id}", use_container_width=True, type=btn_type):
-                        st.session_state.current_session_id = sess_id
-                        st.session_state.messages = HistoryManager.load_session(current_active_kb, sess_id)
-                        st.session_state.suggestions_history = []
-                        st.rerun()
+                    with c_del:
+                        if st.button("🗑️", key=f"sess_del_{safe_sess_id}", help="删除会话"):
+                            # 增加二次确认 (利用 session_state)
+                            st.session_state[f"confirm_del_{safe_sess_id}"] = True
+                    
+                    # 内联重命名区域
+                    if st.session_state.get(f"renaming_sess_{safe_sess_id}"):
+                        with st.container():
+                            new_name = st.text_input("新名称", value=label, key=f"input_ren_{safe_sess_id}", label_visibility="collapsed")
+                            rc1, rc2 = st.columns(2)
+                            if rc1.button("保存", key=f"save_ren_{safe_sess_id}", use_container_width=True):
+                                HistoryManager.rename_session(current_active_kb, sess_id, new_name)
+                                del st.session_state[f"renaming_sess_{safe_sess_id}"]
+                                st.rerun()
+                            if rc2.button("取消", key=f"cancel_ren_{safe_sess_id}", use_container_width=True):
+                                del st.session_state[f"renaming_sess_{safe_sess_id}"]
+                                st.rerun()
+                                
+                    # 内联删除确认区域
+                    if st.session_state.get(f"confirm_del_{safe_sess_id}"):
+                        st.warning("确定删除?")
+                        dc1, dc2 = st.columns(2)
+                        if dc1.button("是", key=f"yes_del_{safe_sess_id}", type="primary", use_container_width=True):
+                            HistoryManager.delete_session(current_active_kb, sess_id)
+                            if is_active:
+                                st.session_state.current_session_id = None
+                                st.session_state.messages = []
+                            del st.session_state[f"confirm_del_{safe_sess_id}"]
+                            st.rerun()
+                        if dc2.button("否", key=f"no_del_{safe_sess_id}", use_container_width=True):
+                            del st.session_state[f"confirm_del_{safe_sess_id}"]
+                            st.rerun()
 
         if selected_nav != st.session_state.get('current_nav'):
             st.session_state.pop('suggestions_history', None) 
