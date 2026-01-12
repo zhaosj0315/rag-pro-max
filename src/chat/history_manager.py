@@ -157,6 +157,14 @@ class HistoryManager:
                 if "meta" not in data: data["meta"] = {}
                 data["meta"]["updated_at"] = datetime.now().isoformat()
             
+            # [核心增强] 自动标题生成：如果还没手动改名，且已有消息，自动从第一句话提取标题
+            if messages and (not data["meta"].get("title") or data["meta"].get("title") == "默认会话"):
+                first_msg = next((m['content'] for m in messages if m['role'] == 'user'), None)
+                if first_msg:
+                    # 提取前 30 个字作为标题
+                    clean_title = first_msg.strip()[:30].replace('\n', ' ')
+                    data["meta"]["title"] = clean_title
+            
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             return True

@@ -1039,9 +1039,13 @@ with st.sidebar:
                     st.rerun()
                 
                 # 会话列表
-                for sess in sessions:
+                total_sess = len(sessions)
+                for i, sess in enumerate(sessions):
                     sess_id = sess['id']
-                    label = sess['title']
+                    # 为每个会话生成一个专门的编号
+                    display_idx = total_sess - i
+                    label = f"#{display_idx} {sess['title']}"
+                    
                     is_active = (sess_id == st.session_state.get('current_session_id'))
                     is_pinned = sess.get('pinned', False)
                     
