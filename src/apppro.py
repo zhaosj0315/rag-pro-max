@@ -2582,6 +2582,7 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
             os.makedirs(raw_sources_dir)
             
         if current_target_path and os.path.exists(current_target_path):
+            import shutil
             status_container.write("📦 正在执行原始文献的物理归档与持久化...")
             if os.path.isdir(current_target_path):
                 # 递归拷贝整个上传目录
@@ -3112,29 +3113,36 @@ if btn_start:
                     is_medical = any(med_word in keyword_lower for med_word in medical_keywords)
                     is_tech = any(tech_word in keyword_lower for tech_word in tech_keywords)
                     
+                    import urllib.parse
+                    q = urllib.parse.quote(keyword)
+                    
+                    # 核心改动：引入通用搜索引擎作为强力跳板
+                    # 使用 HTML 版以减少反爬干扰和解析难度
+                    general_engines = [
+                        f"https://www.bing.com/search?q={q}",
+                        f"https://html.duckduckgo.com/html/?q={q}"
+                    ]
+
                     if is_medical:
-                        return [
-                            "https://zh.wikipedia.org/",
-                            "https://baike.baidu.com/",
+                        return general_engines + [
+                            f"https://zh.wikipedia.org/w/index.php?search={q}",
+                            f"https://baike.baidu.com/search/none?word={q}",
                             "https://www.39.net/",
-                            "https://www.xywy.com/",
-                            "https://www.familydoctor.com.cn/"
+                            "https://www.xywy.com/"
                         ]
                     elif is_tech:
-                        return [
-                            "https://www.runoob.com/",
-                            "https://docs.python.org/zh-cn/3/",
-                            "https://help.aliyun.com/",
-                            "https://zh.wikipedia.org/",
-                            "https://www.zhihu.com/"
+                        return general_engines + [
+                            f"https://www.runoob.com/?s={q}",
+                            f"https://help.aliyun.com/search_search.htm?k={q}",
+                            f"https://so.csdn.net/so/search?q={q}",
+                            f"https://zh.wikipedia.org/w/index.php?search={q}"
                         ]
                     else:
-                        return [
-                            "https://zh.wikipedia.org/",
-                            "https://baike.baidu.com/",
-                            "https://www.zhihu.com/",
-                            "https://www.icourse163.org/",
-                            "https://www.eastmoney.com/"
+                        return general_engines + [
+                            f"https://zh.wikipedia.org/w/index.php?search={q}",
+                            f"https://baike.baidu.com/search/none?word={q}",
+                            f"https://www.zhihu.com/search?type=content&q={q}",
+                            f"https://www.icourse163.org/search.htm?search={q}"
                         ]
                 
                 search_engines = get_smart_search_engines(search_keyword)
@@ -3148,9 +3156,15 @@ if btn_start:
                 status_text = st.empty()
                 
                 def update_status(msg):
-                    status_text.text(f"🔍 {msg}")
-                    logger.info(f"🔍 智能搜索: {msg}")
-                
+                    try:
+                        # 防御性编程：确保 logger 存在
+                        from src.app_logging import LogManager
+                        local_logger = LogManager()
+                        status_text.caption(f"🌐 **实时进度**: {msg}")
+                        local_logger.info(f"🔍 智能搜索: {msg}")
+                    except Exception:
+                        pass
+
                 logger.info(f"🔍 开始智能搜索: {search_keyword} (深度:{crawl_depth}, 页数:{max_pages})")
                 
                 with st.spinner("智能搜索中..."):
@@ -3160,53 +3174,58 @@ if btn_start:
                     
                     concurrent_crawler = ConcurrentCrawler(max_workers=3)
                     content_analyzer = ContentQualityAnalyzer()
-                    
+
                     def enhanced_progress_callback(message, progress=None):
-                        update_status(message)
-                        if progress is not None:
-                            progress_bar.progress(progress)
+                        # 回调函数可能在不同上下文中被调用，确保安全
+                        try:
+                            update_status(message)
+                            if progress is not None:
+                                progress_bar.progress(progress)
+                        except Exception:
+                            pass
+                
+                # 执行并发爬取
+                crawl_results = concurrent_crawler.crawl_with_depth(
+                    search_engines,
+                    max_depth=crawl_depth,
+                    max_pages_per_level=max_pages,
+                    keyword=search_keyword,
+                    progress_callback=enhanced_progress_callback
+                )
+                
+                # 保存结果到文件
+                saved_files = []
+                if crawl_results:
+                    import os
+                    os.makedirs(unique_output_dir, exist_ok=True)
                     
-                    # 执行并发爬取
-                    crawl_results = concurrent_crawler.crawl_with_depth(
-                        search_engines,
-                        max_depth=crawl_depth,
-                        max_pages_per_level=max_pages,
-                        progress_callback=enhanced_progress_callback
-                    )
-                    
-                    # 保存结果到文件
-                    saved_files = []
-                    if crawl_results:
-                        import os
-                        os.makedirs(unique_output_dir, exist_ok=True)
-                        
-                        for i, result in enumerate(crawl_results):
-                            if result['success'] and result['content']:
-                                # 使用网页标题作为文件名，如果没有标题则使用默认名称
-                                title = result.get('title', '').strip()
-                                if title:
-                                    # 清理标题，移除不合法的文件名字符
-                                    safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
-                                    safe_title = safe_title.replace(' ', '_')[:50]  # 限制长度
-                                    filename = f"{safe_title}_{i+1:03d}.md"
-                                else:
-                                    filename = f"quality_content_{i+1:03d}.md"
-                                
-                                filepath = os.path.join(unique_output_dir, filename)
-                                
-                                # 确保导入 (防止多进程或动态加载导致的 NameError)
-                                from src.utils.file_system_utils import set_where_from_metadata
-                                
-                                with open(filepath, 'w', encoding='utf-8') as f:
-                                    # 🔥 核心修正：使用 Markdown 格式，以便溯源引擎识别和更好展示
-                                    f.write(f"**URL:** {result['url']}\n\n")
-                                    f.write(f"# {result['title']}\n\n")
-                                    f.write(f"**内容:**\n\n{result['content']}\n")
-                                
-                                # 为文件设置 macOS 下载来源元数据
-                                set_where_from_metadata(filepath, result['url'])
-                                
-                                saved_files.append(filepath)
+                    for i, result in enumerate(crawl_results):
+                        if result['success'] and result['content']:
+                            # 使用网页标题作为文件名，如果没有标题则使用默认名称
+                            title = result.get('title', '').strip()
+                            if title:
+                                # 清理标题，移除不合法的文件名字符
+                                safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
+                                safe_title = safe_title.replace(' ', '_')[:50]  # 限制长度
+                                filename = f"{safe_title}_{i+1:03d}.md"
+                            else:
+                                filename = f"quality_content_{i+1:03d}.md"
+                            
+                            filepath = os.path.join(unique_output_dir, filename)
+                            
+                            # 确保导入 (防止多进程或动态加载导致的 NameError)
+                            from src.utils.file_system_utils import set_where_from_metadata
+                            
+                            with open(filepath, 'w', encoding='utf-8') as f:
+                                # 🔥 核心修正：使用 Markdown 格式，以便溯源引擎识别和更好展示
+                                f.write(f"**URL:** {result['url']}\n\n")
+                                f.write(f"# {result['title']}\n\n")
+                                f.write(f"**内容:**\n\n{result['content']}\n")
+                            
+                            # 为文件设置 macOS 下载来源元数据
+                            set_where_from_metadata(filepath, result['url'])
+                            
+                            saved_files.append(filepath)
                 
                 # 搜索完成后自动创建知识库
                 if saved_files:
