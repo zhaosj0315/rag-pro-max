@@ -2021,7 +2021,8 @@ with st.sidebar:
                 with confirm_col1:
                     if st.button("✅ 确认删除", type="primary", use_container_width=True):
                         from src.auth.audit_logger import AuditLogger
-                        AuditLogger.log(st.session_state.get('user'), "DELETE_KB", f"永久删除了知识库: {current_kb_name}", status="warning")
+                        from src.common.utils import get_client_ip
+                        AuditLogger.log(st.session_state.get('user'), "DELETE_KB", f"永久删除了知识库: {current_kb_name}", status="warning", ip=get_client_ip())
                         kb_manager.delete(current_kb_name) # 确保实际调用删除逻辑
                         st.toast(f"🗑️ 已删除知识库: {current_kb_name}")
                         # 重置状态
@@ -3513,7 +3514,8 @@ elif active_kb_name:
                 
                 if st.button("🌟 一键生成全量资产包 (ZIP)", use_container_width=True, key=f"dl_all_in_one_{active_kb_name}", type="primary", disabled=not final_export_permission):
                     from src.auth.audit_logger import AuditLogger
-                    AuditLogger.log(current_user, "EXPORT_FULL_SNAPSHOT", f"导出知识库全量镜像: {active_kb_name}")
+                    from src.common.utils import get_client_ip
+                    AuditLogger.log(current_user, "EXPORT_FULL_SNAPSHOT", f"导出知识库全量镜像: {active_kb_name}", ip=get_client_ip())
                     with st.status("正在进行全量数据打包 (含历史对话)...", expanded=True) as status:
                         # 确保元数据已序列化
                         manifest_json = json.dumps(doc_manager.manifest, indent=4, ensure_ascii=False)
@@ -5229,59 +5231,29 @@ if st.session_state.prompt_trigger:
         st.session_state.question_queue.append(st.session_state.prompt_trigger)
     st.session_state.prompt_trigger = None
 
-# 显示队列状态
-queue_len = len(st.session_state.question_queue)
-if st.session_state.get('is_processing'):
-    # 核心安全机制：检测处理时长
-    process_start = st.session_state.get('process_start_time', time.time())
-    elapsed = time.time() - process_start
-    if elapsed > 180: # 3 minutes
-        st.warning(f"⚠️ 处理已持续 {elapsed:.0f}s，可能发生死锁或引擎响应过慢。")
-        if st.button("🚨 强制重置系统状态", type="primary"):
-            st.session_state.is_processing = False
-            st.session_state.question_queue = []
-            st.toast("✅ 系统已强制重置")
-            st.rerun()
-
-    if queue_len > 0:
-        # 显示队列中的问题
-        with st.expander(f"⏳ 正在处理问题，队列中还有 {queue_len} 个问题等待...", expanded=True):
-            for i, q in enumerate(st.session_state.question_queue, 1):
-                # 截断过长的问题
-                display_q = q[:50] + "..." if len(q) > 50 else q
-                st.caption(f"{i}. {display_q}")
-            
-            # 添加队列重置按钮
-            if st.button("🔄 重置队列（如果卡住）", key="reset_queue"):
-                st.session_state.is_processing = False
-                st.session_state.question_queue = []
-                st.success("✅ 队列已重置")
-                st.rerun()
-    else:
-        st.info("⏳ 正在处理问题...")
-        # 添加重置按钮（防止卡住）
-        if st.button("🔄 重置状态", key="reset_processing"):
-            st.session_state.is_processing = False
-            st.success("✅ 处理状态已重置")
-            st.rerun()
-elif queue_len > 0:
-    # 显示待处理的问题列表
-    with st.expander(f"📝 队列中有 {queue_len} 个问题待处理", expanded=True):
-        for i, q in enumerate(st.session_state.question_queue, 1):
-            display_q = q[:50] + "..." if len(q) > 50 else q
-            st.caption(f"{i}. {display_q}")
-        
-        # 添加清空队列按钮
-        if st.button("🗑️ 清空队列", key="clear_queue"):
-            st.session_state.question_queue = []
-            st.success("✅ 队列已清空")
-            st.rerun()
-
-# 从队列中取出问题处理
-if not st.session_state.get('is_processing', False) and st.session_state.question_queue:
-    # 记录开始时间用于死锁检测
+# --- 核心调度逻辑 (v4.5.5 彻底修复死锁) ---
+# 1. 自动从队列消费 (如果当前空闲且队列有任务)
+if not st.session_state.get('is_processing') and st.session_state.question_queue:
+    st.session_state.current_active_query = st.session_state.question_queue.pop(0)
+    st.session_state.is_processing = True
     st.session_state.process_start_time = time.time()
-    final_prompt = st.session_state.question_queue.pop(0)
+    st.rerun()
+
+# 2. 状态监控：如果处理超时(180s)，强制释放 (防止死锁)
+if st.session_state.get('is_processing'):
+    elapsed = time.time() - st.session_state.get('process_start_time', time.time())
+    if elapsed > 180:
+        st.warning(f"⚠️ 处理超时 ({elapsed:.0f}s)，系统已强制重置")
+        st.session_state.is_processing = False
+        st.rerun()
+
+# 3. 如果正在处理任务，提取当前问题
+final_prompt = st.session_state.get('current_active_query')
+
+# 核心问答处理引擎入口
+if st.session_state.get('is_processing') and final_prompt:
+    # 消费掉任务标记 (转移到局部变量)
+    del st.session_state.current_active_query
     
     # 记录当前角色状态 (v2.7.4)
     from src.config.prompt_manager import PromptManager
@@ -5290,111 +5262,40 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
     role_name = next((p['name'] for p in all_prompts if p['id'] == current_role_id), current_role_id)
     
     logger.info(f"🎭 当前角色: {role_name}")
-    logger.info(f"🚀 开始处理队列问题: {final_prompt[:50]}...")
+    logger.info(f"🚀 开始处理对话任务: {final_prompt[:50]}...")
     
-    # 联网搜索 - 在所有模式之前执行
+    # --- 阶段 A: 联网搜索 (Pre-processing) ---
     if st.session_state.get('enable_web_search', False):
         # 使用增强的联网搜索功能
         with st.status("🌐 正在联网搜索...", expanded=False) as status:
             st.write("🔍 智能分析搜索关键词...")
-            
-            # 调用增强搜索函数
             search_results = enhanced_web_search(final_prompt, logger)
-            
             if search_results:
                 st.write(f"✅ 找到 {len(search_results)} 条相关结果")
                 
-                # 简单关键词提取用于显示
                 def extract_display_keywords(query):
+                    # (精简后的关键词提取逻辑)
                     import re
-                    
-                    # 如果查询过长（超过100字符），尝试提取核心概念
-                    if len(query) > 100:
-                        # 查找专有名词和关键概念
-                        if 'AnalyticDB' in query:
-                            return ['阿里云AnalyticDB', '云原生数据仓库', 'Alibaba Cloud AnalyticDB']
-                        elif '数据技术' in query and '发展趋势' in query:
-                            return ['数据技术趋势', '实时数据处理', 'big data trends']
-                        elif '知识库' in query and '数据' in query:
-                            return ['企业知识库', '数据治理', 'enterprise data management']
-                    
-                    # 移除疑问词和连接词
-                    remove_words = ['什么是', '哪些', '如何', '怎么', '为什么', '是什么', '有哪些', '会导致', '导致', '的', '了', '吗', '呢', '能否', '可以', '一份', '包含', '提供', '具体会', '会产生', '产生']
+                    remove_words = ['什么是', '哪些', '如何', '怎么', '为什么', '是什么']
                     cleaned = query
-                    for word in remove_words:
-                        cleaned = cleaned.replace(word, ' ')
-                    
-                    # 特殊查询模式识别
-                    if '数仓' in query or '数据仓库' in query:
-                        return ['数据仓库', '数仓集群', 'data warehouse']
-                    elif '缓存' in query and '元数据' in query:
-                        return ['缓存失效', '元数据缺失', 'cache metadata']
-                    elif 'DS' in query and '术语表' in query:
-                        return ['数据科学术语', 'DS术语表', 'data science glossary']
-                    elif '术语表' in query and ('专业' in query or '通俗' in query):
-                        return ['行业术语表', '专业术语', 'technical glossary']
-                    elif 'OpenAI' in query and 'Deep Research' in query:
-                        if '中国' in query and ('科研' in query or '就业' in query):
-                            return ['OpenAI Deep Research', '中国科研就业', 'AI research jobs China']
-                        else:
-                            return ['OpenAI Deep Research', 'AI research automation', 'knowledge work AI']
-                    elif 'DeepSeek' in query and ('o1' in query or 'OpenAI' in query):
-                        # AI模型对比查询
-                        if '准确率' in query or 'accuracy' in query:
-                            return ['DeepSeek vs OpenAI o1', '模型性能对比', 'AI model benchmark']
-                        else:
-                            return ['DeepSeek R1', 'OpenAI o1', 'AI model comparison']
-                    elif 'AnalyticDB' in query or ('阿里云' in query and '数据仓库' in query):
-                        return ['阿里云AnalyticDB', '云原生数据仓库', 'Alibaba Cloud AnalyticDB']
-                    elif 'AI' in query and ('岗位' in query or '工作' in query or '就业' in query):
-                        return ['AI工作岗位', 'AI jobs', 'artificial intelligence careers']
-                    else:
-                        # 先提取英文词汇和缩写
-                        english_words = re.findall(r'[a-zA-Z]+', query)
-                        # 提取中文词汇 (2-5个字，避免截断)
-                        chinese_words = re.findall(r'[\u4e00-\u9fff]{2,5}', cleaned)
-                        
-                        # 过滤常见词
-                        filtered_chinese = [w for w in chinese_words if w not in [
-                            '可以', '能够', '应该', '需要', '进行', '问题', '方法', '情况', '时候', '地方', '方面', '内容', '系统', '功能', '影响', '作用', '效果'
-                        ]]
-                        filtered_english = [w for w in english_words if w.lower() not in [
-                            'can', 'should', 'need', 'will', 'have', 'what', 'how', 'the', 'and', 'for', 'are', 'with', 'that', 'this'
-                        ]]
-                        
-                        # 合并并去重，保持顺序，优先保留英文专有名词
-                        all_keywords = []
-                        # 先加入英文词汇（通常是专有名词）
-                        for word in filtered_english:
-                            if len(word) >= 2 and word not in all_keywords:
-                                all_keywords.append(word)
-                        # 再加入中文词汇
-                        for word in filtered_chinese:
-                            if word not in all_keywords:
-                                all_keywords.append(word)
-                        
-                        return all_keywords[:3]
+                    for word in remove_words: cleaned = cleaned.replace(word, ' ')
+                    words = re.findall(r'[\u4e00-\u9fff]{2,5}', cleaned)
+                    return words[:3]
                 
-                # 保存搜索结果到session_state，确保持久显示
                 st.session_state.last_web_search_results = {
                     'query': final_prompt,
                     'results': search_results,
                     'timestamp': __import__('time').strftime('%H:%M:%S'),
-                    'keywords': extract_display_keywords(final_prompt)  # 保存搜索关键词
+                    'keywords': extract_display_keywords(final_prompt)
                 }
                 
-                # 将搜索结果整合到查询中
                 web_context = "以下是联网搜索到的相关信息：\n\n"
                 for i, result in enumerate(search_results[:5], 1):
-                    web_context += f"{i}. {result.get('title', 'No Title')}\n"
-                    web_context += f"   {result.get('body', 'No content')[:200]}...\n"
-                    web_context += f"   来源: {result.get('href', 'No URL')}\n\n"
+                    web_context += f"{i}. {result.get('title')}\n   {result.get('body')[:200]}...\n\n"
                 
-                # 将联网信息添加到查询中
-                final_prompt = f"{final_prompt}\n\n{web_context}请结合以上联网搜索信息和知识库内容进行回答。"
-                
+                final_prompt = f"{final_prompt}\n\n{web_context}请结合以上联网搜索信息进行回答。"
             else:
-                st.write("❌ 未找到相关结果，请尝试其他关键词")
+                st.write("❌ 未找到联网结果")
     
     if active_kb_name == "multi_kb_mode":
         # 多知识库模式处理

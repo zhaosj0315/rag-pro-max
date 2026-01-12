@@ -165,6 +165,8 @@ def render_login_page():
                             st.toast("⚠️ 请输入完整的用户名和密码")
                         else:
                             from src.auth.audit_logger import AuditLogger
+                            from src.common.utils import get_client_ip
+                            client_ip = get_client_ip()
                             success, info = authenticate_user(username, password)
                             
                             if success:
@@ -177,13 +179,13 @@ def render_login_page():
                                 st.session_state.user = username
                                 st.session_state.role = info.get('role', 'standard_user')
                                 
-                                AuditLogger.log(username, "LOGIN", f"登录成功 (保持 {days} 天)")
+                                AuditLogger.log(username, "LOGIN", f"登录成功 (保持 {days} 天)", ip=client_ip)
                                 st.balloons()
                                 st.success("✅ 验证通过！正在跳转...")
                                 time.sleep(0.8)
                                 st.rerun()
                             else:
-                                AuditLogger.log(username, "LOGIN_FAILED", f"失败: {info}", status="warning")
+                                AuditLogger.log(username, "LOGIN_FAILED", f"失败: {info}", status="warning", ip=client_ip)
                                 st.error(f"❌ {info}")
 
             # 访客通道
@@ -195,10 +197,11 @@ def render_login_page():
             
             if st.button("👻 以访客身份试用", use_container_width=True):
                 from src.auth.audit_logger import AuditLogger
+                from src.common.utils import get_client_ip
                 st.session_state.logged_in = True
                 st.session_state.user = "guest_user"
                 st.session_state.role = "guest"
-                AuditLogger.log("guest_user", "GUEST_LOGIN", "访客试用")
+                AuditLogger.log("guest_user", "GUEST_LOGIN", "访客试用", ip=get_client_ip())
                 st.rerun()
 
         with tab_register:

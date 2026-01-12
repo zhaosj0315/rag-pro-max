@@ -142,3 +142,20 @@ def get_file_stats(file_path: str) -> dict:
             'is_dir': False,
             'exists': False
         }
+
+def get_client_ip():
+    """获取客户端真实IP"""
+    import streamlit as st
+    try:
+        # 尝试从 Streamlit 头部获取 (针对现代 Streamlit)
+        from streamlit.web.server.websocket_headers import _get_websocket_headers
+        headers = _get_websocket_headers()
+        if headers:
+            # 处理代理情况 (X-Forwarded-For)
+            if "X-Forwarded-For" in headers:
+                return headers["X-Forwarded-For"].split(",")[0]
+            if "Remote-Addr" in headers:
+                return headers["Remote-Addr"]
+    except:
+        pass
+    return "127.0.0.1" # 回退到本地回环

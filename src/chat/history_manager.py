@@ -33,34 +33,41 @@ class HistoryManager:
         """获取知识库的所有会话列表"""
         sessions = []
         if not os.path.exists(cls.HISTORY_DIR):
-            return []
+            os.makedirs(cls.HISTORY_DIR, exist_ok=True)
             
-        # 1. 添加默认会话 (如果有且不为空)
+        # 1. 添加默认会话
         default_path = cls._get_path(kb_id)
-        if os.path.exists(default_path):
+        default_session_exists = os.path.exists(default_path)
+        
+        # 即使文件不存在，我们也预设一个默认会话项（因为它是系统的基础入口）
+        default_title = "默认会话"
+        default_pinned = False
+        default_time = datetime.min
+        
+        if default_session_exists:
             try:
                 stats = os.stat(default_path)
+                default_time = datetime.fromtimestamp(stats.st_mtime)
                 with open(default_path, 'r') as f:
                     data = json.load(f)
-                    # 兼容新旧格式
                     msgs = data.get("messages", []) if isinstance(data, dict) else data
                     meta = data.get("meta", {}) if isinstance(data, dict) else {}
+                    default_title = meta.get("title", "默认会话")
+                    default_pinned = meta.get("pinned", False)
                     
-                    if msgs: 
-                        title = meta.get("title", "默认会话")
-                        if title == "默认会话" and len(msgs) > 0:
-                            first_msg = next((m['content'] for m in msgs if m['role'] == 'user'), None)
-                            if first_msg:
-                                title = first_msg[:20].strip() + ("..." if len(first_msg)>20 else "")
-                        
-                        sessions.append({
-                            "id": None, # None means default
-                            "title": title,
-                            "updated_at": datetime.fromtimestamp(stats.st_mtime),
-                            "is_default": True,
-                            "pinned": meta.get("pinned", False)
-                        })
+                    if default_title == "默认会话" and msgs:
+                        first_msg = next((m['content'] for m in msgs if m['role'] == 'user'), None)
+                        if first_msg:
+                            default_title = first_msg[:20].strip() + ("..." if len(first_msg)>20 else "")
             except: pass
+            
+        sessions.append({
+            "id": None, 
+            "title": default_title,
+            "updated_at": default_time,
+            "is_default": True,
+            "pinned": default_pinned
+        })
             
         # 2. 扫描命名会话
         prefix = f"{kb_id}@"
@@ -76,19 +83,16 @@ class HistoryManager:
                     try:
                         with open(path, 'r') as jf:
                             data = json.load(jf)
-                            # 兼容新旧格式
                             msgs = data.get("messages", []) if isinstance(data, dict) else data
                             meta = data.get("meta", {}) if isinstance(data, dict) else {}
                             
-                            if msgs:
-                                title = meta.get("title", title)
-                                pinned = meta.get("pinned", False)
-                                
-                                # 自动标题回退
-                                if title.startswith("会话 ") and len(msgs) > 0:
-                                    first_msg = next((m['content'] for m in msgs if m['role'] == 'user'), None)
-                                    if first_msg:
-                                        title = first_msg[:20].strip() + ("..." if len(first_msg)>20 else "")
+                            title = meta.get("title", title)
+                            pinned = meta.get("pinned", False)
+                            
+                            if title.startswith("会话 ") and msgs:
+                                first_msg = next((m['content'] for m in msgs if m['role'] == 'user'), None)
+                                if first_msg:
+                                    title = first_msg[:20].strip() + ("..." if len(first_msg)>20 else "")
                     except: pass
                     
                     sessions.append({
@@ -100,7 +104,7 @@ class HistoryManager:
                     })
                 except: pass
                 
-        # 排序：置顶优先(True>False)，然后按时间倒序
+        # 排序：置顶优先，然后按时间倒序
         sessions.sort(key=lambda x: (x.get('pinned', False), x['updated_at']), reverse=True)
         return sessions
 

@@ -9,13 +9,14 @@ class AuditLogger:
     _lock = threading.Lock()
 
     @staticmethod
-    def log(user, action, details, status="success"):
+    def log(user, action, details, status="success", ip=None):
         """
         记录审计日志
         :param user: 操作用户名
-        :param action: 动作名称 (e.g., 'LOGIN', 'EXPORT_DATA', 'UPDATE_PERMISSION')
+        :param action: 动作名称
         :param details: 详细描述
-        :param status: 状态 (success/failed/warning)
+        :param status: 状态
+        :param ip: 客户端IP
         """
         log_entry = {
             "timestamp": datetime.now().isoformat(),
@@ -23,7 +24,7 @@ class AuditLogger:
             "action": action,
             "details": details,
             "status": status,
-            "ip": "local" # 后续可扩展获取真实IP
+            "ip": ip or "unknown"
         }
         
         # 确保目录存在

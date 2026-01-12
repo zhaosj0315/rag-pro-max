@@ -93,7 +93,7 @@ def render_admin_management():
                                 current_white = set(users[u].get('kb_whitelist', []))
                                 users[u]['kb_whitelist'] = list(current_white.union(set(target_kbs)))
                             save_users(users)
-                            AuditLogger.log(st.session_state.get('user'), "BATCH_AUTH", f"为 {len(selected_batch_users)} 名用户批量授权知识库: {', '.join(target_kbs)}")
+                            AuditLogger.log(st.session_state.get('user'), "BATCH_AUTH", f"为 {len(selected_batch_users)} 名用户批量授权知识库: {', '.join(target_kbs)}", ip=get_client_ip())
                             st.success(f"已成功为 {len(selected_batch_users)} 名用户授权")
                             time.sleep(1); st.rerun()
                             
@@ -103,7 +103,7 @@ def render_admin_management():
                             for u in selected_batch_users:
                                 users[u]['is_active'] = False
                             save_users(users)
-                            AuditLogger.log(st.session_state.get('user'), "BATCH_LOCK", f"批量封禁了 {len(selected_batch_users)} 名用户")
+                            AuditLogger.log(st.session_state.get('user'), "BATCH_LOCK", f"批量封禁了 {len(selected_batch_users)} 名用户", ip=get_client_ip())
                             st.toast("账号已批量封禁")
                             time.sleep(1); st.rerun()
 
@@ -422,7 +422,7 @@ def render_admin_management():
                                     
                                     # 自动更新白名单（如果旧用户有白名单，可能需要处理，这里简化为只改所有权）
                                     success_cnt += 1
-                                    AuditLogger.log(st.session_state.get('user'), "BATCH_TRANSFER", f"将 {kb_name} 所有权从 {old_owner} 移交给 {target_new_owner}")
+                                    AuditLogger.log(st.session_state.get('user'), "BATCH_TRANSFER", f"将 {kb_name} 所有权从 {old_owner} 移交给 {target_new_owner}", ip=get_client_ip())
                                 except Exception as e:
                                     st.error(f"{kb_name} 移交失败: {e}")
                             
@@ -452,7 +452,7 @@ def render_admin_management():
                                 sug_file = os.path.join("suggestion_config", f"{target_kb}_config.json")
                                 if os.path.exists(sug_file): os.remove(sug_file)
                                 
-                                AuditLogger.log(st.session_state.get('user'), "BATCH_DELETE_KB", f"物理删除了知识库: {target_kb}")
+                                AuditLogger.log(st.session_state.get('user'), "BATCH_DELETE_KB", f"物理删除了知识库: {target_kb}", ip=get_client_ip())
                             
                             status.update(label="✅ 资产批量清理完成", state="complete")
                         
@@ -560,9 +560,53 @@ def render_admin_management():
 
     with tab_audit:
         from src.auth.audit_logger import AuditLogger
-        st.caption("系统审计日志")
-        logs = AuditLogger.get_logs()
-        for l in logs[:50]:
+        from src.common.utils import get_client_ip
+        st.caption("系统审计日志：追踪所有关键操作、访问来源与执行状态")
+        
+        raw_logs = AuditLogger.get_logs()
+        if not raw_logs:
+            st.info("暂无审计记录")
+        else:
+            # 1. 筛选矩阵
             with st.container(border=True):
-                st.markdown(f"**{l['action']}** | `{l['user']}` | {l['timestamp'][:19]}")
-                st.caption(l['details'])
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    u_list = sorted(list(set(l['user'] for l in raw_logs)))
+                    sel_users = st.multiselect("👤 操作人", options=u_list)
+                with c2:
+                    a_list = sorted(list(set(l['action'] for l in raw_logs)))
+                    sel_actions = st.multiselect("⚡ 动作类型", options=a_list)
+                with c3:
+                    sel_status = st.multiselect("🚦 状态", options=["success", "failed", "warning"])
+
+            # 过滤逻辑
+            filtered_logs = raw_logs
+            if sel_users:
+                filtered_logs = [l for l in filtered_logs if l['user'] in sel_users]
+            if sel_actions:
+                filtered_logs = [l for l in filtered_logs if l['action'] in sel_actions]
+            if sel_status:
+                filtered_logs = [l for l in filtered_logs if l.get('status', 'success') in sel_status]
+
+            # 2. 统计概览
+            st.info(f"📊 匹配结果: {len(filtered_logs)} 条记录")
+
+            # 3. 渲染记录
+            for l in filtered_logs[:100]: # 限制显示前100条
+                status_color = "#10b981" if l.get('status') == 'success' else "#ef4444" if l.get('status') == 'failed' else "#f59e0b"
+                
+                with st.container(border=True):
+                    header_col1, header_col2 = st.columns([3, 1])
+                    with header_col1:
+                        st.markdown(f"**{l['action']}** | `{l['user']}`")
+                    with header_col2:
+                        st.markdown(f"<div style='text-align:right; font-size:0.8rem; color:#666;'>{l['timestamp'][:19].replace('T', ' ')}</div>", unsafe_allow_html=True)
+                    
+                    st.caption(l['details'])
+                    
+                    footer_col1, header_col2 = st.columns([2, 1])
+                    with footer_col1:
+                        ip_val = l.get('ip', 'unknown')
+                        st.markdown(f"<span style='font-size:0.75rem; color:#999;'>🌐 IP: {ip_val}</span>", unsafe_allow_html=True)
+                    with header_col2:
+                        st.markdown(f"<div style='text-align:right; font-size:0.75rem; color:{status_color}; font-weight:bold;'>{l.get('status', 'success').upper()}</div>", unsafe_allow_html=True)
