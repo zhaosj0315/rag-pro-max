@@ -1135,6 +1135,28 @@ with st.sidebar:
                 raw_name = selected_nav.split("📂 ")[1] if "📂 " in selected_nav else ""
                 current_kb_name = raw_name.split(" (")[0].strip() if not is_create_mode and raw_name else None
 
+        # --- [逻辑对齐补丁] 自动恢复最近一次历史会话 ---
+        if current_kb_name and current_kb_name != "pure_chat" and not is_create_mode:
+            # 如果知识库切换了，或者当前没有加载消息
+            if st.session_state.get('last_loaded_kb') != current_kb_name or not st.session_state.get('messages'):
+                from src.chat.history_manager import HistoryManager
+                sessions = HistoryManager.list_sessions(current_kb_name)
+                if sessions:
+                    # 默认加载第一个（通常是最近更新的）
+                    latest_sess_id = sessions[0]['id']
+                    st.session_state.current_session_id = latest_sess_id
+                    st.session_state.messages = HistoryManager.load_session(current_kb_name, latest_sess_id)
+                    # 恢复建议历史
+                    if st.session_state.messages:
+                        last_msg = st.session_state.messages[-1]
+                        if isinstance(last_msg, dict) and last_msg.get('suggestions'):
+                            st.session_state.suggestions_history = last_msg['suggestions']
+                
+                st.session_state.last_loaded_kb = current_kb_name
+                # 仅在真正需要时触发刷新，避免无限循环
+                if st.session_state.get('messages'):
+                    st.rerun()
+
         # 统一的数据源处理逻辑
         uploaded_files = st.session_state.get('uploader') # 优先从 uploader 获取，支持多模式
         crawl_url = None
