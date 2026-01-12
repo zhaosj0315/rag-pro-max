@@ -420,6 +420,12 @@ class WebCrawler:
                     if status_callback:
                         status_callback(f"🔄 正在抓取 ({total_count+1}) 第{depth}层 ({i}/{len(current_level)}): {url}")
                     
+                    # --- [逻辑对齐] 终端同步打印详细 URL ---
+                    from src.app_logging import LogManager
+                    console_logger = LogManager()
+                    console_logger.info(f"🌐 [CRAWLING] Page {total_count+1} | Depth {depth} | URL: {url}")
+                    # ------------------------------------
+
                     # 使用智能请求方法
                     response = self._smart_request(url, status_callback)
                     if status_callback:

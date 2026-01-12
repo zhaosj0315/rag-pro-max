@@ -243,8 +243,13 @@ class WebToKBProcessor:
                                     
                                     if not is_search_page and kw_count >= 1:
                                         relevant_files.append(f_path)
+                                        from src.app_logging import LogManager
+                                        LogManager().info(f"✅ [RELEVANT] Saved: {os.path.basename(f_path)} (Matches: {kw_count})")
                                     else:
                                         os.remove(f_path) 
+                                        from src.app_logging import LogManager
+                                        reason = "SEARCH_PAGE" if is_search_page else "NO_KEYWORDS"
+                                        LogManager().warning(f"🗑️ [FILTERED] Discarded: {f_path} | Reason: {reason}")
                             except:
                                 continue
                         crawled_files.extend(relevant_files)
