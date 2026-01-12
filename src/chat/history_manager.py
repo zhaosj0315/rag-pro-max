@@ -12,6 +12,16 @@ class HistoryManager:
     HISTORY_DIR = "chat_histories"
     
     @classmethod
+    def exists(cls, kb_id: str) -> bool:
+        """检查历史是否存在"""
+        return os.path.exists(cls._get_path(kb_id))
+    
+    @classmethod
+    def _get_path(cls, kb_id: str) -> str:
+        """获取历史文件路径"""
+        return os.path.join(cls.HISTORY_DIR, f"{kb_id}.json")
+
+    @classmethod
     def _get_full_path(cls, kb_id: str, session_id: Optional[str] = None) -> str:
         """获取完整路径"""
         if not session_id:
