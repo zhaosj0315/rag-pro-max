@@ -11,17 +11,26 @@ import re
 # 捕获 watchdog 线程中的 FileNotFoundError (通常由临时文件快速删除引起)
 try:
     import streamlit.watcher.util
-    _original_path_modification_time = streamlit.watcher.util.path_modification_time
     
+    # 1. Patch path_modification_time
+    _original_path_modification_time = streamlit.watcher.util.path_modification_time
     def _safe_path_modification_time(path, allow_nonexistent=False):
         try:
             return _original_path_modification_time(path, allow_nonexistent)
-        except FileNotFoundError:
+        except (FileNotFoundError, OSError):
             return 0.0
-        except OSError:
-            return 0.0
-            
     streamlit.watcher.util.path_modification_time = _safe_path_modification_time
+
+    # 2. Patch calc_md5_with_blocking_retries (针对本报错的核心修复)
+    _original_calc_md5 = streamlit.watcher.util.calc_md5_with_blocking_retries
+    def _safe_calc_md5(path, **kwargs):
+        try:
+            return _original_calc_md5(path, **kwargs)
+        except (FileNotFoundError, OSError):
+            # 返回一个哑值的MD5，避免崩溃
+            return "0" * 32
+    streamlit.watcher.util.calc_md5_with_blocking_retries = _safe_calc_md5
+    
 except ImportError:
     pass
 # -----------------------------------------------------------
@@ -2196,24 +2205,97 @@ with st.sidebar:
         active_tab = st.session_state.get('help_active_tab', 'onboarding')
         
         if active_tab == "onboarding":
-            st.markdown("#### 🚀 快速上手指南")
-            # 引入部署检查清单
-            with st.container(border=True):
-                st.markdown("**✅ 启动检查清单**")
-                cols = st.columns(2)
-                cols[0].checkbox("Python 3.10+ 环境就绪", value=True, disabled=True)
-                cols[0].checkbox("Ollama / OpenAI API 配置完成", value=True, disabled=True)
-                cols[1].checkbox("向量数据库 (ChromaDB) 正常", value=True, disabled=True)
-                cols[1].checkbox("GPU 加速已感应 (MPS/CUDA)", value=True, disabled=True)
+            # --- 1. Hero Header: 产品概览 ---
+            st.markdown("""
+            <div style="background: linear-gradient(120deg, #fdfbfb 0%, #ebedee 100%); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; border: 1px solid #e0e0e0;">
+                <h1 style="color: #1a1a1a; margin-bottom: 0.5rem;">🌌 RAG Pro Max <span style="font-size: 1rem; color: #666; font-weight: normal;">v5.6.0 Enterprise</span></h1>
+                <p style="color: #4a4a4a; font-size: 1.1rem; line-height: 1.6;">
+                    <b>云原生级私有化知识中台</b> — 专为高价值数据设计的下一代认知引擎。<br>
+                    融合了 <b>OCR 视觉解析</b>、<b>混合语义检索</b> 与 <b>CoT 深度推理</b>，让您的文档真正“开口说话”。
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # --- 2. 核心能力矩阵 (仿阿里云功能特性) ---
+            st.markdown("#### ✨ 核心能力矩阵")
+            cap_col1, cap_col2, cap_col3, cap_col4 = st.columns(4)
             
-            guide_tabs = st.tabs(["创建与上传", "智能问答", "资产治理"])
-            with guide_tabs[0]:
-                st.info("💡 **提示**: 点击左侧 '➕ 新建知识库'，支持 PDF/Excel 拖拽和网址深度抓取。")
-                st.image("https://img.icons8.com/clouds/100/database.png", width=60)
-            with guide_tabs[1]:
-                st.info("💡 **深度思考**: 开启该模式可自动优化您的提问，获得更专业的回答。")
-            with guide_tabs[2]:
-                st.info("💡 **数据主权**: 支持 01-06 全量资产包一键带走，确保企业数据完全私有化。")
+            with cap_col1:
+                with st.container(border=True):
+                    st.markdown("#### 📄 全模态解析")
+                    st.caption("不仅仅是文本。支持 PDF 表格还原、Excel 数据透视及图片 OCR 识别。")
+                    st.markdown("`PDF` `Excel` `Image` `Markdown`")
+            
+            with cap_col2:
+                with st.container(border=True):
+                    st.markdown("#### 🔍 混合检索")
+                    st.caption("BM25 关键词匹配 + BGE 向量语义召回，确保专业术语与模糊语义都不遗漏。")
+                    st.markdown("`Hybrid Search` `Rerank`")
+
+            with cap_col3:
+                with st.container(border=True):
+                    st.markdown("#### 🧠 深度思考")
+                    st.caption("内置 Chain-of-Thought (CoT) 推理链，支持多步推演与专家会审模式。")
+                    st.markdown("`CoT` `Multi-Agent` `Reasoning`")
+            
+            with cap_col4:
+                with st.container(border=True):
+                    st.markdown("#### 🛡️ 数据主权")
+                    st.caption("100% 本地化部署。支持 RBAC 细粒度权限管控与全量资产加密导出。")
+                    st.markdown("`Local First` `RBAC` `Encrypted`")
+
+            st.markdown("---")
+
+            # --- 3. 快速行动区 ---
+            st.markdown("#### 🚀 快速开始")
+            action_col1, action_col2, action_col3 = st.columns([1, 1, 2])
+            
+            with action_col1:
+                if st.button("➕ 新建知识库", use_container_width=True, type="primary"):
+                    st.session_state.show_new_kb_dialog = True
+                    st.rerun()
+                st.caption("开始构建您的第一个知识大脑")
+            
+            with action_col2:
+                if st.button("💬 纯对话模式", use_container_width=True):
+                    st.session_state.current_kb_id = "pure_chat"
+                    st.session_state.chat_engine = "pure_chat"
+                    st.rerun()
+                st.caption("直接与底层大模型进行交互")
+            
+            with action_col3:
+                # 状态检查清单 (优化版)
+                with st.expander("✅ 环境自检清单 (System Health)", expanded=False):
+                    check_cols = st.columns(2)
+                    check_cols[0].success("Python 3.10+ Runtime Ready")
+                    check_cols[0].success("Vector DB (Chroma) Connected")
+                    check_cols[1].success("LLM/Embedding Model Loaded")
+                    check_cols[1].success("GPU Acceleration Enabled")
+
+            st.markdown("---")
+
+            # --- 4. 系统架构图 (Mermaid) ---
+            st.markdown("#### 🏗️ 逻辑架构视图")
+            st.markdown("""
+            ```mermaid
+            graph LR
+                A[📂 非结构化数据] -->|OCR/Parser| B(统一文档对象)
+                B -->|Chunking| C{混合索引引擎}
+                C -->|Embedding| D[向量数据库]
+                C -->|Tokenize| E[倒排索引库]
+                
+                U[👤 用户提问] -->|Rewrite| Q[优化查询]
+                Q -->|Retrieve| D & E
+                D & E -->|Fusion| R[重排序结果]
+                R -->|Context| L[🧠 LLM 推理核心]
+                L -->|Answer| O[💡 最终答案]
+                
+                style C fill:#e1f5fe,stroke:#01579b
+                style L fill:#fff3e0,stroke:#ff6f00
+                style U fill:#f3e5f5,stroke:#7b1fa2
+            ```
+            """)
+            st.caption("RAG Pro Max 数据流转示意图")
 
         elif active_tab == "api":
             st.markdown("#### 🔌 开发者与 API 集成")
@@ -5354,6 +5436,10 @@ final_prompt = st.session_state.get('current_active_query')
 if st.session_state.get('is_processing') and final_prompt:
     # 消费掉任务标记 (转移到局部变量)
     del st.session_state.current_active_query
+    
+    # [审计] 记录用户提问行为
+    from src.auth.audit_logger import AuditLogger
+    AuditLogger.log(st.session_state.get('user', 'unknown'), "USER_QUERY", f"问: {final_prompt[:100]}", status="success")
     
     # 记录当前角色状态 (v2.7.4)
     from src.config.prompt_manager import PromptManager

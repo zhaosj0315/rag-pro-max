@@ -3,6 +3,7 @@
 import os
 import json
 import time
+import getpass
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from contextlib import contextmanager
@@ -54,7 +55,19 @@ class LogManager:
 
         self.enable_terminal = enable_terminal
         
-        self.log_file = os.path.join(log_dir, f"log_{datetime.now().strftime('%Y%m%d')}.jsonl")
+        # 使用当前用户名防止多用户冲突
+        current_user = getpass.getuser()
+        self.log_file = os.path.join(self.log_dir, f"log_{datetime.now().strftime('%Y%m%d')}_{current_user}.jsonl")
+        
+        # 再次确认文件写入权限，如果当前文件被root占用了，尝试重命名
+        try:
+            with open(self.log_file, 'a', encoding='utf-8') as f:
+                pass
+        except PermissionError:
+             if enable_terminal:
+                print(f"⚠️ [LogManager] {self.log_file} 权限被锁定，已自动切换到专属日志文件")
+             # 如果 log_20260112_zhaosj.jsonl 也被占用了（极少见），加个时间戳后缀
+             self.log_file = os.path.join(self.log_dir, f"log_{datetime.now().strftime('%Y%m%d')}_{current_user}_{int(time.time())}.jsonl")
         
         # Initialize metrics and tracking
         self.metrics: Dict[str, List[float]] = {}
@@ -73,11 +86,15 @@ class LogManager:
             for log_file in glob.glob(os.path.join(self.log_dir, 'log_*.jsonl')):
                 try:
                     filename = os.path.basename(log_file)
-                    date_str = filename.split('_')[1].split('.')[0]
-                    log_date = datetime.strptime(date_str, '%Y%m%d')
-                    
-                    if log_date < cutoff:
-                        os.remove(log_file)
+                    parts = filename.split('_')
+                    if len(parts) >= 2:
+                        date_str = parts[1]
+                        # 简单的日期校验
+                        if len(date_str) == 8 and date_str.isdigit():
+                            log_date = datetime.strptime(date_str, '%Y%m%d')
+                            
+                            if log_date < cutoff:
+                                os.remove(log_file)
                 except Exception:
                     continue
         except Exception:
