@@ -461,7 +461,7 @@ def render_admin_management():
     with tab_roles:
         st.caption("角色权限中台：定义角色的底层功能矩阵与默认资源配额")
         
-        all_perms = {
+        ALL_PERMISSIONS_MAP = {
             "chat": "🗨️ 基础对话", 
             "kb_create": "➕ 创建库", 
             "kb_delete_own": "🗑️ 删除个人库",
@@ -530,7 +530,7 @@ def render_admin_management():
                 
                 new_perms_list = []
                 p_cols = st.columns(2)
-                for i, (p_id, p_name) in enumerate(all_perms.items()):
+                for i, (p_id, p_name) in enumerate(ALL_PERMISSIONS_MAP.items()):
                     with p_cols[i % 2]:
                         # 如果是管理员且为 * 权限，强制勾选
                         is_checked = (p_id in current_perms or "*" in current_perms)
