@@ -199,31 +199,45 @@ class WebToKBProcessor:
                     kb_name = self.generate_kb_name_from_url(url, content_preview)
             
             elif keyword:
-                # 关键词搜索模式
+                # 关键词搜索模式 (v5.5.8 增强：相关性优先)
                 if not sites:
-                    sites = ["维基百科", "百度百科"]  # 默认搜索网站
+                    # 使用智能推荐源
+                    sites = self.recommend_sites_for_keyword(keyword)[:3]
                 
                 if status_callback:
-                    status_callback(f"🔍 搜索关键词: {keyword}")
+                    status_callback(f"🔍 正在智能规划搜索源: {', '.join(sites)}")
                 
                 search_results = self.search_preset_sites(keyword, sites)
                 
                 # 抓取搜索结果
-                for result in search_results[:2]:  # 限制搜索结果数量
+                for result in search_results:
                     if status_callback:
-                        status_callback(f"🌐 抓取 {result['site']}: {result['url']}")
+                        status_callback(f"🌐 正在从 {result['site']} 提取相关条目...")
                     
                     try:
+                        # v5.5.8 核心逻辑：强制首层相关性校验
                         files = crawler.crawl_advanced(
                             start_url=result['url'],
-                            max_depth=2,  # 搜索结果需要抓取2层
+                            max_depth=2,
                             max_pages=max_pages // len(search_results),
                             status_callback=status_callback
                         )
-                        crawled_files.extend(files)
+                        # 过滤掉内容中完全不提及关键词的碎片文件 (简单过滤)
+                        relevant_files = []
+                        for f_path in files:
+                            try:
+                                with open(f_path, 'r', encoding='utf-8') as f:
+                                    content = f.read().lower()
+                                    if keyword.lower() in content:
+                                        relevant_files.append(f_path)
+                                    else:
+                                        os.remove(f_path) # 物理删除无关碎片
+                            except:
+                                continue
+                        crawled_files.extend(relevant_files)
                     except Exception as e:
                         if status_callback:
-                            status_callback(f"❌ {result['site']} 抓取失败: {e}")
+                            status_callback(f"⚠️ {result['site']} 抓取条目部分受限: {e}")
                         continue
                 
                 # 生成知识库名称
