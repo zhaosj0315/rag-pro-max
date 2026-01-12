@@ -63,8 +63,19 @@ class KnowledgeBaseLoader:
         db_path = os.path.join(self.output_base, kb_name)
         
         if not os.path.exists(db_path):
-            logger.error(f"❌ 知识库路径不存在: {db_path} (CWD: {os.getcwd()})")
-            return None, f"知识库不存在: {kb_name} (路径异常)", None
+            cwd = os.getcwd()
+            # 尝试列出当前存在的目录，辅助调试
+            try:
+                available = os.listdir(self.output_base)
+            except:
+                available = ["(无法读取目录)"]
+                
+            logger.error(f"❌ 知识库路径不存在: {db_path}")
+            logger.error(f"   - CWD: {cwd}")
+            logger.error(f"   - Base: {self.output_base}")
+            logger.error(f"   - Available: {available}")
+            
+            return None, f"知识库路径异常: '{kb_name}' \n(目标路径: {db_path} 不存在)", None
         
         try:
             logger.log("INFO", f"开始加载知识库: {kb_name}", stage="知识库加载")
