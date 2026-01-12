@@ -1,14 +1,13 @@
 {
-  "version": "5.5.8",
+  "version": "5.6.0",
   "release_date": "2026-01-12",
-  "build_number": "20260112.01",
+  "build_number": "20260112.02",
   "status": "stable",
   "major_features": [
-    "📦 Ultimate Full Export: 01-06 complete structure including raw files, history and logic models",
-    "🕵️ Cross-Directory Salvage: Automated retrieval of smart search and crawl results",
-    "🛡️ Unified KB Logic: Standardized processing pipeline for all data ingestion modes",
-    "🛠️ Admin Asset Hub: Batch filtering, auditing and physical cleanup of all user KBs",
-    "🧼 Permission Self-Healing: Intelligent log directory failsafe and scope optimization"
+    "🔍 Multi-Source Meta-Search: Integrated Bing/DuckDuckGo as entry springboards",
+    "📦 Ultimate Asset Export v2: Full capture of in-memory active sessions and automated deduplication",
+    "🛡️ Intelligent Crawler Filter: Hybrid springboard logic (loose entry, strict depth) for precise relevance",
+    "🧼 Technical Debt Cleanup: Zero-noise logging and robust xattr/shutil compatibility"
   ],
   "compatibility": {
     "python": ">=3.9",
