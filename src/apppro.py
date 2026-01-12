@@ -83,6 +83,31 @@ os.environ['VECLIB_MAXIMUM_THREADS'] = '1'  # Apple Accelerate只用1个线程
 
 import streamlit as st
 
+# --- [逻辑对齐] 处理分享链接 (Session Sharing) ---
+if "share" in st.query_params:
+    share_id = st.query_params["share"]
+    from src.chat.share_manager import ShareManager
+    share_data = ShareManager.get_share(share_id)
+    
+    if share_data:
+        st.info(f"📑 正在查看分享会话: **{share_data['kb_name']}** (由 {share_data['creator']} 分享于 {share_data['created_at'][:10]})")
+        
+        # 渲染快照消息
+        for msg in share_data["messages"]:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+        
+        if st.button("返回我的工作台", use_container_width=True):
+            del st.query_params["share"]
+            st.rerun()
+        st.stop() # 停止后续正常逻辑渲染
+    else:
+        st.error("❌ 分享链接已失效或 ID 不正确")
+        if st.button("进入系统"):
+            del st.query_params["share"]
+            st.rerun()
+        st.stop()
+
 # 防止HTML内容被截断
 st.set_page_config(
     page_title="RAG Pro Max",
@@ -1033,11 +1058,37 @@ with st.sidebar:
                     import uuid
                     new_id = str(uuid.uuid4())[:8]
                     st.session_state.current_session_id = new_id
-                    st.session_state.messages = []
-                    st.session_state.suggestions_history = []
-                    HistoryManager.save_session(current_active_kb, [], new_id)
+                    
+                    # --- [逻辑对齐] 注入初始状态 (Initial State) ---
+                    kb_path = os.path.join("vector_db_storage", current_active_kb)
+                    from src.config.manifest_manager import ManifestManager
+                    manifest = ManifestManager.load(kb_path)
+                    
+                    initial_msg = []
+                    summary = manifest.get('summary', "👋 知识库已就绪，您可以开始提问了。")
+                    sug = manifest.get('suggestions', [])
+                    
+                    # 构造初始欢迎消息
+                    initial_msg.append({
+                        "role": "assistant", 
+                        "content": f"### 📊 知识库初始化完成\n\n{summary}",
+                        "suggestions": sug,
+                        "is_initial": True
+                    })
+                    
+                    st.session_state.messages = initial_msg
+                    st.session_state.suggestions_history = sug
+                    
+                    HistoryManager.save_session(current_active_kb, initial_msg, new_id)
                     st.rerun()
                 
+                # 显示刚才生成的分享 ID
+                if st.session_state.get('last_share_id'):
+                    st.code(f"http://localhost:8501/?share={st.session_state.last_share_id}", language="markdown")
+                    if st.button("关闭分享提示", key="close_share"):
+                        del st.session_state['last_share_id']
+                        st.rerun()
+
                 # 会话列表
                 total_sess = len(sessions)
                 for i, sess in enumerate(sessions):
@@ -1049,8 +1100,8 @@ with st.sidebar:
                     is_active = (sess_id == st.session_state.get('current_session_id'))
                     is_pinned = sess.get('pinned', False)
                     
-                    # 使用列布局放置操作按钮 [标题(6), 置顶(1), 重命名(1), 删除(1)]
-                    c_title, c_pin, c_edit, c_del = st.columns([5.5, 1.2, 1.2, 1.2])
+                    # 使用列布局放置操作按钮 [标题(6), 置顶(1), 分享(1), 重命名(1), 删除(1)]
+                    c_title, c_pin, c_share, c_edit, c_del = st.columns([5.5, 1.2, 1.2, 1.2, 1.2])
                     
                     with c_title:
                         icon = "📌" if is_pinned else ("📂" if is_active else "📄")
@@ -1075,6 +1126,15 @@ with st.sidebar:
                         if st.button(pin_icon, key=f"sess_pin_{safe_sess_id}", help=pin_help):
                             HistoryManager.toggle_pin_session(current_active_kb, sess_id)
                             st.rerun()
+
+                    with c_share:
+                        if st.button("🔗", key=f"sess_share_{safe_sess_id}", help="生成分享链接"):
+                            from src.chat.share_manager import ShareManager
+                            # 加载该会话的完整消息
+                            share_msgs = HistoryManager.load_session(current_active_kb, sess_id)
+                            s_id = ShareManager.create_share(current_active_kb, share_msgs, st.session_state.get('user', 'admin'))
+                            st.session_state.last_share_id = s_id
+                            st.toast(f"✅ 分享链接已生成")
                             
                     with c_edit:
                         if st.button("✏️", key=f"sess_edit_{safe_sess_id}", help="重命名"):
