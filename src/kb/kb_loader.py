@@ -62,6 +62,27 @@ class KnowledgeBaseLoader:
         """加载知识库"""
         db_path = os.path.join(self.output_base, kb_name)
         
+        # 智能路径修复逻辑 (v4.5.3)
+        if not os.path.exists(db_path):
+            try:
+                available_dirs = os.listdir(self.output_base)
+                
+                # 策略1: 尝试添加 admin_ 前缀
+                if f"admin_{kb_name}" in available_dirs:
+                    logger.warning(f"⚠️ 自动路径修正: {kb_name} -> admin_{kb_name}")
+                    kb_name = f"admin_{kb_name}"
+                    db_path = os.path.join(self.output_base, kb_name)
+                
+                # 策略2: 尝试后缀匹配 (针对被截断的前缀)
+                elif any(d.endswith(f"_{kb_name}") for d in available_dirs):
+                    match = next(d for d in available_dirs if d.endswith(f"_{kb_name}"))
+                    logger.warning(f"⚠️ 自动路径修正: {kb_name} -> {match}")
+                    kb_name = match
+                    db_path = os.path.join(self.output_base, kb_name)
+                    
+            except Exception as e:
+                logger.warning(f"路径自动修复失败: {e}")
+
         if not os.path.exists(db_path):
             cwd = os.getcwd()
             # 尝试列出当前存在的目录，辅助调试
