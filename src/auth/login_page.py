@@ -207,10 +207,16 @@ def render_login_page():
                 st.markdown("### 创建新账号")
                 st.caption("注册即享 100MB 免费私有空间")
                 
+                # 在表单外或表单内通过变量控制
+                show_reg_pwd = st.checkbox("👁️ 显示密码", key="show_reg_pwd")
+                
                 with st.form("register_form"):
                     new_user = st.text_input("设置用户名", placeholder="仅支持字母与数字", help="这将是您的唯一标识ID")
-                    new_pwd = st.text_input("设置密码", type="password", placeholder="建议包含大小写字母")
-                    confirm_pwd = st.text_input("确认密码", type="password", placeholder="请再次输入")
+                    new_pwd = st.text_input(
+                        "设置密码", 
+                        type="default" if show_reg_pwd else "password",
+                        placeholder="建议包含大小写字母"
+                    )
                     
                     st.write("")
                     reg_submit = st.form_submit_button("✨ 提交注册", use_container_width=True, type="primary")
@@ -218,8 +224,6 @@ def render_login_page():
                     if reg_submit:
                         if not new_user or not new_pwd:
                             st.warning("⚠️ 字段不能为空")
-                        elif new_pwd != confirm_pwd:
-                            st.error("❌ 两次输入的密码不一致")
                         else:
                             success, msg = register_user(new_user, new_pwd)
                             if success:
