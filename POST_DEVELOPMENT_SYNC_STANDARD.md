@@ -2,8 +2,8 @@
 
 
 
-**版本**: v4.3.0 (Data Analysis Optimized)  
-**更新日期**: 2026-01-11
+**版本**: v5.5.8 (Data Sovereignty Edition)  
+**更新日期**: 2026-01-12
 **类型**: 工程管理规范
 **适用阶段**: 开发完成 (Code Freeze) 后，发布/推送前
 **执行角色**: Release Manager / Tech Lead
@@ -11,8 +11,6 @@
 ------
 
 ## 🎯 核心原则 (Core Principles)
-
-
 
 1. **代码即真理 (Code is Truth)**: 代码库一旦锁定，即为最终事实标准。所有文档必须向代码现状看齐，严禁反向修改代码以适配文档。
 2. **全量对齐 (Full Alignment)**: 不允许存在“代码已更新但文档未更新”的灰色地带。
@@ -22,8 +20,6 @@
 ------
 
 ## 1. 锚定当前事实 (Phase 1: Anchor Truth)
-
-
 
 在执行同步前，必须明确以下三个基准：
 
@@ -38,24 +34,16 @@
 
 ## 2. 三步走执行路径 (Phase 2: Execution Workflow)
 
-
-
 ### 第一阶段：自动化验证与配置同步 (Automated Verification)
-
-
 
 利用项目内置脚本进行初筛，确保低级错误被拦截。
 
 #### 1. 脚本扫描 (Script Execution)
 
-
-
 -  **文档同步检查**: 运行 `./scripts/check_docs_sync.sh` (如有) 或相关检查脚本，扫描文档中的版本号是否滞后。
--  **清理脚本执行**: 运行 `bash ./scripts/cleanup.sh`，自动清理 `__pycache__`, `.DS_Store`, 临时日志等。
+-  **清理脚本执行**: 运行 `bash ./scripts/cleanup.sh` (如有) 或执行 `DEVELOPMENT_CLEANUP_STANDARD.md` 中的步骤。
 
 #### 2. 配置层 (Configuration Layer)
-
-
 
 -  **version.json**: 更新 `version` 字段，确保与锚定版本一致。
 -  **.gitignore**: 检查是否有新增的临时文件类型或敏感配置需忽略。使用 `git check-ignore -v <file>` 验证关键文件是否被正确忽略。
@@ -64,80 +52,53 @@
 
 ### 第二阶段：全量文档同步 (Documentation Synchronization)
 
-
-
 必须按照以下四个维度顺序检查并更新文档：
 
 #### 1. 记录层 (Record Layer)
 
-
-
--  
-
-  CHANGELOG.md
-
-  :
-
+-  **CHANGELOG.md**:
   - 按照 `[版本号] - 日期` 格式记录。
   - 分类记录：`🚀 New`, `⚡ Improvement`, `🐛 Fix`, `🔧 Refactor`。
   - **关键**: 必须包含 Breaking Changes 的显式警告。
 
--  
-
-  README.md
-
-  :
-
+-  **README.md**:
   - 更新顶部 Badges (Version, Coverage)。
   - 更新核心功能列表 (Features)，移除已废弃功能的描述。
   - 检查 "Quick Start" 命令是否依然有效。
 
 #### 2. 用户层 (User Layer)
 
-
-
--  
-
-  USER_MANUAL.md
-
-  :
-
+-  **USER_MANUAL.md**:
   - **UI截图**: 若 UI 布局变更（如新按钮、新布局），必须替换对应截图。
-  - **参数说明**: 检查配置项说明是否与代码中定义的默认配置值 (e.g., `src/core/app_config.py` 中的 `defaults`) 一致。
+  - **参数说明**: 检查配置项说明是否与代码中定义的默认配置值一致。
 
--  **FAQ.md**: 针对本次更新可能引发的常见疑问（如：为什么原来的按钮不见了？），预置 Q&A。
+-  **FAQ.md**: 针对本次更新可能引发的常见疑问（如：导出的资产在哪里？），预置 Q&A。
 
 #### 3. 技术层 (Technical Layer)
 
-
-
 -  **INTERFACE_SUMMARY.md**: 更新模块统计、API 端点列表。
 -  **API_DOCUMENTATION.md**: 若 API 参数或返回值变更，必须同步 Swagger/OpenAPI 定义或 Markdown 描述。
--  **ARCHITECTURE.md**: 若引入了新的中间件（如 DuckDuckGo, Redis），需更新架构图。
+-  **ARCHITECTURE.md**: 更新架构图，尤其是 v5.5.8 引入的资产打捞与归档链路。
 
 ------
 
 ### 第三阶段：逻辑审计与深度清理 (Audit & Deep Cleanup)
 
-
-
 #### 1. 术语一致性审计 (Terminological Consistency)
-
-
 
 确保以下三处使用的术语完全一致（100% Match）：
 
-- **UI 界面**: 用户看到的 Label (e.g., "分析实验室", "全宽布局").
-- **代码变量**: 关键配置项 Key (e.g., `analysis_lab_enabled`, `fluid_layout_mode`).
-- **文档描述**: 用户手册中的用词 (e.g., "分析实验室 (Analysis Lab)", "分析成果工作台 (Artifacts)").
+- **UI 界面**: 用户看到的 Label (e.g., "全量资产导出", "全域开模").
+- **代码变量**: 关键配置项 Key (e.g., `asset_export_enabled`, `universal_modeling_mode`).
+- **文档描述**: 用户手册中的用词 (e.g., "资产归档 (Asset Archiving)").
 
-**v4.3.0 核心术语检查清单 (当前版本重点)**:
-*(注：新版本发布时需在此处更新当期核心功能的关键术语)*
+**v5.5.8 核心术语检查清单 (当前版本重点)**:
 
--  分析实验室 / Analysis Lab / analysis_lab_enabled
--  分析成果 / Artifacts / artifacts_proxy_enabled
--  全宽布局 / Fluid Layout / fluid_layout_active
--  线程并发 / ThreadPool Concurrency / concurr_strategy_darwin
+-  全量资产导出 / Full Asset Export / `export_full_assets`
+-  全域开模分析 / Universal Modeling / `universal_modeling_active`
+-  跨目录打捞 / Cross-Dir Salvage / `cross_dir_salvage_enabled`
+-  管理员资产中心 / Admin Asset Hub / `admin_asset_center`
+-  对话 MD 还原 / Conversation MD Restore / `conv_md_conversion`
 
 #### 2. 深度清理 (Standardized Cleanup)
 
@@ -235,7 +196,7 @@
 ```
 ### ✅ 全量同步与清理报告 (Expert Reviewed)
 
-**版本**: [vX.Y.Z] (当前: v4.3.0)
+**版本**: [vX.Y.Z] (当前: v5.5.8)
 **执行人**: [Role/Name]
 
 #### 1. 变更摘要 (Summary)

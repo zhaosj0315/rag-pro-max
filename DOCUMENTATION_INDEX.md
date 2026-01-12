@@ -1,20 +1,20 @@
 # 📚 RAG Pro Max 文档索引
 
-**版本**: v5.3.3  
+**版本**: v5.5.8  
 **更新日期**: 2026-01-11
 
 ## 🚀 快速开始
 - [README.md](README.md) - 项目主文档
 - [FIRST_TIME_GUIDE.md](FIRST_TIME_GUIDE.md) - 首次使用指南
 - [DEPLOYMENT.md](DEPLOYMENT.md) - 部署指南
-- [USER_MANUAL.md](USER_MANUAL.md) - 用户手册 (v5.3.3 战略版)
+- [USER_MANUAL.md](USER_MANUAL.md) - 用户手册 (v5.5.8 战略版)
 
 ## 🆕 新功能指南
 - [IMAGE_OCR_GUIDE.md](IMAGE_OCR_GUIDE.md) - 图片OCR功能使用指南
 - [CONTINUOUS_OPTIMIZATION_GUIDE.md](CONTINUOUS_OPTIMIZATION_GUIDE.md) - 持续优化系统
 
 ## 🔧 开发文档
-- [ARCHITECTURE.md](ARCHITECTURE.md) - 系统架构 (v5.3.3 全域建模版)
+- [ARCHITECTURE.md](ARCHITECTURE.md) - 系统架构 (v5.5.8 全域建模版)
 - [API_DOCUMENTATION.md](API_DOCUMENTATION.md) - API文档
 - [INTERNAL_API.md](INTERNAL_API.md) - 内部API
 - [CONTRIBUTING.md](CONTRIBUTING.md) - 贡献指南
@@ -58,8 +58,8 @@
 
 | 文档类型 | 最后更新 | 状态 | 维护者 |
 |---------|---------|------|--------|
-| 核心文档 | 2026-01-11 | ✅ v5.3.3 | 主开发者 |
-| 技术架构 | 2026-01-11 | ✅ v5.3.3 | 架构师 |
-| 开发规范 | 2026-01-11 | ✅ v5.3.3 | 架构师 |
+| 核心文档 | 2026-01-11 | ✅ v5.5.8 | 主开发者 |
+| 技术架构 | 2026-01-11 | ✅ v5.5.8 | 架构师 |
+| 开发规范 | 2026-01-11 | ✅ v5.5.8 | 架构师 |
 
-**文档完整性**: 核心文档全部同步到 v5.3.3 稳定版 ✅
+**文档完整性**: 核心文档全部同步到 v5.5.8 稳定版 ✅

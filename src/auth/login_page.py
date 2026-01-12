@@ -91,7 +91,7 @@ def render_login_page():
     with col_brand:
         st.markdown("<div style='margin-top: 3.5rem;'></div>", unsafe_allow_html=True)
         st.markdown("<h1 class='brand-header'>RAG Pro Max</h1>", unsafe_allow_html=True)
-        st.markdown("<h4 style='color: #94a3b8; font-weight: 300; margin-bottom: 3.5rem;'>下一代企业级私有化知识大脑 · v4.5.5</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #94a3b8; font-weight: 300; margin-bottom: 3.5rem;'>下一代企业级私有化知识大脑 · v5.5.8</h4>", unsafe_allow_html=True)
         
         # 步骤
         steps = [
@@ -175,7 +175,7 @@ def render_login_page():
     # --- 页脚 ---
     st.markdown("""
     <div style='position: fixed; bottom: 25px; width: 100%; text-align: center; color: rgba(255,255,255,0.4); font-size: 0.8rem;'>
-        <b>RAG Pro Max v4.5.5</b> · 企业私有化知识中台 · &copy; 2026<br>
+        <b>RAG Pro Max v5.5.8</b> · 企业私有化知识中台 · &copy; 2026<br>
         <span style='font-size: 0.7rem; opacity: 0.6;'>Powered by Streamlit & LlamaIndex · 系统状态: 正常</span>
     </div>
     """, unsafe_allow_html=True)

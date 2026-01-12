@@ -144,7 +144,7 @@ class MainController:
             st.metric("对话数", msg_count)
         
         with col4:
-            st.metric("版本", "v1.8.0")
+            st.metric("版本", "v5.5.8")
     
     def get_knowledge_bases(self) -> List[str]:
         """获取知识库列表"""

@@ -24,8 +24,8 @@
 - **Admin Asset Inventory**: New 'Asset Hub' in admin dashboard for cross-user batch filtering and deep cleanup.
 - **Self-Healing Infrastructure**: Optimized log system with automated fallback to user home directory, bypassing macOS permission issues.
 
-## 🚀 RAG Pro Max v5.3.3
-### 💎 Universal Strategic Modeling (v5.3.3 Major Update)
+## 🚀 RAG Pro Max v5.5.8
+### 💎 Universal Strategic Modeling (v5.5.8 Major Update)
 - **Multi-modal Alignment**: Supports mixed input of PDF/MD dictionaries and CSV/Excel tables, automatically locking business definitions to physical table structures.
 - **Virtual Strategic Sandbox**: Introducing the "Golden Mock Data" engine, enabling one-click simulation of 20 closed-loop data records even with only data dictionaries.
 - **Forced Routing Guard**: Completely isolates Data Analysis and RAG pipelines, ensuring professional analysis dashboard outputs via `st.rerun()`.
@@ -48,7 +48,7 @@
 - **Self-hosted Vector Database**: Sensitive information stays internal
 - **Open Source Transparency**: Complete source code for security auditing
 
-### 🔬 Intelligent Research & Deep Analysis (Enhanced in v3.2.2)
+### 🔬 Intelligent Research & Deep Analysis (Enhanced in v5.5.8)
 - **Deep Research Mode**: Simulates expert-level multi-step analysis, fact-checking, and cross-domain knowledge integration
 - **Research Instruction Injection**: Automatically decomposes complex questions into multi-dimensional analysis
 - **Status Indicator Bar**: Real-time display of four core capabilities: "Thinking, Networking, Searching, Researching"
@@ -58,7 +58,7 @@
 - **Quality Assessment System**: Integrated intelligent quality analyzer with automatic authority scoring (🏆/⭐/⚠️)
 - **Collapsible Display**: Search details sorted by quality and collapsed in status bar by default
 
-### 🔄 Continuous Optimization System (New in v3.2.2)
+### 🔄 Continuous Optimization System (New in v5.5.8)
 - **Virtuous Cycle Mechanism**: Automated optimization workflow of patrol → analyze → plan → implement → verify
 - **Intelligent Monitoring**: Automatic monitoring of code quality, performance metrics, test coverage, documentation completeness
 - **Auto Optimization**: Executes automated improvement tasks like cleanup, refactoring, performance tuning

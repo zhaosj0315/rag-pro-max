@@ -60,7 +60,7 @@
 - ✅ 零影响现有功能
 - ✅ 成本最低的实现方案
 
-### 修改的文件 (v4.3.0 对齐)
+### 修改的文件 (v5.5.8 对齐)
 1. `src/file_processor.py` - 实现图片 OCR 与 native 引擎调用逻辑
 2. `src/apppro.py` - 更新全宽布局下的图片上传提示与交互
 3. `src/processors/multimodal_processor.py` - 核心 OCR 处理引擎

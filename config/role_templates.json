@@ -38,10 +38,13 @@
             "kb_delete_own",
             "upload_files",
             "paste_text",
-            "summary_gen",
-            "kb_export_report",
+            "use_crawler",
+            "smart_search",
+            "deep_research",
             "data_analysis",
+            "summary_gen",
             "download_knowledge_base",
+            "kb_export_report",
             "kb_export_full"
         ],
         "default_quota_mb": 200
