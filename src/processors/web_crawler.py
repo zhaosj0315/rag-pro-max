@@ -253,9 +253,13 @@ class WebCrawler:
                 is_related = (kw in link_text) or (kw in parsed_url.path.lower())
                 
                 # 排除维基百科常见的系统性噪音链接
-                is_system_link = any(p in full_url for p in ['Special:', 'Help:', 'File:', 'Category:', 'Talk:', 'Template:', 'Main_Page'])
+                # 增加了 Special, Help, File, Portal, Category 等更全面的屏蔽
+                is_system_link = any(p in full_url for p in ['Special:', 'Help:', 'File:', 'Category:', 'Talk:', 'Template:', 'Main_Page', 'Portal:', 'Wikipedia:'])
                 
-                if is_system_link:
+                # 强制屏蔽“随机条目”这种高偏移链接
+                is_drift_link = "Random" in full_url or "index.php" in full_url
+                
+                if is_system_link or is_drift_link:
                     continue
                 
                 # 如果当前是搜索引擎结果页，且链接不相关，则跳过

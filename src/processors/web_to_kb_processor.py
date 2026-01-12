@@ -200,15 +200,22 @@ class WebToKBProcessor:
             
             elif keyword:
                 # 关键词搜索模式 (v5.5.8 增强：相关性优先)
-                crawler._current_keyword = keyword # 设置当前任务关键词
+                # 1. 自动清洗关键词标点
+                import re
+                clean_kw = re.sub(r'^[^\w\u4e00-\u9fff]+|[^\w\u4e00-\u9fff]+$', '', keyword).strip()
+                crawler._current_keyword = clean_kw 
+                
+                if status_callback:
+                    status_callback(f"🔍 关键词已优化: {clean_kw}")
+                
                 if not sites:
                     # 使用智能推荐源
-                    sites = self.recommend_sites_for_keyword(keyword)[:3]
+                    sites = self.recommend_sites_for_keyword(clean_kw)[:3]
                 
                 if status_callback:
                     status_callback(f"🔍 正在智能规划搜索源: {', '.join(sites)}")
                 
-                search_results = self.search_preset_sites(keyword, sites)
+                search_results = self.search_preset_sites(clean_kw, sites)
                 
                 # 抓取搜索结果
                 for result in search_results:
@@ -223,16 +230,21 @@ class WebToKBProcessor:
                             max_pages=max_pages // len(search_results),
                             status_callback=status_callback
                         )
-                        # 过滤掉内容中完全不提及关键词的碎片文件 (简单过滤)
+                        # 过滤逻辑增强：排除搜索结果页本身，且正文必须高相关
                         relevant_files = []
                         for f_path in files:
                             try:
                                 with open(f_path, 'r', encoding='utf-8') as f:
-                                    content = f.read().lower()
-                                    if keyword.lower() in content:
+                                    content = f.read()
+                                    # 排除搜索结果页和系统页面
+                                    is_search_page = "Special:Search" in content or "search?" in content or "百度搜索" in content
+                                    # 统计关键词频率
+                                    kw_count = content.lower().count(clean_kw.lower())
+                                    
+                                    if not is_search_page and kw_count >= 1:
                                         relevant_files.append(f_path)
                                     else:
-                                        os.remove(f_path) # 物理删除无关碎片
+                                        os.remove(f_path) 
                             except:
                                 continue
                         crawled_files.extend(relevant_files)
