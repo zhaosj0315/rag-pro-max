@@ -108,6 +108,15 @@ class HistoryManager:
         return sessions
 
     @classmethod
+    def get_latest_session_id(cls, kb_id: str) -> Optional[str]:
+        """获取最近活跃的会话ID"""
+        sessions = cls.list_sessions(kb_id)
+        if not sessions:
+            return None
+        # sessions 已经按时间倒序排列
+        return sessions[0]['id']
+
+    @classmethod
     def load_session(cls, kb_id: str, session_id: Optional[str] = None) -> List[Dict]:
         """加载特定会话"""
         if not session_id:

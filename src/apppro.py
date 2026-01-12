@@ -2736,6 +2736,12 @@ if active_kb_name and active_kb_name != st.session_state.current_kb_id:
         st.session_state.current_kb_id = active_kb_name
         st.session_state.chat_engine = None
         with st.spinner("📜 正在加载对话历史..."):
+            # 自动恢复最近会话 (如果未指定)
+            if not st.session_state.get('current_session_id'):
+                latest_id = HistoryManager.get_latest_session_id(active_kb_name)
+                if latest_id:
+                    st.session_state.current_session_id = latest_id
+            
             st.session_state.messages = HistoryManager.load_session(active_kb_name, st.session_state.get('current_session_id'))
         st.session_state.suggestions_history = []
     else:
