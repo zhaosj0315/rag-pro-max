@@ -2740,7 +2740,13 @@ if active_kb_name and active_kb_name != st.session_state.current_kb_id:
                     st.session_state.current_session_id = latest_id
             
             st.session_state.messages = HistoryManager.load_session(active_kb_name, st.session_state.get('current_session_id'))
+        
+        # 恢复状态：从最后一条消息恢复建议列表
         st.session_state.suggestions_history = []
+        if st.session_state.messages:
+            last_msg = st.session_state.messages[-1]
+            if isinstance(last_msg, dict) and last_msg.get('suggestions'):
+                st.session_state.suggestions_history = last_msg['suggestions']
     else:
         st.warning("⚠️ 正在处理问题，请等待完成后再切换知识库")
         st.session_state.current_nav = f"📂 {st.session_state.current_kb_id}"
