@@ -21,7 +21,7 @@ from src.core.version import get_version_info
 
 logger = LogManager()
 version_info = get_version_info()
-CURRENT_VERSION = version_info.get("version", "3.2.7")
+CURRENT_VERSION = version_info.get("version", "5.5.8")
 
 # 原有数据模型
 class QueryRequest(BaseModel):
@@ -186,8 +186,8 @@ async def incremental_update(request: IncrementalUpdateRequest):
             files_to_process = changes['new'] + changes['modified']
             skipped_files = changes['unchanged']
         
-        # ⚠️ MOCK IMPLEMENTATION: This is a placeholder. Real processing logic needs to be connected to KBManager.
-        logger.warning("Executing MOCK incremental update - no actual files are processed", stage="API")
+        # ⚠️ MOCK IMPLEMENTATION: Real processing logic is being unified in KBService.
+        logger.warning("Executing MOCK incremental update - Logic alignment pending in v5.5.8", stage="API")
         for file_path in files_to_process:
             try:
                 processed_files.append(file_path)
