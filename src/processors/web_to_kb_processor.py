@@ -200,6 +200,7 @@ class WebToKBProcessor:
             
             elif keyword:
                 # 关键词搜索模式 (v5.5.8 增强：相关性优先)
+                crawler._current_keyword = keyword # 设置当前任务关键词
                 if not sites:
                     # 使用智能推荐源
                     sites = self.recommend_sites_for_keyword(keyword)[:3]
