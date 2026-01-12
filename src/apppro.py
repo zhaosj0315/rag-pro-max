@@ -3609,19 +3609,50 @@ elif active_kb_name:
                             chat_history_md = f"# 对话历史备份: {active_kb_name}\n\n"
                             has_chats = False
                             
+                            # 🔥 [v5.6.0] 核心增强：强制捕获内存中的最新活跃会话
+                            # 即使磁盘文件未同步，这里也能保证导出的是"这一秒"看到的记录
+                            current_msgs = st.session_state.get('messages', [])
+                            if current_msgs:
+                                has_chats = True
+                                chat_history_md += f"### 🔴 当前活跃会话 (最新内存快照)\n"
+                                chat_history_md += f"> 导出时刻：{datetime.now().strftime('%H:%M:%S')}\n\n"
+                                
+                                # 保存为独立 JSON 快照
+                                current_snapshot = {
+                                    "kb_name": active_kb_name,
+                                    "export_time": datetime.now().isoformat(),
+                                    "messages": current_msgs
+                                }
+                                zip_file.writestr(
+                                    "02_历史对话/raw_json/CURRENT_ACTIVE_SESSION.json", 
+                                    json.dumps(current_snapshot, indent=4, ensure_ascii=False)
+                                )
+                                
+                                for msg in current_msgs:
+                                    role_tag = "👤 用户" if msg['role'] == 'user' else "🤖 AI"
+                                    chat_history_md += f"**{role_tag}**: {msg['content']}\n\n"
+                                chat_history_md += "---\n\n"
+                            
                             if os.path.exists(history_dir):
                                 for chat_file in os.listdir(history_dir):
                                     if chat_file.endswith(".json") and (active_kb_name in chat_file):
                                         try:
                                             with open(os.path.join(history_dir, chat_file), 'r', encoding='utf-8') as f:
                                                 chat_data = json.load(f)
+                                                # 避免完全重复（简单去重：如果文件内容完全等于内存，则跳过 md 展示，但仍保留 raw 文件）
+                                                is_duplicate = False
+                                                if current_msgs and chat_data.get('messages') == current_msgs:
+                                                    is_duplicate = True
+                                                
                                                 has_chats = True
                                                 zip_file.write(os.path.join(history_dir, chat_file), arcname=f"02_历史对话/raw_json/{chat_file}")
-                                                chat_history_md += f"### 📅 会话: {chat_file.replace('.json','')}\n"
-                                                for msg in chat_data.get('messages', []):
-                                                    role_tag = "👤 用户" if msg['role'] == 'user' else "🤖 AI"
-                                                    chat_history_md += f"**{role_tag}**: {msg['content']}\n\n"
-                                                chat_history_md += "---\n\n"
+                                                
+                                                if not is_duplicate:
+                                                    chat_history_md += f"### 📅 归档会话: {chat_file.replace('.json','')}\n"
+                                                    for msg in chat_data.get('messages', []):
+                                                        role_tag = "👤 用户" if msg['role'] == 'user' else "🤖 AI"
+                                                        chat_history_md += f"**{role_tag}**: {msg['content']}\n\n"
+                                                    chat_history_md += "---\n\n"
                                         except: continue
                             
                             if not has_chats:
