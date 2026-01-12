@@ -1044,8 +1044,9 @@ with st.sidebar:
                     label = sess['title']
                     is_active = (sess_id == st.session_state.get('current_session_id'))
                     
-                    if sess.get('is_default'):
-                        label = "📝 默认会话"
+                    # 移除强制覆盖默认会话标题的逻辑，显示实际内容摘要
+                    # if sess.get('is_default'):
+                    #    label = "📝 默认会话"
                     
                     btn_type = "primary" if is_active else "secondary"
                     icon = "📂" if is_active else "📄"
