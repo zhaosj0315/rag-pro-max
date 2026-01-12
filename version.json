@@ -1,7 +1,7 @@
 {
-  "version": "5.6.0",
+  "version": "5.6.1",
   "release_date": "2026-01-12",
-  "build_number": "20260112.02",
+  "build_number": "20260112.03",
   "status": "stable",
   "major_features": [
     "🔍 Multi-Source Meta-Search: Integrated Bing/DuckDuckGo as entry springboards",
