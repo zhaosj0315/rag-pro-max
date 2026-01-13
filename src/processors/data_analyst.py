@@ -425,38 +425,51 @@ class DataAnalystEngine:
         [v5.7.1] 增强型 SQL 执行器：
         1. 支持多语句 (Script Mode) 并在同一事务中执行。
         2. 增加 SQL 自动修复 (Auto-Healing) 功能。
+        3. [v5.7.2] 增强连接鲁棒性 (Timeout + WAL + Retry)。
         """
-        try:
-            conn = sqlite3.connect(self.db_path)
-            # 使用 Row factory 保证结果是字典列表
-            conn.row_factory = lambda c, r: dict([(col[0], r[idx]) for idx, col in enumerate(c.description)])
-            cursor = conn.cursor()
-
-            # A. 预处理：移除尾部分号并按分号分割，过滤空语句
-            statements = [s.strip() for s in sql.split(';') if s.strip()]
-            
-            if not statements:
-                return {"success": True, "data": []}
-            
-            rows = []
-            
-            # B. 执行逻辑：顺序执行所有语句，只捕获最后一个 SELECT 的结果
-            for idx, stmt in enumerate(statements):
+        import time
+        max_retries = 3
+        
+        for attempt in range(max_retries):
+            try:
+                # [v5.7.2] 增加超时设置，防止数据库锁定
+                conn = sqlite3.connect(self.db_path, timeout=30)
+                
+                # [v5.7.2] 开启 WAL 模式提高并发性能
                 try:
-                    cursor.execute(stmt)
-                    # 如果是最后一条语句，且是 SELECT，则获取结果
-                    if idx == len(statements) - 1 and stmt.upper().startswith("SELECT"):
-                        rows = cursor.fetchall()
-                except Exception as step_error:
-                    # [v5.7.1] 自动修复逻辑
-                    error_msg = str(step_error).lower()
-                    
-                    # 仅在模型可用且错误类型可修复时触发
-                    is_fixable = any(k in error_msg for k in ["syntax", "bindings", "no such column", "qualify", "unrecognized token"])
-                    
-                    if is_fixable and model_client:
-                        if self.logger: self.logger.warning(f"🔧 SQL执行报错，尝试自动修复: {error_msg}")
-                        fix_prompt = f"""
+                    conn.execute("PRAGMA journal_mode=WAL;")
+                except: pass
+                
+                # 使用 Row factory 保证结果是字典列表
+                conn.row_factory = lambda c, r: dict([(col[0], r[idx]) for idx, col in enumerate(c.description)])
+                cursor = conn.cursor()
+
+                # A. 预处理：移除尾部分号并按分号分割，过滤空语句
+                statements = [s.strip() for s in sql.split(';') if s.strip()]
+                
+                if not statements:
+                    conn.close()
+                    return {"success": True, "data": []}
+                
+                rows = []
+                
+                # B. 执行逻辑：顺序执行所有语句，只捕获最后一个 SELECT 的结果
+                for idx, stmt in enumerate(statements):
+                    try:
+                        cursor.execute(stmt)
+                        # 如果是最后一条语句，且是 SELECT，则获取结果
+                        if idx == len(statements) - 1 and stmt.upper().startswith("SELECT"):
+                            rows = cursor.fetchall()
+                    except Exception as step_error:
+                        # [v5.7.1] 自动修复逻辑
+                        error_msg = str(step_error).lower()
+                        
+                        # 仅在模型可用且错误类型可修复时触发
+                        is_fixable = any(k in error_msg for k in ["syntax", "bindings", "no such column", "qualify", "unrecognized token"])
+                        
+                        if is_fixable and model_client:
+                            if self.logger: self.logger.warning(f"🔧 SQL执行报错，尝试自动修复: {error_msg}")
+                            fix_prompt = f"""
 Auto-Fix SQLite Error:
 Error: {step_error}
 Bad SQL Statement: {stmt}
@@ -466,36 +479,50 @@ Constraint:
 2. SQLite does NOT support '?' placeholder without bindings (Use literal values).
 3. Output ONLY the fixed SQL statement.
 """
-                        try:
-                            fixed_sql = model_client.complete(fix_prompt).text.strip().replace("```sql", "").replace("```", "")
-                            cursor.execute(fixed_sql)
-                            if idx == len(statements) - 1 and fixed_sql.upper().startswith("SELECT"):
-                                rows = cursor.fetchall()
-                            if self.logger: self.logger.success(f"✅ SQL自动修复成功")
-                            continue # 修复成功，继续下一条
-                        except Exception as fix_err:
-                            if self.logger: self.logger.error(f"❌ 自动修复失败: {fix_err}")
-                            if "SELECT" in stmt.upper(): raise step_error
+                            try:
+                                fixed_sql = model_client.complete(fix_prompt).text.strip().replace("```sql", "").replace("```", "")
+                                cursor.execute(fixed_sql)
+                                if idx == len(statements) - 1 and fixed_sql.upper().startswith("SELECT"):
+                                    rows = cursor.fetchall()
+                                if self.logger: self.logger.success(f"✅ SQL自动修复成功")
+                                continue # 修复成功，继续下一条
+                            except Exception as fix_err:
+                                if self.logger: self.logger.error(f"❌ 自动修复失败: {fix_err}")
+                                if "SELECT" in stmt.upper(): raise step_error
 
-                    # 默认行为：如果不是 SELECT，可能是 DROP/CREATE 失败，尝试忽略；如果是 SELECT 失败则抛出
-                    if "SELECT" in stmt.upper():
-                        raise step_error 
-            
-            conn.commit()
-            conn.close()
-            return {"success": True, "data": rows}
-            
-        except Exception as e:
-            error_str = str(e)
-            # 自动修复机制：如果表不存在，尝试从 docstore 恢复
-            if "no such table" in error_str.lower():
-                try:
-                    self._recover_data_from_docstore()
-                    # 恢复后重试（递归调用一次）
-                    return self._retry_single_query(sql) 
-                except: pass
-            
-            return {"success": False, "error": str(e), "data": []}
+                        # 默认行为：如果不是 SELECT，可能是 DROP/CREATE 失败，尝试忽略；如果是 SELECT 失败则抛出
+                        if "SELECT" in stmt.upper():
+                            raise step_error 
+                
+                conn.commit()
+                conn.close()
+                return {"success": True, "data": rows}
+                
+            except sqlite3.OperationalError as e:
+                # [v5.7.2] 捕获文件锁定或无法打开的错误并重试
+                error_str = str(e).lower()
+                if "locked" in error_str or "unable to open" in error_str:
+                    if attempt < max_retries - 1:
+                        if self.logger: self.logger.warning(f"⚠️ 数据库忙或被锁定，正在重试 ({attempt+1}/{max_retries})...")
+                        time.sleep(0.5)
+                        continue
+                
+                # 无法恢复的错误，返回失败
+                return {"success": False, "error": str(e), "data": []}
+                
+            except Exception as e:
+                error_str = str(e)
+                # 自动修复机制：如果表不存在，尝试从 docstore 恢复
+                if "no such table" in error_str.lower():
+                    try:
+                        self._recover_data_from_docstore()
+                        # 恢复后重试（递归调用一次）
+                        return self._retry_single_query(sql) 
+                    except: pass
+                
+                return {"success": False, "error": str(e), "data": []}
+        
+        return {"success": False, "error": "Max retries exceeded", "data": []}
 
     def _retry_single_query(self, sql: str) -> Dict[str, Any]:
         """简单的单查询重试"""
