@@ -166,8 +166,8 @@ def render_login_page():
 
         /* 6. 激励语录 */
         .quote-box {
-            margin-top: 2rem;
-            padding: 1.2rem;
+            margin-top: 1rem;
+            padding: 1rem;
             border-radius: 12px;
             background: rgba(255, 255, 255, 0.05);
             font-style: italic;
@@ -232,9 +232,9 @@ def render_login_page():
     col_brand, col_spacer, col_auth = st.columns([1.4, 0.1, 1])
 
     with col_brand:
-        st.markdown("<div style='margin-top: 4.5rem;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 1.5rem;'></div>", unsafe_allow_html=True)
         st.markdown("<h1 class='brand-header'>RAG Pro Max</h1>", unsafe_allow_html=True)
-        st.markdown(f"<h2 style='color: #60a5fa; font-weight: 800; letter-spacing: 1px; text-shadow: 0 4px 12px rgba(0,0,0,0.5);'>{greeting}</h2>", unsafe_allow_html=True)
+        st.markdown(f"<h2 style='color: #60a5fa; font-weight: 800; letter-spacing: 1px; text-shadow: 0 4px 12px rgba(0,0,0,0.5); margin-top: -10px;'>{greeting}</h2>", unsafe_allow_html=True)
         
         # 核心功能卡片
         steps = [
@@ -273,7 +273,7 @@ def render_login_page():
         st.markdown(f"<div class='quote-box'>{daily_quote}</div>", unsafe_allow_html=True)
 
     with col_auth:
-        st.markdown("<div style='margin-top: 6rem;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
         
         tab_login, tab_register = st.tabs(["🔐 身份验证", "✨ 开启新账户"])
         
@@ -331,7 +331,7 @@ def render_login_page():
 
     # --- 页脚 ---
     st.markdown("""
-    <div style='position: fixed; bottom: 25px; width: 100%; text-align: center; color: rgba(255,255,255,0.2); font-size: 0.75rem; font-family: monospace;'>
-        SYSTEM STATUS: ONLINE | ENCRYPTION: AES-256 | RAG PRO MAX v5.5.8
+    <div style='margin-top: 4rem; padding-bottom: 2rem; width: 100%; text-align: center; color: rgba(255,255,255,0.2); font-size: 0.75rem; font-family: monospace;'>
+        SYSTEM STATUS: ONLINE | ENCRYPTION: AES-256 | RAG PRO MAX v5.6.8
     </div>
     """, unsafe_allow_html=True)
