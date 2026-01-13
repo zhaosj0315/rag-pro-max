@@ -141,7 +141,55 @@ def fetch_url_worker(args):
                     if href:
                         extracted_links.append(href)
 
-            # 5. 通用提取 (作为保底)
+            # 5. 阿里云帮助文档适配 (Aliyun Help)
+            elif "help.aliyun.com" in base_domain:
+                # A. 增强内容提取：聚焦文档核心区域
+                # 阿里云通常使用 .markdown-body 或 .icms-help-docs-content
+                main_content = soup.select_one('.markdown-body') or \
+                               soup.select_one('.icms-help-docs-content') or \
+                               soup.select_one('#main-content') or \
+                               soup.select_one('article')
+                
+                if main_content:
+                    # 仅在找到特定内容区域时清理并提取，覆盖默认的全页提取
+                    # 1. 移除干扰标签
+                    for tag in main_content(["script", "style", "button", "input"]):
+                        tag.decompose()
+                    
+                    # 2. 移除干扰类 (如反馈按钮、复制按钮等)
+                    for tag in main_content.select(".feedback-wrapper, .copy-btn, .header-anchor"):
+                        tag.decompose()
+                    
+                    content_text = main_content.get_text()
+                    lines = (line.strip() for line in content_text.splitlines())
+                    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+                    result['content'] = ' '.join(chunk for chunk in chunks if chunk)
+                
+                # B. 关键词增强：从 Meta 标签提取
+                meta_keywords = soup.find('meta', attrs={'name': 'keywords'})
+                if meta_keywords:
+                    keywords_text = meta_keywords.get('content', '')
+                    if keywords_text:
+                        # 将关键词前置，提高相关性评分
+                        result['content'] = f"Keywords: {keywords_text}\n\n{result.get('content', '')}"
+
+                # C. 链接提取优化：优先抓取目录和下一篇
+                # 1. 尝试抓取 "下一篇" 链接 (通常在底部)
+                next_links = soup.select('a.next-link') or soup.select('.post-navigation a')
+                for link in next_links:
+                    href = link.get('href')
+                    if href:
+                         extracted_links.append(urljoin("https://help.aliyun.com", href))
+                
+                # 2. 尝试抓取左侧目录树 (Sidebar)
+                sidebar = soup.select_one('.menu-tree') or soup.select_one('.left-nav') or soup.select_one('div[class*="sidebar"]')
+                if sidebar:
+                    for link in sidebar.find_all('a', href=True):
+                        href = link.get('href')
+                        if href:
+                             extracted_links.append(urljoin("https://help.aliyun.com", href))
+
+            # 6. 通用提取 (作为保底)
             for link in soup.find_all('a', href=True):
                 href = link.get('href')
                 if href:

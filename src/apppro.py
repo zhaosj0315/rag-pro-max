@@ -4909,19 +4909,121 @@ for msg_idx, msg in enumerate(state.get_messages()):
                 for stage_h in msg.get("stages", []):
                     m_h = stage_h["meta"]
                     with st.expander(f"📍 Stage {m_h['stage_id']}: {m_h['title']}", expanded=True):
-                        import pandas as pd
-                        import plotly.express as px
-                        df_h = pd.DataFrame(stage_h["data"])
-                        if not df_h.empty:
-                            # [v5.6.4] 简化历史图表显示
-                            h_key_base = f"hist_{msg_idx}_{m_h['stage_id']}"
-                            st.plotly_chart(px.bar(df_h, x=df_h.columns[0], y=df_h.columns[-1], template="plotly_white"), use_container_width=True, key=f"{h_key_base}_bar")
-                        st.markdown("**💻 DataWorks SQL**")
-                        st.code(stage_h.get("sqls", {}).get("dataworks", "-- N/A"), language="sql")
-                        st.markdown("**🧪 SQLite (Local)**")
-                        st.code(stage_h.get("sqls", {}).get("sqlite", "-- N/A"), language="sql")
-                        if stage_h.get("is_simulated"):
-                            st.info("✨ 此阶段基于业务模型仿真推演")
+                        # --- [v5.2] 数据流转全演示 (History Mode) ---
+                        with st.container(border=True):
+                            # A. 查询前：原始数据 (如果有)
+                            if stage_h.get("source_samples"):
+                                st.markdown("**1. 查询前：业务表采样 (Before)**")
+                                s_tabs = st.tabs(list(stage_h["source_samples"].keys()))
+                                for idx, t_name in enumerate(stage_h["source_samples"]):
+                                    with s_tabs[idx]:
+                                        import pandas as pd
+                                        st.dataframe(pd.DataFrame(stage_h["source_samples"][t_name]), use_container_width=True)
+
+                            # B. 加工中：逻辑脚本 (Restored 3 Tabs)
+                            st.markdown("**2. 执行中：工程逻辑 (The Logic)**")
+                            sqls = stage_h.get("sqls", {})
+                            # 恢复 3 个 Tab 的横向布局
+                            sql_tabs = st.tabs(["🧪 SQLite (本地验证)", "🐘 Standard SQL", "💻 DataWorks (生产)"])
+                            with sql_tabs[0]:
+                                st.caption("SQL 语言: SQLite (Local Sim)")
+                                st.code(sqls.get("sqlite", "-- N/A"), language="sql")
+                            with sql_tabs[1]:
+                                st.caption("SQL 语言: Standard ANSI SQL")
+                                st.code(sqls.get("standard", "-- N/A"), language="sql")
+                            with sql_tabs[2]:
+                                st.caption("SQL 语言: MaxCompute / DataWorks")
+                                st.code(sqls.get("dataworks", "-- N/A"), language="sql")
+
+                            # C. 查询后：结果产出
+                            st.markdown("**3. 查询后：汇聚结果表 (After)**")
+                            import pandas as pd
+                            import plotly.express as px
+                            import time
+                            df_h = pd.DataFrame(stage_h["data"])
+                            
+                            if not df_h.empty:
+                                st.dataframe(df_h, use_container_width=True)
+                                
+                                # --- 可视化画板 (Smart Vis - History Port) ---
+                                st.markdown("---")
+                                
+                                # 1. 智能列识别
+                                from pandas.api.types import is_numeric_dtype
+                                dim_col, metric_col = None, None
+                                
+                                # 寻找指标列
+                                for col in reversed(df_h.columns):
+                                    if is_numeric_dtype(df_h[col]):
+                                        metric_col = col
+                                        break
+                                
+                                # 寻找维度列
+                                for col in df_h.columns:
+                                    if col != metric_col:
+                                        dim_col = col
+                                        break
+                                if not dim_col and len(df_h.columns) > 0: dim_col = df_h.columns[0]
+                                
+                                # 2. 渲染逻辑 (Restore Quality)
+                                if metric_col:
+                                    h_key_base = f"hist_{msg_idx}_{m_h['stage_id']}_{time.time()}"
+                                    
+                                    # Case A: 单一数值
+                                    if len(df_h) == 1:
+                                        cols = st.columns(len(df_h.columns))
+                                        for idx, c in enumerate(df_h.columns):
+                                            if is_numeric_dtype(df_h[c]):
+                                                cols[idx].metric(label=c, value=df_h.iloc[0][c])
+                                            else:
+                                                cols[idx].markdown(f"**{c}**\n\n{df_h.iloc[0][c]}")
+                                    else:
+                                        # Case B: 图表渲染 (Smart Vis Logic)
+                                        import plotly.graph_objects as go
+                                        
+                                        # 预计算
+                                        is_time_series = any(x in str(dim_col).lower() for x in ['date', 'time', 'day', 'month', 'year', 'period', '日期', '时间']) or \
+                                                         pd.api.types.is_datetime64_any_dtype(df_h[dim_col])
+                                        cardinality = df_h[dim_col].nunique()
+                                        has_negative = (df_h[metric_col] < 0).any()
+                                        is_waterfall_context = any(x in str(df_h[dim_col].values).lower() for x in ['total', 'net', 'sum']) or \
+                                                               any(x in metric_col.lower() for x in ['delta', 'change', 'diff', '增长', '变动', '差异'])
+                                        
+                                        aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA']
+
+                                        if is_waterfall_context and len(df_h) > 1:
+                                            fig = go.Figure(go.Waterfall(
+                                                name = "归因", orientation = "v",
+                                                measure = ["relative"] * (len(df_h)-1) + ["total"],
+                                                x = df_h[dim_col],
+                                                textposition = "outside",
+                                                text = [f"{v:+}" if isinstance(v, (int, float)) else v for v in df_h[metric_col]],
+                                                y = df_h[metric_col],
+                                                connector = {"line":{"color":"rgb(63, 63, 63)"}},
+                                            ))
+                                            fig.update_layout(title=f"🌊 {metric_col} (归因分析)", template="plotly_white")
+                                            st.plotly_chart(fig, use_container_width=True, key=f"{h_key_base}_waterfall")
+                                        
+                                        elif is_time_series:
+                                            fig = px.area(df_h, x=dim_col, y=metric_col, title=f"📈 {metric_col} (趋势)", template="plotly_white")
+                                            st.plotly_chart(fig, use_container_width=True, key=f"{h_key_base}_area")
+                                        
+                                        elif cardinality > 8:
+                                            fig = px.bar(df_h.sort_values(metric_col, ascending=True), 
+                                                         x=metric_col, y=dim_col, orientation='h',
+                                                         title=f"🏆 {metric_col} (排名)", template="plotly_white")
+                                            st.plotly_chart(fig, use_container_width=True, key=f"{h_key_base}_bar_h")
+                                            
+                                        else:
+                                            fig = px.bar(df_h, x=dim_col, y=metric_col, 
+                                                         title=f"📊 {metric_col} (对比)", template="plotly_white",
+                                                         color_discrete_sequence=aurora_colors)
+                                            st.plotly_chart(fig, use_container_width=True, key=f"{h_key_base}_bar")
+                                else:
+                                    st.caption("⚠️ 未检测到数值列，仅展示表格数据")
+
+                            if stage_h.get("is_simulated"):
+                                st.info("✨ 此阶段基于业务模型仿真推演")
 
         # 显示角色标签 (v2.7.4)
         if role == "assistant" and msg.get("prompt_role"):
