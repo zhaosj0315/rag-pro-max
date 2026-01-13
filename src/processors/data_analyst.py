@@ -13,14 +13,17 @@ class DataAnalystEngine:
         self.schema_path = os.path.join(kb_path, "business_schema.json")
         self.blueprint_path = os.path.join(kb_path, "business_blueprint.json")
 
-    def extract_schema_from_docs(self, docs: List[Any], model_client) -> Dict[str, Any]:
+    def extract_schema_from_docs(self, docs: List[Any], model_client, status_callback=None) -> Dict[str, Any]:
         """
         [v4.5.0 战略版] 宏观语义提取：从文档中识别表结构、业务拓扑及【宏观战略目标】。
         """
+        if status_callback: status_callback(f"📄 正在阅读 {len(docs)} 个业务文档...")
         all_text = "\n".join([d.text for d in docs[:30]]) 
         # [Safe Guard] 防止上下文过长导致超时
         if len(all_text) > 60000:
-            all_text = all_text[:60000] + "...(truncated)"        
+            all_text = all_text[:60000] + "...(truncated)"
+            
+        if status_callback: status_callback("🧠 正在请求大模型提取业务架构 (可能需要 1-2 分钟)...")
         prompt = f"""
 你是一名资深首席架构师与业务战略专家。请从以下文档中提取业务模型与宏观背景。
 文档内容：{all_text}
@@ -45,6 +48,7 @@ class DataAnalystEngine:
             with open(self.schema_path, 'w', encoding='utf-8') as f:
                 json.dump(schema_data, f, indent=4, ensure_ascii=False)
             if self.logger: self.logger.success("✨ 业务架构定义已成功存入物理库")
+            if status_callback: status_callback("✅ 架构提取完成")
             return schema_data
         except Exception as e:
             if self.logger: self.logger.error(f"战略模型解析失败: {e}")
@@ -387,7 +391,7 @@ class DataAnalystEngine:
                 except: pass
             return {"success": False, "error": str(e), "data": []}
 
-    def process_files(self, file_paths: List[str], model_client=None) -> Dict[str, Any]:
+    def process_files(self, file_paths: List[str], model_client=None, status_callback=None) -> Dict[str, Any]:
         """
         [v5.3 战略版] 全域开模引擎：支持全格式输入 (PDF/MD/CSV/XLSX) 统一建模。
         """
@@ -398,6 +402,8 @@ class DataAnalystEngine:
             
             physical_tables = {}
             semantic_docs = []
+            
+            if status_callback: status_callback(f"📊 正在处理 {len(file_paths)} 个源文件...")
             
             for file_path in file_paths:
                 file_name = os.path.basename(file_path).lower()
@@ -429,6 +435,7 @@ class DataAnalystEngine:
             
             if semantic_docs and model_client:
                 if self.logger: self.logger.info(f"🧠 正在从 {len(semantic_docs)} 个源材料中提取战略模型...")
+                if status_callback: status_callback(f"🧠 正在从 {len(semantic_docs)} 个源材料中提取战略模型...")
                 docs_content = []
                 for doc_path in semantic_docs:
                     with open(doc_path, 'r', encoding='utf-8', errors='ignore') as f:

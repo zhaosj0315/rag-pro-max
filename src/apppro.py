@@ -2758,13 +2758,21 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
         da_engine = DataAnalystEngine(persist_dir, logger)
         llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
         
+        def kb_status_callback(msg):
+            status_container.write(msg)
+            logger.info(f"👉 {msg}")
+        
         if data_files:
-             status_container.write(f"📊 检测到 {len(data_files)} 个业务源文件，正在执行物理归档与战略建模...")
-             logger.info(f"📊 [Strategic Workshop] 检测到 {len(data_files)} 个业务源文件，启动战略建模...")
-             res = da_engine.process_files(data_files, llm)
-             if res['success']:
-                 status_container.success(f"✅ 战略大脑初始化完成 (已归档并导入 {len(res['tables'])} 张表)")
-                 logger.success(f"✅ [Strategic Workshop] 战略大脑初始化完成 (已导入 {len(res['tables'])} 张表)")
+             # [v5.6.2] Idempotency Check: Don't rebuild if schema exists to avoid delay
+             if not os.path.exists(da_engine.schema_path):
+                 status_container.write(f"📊 检测到 {len(data_files)} 个业务源文件，正在执行物理归档与战略建模...")
+                 logger.info(f"📊 [Strategic Workshop] 检测到 {len(data_files)} 个业务源文件，启动战略建模...")
+                 res = da_engine.process_files(data_files, llm, status_callback=kb_status_callback)
+                 if res['success']:
+                     status_container.success(f"✅ 战略大脑初始化完成 (已归档并导入 {len(res['tables'])} 张表)")
+                     logger.success(f"✅ [Strategic Workshop] 战略大脑初始化完成 (已导入 {len(res['tables'])} 张表)")
+             else:
+                 status_container.write("⏩ 业务语义模型已就绪，跳过重建...")
 
         # 1. 执行 RAG 预扫描以获取文本（用于非结构化建模）
         docs, _ = builder._read_documents(current_target_path, 0, None)
@@ -2774,7 +2782,7 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
             status_container.write("🧠 正在执行深度业务语义建模...")
             logger.info("🧠 [Strategic Workshop] 正在从源材料中提取业务元模型与逻辑通路...")
             if not os.path.exists(da_engine.schema_path):
-                schemas = da_engine.extract_schema_from_docs(docs, llm)
+                schemas = da_engine.extract_schema_from_docs(docs, llm, status_callback=kb_status_callback)
             else:
                 status_container.write("⏩ 已存在物理表结构，跳过纯文档提取...")
                 with open(da_engine.schema_path, 'r') as f:
