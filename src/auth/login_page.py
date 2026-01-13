@@ -7,10 +7,11 @@ def render_login_page():
     # --- 1. 数字化指挥中心样式表 (Digital Command Center) ---
     st.markdown("""
         <style>
-        /* 1. 动态噪点极光背景 */
-        .stApp {
-            background: radial-gradient(circle at 50% 50%, #1e1b4b 0%, #0f172a 50%, #020617 100%);
-            background-size: cover;
+        /* 1. 动态噪点极光背景 - 强制锁定深色 */
+        .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stToolbar"] {
+            background: radial-gradient(circle at 50% 50%, #1e1b4b 0%, #0f172a 50%, #020617 100%) !important;
+            background-attachment: fixed !important;
+            background-size: cover !important;
         }
         .stApp::before {
             content: "";
@@ -49,7 +50,7 @@ def render_login_page():
             display: flex;
             flex-direction: column;
         }
-        .hud-label { color: #94a3b8; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; }
+        .hud-label { color: #cbd5e1; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; }
         .hud-value { color: #60a5fa; font-size: 0.9rem; font-weight: 700; font-family: 'Courier New', monospace; text-shadow: 0 0 8px rgba(96,165,250,0.3); }
         .hud-status { width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block; margin-right: 5px; box-shadow: 0 0 8px #10b981; }
 
@@ -101,19 +102,29 @@ def render_login_page():
             letter-spacing: 0.5px !important;
         }
 
-        /* 4. 特别针对输入框内部文字 */
+        /* 4. 特别针对输入框内部文字 - 强制深色背景防止白底白字 */
         .stTextInput input {
             color: #ffffff !important;
-            background: rgba(255, 255, 255, 0.05) !important;
-            border: 1px solid rgba(59, 130, 246, 0.3) !important;
+            background-color: rgba(2, 6, 23, 0.8) !important; /* 深蓝色背景 */
+            border: 1px solid rgba(59, 130, 246, 0.6) !important;
+            border-radius: 8px !important;
+        }
+        .stTextInput input:focus {
+            border-color: #60a5fa !important;
+            box-shadow: 0 0 10px rgba(96, 165, 250, 0.4) !important;
+            background-color: rgba(2, 6, 23, 1) !important;
         }
 
         /* 5. 特别针对 Tabs 标签 - 强制避开系统灰色 */
         .stTabs [data-baseweb="tab"] {
-            color: #94a3b8 !important;
+            color: #cbd5e1 !important;
+        }
+        .stTabs [baseweb="tab-list"] {
+            gap: 20px !important;
         }
         .stTabs [aria-selected="true"] {
             color: #ffffff !important;
+            font-weight: bold !important;
             border-bottom-color: #60a5fa !important;
             background: rgba(59, 130, 246, 0.1) !important;
         }
@@ -132,9 +143,25 @@ def render_login_page():
             color: #cbd5e1 !important;
         }
 
-        /* 8. 修复按钮文字颜色 */
+        /* 8. 修复按钮文字颜色与背景 */
+        .stButton button {
+            color: #ffffff !important;
+            background: rgba(255, 255, 255, 0.1) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            transition: all 0.3s ease !important;
+        }
+        .stButton button:hover {
+            border-color: #60a5fa !important;
+            background: rgba(96, 165, 250, 0.2) !important;
+            box-shadow: 0 0 15px rgba(96, 165, 250, 0.3) !important;
+        }
         .stButton button p {
-            color: inherit !important; /* 按钮文字跟随按钮主题色，通常是白色 */
+            color: #ffffff !important;
+        }
+
+        /* 9. 输入框占位符颜色 */
+        ::placeholder {
+            color: rgba(255, 255, 255, 0.4) !important;
         }
 
         /* 6. 激励语录 */
@@ -253,10 +280,10 @@ def render_login_page():
         with tab_login:
             with st.container(border=True):
                 st.markdown("<h3 style='color:#ffffff; margin-bottom:0;'>控制台登录</h3>", unsafe_allow_html=True)
-                st.markdown("<p style='color:#94a3b8; font-size:0.85rem; margin-bottom:1.5rem;'>验证身份以激活您的私有知识大脑</p>", unsafe_allow_html=True)
+                st.markdown("<p style='color:#cbd5e1; font-size:0.85rem; margin-bottom:1.5rem;'>验证身份以激活您的私有知识大脑</p>", unsafe_allow_html=True)
                 
                 with st.form("login_form"):
-                    u = st.text_input("Username", placeholder="admin", label_visibility="collapsed")
+                    u = st.text_input("Username", placeholder="请输入用户名", label_visibility="collapsed")
                     p = st.text_input("Password", type="password", placeholder="••••••••", label_visibility="collapsed")
                     if st.form_submit_button("立即进入指挥中心", use_container_width=True, type="primary"):
                         if u and p:
@@ -278,8 +305,8 @@ def render_login_page():
                                 AuditLogger.log(u, "LOGIN_FAILED", f"失败: {info}", status="warning", ip=client_ip)
                                 st.error(f"❌ {info}")
                 
-                st.markdown("<div style='text-align:center; margin: 1rem 0; color:#cbd5e1; font-size:0.8rem;'>—— 或 ——</div>", unsafe_allow_html=True)
-                if st.button("🚪 访客试用模式", use_container_width=True, help="以受限权限访问系统演示"):
+                st.markdown("<div style='text-align:center; margin: 1rem 0; color:#ffffff; font-size:0.8rem; font-weight:bold;'>—— 或 ——</div>", unsafe_allow_html=True)
+                if st.button("🚪 游客登录 (试用模式)", use_container_width=True, help="以受限权限访问系统演示"):
                     st.session_state.logged_in = True
                     st.session_state.user = "guest_user"
                     st.session_state.role = "guest"
@@ -288,7 +315,7 @@ def render_login_page():
         with tab_register:
             with st.container(border=True):
                 st.markdown("<h3 style='color:#ffffff;'>注册新身份</h3>", unsafe_allow_html=True)
-                st.markdown("<p style='color:#94a3b8; font-size:0.85rem; margin-bottom:1.5rem;'>注册后即可获得独立物理存储空间</p>", unsafe_allow_html=True)
+                st.markdown("<p style='color:#cbd5e1; font-size:0.85rem; margin-bottom:1.5rem;'>注册后即可获得独立物理存储空间</p>", unsafe_allow_html=True)
                 
                 show_p = st.checkbox("显示密码", key="reg_show_p")
                 with st.form("reg_form"):
