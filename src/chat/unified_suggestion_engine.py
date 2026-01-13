@@ -106,7 +106,7 @@ class UnifiedSuggestionEngine:
         return None
 
     def _generate_llm_based_questions(self, context: str, llm=None) -> List[str]:
-        """使用 LLM 基于上下文生成推荐问题"""
+        """使用 LLM 基于上下文生成推荐问题 (v4.5.0 战略增强)"""
         try:
             if not llm:
                 return []
@@ -114,16 +114,29 @@ class UnifiedSuggestionEngine:
             # 限制上下文长度
             safe_context = context[:2000] if context else ""
             
-            prompt = (
-                "基于以下对话上下文，生成 3 个用户可能会进一步追问的问题。\n"
-                "要求：\n"
-                "1. 问题必须简短、具体（20字以内）。\n"
-                "2. 问题必须紧扣上下文，且能在知识库中找到答案。\n"
-                "3. 严禁生成'更多信息'、'相关内容'等通用废话。\n"
-                "4. 必须是疑问句。\n\n"
-                f"上下文：\n{safe_context}\n\n"
-                "推荐问题（每行一个）："
-            )
+            # 检测是否为战略分析场景
+            is_strategic = any(word in context for word in ["战略报告", "数据透视", "推演", "SQL"])
+            
+            if is_strategic:
+                prompt = (
+                    "你是一名资深战略顾问。基于以下【数据分析/战略报告】上下文，生成 3 个更具宏观深度或工程落地的追问。\n"
+                    "要求：\n"
+                    "1. 必须包含一个探讨【宏观趋势/战略风险】的问题。\n"
+                    "2. 必须包含一个探讨【数据如何落地/DataWorks接入/工程优化】的问题。\n"
+                    "3. 严禁生成通用废话，必须紧扣报告中的具体业务逻辑。\n"
+                    f"上下文：\n{safe_context}\n\n"
+                    "推荐问题（每行一个）："
+                )
+            else:
+                prompt = (
+                    "基于以下对话上下文，生成 3 个用户可能会进一步追问的问题。\n"
+                    "要求：\n"
+                    "1. 问题必须简短、具体（20字以内）。\n"
+                    "2. 问题必须紧扣上下文，且能在知识库中找到答案。\n"
+                    "3. 必须是疑问句。\n\n"
+                    f"上下文：\n{safe_context}\n\n"
+                    "推荐问题（每行一个）："
+                )
             
             response = llm.complete(prompt)
             text = response.text

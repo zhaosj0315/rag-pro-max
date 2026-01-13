@@ -1,13 +1,5 @@
-# RAG Pro Max v3.2.2 内部开发 SDK 文档
-
-## 概述
-
-本文档仅供 **RAG Pro Max 核心开发者** 参考。
-如果您是外部集成方，请参考 **[RESTful API 文档](API_DOCUMENTATION.md)**。
-
-本 SDK 文档描述了 `src/services/` 层提供的 Python 内部接口，用于在 `apppro.py` 或其他后台任务中直接调用业务逻 辑。
-
-**版本**: v3.2.2
+# RAG Pro Max v5.5.8 内部开发 SDK 文档
+**版本**: v5.5.8
   
 **架构**: 四层统一架构  
 **模块数**: 189个  

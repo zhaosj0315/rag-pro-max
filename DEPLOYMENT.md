@@ -1,31 +1,28 @@
-**版本**: v3.2.6  
-**更新日期**: 2026-01-03  
-**适用范围**: 企业级部署与运维  
+# RAG Pro Max v5.5.8 企业级部署指南 (Stable Data Analysis Edition)
 
-# RAG Pro Max v3.2.2 企业级部署指南
+**版本**: v5.5.8  
+**更新日期**: 2026-01-11  
+**适用范围**: 生产环境部署、大数据量分析、macOS 深度优化版  
 
-RAG Pro Max v3.2.2 企业级版本支持多种部署方式，从本地开发到生产环境，提供完整的部署解决方案。
+RAG Pro Max v5.5.8 企业级版本支持多种部署方式，从本地开发到生产环境，提供完整的部署解决方案。
 
-**🔥 v3.2.2 企业级特性**:
-- 🌍 多语言国际化支持 - 中英文双语文档体系
-- 🛡️ 企业级安全特性 - 完全离线部署，数据不出内网
-- 🔒 零数据上传 - 100% 本地存储，敏感信息不外泄
-- 🏗️ 四层架构设计 - 180个Python文件，92.8%测试覆盖率
-- 🚀 持续优化系统 - 自动化改进流程，智能监控
+**🔥 v5.5.8 企业级特性**:
+- 🏛️ **分析实验室 2.0**: 全宽流式 Artifacts 工作台，支持复杂数据可视化。
+- 🛡️ **企业级安全**: 完全离线部署，数据不出内网，支持 30+ 项文件元数据取证。
+- 🚀 **macOS 性能优化**: 针对 Darwin 内核自动启用高性能线程池并发模型。
+- 🏗️ **四层架构设计**: 模块化解耦，支持 RESTful API 与 Web UI 双重接入。
 
 ## 🏢 企业环境要求
 
 ### 🔒 安全要求
-- **网络隔离**: 支持完全内网环境部署
-- **数据主权**: 所有数据本地存储，不依赖外部服务
-- **访问控制**: 支持企业级权限管理
-- **审计合规**: 完整的操作日志和审计追踪
+- **网络隔离**: 支持完全内网环境部署。
+- **数据主权**: 所有数据本地存储，不依赖外部服务。
+- **审计合规**: 完整的操作日志与审计追踪。
 
-### 💻 硬件配置
-- **最低配置**: 4GB RAM, 10GB 存储, Python 3.8+
-- **推荐配置**: 16GB+ RAM, 50GB+ SSD, Python 3.10+
-- **企业配置**: 32GB+ RAM, 100GB+ SSD, GPU 加速
-- **集群配置**: 支持 Docker Swarm / Kubernetes 部署
+### 💻 硬件配置 (针对分析实验室优化)
+- **最低配置**: 8GB RAM, 20GB 存储, **Python 3.9+** (必选)。
+- **推荐配置**: 16GB+ RAM, 100GB+ SSD, 8核 CPU。
+- **企业配置**: 32GB+ RAM, 100GB+ SSD, GPU 加速 (macOS 自动调用 MPS)。
 
 ## 🚀 快速部署
 
@@ -77,14 +74,14 @@ streamlit run src/apppro.py --server.port 8501
 ### 1. 使用预构建镜像
 ```bash
 # 拉取镜像
-docker pull ragpromax/rag-pro-max:v3.2.2
+docker pull ragpromax/rag-pro-max:v5.5.8
 
 # 运行容器
 docker run -d \
   --name rag-pro-max \
   -p 8501:8501 \
   -v $(pwd)/data:/app/data \
-  ragpromax/rag-pro-max:v3.2.2
+  ragpromax/rag-pro-max:v5.5.8
 ```
 
 ### 2. 本地构建镜像
@@ -321,7 +318,7 @@ spec:
     spec:
       containers:
       - name: rag-pro-max
-        image: ragpromax/rag-pro-max:v3.2.2
+        image: ragpromax/rag-pro-max:v5.5.8
         ports:
         - containerPort: 8501
         env:
@@ -355,7 +352,7 @@ spec:
 version: '3.8'
 services:
   rag-pro-max:
-    image: ragpromax/rag-pro-max:v3.2.2
+    image: ragpromax/rag-pro-max:v5.5.8
     ports:
       - "8501:8501"
     deploy:

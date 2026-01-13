@@ -257,7 +257,7 @@ class MultimodalProcessor:
         logger = LogManager()
         
         # ⚠️ MOCK IMPLEMENTATION: Real multimodal retrieval (images/tables) is pending integration.
-        logger.warning("执行 MOCK 多模态查询 - v3.2.2 版本功能未完整实现", stage="多模态处理")
+        logger.warning("执行 MOCK 多模态查询 - v5.5.8 版本功能未完全实现", stage="多模态处理")
         
         # 这里需要集成向量检索，支持文本、图片、表格的混合检索
         

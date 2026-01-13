@@ -4,6 +4,8 @@
 """
 
 import streamlit as st
+import os
+import json
 from typing import Dict, Any, Optional
 
 class TabbedSidebar:
@@ -268,50 +270,200 @@ class TabbedSidebar:
                 st.button("恢复数据", key="restore_data")
                 st.button("同步数据", key="sync_data")
     
+    @st.fragment
     def _render_help_tab(self):
-        """帮助标签 - 文档和支持"""
-        st.markdown("##### 📖 帮助中心")
+        """帮助标签 - 仿阿里云文档中心 (深度层级版)"""
+        # --- 样式注入：专业文档中心 ---
+        st.markdown("""
+        <style>
+        /* 导航树样式 */
+        .nav-category {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+        }
         
-        # 帮助链接
-        help_items = [
-            {"icon": "🚀", "title": "快速开始", "desc": "新手入门指南"},
-            {"icon": "❓", "title": "常见问题", "desc": "FAQ和解决方案"},
-            {"icon": "🔧", "title": "故障排除", "desc": "问题诊断和修复"},
-            {"icon": "📞", "title": "联系支持", "desc": "获取技术支持"},
-            {"icon": "📚", "title": "用户手册", "desc": "完整功能文档"},
-            {"icon": "🎥", "title": "视频教程", "desc": "操作演示视频"}
-        ]
+        /* 选中项高亮 */
+        div[data-testid="stVerticalBlock"] button[kind="secondary"] {
+            border: none !important;
+            text-align: left !important;
+            padding-left: 1rem !important;
+            color: #64748b !important;
+        }
+        div[data-testid="stVerticalBlock"] button[kind="primary"] {
+            border: none !important;
+            border-left: 3px solid #3b82f6 !important;
+            text-align: left !important;
+            padding-left: 0.8rem !important;
+            background: #f1f5f9 !important;
+            color: #0f172a !important;
+            font-weight: 600 !important;
+        }
         
-        for item in help_items:
-            with st.container():
-                col1, col2 = st.columns([1, 4])
-                with col1:
-                    st.markdown(f"## {item['icon']}")
-                with col2:
-                    if st.button(f"**{item['title']}**", key=f"help_{item['title']}", use_container_width=True):
-                        st.info(f"打开 {item['title']}")
-                    st.caption(item['desc'])
-        
+        /* 文档标题区 */
+        .doc-title-box {
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }
+        .doc-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+        .doc-meta {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-top: 0.5rem;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # --- 1. 顶部栏 (搜索 + 版本) ---
+        col_search, col_ver = st.columns([3, 1])
+        with col_search:
+            search_query = st.text_input("🔍", placeholder="搜索文档...", label_visibility="collapsed", key="doc_deep_search")
+        with col_ver:
+            st.caption("📚 RAG Pro Max Docs")
+
         st.divider()
-        
-        # 版本信息
-        st.markdown("##### ℹ️ 版本信息")
-        st.info("""
-        **RAG Pro Max v2.1.0**
-        - 🧠 自适应调度
-        - 📊 实时监控
-        - 🚀 GPU加速
-        - 🛡️ CPU保护
-        """)
-        
-        # 快速反馈
-        st.markdown("##### 💬 快速反馈")
-        feedback = st.text_area("反馈建议", placeholder="请输入您的建议或问题...")
-        if st.button("提交反馈", key="submit_feedback"):
-            if feedback:
-                st.success("感谢您的反馈！")
+
+        # --- 2. 双栏布局 ---
+        nav_col, content_col = st.columns([1.2, 3.8])
+
+        # 定义深度文档树 (仿阿里云结构)
+        # 格式: "显示名称": ("文件名.md", "锚点/备注")
+        doc_structure = {
+            "产品概述": {
+                "expanded": True,
+                "items": {
+                    "产品简介": "README.md",
+                    "功能特性": "version.json",  # 特殊处理
+                    "技术白皮书": "ARCHITECTURE.md",
+                    "动态与公告": "CHANGELOG.md"
+                }
+            },
+            "快速入门": {
+                "expanded": True,
+                "items": {
+                    "部署指南": "DEPLOYMENT.md",
+                    "首次运行向导": "FIRST_TIME_GUIDE.md",
+                    "免费公网访问": "FREE_PUBLIC_ACCESS.md"
+                }
+            },
+            "操作指南": {
+                "expanded": False,
+                "items": {
+                    "用户手册 (完整版)": "USER_MANUAL.md",
+                    "数据安全": "DOCUMENT_PROTECTION_LIST.md",
+                    "OCR 识别指南": "IMAGE_OCR_GUIDE.md",
+                    "日志与监控": "LOGGING_AND_NOTIFICATION_STANDARD.md"
+                }
+            },
+            "开发参考": {
+                "expanded": False,
+                "items": {
+                    "API 参考": "API_DOCUMENTATION.md",
+                    "内部接口定义": "INTERNAL_API.md",
+                    "贡献指南": "CONTRIBUTING.md",
+                    "测试标准": "TESTING.md"
+                }
+            },
+            "服务支持": {
+                "expanded": False,
+                "items": {
+                    "常见问题 (FAQ)": "FAQ.md",
+                    "相关协议": "LICENSE"
+                }
+            }
+        }
+
+        # 初始化 Session State
+        if "current_doc_path" not in st.session_state:
+            st.session_state.current_doc_path = "README.md"
+            st.session_state.current_doc_title = "产品简介"
+
+        # --- 左侧：折叠式导航树 ---
+        with nav_col:
+            for category, data in doc_structure.items():
+                # 使用 expander 模拟一级菜单
+                with st.expander(category, expanded=data["expanded"]):
+                    for label, file_name in data["items"].items():
+                        is_active = (st.session_state.current_doc_path == file_name)
+                        
+                        # 点击切换文档
+                        if st.button(label, key=f"nav_{category}_{label}", use_container_width=True, 
+                                   type="primary" if is_active else "secondary"):
+                            st.session_state.current_doc_path = file_name
+                            st.session_state.current_doc_title = label
+                            st.rerun()
+
+        # --- 右侧：文档内容渲染 ---
+        with content_col:
+            # 搜索模式拦截
+            if search_query:
+                st.info(f"🔍 搜索结果: '{search_query}'")
+                found_count = 0
+                for cat, data in doc_structure.items():
+                    for label, fname in data["items"].items():
+                        if os.path.exists(fname) and fname.endswith(".md"): # 只搜MD
+                            with open(fname, 'r', encoding='utf-8') as f:
+                                content = f.read()
+                            if search_query.lower() in content.lower():
+                                found_count += 1
+                                with st.expander(f"{label} ({cat})", expanded=True):
+                                    idx = content.lower().find(search_query.lower())
+                                    snippet = content[max(0, idx-40):min(len(content), idx+150)]
+                                    st.markdown(f"...{snippet.replace(search_query, f'**{search_query}**')}...")
+                                    if st.button("阅读", key=f"go_{fname}_{found_count}"):
+                                        st.session_state.current_doc_path = fname
+                                        st.session_state.current_doc_title = label
+                                        # 关键修复：清空搜索框以退出搜索模式
+                                        st.session_state.doc_deep_search = ""
+                                        st.rerun()
+                if found_count == 0:
+                    st.warning("未找到相关内容")
+            
+            # 正常阅读模式
             else:
-                st.warning("请输入反馈内容")
+                path = st.session_state.current_doc_path
+                title = st.session_state.current_doc_title
+                
+                # 渲染页头
+                update_time = "2026-01-12 20:00:00"
+                if os.path.exists(path):
+                    mtime = os.path.getmtime(path)
+                    import datetime
+                    update_time = datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
+                
+                st.markdown(f"""
+                <div class="doc-title-box">
+                    <div class="doc-title">{title}</div>
+                    <div class="doc-meta">
+                        更新时间：{update_time} &nbsp;|&nbsp; 
+                        <span style="color:#3b82f6; cursor:pointer;">📥 下载PDF</span> &nbsp;|&nbsp; 
+                        <span style="color:#3b82f6; cursor:pointer;">⭐ 收藏</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # 渲染内容
+                if path == "version.json":
+                    # 特殊渲染 JSON 数据为表格
+                    try:
+                        with open(path, 'r') as f:
+                            v_data = json.load(f)
+                        st.json(v_data)
+                    except: st.error("版本文件读取失败")
+                elif os.path.exists(path):
+                    with open(path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    with st.container(height=700):
+                        st.markdown(content)
+                else:
+                    st.warning(f"文档 [{path}] 暂未上传或已移动位置。")
+                    st.info("💡 提示：您可以联系管理员补充此文档。")
     
     # 辅助方法
     def _get_knowledge_bases(self):

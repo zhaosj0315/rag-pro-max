@@ -4,6 +4,11 @@ address = "localhost"
 enableCORS = false
 enableXsrfProtection = false
 baseUrlPath = ""
+# 避免监听临时文件夹，减少 FileNotFoundError 报错
+fileWatcherType = "auto"
+# 注意：Streamlit 不直接支持 exclude pattern，但可以通过 watchdog 的配置或环境变量间接影响
+# 这里的 fileWatcherPattern 其实不起作用，Streamlit 配置中没有这个原生选项
+# 正确的做法是尽量减少在被监听目录下的临时文件操作，或者忽略这个错误
 
 [browser]
 gatherUsageStats = false

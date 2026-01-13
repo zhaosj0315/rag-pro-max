@@ -15,6 +15,9 @@ def setup_environment():
     """设置环境配置"""
     # 禁用模型源检查（减少启动日志）
     os.environ['DISABLE_MODEL_SOURCE_CHECK'] = 'True'
+    # 再次强制确认，防止部分库初始化过早读取
+    if 'DISABLE_MODEL_SOURCE_CHECK' not in os.environ:
+         os.environ['DISABLE_MODEL_SOURCE_CHECK'] = 'True'
     
     # 设置离线模式
     os.environ['HF_HUB_OFFLINE'] = '1'
@@ -39,15 +42,35 @@ def suppress_warnings():
     os.environ["STREAMLIT_SERVER_RUN_ON_SAVE"] = "false"
     
     # 屏蔽所有 Streamlit 相关日志
-    for logger_name in ['streamlit', 'streamlit.runtime', 'streamlit.runtime.scriptrunner_utils', 
-                       'streamlit.watcher', 'watchdog', 'tornado', 'asyncio']:
-        logging.getLogger(logger_name).setLevel(logging.ERROR)
-        logging.getLogger(logger_name).propagate = False
+    loggers_to_silence = [
+        'streamlit', 
+        'streamlit.runtime', 
+        'streamlit.runtime.scriptrunner_utils',
+        'streamlit.runtime.scriptrunner_utils.script_run_context',  # 明确指定该 Logger
+        'streamlit.runtime.state.session_state_proxy',  # 屏蔽 Session State 警告
+        'streamlit.watcher', 
+        'watchdog', 
+        'tornado', 
+        'asyncio'
+    ]
+    
+    for logger_name in loggers_to_silence:
+        logger = logging.getLogger(logger_name)
+        logger.setLevel(logging.CRITICAL)  # 提升到 CRITICAL 级别
+        logger.propagate = False
     
     # 重定向 stderr 中的警告
     class SuppressWarnings:
         def write(self, text):
-            if 'ScriptRunContext' not in text and 'WARNING' not in text:
+            # 过滤不需要的日志关键词
+            ignore_keywords = [
+                'ScriptRunContext', 
+                'WARNING', 
+                'session_state_proxy',
+                'Checking connectivity',
+                'DISABLE_MODEL_SOURCE_CHECK'
+            ]
+            if not any(keyword in text for keyword in ignore_keywords):
                 sys.__stderr__.write(text)
         def flush(self):
             sys.__stderr__.flush()

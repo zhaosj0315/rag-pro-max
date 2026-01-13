@@ -1,0 +1,21 @@
+product_id,product_name,category,brand,unit_price,cost_price,stock_quantity
+P001,MacBook Pro,Electronics,Apple,15000.0,12000.0,50
+P002,iPhone 16,Electronics,Apple,7000.0,5500.0,100
+P003,Coffee Maker,Appliances,Philips,500.0,300.0,30
+P004,Ergonomic Chair,Furniture,Herman Miller,1200.0,800.0,20
+P005,Mechanical Keyboard,Electronics,Logitech,800.0,450.0,80
+P006,Desk Lamp,Furniture,IKEA,150.0,60.0,150
+P007,Air Purifier,Appliances,Xiaomi,2000.0,1400.0,40
+P008,Wireless Mouse,Electronics,Logitech,300.0,120.0,200
+P009,iPad Air,Electronics,Apple,4500.0,3600.0,60
+P010,Electric Kettle,Appliances,Joyoung,200.0,100.0,100
+P011,Monitor,Electronics,Dell,2500.0,1800.0,45
+P012,Standing Desk,Furniture,Loctek,3500.0,2200.0,15
+P013,Noise Cancelling Headphone,Electronics,Sony,2200.0,1600.0,70
+P014,Robot Vacuum,Appliances,Roborock,3000.0,2100.0,25
+P015,Bookshelf,Furniture,IKEA,600.0,350.0,40
+P016,Gaming Mouse,Electronics,Razer,500.0,280.0,120
+P017,Smart Watch,Electronics,Huawei,2500.0,1700.0,85
+P018,Bluetooth Speaker,Electronics,JBL,1200.0,750.0,90
+P019,Air Fryer,Appliances,Joyoung,450.0,260.0,55
+P020,Dining Table,Furniture,IKEA,1800.0,1100.0,10

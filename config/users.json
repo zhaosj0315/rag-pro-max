@@ -3,8 +3,9 @@
         "password_hash": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
         "role": "admin",
         "created_at": "2025-12-14T06:57:52.927469",
-        "last_login": "2026-01-10T15:16:13.070526",
-        "is_active": true
+        "last_login": "2026-01-12T19:42:38.476242",
+        "is_active": true,
+        "storage_quota_mb": 9999
     },
     "zhaosj": {
         "password_hash": "f867aff52a68a971ab89d2d7f9110406ac1613c98413c5c9b21922f8895b9d8c",
@@ -13,6 +14,23 @@
         "is_active": true,
         "kb_whitelist": [],
         "storage_quota_mb": 100,
-        "last_login": "2026-01-08T21:14:24.715484"
+        "last_login": "2026-01-12T20:15:03.308541"
+    },
+    "yxd": {
+        "password_hash": "9da7b97f6dd053c33a3fd0b910256199cb0e20c1988c9b789c39571526c01c91",
+        "role": "standard_user",
+        "created_at": "2026-01-12T01:00:14.092199",
+        "is_active": true,
+        "kb_whitelist": [],
+        "storage_quota_mb": 100,
+        "last_login": "2026-01-12T01:26:02.896623"
+    },
+    "test_std_user": {
+        "password_hash": "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3",
+        "role": "standard_user",
+        "created_at": "2026-01-12T09:17:17.638023",
+        "is_active": true,
+        "kb_whitelist": [],
+        "storage_quota_mb": 100
     }
 }

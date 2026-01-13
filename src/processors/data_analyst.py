@@ -2,7 +2,6 @@ import os
 import json
 import pandas as pd
 import sqlite3
-import re
 from typing import List, Dict, Any
 import hashlib
 
@@ -16,217 +15,435 @@ class DataAnalystEngine:
 
     def extract_schema_from_docs(self, docs: List[Any], model_client) -> Dict[str, Any]:
         """
-        [Phase 2: 语义建模]
-        从文档中提取 Schema 并推导 ER 关联关系。
+        [v4.5.0 战略版] 宏观语义提取：从文档中识别表结构、业务拓扑及【宏观战略目标】。
         """
-        print(f"\n[DA DEBUG] >>> 开始提取 Schema, 文档片段数: {len(docs)}")
-        try:
-            # 1. 准备上下文 (合并前 20 个片段)
-            all_text = "\n".join([d.text for d in docs[:20] if hasattr(d, 'text') and d.text])
-            
-            if not all_text.strip():
-                print("[DA DEBUG] !!! 警告: 文档内容为空，无法提取 Schema")
-                return {"error": "empty_content"}
+        all_text = "\n".join([d.text for d in docs[:30]]) 
+        
+        prompt = f"""
+你是一名资深首席架构师与业务战略专家。请从以下文档中提取业务模型与宏观背景。
+文档内容：{all_text}
 
-            prompt = f"""
-你是一名资深数据库架构师。请分析以下内容，识别出数据库表结构及其关联关系（外键）。
+要求输出标准的 JSON，必须包含：
+1. "macro_context": "基于文档推断的宏观业务背景、核心 KPI 目标和战略方向"
+2. "tables": {{ "表名": {{ "desc": "业务含义", "cols": [{{ "name": "字段名", "type": "类型", "comment": "解释" }}] }} }}
+3. "relationships": [ {{ "source": "表A", "target": "表B", "on": "关联字段", "logic": "宏观业务流转逻辑" }} ]
+4. "business_domains": {{ "领域名": ["相关表名"] }}
 
-内容摘要：
-{all_text[:3500]}
-
-要求：
-1. 识别表名、字段名、类型。
-2. 识别表间关联 (如 Orders.user_id -> Users.user_id)。
-3. 必须输出标准 JSON 格式。
-
-输出示例：
-{{
-  "tables": {{ "Users": {{ "description": "用户表", "columns": [...] }} }},
-  "relationships": ["Users.user_id -> Orders.user_id"]
-}}
-请仅输出 JSON。
+即使文档中仅有数据字典，也请根据字段名推断其在宏观业务中的价值。
 """
-            print("[DA DEBUG] 正在请求 LLM 提取 Schema...")
-            response = model_client.complete(prompt)
-            raw_text = response.text.strip()
-            print(f"[DA DEBUG] LLM 响应内容: {raw_text[:200]}...")
-            
-            # 使用正则暴力提取 JSON 块
-            json_str = raw_text
-            json_match = re.search(r'(\{.*\})', raw_text, re.DOTALL)
+        response = model_client.complete(prompt)
+        try:
+            content = response.text.strip()
+            import re
+            json_match = re.search(r'(\{.*\})', content, re.DOTALL)
             if json_match:
-                json_str = json_match.group(1)
+                content = json_match.group(1)
             
-            schema_data = json.loads(json_str)
-            print(f"[DA DEBUG] ✅ Schema 解析成功: 识别到 {len(schema_data.get('tables', {}))} 张表")
-            
-            # 持久化
-            os.makedirs(self.kb_path, exist_ok=True)
+            schema_data = json.loads(content)
             with open(self.schema_path, 'w', encoding='utf-8') as f:
                 json.dump(schema_data, f, indent=4, ensure_ascii=False)
-            print(f"[DA DEBUG] ✅ Schema 已保存至: {self.schema_path}")
-            
-            # 自动构建数据库
-            self._auto_build_db_from_csv()
-                
+            if self.logger: self.logger.success("✨ 业务架构定义已成功存入物理库")
             return schema_data
         except Exception as e:
-            print(f"[DA DEBUG] ❌ Schema 提取失败: {e}")
-            return {"error": str(e), "tables": {}, "relationships": []}
+            if self.logger: self.logger.error(f"战略模型解析失败: {e}")
+            return {"error": f"解析失败: {str(e)}"}
 
     def infer_business_blueprint(self, schemas: Any, model_client) -> Dict[str, Any]:
         """
-        [Phase 3: 业务推演]
-        基于 Schema 推导业务场景和 KPI。
+        [接口恢复] 业务蓝图推演：对接 v3.7.0 架构图谱引擎。
         """
-        print("\n[DA DEBUG] >>> 开始业务蓝图推演...")
         try:
-            # 安全序列化
             if isinstance(schemas, str):
                 schemas_str = schemas
             else:
                 schemas_str = json.dumps(schemas, indent=2, ensure_ascii=False, default=str)
             
+            # [v5.3.1] 防止 Schema 过大导致模型推理超时
+            if len(schemas_str) > 8000:
+                schemas_str = schemas_str[:8000] + "...(truncated)"
+            
             prompt = f"""
-请根据以下数据库结构推导业务全景图：
+请根据以下数据库架构图谱推导业务全景图：
 {schemas_str}
 
-请推演并输出 JSON：
+请输出标准的 JSON 格式：
 {{
-  "business_scenario": "业务场景描述",
-  "core_logic": "业务流转逻辑",
-  "metrics": [
-    {{"name": "指标", "definition": "逻辑"}}
-  ]
+  "business_scenario": "业务系统描述",
+  "core_logic": "核心业务流转逻辑",
+  "analysis_dimensions": ["维度1", "维度2", "维度3", "维度4", "维度5"]
 }}
-请仅输出 JSON。
 """
             response = model_client.complete(prompt)
-            raw_text = response.text.strip()
+            content = response.text.strip()
+            # 增强型 JSON 提取
+            import re
+            json_match = re.search(r'(\{.*\})', content, re.DOTALL)
+            if json_match: content = json_match.group(1)
             
-            json_str = raw_text
-            json_match = re.search(r'(\{.*\})', raw_text, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(1)
-                
-            blueprint = json.loads(json_str)
-            print(f"[DA DEBUG] ✅ 业务识别成功: {blueprint.get('business_scenario')}")
-            
+            blueprint = json.loads(content)
             with open(self.blueprint_path, 'w', encoding='utf-8') as f:
                 json.dump(blueprint, f, indent=4, ensure_ascii=False)
-                
             return blueprint
         except Exception as e:
-            print(f"[DA DEBUG] ❌ 业务推演失败: {e}")
-            return {"business_scenario": "通用数据分析", "core_logic": "未知", "metrics": []}
+            if self.logger: self.logger.error(f"业务蓝图推演失败: {e}")
+            return {
+                "business_scenario": "基于当前架构推演业务全景",
+                "core_logic": "多维业务数据分析与战略决策支持",
+                "analysis_dimensions": ["业务趋势分析", "风险预警", "资源优化", "绩效评估", "战略对齐"],
+                "error": str(e)
+            }
 
-    def execute_analysis(self, query: str, model_client) -> Dict[str, Any]:
+    def _get_relevant_tables(self, query: str, schemas: Dict[str, Any]) -> List[str]:
+        """针对百表规模的动态剪枝"""
+        all_tables = schemas.get("tables", {})
+        if len(all_tables) <= 8:
+            return list(all_tables.keys())
+        relevant = []
+        query_words = query.lower()
+        for t_name, info in all_tables.items():
+            if t_name.lower() in query_words or any(w in info.get("desc", "").lower() for w in query_words if len(w)>1):
+                relevant.append(t_name)
+        rels = schemas.get("relationships", [])
+        extra = []
+        for r in rels:
+            if r["source"] in relevant and r["target"] not in relevant: extra.append(r["target"])
+            elif r["target"] in relevant and r["source"] not in relevant: extra.append(r["source"])
+        return list(set(relevant + extra))[:10]
+
+    def _ensure_sandbox_ready(self, schemas: Dict[str, Any], model_client):
         """
-        [Phase 4: 执行与决策]
-        Query -> SQL -> Execution -> Insight
+        [v5.3.1] 虚拟沙盒激活：增加 dual 表支持与仿真数据注入。
         """
-        print(f"\n[DA DEBUG] >>> 收到分析请求: {query}")
-        # 1. 加载上下文
-        schemas = {}
-        blueprint = {}
-        try:
-            if os.path.exists(self.schema_path):
-                with open(self.schema_path, 'r', encoding='utf-8') as f: schemas = json.load(f)
-            if os.path.exists(self.blueprint_path):
-                with open(self.blueprint_path, 'r', encoding='utf-8') as f: blueprint = json.load(f)
-        except: pass
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
         
-        # 2. 生成 SQL
-        rel_hint = "\n".join(schemas.get("relationships", []))
-        sql_prompt = f"""
-你是一名资深数据分析专家。请基于以下结构生成 SQLite 查询语句。
-
-【表结构】：{json.dumps(schemas.get('tables', {}), ensure_ascii=False)}
-【关联关系】：{rel_hint}
-
-用户问题：{query}
+        # A. 创建 DUAL 表垫片 (解决 no such table: dual)
+        cursor.execute("CREATE TABLE IF NOT EXISTS dual (dummy TEXT)")
+        cursor.execute("SELECT count(*) FROM dual")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("INSERT INTO dual (dummy) VALUES ('X')")
+        
+        tables_to_mock = []
+        for t_name, info in schemas.get('tables', {}).items():
+            cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{t_name}'")
+            if not cursor.fetchone():
+                tables_to_mock.append(t_name)
+        
+        if tables_to_mock and model_client:
+            if self.logger: self.logger.info(f"🚧 正在为虚拟表 {tables_to_mock} 制造仿真数据...")
+            for t_name in tables_to_mock:
+                t_info = schemas['tables'][t_name]
+                cols_str = ", ".join([f"{c['name']} (注释: {c.get('comment', '无')})" for c in t_info.get('cols', t_info.get('columns', []))])
+                
+                mock_prompt = f"""
+请为以下业务表生成 20 条【逻辑闭环】的仿真数据。
+表名：{t_name}
+字段定义：{cols_str}
+业务背景：{schemas.get('macro_context', '通用业务')}
 
 要求：
-1. 必须使用标准 SQL。
-2. 优先使用 GROUP BY 语句以展示数据的分布对比（除非用户明确要求单条记录）。
-3. 结果包裹在 [SQL_START] 和 [SQL_END] 之间。
+1. 输出标准的 SQL INSERT 语句（适配 SQLite）。
+2. 数据必须符合业务常识（如金额不为负，日期连续等）。
+3. 仅输出 SQL 语句，不要解释。
 """
-        print("[DA DEBUG] 正在生成 SQL...")
-        sql_res = model_client.complete(sql_prompt).text
-        sql_query = ""
-        if "[SQL_START]" in sql_res:
-            sql_query = sql_res.split("[SQL_START]")[1].split("[SQL_END]")[0].strip()
+                try:
+                    mock_sql = model_client.complete(mock_prompt).text
+                    # 清理并执行 SQL
+                    for sql_line in mock_sql.split(';'):
+                        clean_sql = sql_line.strip()
+                        if clean_sql.upper().startswith(('CREATE', 'INSERT')):
+                            if clean_sql.upper().startswith('INSERT') and "CREATE" not in mock_sql:
+                                cols_def = ", ".join([f"{c['name']} TEXT" for c in t_info.get('cols', t_info.get('columns', []))])
+                                cursor.execute(f"CREATE TABLE IF NOT EXISTS {t_name} ({cols_def})")
+                            cursor.execute(clean_sql)
+                except Exception as e:
+                    if self.logger: self.logger.error(f"仿真数据注入失败 ({t_name}): {e}")
         
-        # 3. 执行 SQL
-        execution_result = {"success": False, "data": [], "error": None}
-        if sql_query:
-            execution_result = self.execute_sql(sql_query)
+        conn.commit()
+        conn.close()
+
+    def execute_analysis(self, query: str, model_client, context_text: str = "") -> Dict[str, Any]:
+        """
+        [v5.0 极光战略工作坊] 链式推演引擎：需求拆解 -> 多阶脚本 -> 闭环仿真 -> 综合研判
+        """
+        if not os.path.exists(self.schema_path):
+             return {"success": False, "logic": "未找到数据结构定义，请上传文档或表单。"}
+
+        with open(self.schema_path, 'r', encoding='utf-8') as f:
+            full_schemas = json.load(f)
         
-        # 4. 生成洞察
-        if execution_result['success']:
-            data_sample = execution_result['data'][:20] 
-            insight_prompt = f"""
-作为首席业务分析师，请根据数据结果回答用户问题。
-
-【用户问题】：{query}
-【数据结果】：{json.dumps(data_sample, ensure_ascii=False)}
-
-请输出简洁的报告 (Markdown)：
-1. **💡 核心结论**: 一句话直接回答提问。
-2. **📊 数据解读**: 简要分析数据中的关键点。
-3. **🚀 行动建议**: 给出 1-2 条建议。
-"""
-            print("[DA DEBUG] 正在生成业务洞察报告...")
-            final_report = model_client.complete(insight_prompt).text
-        else:
-            final_report = f"执行失败：{execution_result.get('error')}"
-
-        return {
-            "sql": sql_query,
-            "data": execution_result.get('data', []),
-            "logic": final_report,
-            "success": execution_result.get('success', False)
+        self._ensure_sandbox_ready(full_schemas, model_client)
+        relevant_table_names = self._get_relevant_tables(query, full_schemas)
+        pruned_schemas = {
+            "macro_context": full_schemas.get("macro_context", "通用业务分析"),
+            "tables": {name: full_schemas["tables"][name] for name in relevant_table_names if name in full_schemas["tables"]},
+            "relationships": [r for r in full_schemas.get("relationships", []) if r["source"] in relevant_table_names or r["target"] in relevant_table_names]
         }
 
-    def execute_sql(self, sql: str) -> Dict[str, Any]:
-        """执行 SQL 并返回结果"""
-        print(f"[DA DEBUG] 执行 SQL: {sql}")
+        decomposition_prompt = f"""
+你是一名顶级商业技术顾问。针对用户需求，请将其拆解为 2 个逻辑递进的分析阶段。
+需求：{query}
+业务模型：{json.dumps(pruned_schemas, ensure_ascii=False)}
+
+请返回标准的 JSON 数组，格式如下：
+[
+  {{
+    "stage_id": 1, 
+    "title": "阶段标题", 
+    "requirement": "【需求理解】本阶段要解决的业务核心痛点是什么",
+    "transformation": "【技术转化】本阶段将如何通过数据加工（逻辑、表、指标）来满足上述需求",
+    "goal": "具体执行目标", 
+    "logic": "核心算法说明" 
+  }},
+  ...
+]"""
         try:
-            if not os.path.exists(self.db_path):
-                self._auto_build_db_from_csv()
+            decomp_res = model_client.complete(decomposition_prompt).text
+            stages_meta = json.loads(decomp_res.strip().replace("```json", "").replace("```", ""))
+        except:
+            stages_meta = [{"stage_id": 1, "title": "核心逻辑分析", "goal": "执行基础数据摸排", "logic": "直接针对需求进行多表关联分析"}]
+
+        final_stages_data = []
+        full_analysis_context = ""
+
+        for meta in stages_meta:
+            analysis_path = meta.get('transformation', meta.get('title', '业务逻辑推演'))
+            sql_prompt = f"""
+基于分析路径："{analysis_path}"，请编写高度可读、带有详细业务注释的多方言 SQL。
+业务背景：{pruned_schemas['macro_context']}
+模型：{json.dumps(pruned_schemas['tables'], ensure_ascii=False)}
+
+要求：
+1. **必须包含详细注释**：使用 '--' 对每一段逻辑进行说明。
+2. **注释内容**：
+   - 标注使用的原始表业务含义。
+   - 标注关键字段或计算公式的业务逻辑。
+   - 标注 JOIN 关联的血缘依据。
+3. 返回一个 JSON 对象，包含三个字段：
+   - "sqlite": "带有注释的本地验证 SQL"
+   - "dataworks": "带有注释的适配 MaxCompute 语法的 SQL，包含 ${{bizdate}} 变量"
+   - "standard": "带有注释 de ANSI SQL"
+
+仅返回 JSON，不要有其他解释。"""
             
+            sqls = {"sqlite": "", "dataworks": "", "standard": ""}
+            try:
+                sql_res = model_client.complete(sql_prompt).text
+                sqls = json.loads(sql_res.strip().replace("```json", "").replace("```", ""))
+            except: pass
+
+            execution_res = {"success": False, "data": []}
+            is_simulated = False
+            source_samples = {}
+            
+            for t_name in relevant_table_names:
+                s_res = self.execute_sql(f"SELECT * FROM {t_name} LIMIT 3")
+                if s_res["success"] and s_res["data"]:
+                    source_samples[t_name] = s_res["data"]
+                else:
+                    source_samples[t_name] = [{"info": f"正在基于 {t_name} 模型进行逻辑模拟..."}]
+
+            if sqls.get("sqlite"):
+                execution_res = self.execute_sql(sqls["sqlite"])
+                if not execution_res["success"] or not execution_res["data"]:
+                    is_simulated = True
+                    sim_prompt = f"""【战略仿真模式】为阶段：{meta['title']} 制造 10 条反映宏观趋势的“黄金模拟数据”。
+业务背景：{pruned_schemas['macro_context']}
+逻辑依赖：{meta['logic']}
+表结构：{json.dumps(pruned_schemas['tables'], ensure_ascii=False)}
+
+要求：
+1. 数据必须逻辑闭环（如：金额必须符合业务常识，日期要有连续性）。
+2. **宏观特征**：模拟出的数据应包含 1-2 处“异常点”或“显著趋势”，以供战略分析使用。
+3. 仅返回 JSON 数组格式。"""
+                    try:
+                        sim_out = model_client.complete(sim_prompt).text
+                        import re
+                        json_match = re.search(r'(\[.*\])', sim_out, re.DOTALL)
+                        if json_match: execution_res = {"success": True, "data": json.loads(json_match.group(1))}
+                    except: pass
+            
+            stage_entry = {
+                "meta": meta,
+                "sqls": sqls,
+                "data": execution_res.get("data", []),
+                "source_samples": source_samples,
+                "is_simulated": is_simulated
+            }
+            final_stages_data.append(stage_entry)
+            full_analysis_context += f"阶段 {meta['stage_id']} ({meta['title']}) 结论数据: {json.dumps(stage_entry['data'][:3], ensure_ascii=False)}\n"
+
+        summary_prompt = f"""
+你是一名首席战略官。请基于以下【多阶段链式推演】的实际结果撰写最终战略报告。
+用户原始需求: {query}
+业务宏观背景: {pruned_schemas['macro_context']}
+各阶段推演数据摘要:
+{full_analysis_context}
+
+要求（严格执行）：
+1. **真实性第一**：报告中的每一个百分比、每一个地区名称必须与“推演数据摘要”中提供的 JSON 内容完全一致。
+2. **严禁编造**：如果数据摘要中只有 East/West，严禁在报告中提到北美、欧洲等虚假信息。
+3. 如果数据是仿真的，请在开头明确标注：“当前分析基于业务架构模型仿真得出”。
+4. 报告结构包含：### 🗺️ 全局战略地图、### 🔬 阶段性洞察汇编、### 💻 工程落地指南、### 🚀 首席执行建议。
+"""
+        
+        def report_generator():
+            if hasattr(model_client, 'stream_chat'):
+                from llama_index.core.base.llms.types import ChatMessage, MessageRole
+                messages = [ChatMessage(role=MessageRole.USER, content=summary_prompt)]
+                try:
+                    response_gen = model_client.stream_chat(messages)
+                    for chunk in response_gen:
+                        if hasattr(chunk, 'delta') and chunk.delta: yield chunk.delta
+                        elif hasattr(chunk, 'message') and hasattr(chunk.message, 'content'): yield chunk.message.content
+                        else: yield str(chunk)
+                except: yield "战略推演报告生成异常"
+            else:
+                res = model_client.complete(summary_prompt).text
+                for char in res: yield char
+
+        return {
+            "stages": final_stages_data,
+            "logic_gen": report_generator(),
+            "success": True,
+            "macro_context": pruned_schemas['macro_context']
+        }
+
+    def _recover_data_from_docstore(self):
+        docstore_path = os.path.join(self.kb_path, "docstore.json")
+        if not os.path.exists(docstore_path): return
+        try:
+            with open(docstore_path, 'r', encoding='utf-8') as f:
+                docstore = json.load(f)
+            nodes = docstore.get("docstore/data", {})
+            import io, re
+            conn = sqlite3.connect(self.db_path)
+            for node_id, node_data in nodes.items():
+                text = node_data.get("__data__", {}).get("text", "")
+                metadata = node_data.get("__data__", {}).get("metadata", {})
+                file_name = metadata.get("file_name", "")
+                if file_name.endswith('.csv') or (',' in text and '\n' in text):
+                    table_name = os.path.splitext(file_name)[0] if file_name else f"table_{{node_id[:8]}}"
+                    table_name = re.sub(r'[^a-zA-Z0-9_]', '_', table_name)
+                    try:
+                        df = pd.read_csv(io.StringIO(text))
+                        df.to_sql(table_name, conn, index=False, if_exists='replace')
+                    except: continue
+            conn.close()
+        except: pass
+
+    def execute_sql(self, sql: str) -> Dict[str, Any]:
+        try:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = lambda c, r: dict([(col[0], r[idx]) for idx, col in enumerate(c.description)])
             cursor = conn.cursor()
             cursor.execute(sql)
             rows = cursor.fetchall()
             conn.close()
-            
-            print(f"[DA DEBUG] ✅ 查询完成，返回 {len(rows)} 行")
             return {"success": True, "data": rows}
         except Exception as e:
-            print(f"[DA DEBUG] ❌ SQL 错误: {e}")
+            error_str = str(e)
+            if "no such table" in error_str.lower():
+                try:
+                    self._recover_data_from_docstore()
+                    conn = sqlite3.connect(self.db_path)
+                    conn.row_factory = lambda c, r: dict([(col[0], r[idx]) for idx, col in enumerate(c.description)])
+                    cursor = conn.cursor()
+                    cursor.execute(sql)
+                    rows = cursor.fetchall()
+                    conn.close()
+                    return {"success": True, "data": rows}
+                except: pass
             return {"success": False, "error": str(e), "data": []}
 
-    def _auto_build_db_from_csv(self):
-        """物理构建 SQLite 数据库"""
-        print("[DA DEBUG] 正在同步构建 SQLite 数据库...")
+    def process_files(self, file_paths: List[str], model_client=None) -> Dict[str, Any]:
+        """
+        [v5.3 战略版] 全域开模引擎：支持全格式输入 (PDF/MD/CSV/XLSX) 统一建模。
+        """
+        import re
         try:
-            from src.config.manifest_manager import ManifestManager
-            manifest = ManifestManager.load(self.kb_path)
-            files_count = 0
-            for f_info in manifest.get('files', []):
-                f_path = f_info.get('file_path')
-                if f_path and os.path.exists(f_path) and f_path.endswith('.csv'):
-                    t_name = os.path.splitext(f_info['name'])[0].replace('.', '_')
-                    df = pd.read_csv(f_path)
-                    conn = sqlite3.connect(self.db_path)
-                    df.to_sql(t_name, conn, index=False, if_exists='replace')
-                    conn.close()
-                    files_count += 1
-            print(f"[DA DEBUG] ✅ 数据库就绪，导入 {files_count} 张表")
-        except Exception as e:
-            print(f"[DA DEBUG] ❌ 物理入库失败: {e}")
+            if os.path.exists(self.db_path): os.remove(self.db_path)
+            conn = sqlite3.connect(self.db_path)
+            
+            physical_tables = {}
+            semantic_docs = []
+            
+            for file_path in file_paths:
+                file_name = os.path.basename(file_path).lower()
+                if file_name.endswith(('.md', '.markdown', '.pdf', '.docx', '.txt')):
+                    semantic_docs.append(file_path)
+                    continue
 
-    def process_files(self, file_paths: List[str]):
-        self._auto_build_db_from_csv()
+                table_name = os.path.splitext(file_name)[0]
+                table_name = re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', table_name)
+                
+                try:
+                    if file_name.endswith('.csv'): df = pd.read_csv(file_path)
+                    elif file_name.endswith(('.xls', '.xlsx')): df = pd.read_excel(file_path)
+                    else: continue
+                    
+                    df.columns = [re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', str(c)) for c in df.columns]
+                    df.to_sql(table_name, conn, index=False, if_exists='replace')
+                    
+                    physical_tables[table_name] = {
+                        "source": file_name,
+                        "columns": [{"name": c, "type": str(t)} for c, t in df.dtypes.items()]
+                    }
+                except Exception as e:
+                    if self.logger: self.logger.warning(f"物理表 {file_name} 解析跳过: {e}")
+            
+            conn.close()
+
+            unified_schema = {"tables": physical_tables, "macro_context": "通用业务分析", "relationships": []}
+            
+            if semantic_docs and model_client:
+                if self.logger: self.logger.info(f"🧠 正在从 {len(semantic_docs)} 个源材料中提取战略模型...")
+                docs_content = []
+                for doc_path in semantic_docs:
+                    with open(doc_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        docs_content.append(f.read()[:5000])
+                
+                prompt = f"""
+你是一名资深架构师。请结合以下【物理表结构】与【业务材料内容】，构建统一的业务模型。
+【物理表结构】：{json.dumps(physical_tables, ensure_ascii=False)}
+【业务材料】：{"".join(docs_content)}
+
+要求输出标准 JSON：
+1. "macro_context": "基于文档推断的宏观背景与 KPI 定义"
+2. "tables": {{ 
+      "表名": {{ 
+         "desc": "业务含义", 
+         "is_virtual": true/false(物理表为false),
+         "cols": [{{ "name": "字段名", "comment": "从文档中识别的业务定义" }}] 
+      }} 
+   }}
+3. "relationships": [ {{ "source": "表A", "target": "表B", "on": "关联字段", "logic": "业务流转逻辑" }} ]
+"""
+                res = model_client.complete(prompt).text
+                try:
+                    json_match = re.search(r'(\{.*\})', res, re.DOTALL)
+                    if json_match:
+                        semantic_schema = json.loads(json_match.group(1))
+                        for t_name, t_info in semantic_schema.get('tables', {}).items():
+                            if t_name in unified_schema['tables']:
+                                unified_schema['tables'][t_name].update(t_info)
+                                unified_schema['tables'][t_name]['is_virtual'] = False
+                            else:
+                                unified_schema['tables'][t_name] = t_info
+                                unified_schema['tables'][t_name]['is_virtual'] = True
+                        
+                        unified_schema['macro_context'] = semantic_schema.get('macro_context', unified_schema['macro_context'])
+                        unified_schema['relationships'] = semantic_schema.get('relationships', [])
+                except: pass
+
+            with open(self.schema_path, 'w', encoding='utf-8') as f:
+                json.dump(unified_schema, f, indent=4, ensure_ascii=False)
+            
+            return {
+                "success": True, 
+                "tables": list(unified_schema['tables'].keys()),
+                "has_virtual": any(t.get('is_virtual') for t in unified_schema['tables'].values())
+            }
+        except Exception as e:
+            if self.logger: self.logger.error(f"全域开模失败: {e}")
+            return {"success": False, "error": str(e)}

@@ -12,17 +12,25 @@
 
 # RAG Pro Max - Intelligent Document Q&A System
 
-**版本**: v3.2.2  
-**更新日期**: 2026-01-03  
-**适用范围**: 企业级部署与运维
-
-![Version](https://img.shields.io/badge/version-v3.2.2-brightgreen)
+**Version**: v5.5.8  
+![Version](https://img.shields.io/badge/version-v5.5.8-brightgreen)
 ![Status](https://img.shields.io/badge/status-Stable-blue)
-![Last Update](https://img.shields.io/badge/last%20update-2026--01--03-orange)
+![Last Update](https://img.shields.io/badge/last%20update-2026--01--12-orange)
 
-> **Enterprise-grade RAG (Retrieval Augmented Generation) Knowledge Base System - Ultimate Evolution of Intelligent Recommendations & Ultra-fast Retrieval**
+## 🚀 RAG Pro Max v5.5.8
+### 📦 Data Sovereignty & Full Export (v5.5.8 Update)
+- **Ultimate Asset Package**: One-click export of 01-06 structure, including raw documents, chat history (MD), strategic models, and vector snapshots.
+- **Cross-Directory Salvage**: Automated retrieval of search results from temporary folders to ensure complete data portability.
+- **Admin Asset Inventory**: New 'Asset Hub' in admin dashboard for cross-user batch filtering and deep cleanup.
+- **Self-Healing Infrastructure**: Optimized log system with automated fallback to user home directory, bypassing macOS permission issues.
 
-**🎯 Core Advantages**: Modern Configuration Center • Plugin-based Custom Vendors • Semantic Firewall • Expert-level Intelligent Research
+## 🚀 RAG Pro Max v5.5.8
+### 💎 Universal Strategic Modeling (v5.5.8 Major Update)
+- **Multi-modal Alignment**: Supports mixed input of PDF/MD dictionaries and CSV/Excel tables, automatically locking business definitions to physical table structures.
+- **Virtual Strategic Sandbox**: Introducing the "Golden Mock Data" engine, enabling one-click simulation of 20 closed-loop data records even with only data dictionaries.
+- **Forced Routing Guard**: Completely isolates Data Analysis and RAG pipelines, ensuring professional analysis dashboard outputs via `st.rerun()`.
+- **Zero-Crash Stability**: Deeply optimized initialization scopes, eliminating `NameError` for critical variables like `logger` and `time` under extreme loads.
+- **Auto-Format Sensing**: System automatically triggers the "Business Semantic Brain" whenever tables or dictionary files are detected.
 
 ---
 
@@ -40,7 +48,7 @@
 - **Self-hosted Vector Database**: Sensitive information stays internal
 - **Open Source Transparency**: Complete source code for security auditing
 
-### 🔬 Intelligent Research & Deep Analysis (Enhanced in v3.2.2)
+### 🔬 Intelligent Research & Deep Analysis (Enhanced in v5.5.8)
 - **Deep Research Mode**: Simulates expert-level multi-step analysis, fact-checking, and cross-domain knowledge integration
 - **Research Instruction Injection**: Automatically decomposes complex questions into multi-dimensional analysis
 - **Status Indicator Bar**: Real-time display of four core capabilities: "Thinking, Networking, Searching, Researching"
@@ -50,7 +58,7 @@
 - **Quality Assessment System**: Integrated intelligent quality analyzer with automatic authority scoring (🏆/⭐/⚠️)
 - **Collapsible Display**: Search details sorted by quality and collapsed in status bar by default
 
-### 🔄 Continuous Optimization System (New in v3.2.2)
+### 🔄 Continuous Optimization System (New in v5.5.8)
 - **Virtuous Cycle Mechanism**: Automated optimization workflow of patrol → analyze → plan → implement → verify
 - **Intelligent Monitoring**: Automatic monitoring of code quality, performance metrics, test coverage, documentation completeness
 - **Auto Optimization**: Executes automated improvement tasks like cleanup, refactoring, performance tuning

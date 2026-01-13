@@ -1,8 +1,121 @@
 import json
 import os
+import uuid
+import time
+from datetime import datetime, timedelta
 from src.auth.user_auth import load_users
 
 SHARING_CONFIG_PATH = "config/kb_sharing.json"
+SESSION_CONFIG_PATH = "config/sessions.json"
+DEFAULT_SESSION_DAYS = 7
+
+# ==================== Session Token Management ====================
+
+def load_session_store():
+    if os.path.exists(SESSION_CONFIG_PATH):
+        try:
+            with open(SESSION_CONFIG_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            return {"sessions": {}, "user_settings": {}}
+    return {"sessions": {}, "user_settings": {}}
+
+def save_session_store(store):
+    os.makedirs(os.path.dirname(SESSION_CONFIG_PATH), exist_ok=True)
+    with open(SESSION_CONFIG_PATH, 'w', encoding='utf-8') as f:
+        json.dump(store, f, indent=4, ensure_ascii=False)
+
+def create_session(username):
+    """创建新会话，返回 Token"""
+    store = load_session_store()
+    
+    # 获取用户设置或默认设置
+    user_settings = store.get("user_settings", {})
+    # 优先使用用户特定设置，否则使用全局设置，最后使用代码默认值
+    days = user_settings.get(username, user_settings.get("global_default", DEFAULT_SESSION_DAYS))
+    
+    token = str(uuid.uuid4())
+    expiry = datetime.now() + timedelta(days=days)
+    
+    if "sessions" not in store:
+        store["sessions"] = {}
+
+    store["sessions"][token] = {
+        "username": username,
+        "expiry": expiry.isoformat(),
+        "created_at": datetime.now().isoformat()
+    }
+    
+    # 简单的垃圾回收
+    _cleanup_expired_sessions(store)
+    
+    save_session_store(store)
+    return token, days
+
+def validate_session(token):
+    """验证 Token 有效性"""
+    if not token: return None
+    store = load_session_store()
+    session = store.get("sessions", {}).get(token)
+    
+    if not session:
+        return None
+        
+    try:
+        expiry = datetime.fromisoformat(session["expiry"])
+        if datetime.now() > expiry:
+            if token in store["sessions"]:
+                del store["sessions"][token]
+                save_session_store(store)
+            return None
+    except:
+        return None
+        
+    return session["username"]
+
+def revoke_user_sessions(username):
+    """注销用户所有会话"""
+    store = load_session_store()
+    if "sessions" not in store: return 0
+    
+    tokens_to_remove = [k for k, v in store["sessions"].items() if v["username"] == username]
+    for t in tokens_to_remove:
+        del store["sessions"][t]
+    save_session_store(store)
+    return len(tokens_to_remove)
+
+def get_session_settings():
+    """获取会话配置"""
+    store = load_session_store()
+    return store.get("user_settings", {})
+
+def set_session_setting(username, days):
+    """设置会话时长"""
+    store = load_session_store()
+    if "user_settings" not in store:
+        store["user_settings"] = {}
+    
+    if username == "global_default":
+        store["user_settings"]["global_default"] = days
+    else:
+        store["user_settings"][username] = days
+    save_session_store(store)
+
+def _cleanup_expired_sessions(store):
+    """清理过期会话"""
+    if "sessions" not in store: return
+    now = datetime.now()
+    expired = []
+    for token, info in store["sessions"].items():
+        try:
+            if now > datetime.fromisoformat(info["expiry"]):
+                expired.append(token)
+        except:
+            expired.append(token)
+    for t in expired:
+        del store["sessions"][t]
+
+# ==================== Existing Sharing Logic ====================
 
 def load_sharing_config():
     """加载知识库共享配置"""

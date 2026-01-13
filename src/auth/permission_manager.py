@@ -8,21 +8,43 @@ class PermissionManager:
 
     def _load_templates(self):
         if os.path.exists(self.templates_path):
-            with open(self.templates_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+            try:
+                with open(self.templates_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"❌ Error loading role templates: {e}")
+                # Fallback to hardcoded defaults
+        
         return {
             "admin": {"name": "管理员", "permissions": ["*"]},
-            "standard_user": {"name": "注册用户", "permissions": ["create_kb", "upload_files", "chat"]},
+            "standard_user": {
+                "name": "注册用户", 
+                "permissions": [
+                    "create_kb", "upload_files", "chat", 
+                    "data_analysis", "download_knowledge_base", "kb_export_full", "kb_export_report", "summary_gen", "kb_delete_own", "paste_text"
+                ]
+            },
             "guest": {"name": "访客", "permissions": ["chat"]}
         }
 
     def has_permission(self, username, permission):
         """实时检查用户权限"""
+        # 强制重新加载角色配置，确保热更新生效
+        self.roles = self._load_templates()
+
         from src.auth.user_auth import load_users
         users = load_users()
         user_info = users.get(username, {})
         
-        # 访客处理
+        # 1. 检查用户特有权限覆盖 (User-Specific Overrides)
+        # 支持 "custom_permissions": ["data_analysis", "-download_files"]
+        custom_perms = user_info.get("custom_permissions", [])
+        if f"-{permission}" in custom_perms:
+            return False  # 明确禁止
+        if permission in custom_perms:
+            return True   # 明确允许
+        
+        # 2. 访客处理
         if username == "guest_user":
             user_role = "guest"
         else:

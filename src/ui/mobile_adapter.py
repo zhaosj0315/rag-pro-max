@@ -23,47 +23,16 @@ class MobileAdapter:
 
     @staticmethod
     def render_view_selector():
-        """渲染视图切换器 (建议放在侧边栏)"""
+        """渲染视图切换器 (已简化：仅保留桌面模式)"""
         MobileAdapter.init_state()
         
-        st.markdown("### 📱 视图预览", help="切换不同设备的视图布局，不影响功能，仅改变显示宽度。")
-        
-        # 使用列布局放置三个小按钮
-        cols = st.columns(3)
-        
-        # 定义按钮点击回调
-        def set_mode(mode):
-            st.session_state.view_mode = mode
+        # 强制锁定为桌面模式
+        if st.session_state.view_mode != "desktop":
+            st.session_state.view_mode = "desktop"
+            st.rerun()
 
-        # 渲染按钮
-        current_mode = st.session_state.view_mode
-        
-        with cols[0]:
-            # 桌面按钮
-            if st.button("🖥️", key="btn_view_desktop", help="桌面全宽视图", 
-                         type="primary" if current_mode == "desktop" else "secondary",
-                         use_container_width=True):
-                set_mode("desktop")
-                st.rerun()
-                
-        with cols[1]:
-            # 平板按钮
-            if st.button("📟", key="btn_view_tablet", help="平板 (iPad) 视图", 
-                         type="primary" if current_mode == "tablet" else "secondary",
-                         use_container_width=True):
-                set_mode("tablet")
-                st.rerun()
-                
-        with cols[2]:
-            # 手机按钮
-            if st.button("📱", key="btn_view_mobile", help="手机视图", 
-                         type="primary" if current_mode == "mobile" else "secondary",
-                         use_container_width=True):
-                set_mode("mobile")
-                st.rerun()
-
-        # 立即应用对应的 CSS
-        MobileAdapter._apply_css(current_mode)
+        # 不再显示切换按钮，直接应用桌面样式
+        MobileAdapter._apply_css("desktop")
 
     @staticmethod
     def _apply_css(mode):

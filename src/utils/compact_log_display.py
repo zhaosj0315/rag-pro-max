@@ -107,17 +107,32 @@ class CompactLogDisplay:
         if not self.log_dir.exists():
             return []
         
-        return [f for f in self.log_dir.glob("*.log") if f.is_file()]
+        # 扩展支持: 兼容 .log 和 .jsonl 格式
+        log_files = []
+        for ext in ["*.log", "*.jsonl"]:
+            log_files.extend(list(self.log_dir.glob(ext)))
+            
+        # 按修改时间排序，最新的在前
+        log_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        return [f for f in log_files if f.is_file()]
     
     def _get_log_preview(self, log_file: Path) -> List[str]:
-        """获取日志文件预览"""
+        """获取日志文件预览 - 增强容错"""
         try:
-            with open(log_file, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
+            # 优先尝试只读模式打开，不锁定文件
+            with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                # 这种方式对大文件不友好，优化为读取末尾
+                f.seek(0, 2) # 移到末尾
+                file_size = f.tell()
+                # 只读取最后 100KB 的内容
+                offset = max(0, file_size - 102400)
+                f.seek(offset)
+                content = f.read()
+                lines = content.splitlines()
                 # 返回最后几行
                 return [line.strip() for line in lines[-self.max_lines_preview:] if line.strip()]
-        except Exception:
-            return ["无法读取日志内容"]
+        except Exception as e:
+            return [f"⚠️ 无法读取: {str(e)}"]
     
     def _count_log_levels(self, log_file: Path) -> Dict[str, int]:
         """统计日志级别数量"""

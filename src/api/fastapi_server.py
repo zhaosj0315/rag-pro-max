@@ -21,7 +21,7 @@ from src.core.version import get_version_info
 
 logger = LogManager()
 version_info = get_version_info()
-CURRENT_VERSION = version_info.get("version", "3.2.7")
+CURRENT_VERSION = version_info.get("version", "5.5.8")
 
 # 原有数据模型
 class QueryRequest(BaseModel):
@@ -127,15 +127,17 @@ async def query_knowledge_base(request: QueryRequest):
 async def list_knowledge_bases():
     """列出所有知识库"""
     try:
-        # 模拟知识库列表
-        kbs = [
-            {
-                "name": "示例知识库",
-                "document_count": 10,
-                "created_at": "2025-12-10",
-                "size_mb": 25.6
-            }
-        ]
+        kb_names = kb_manager.list_all()
+        kbs = []
+        for name in kb_names:
+            info = kb_manager.get_info(name)
+            if info:
+                kbs.append({
+                    "name": name,
+                    "document_count": info.get("document_count", 0),
+                    "created_at": info.get("created_time", ""),
+                    "size_mb": info.get("total_size_mb", 0.0)
+                })
         
         return [KnowledgeBaseInfo(**kb) for kb in kbs]
         
@@ -184,8 +186,8 @@ async def incremental_update(request: IncrementalUpdateRequest):
             files_to_process = changes['new'] + changes['modified']
             skipped_files = changes['unchanged']
         
-        # ⚠️ MOCK IMPLEMENTATION: This is a placeholder. Real processing logic needs to be connected to KBManager.
-        logger.warning("Executing MOCK incremental update - no actual files are processed", stage="API")
+        # ⚠️ MOCK IMPLEMENTATION: Real processing logic is being unified in KBService.
+        logger.warning("Executing MOCK incremental update - Logic alignment pending in v5.5.8", stage="API")
         for file_path in files_to_process:
             try:
                 processed_files.append(file_path)
@@ -304,7 +306,7 @@ async def get_multimodal_formats():
 def start_api_server(host: str = "0.0.0.0", port: int = 8502):
     """启动API服务器"""
     logger.info(f"🚀 启动FastAPI服务器: http://{host}:{port}")
-    logger.info("📋 v2.0 新功能: 增量更新、多模态支持")
+    logger.info("📋 v5.5.8 新功能: 全量资产导出、管理员治理中心")
     uvicorn.run(app, host=host, port=port)
 
 if __name__ == "__main__":

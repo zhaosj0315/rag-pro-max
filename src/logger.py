@@ -2,6 +2,7 @@ import os
 import json
 from datetime import datetime
 import time
+import getpass
 
 from src.app_logging.log_manager import LogManager
 
@@ -13,7 +14,20 @@ if not os.path.exists(LOG_DIR):
 
 class Logger:
     def __init__(self):
-        self.log_file = os.path.join(LOG_DIR, f"log_{datetime.now().strftime('%Y%m%d')}.jsonl")
+        # 使用当前用户名作为日志文件名的一部分，防止多用户/root权限冲突
+        current_user = getpass.getuser()
+        self.log_file = os.path.join(LOG_DIR, f"log_{datetime.now().strftime('%Y%m%d')}_{current_user}.jsonl")
+        
+        # 尝试写入测试，如果权限受限，回退到临时目录
+        try:
+            with open(self.log_file, 'a', encoding='utf-8') as f:
+                pass
+        except PermissionError:
+            print(f"⚠️ [Logger] 无法写入 {self.log_file}，尝试切换到临时目录...")
+            import tempfile
+            self.log_file = os.path.join(tempfile.gettempdir(), f"rag_log_{datetime.now().strftime('%Y%m%d')}_{current_user}.jsonl")
+            print(f"⚠️ [Logger] 已切换日志路径至: {self.log_file}")
+
         self.timers = {}  # 记录各阶段开始时间
         self._cleanup_old_logs()
     
@@ -24,20 +38,26 @@ class Logger:
             from datetime import timedelta
             
             cutoff = datetime.now() - timedelta(days=days)
+            # 匹配包含用户名的日志文件
             for log_file in glob.glob(os.path.join(LOG_DIR, 'log_*.jsonl')):
                 try:
-                    # 从文件名提取日期 log_20251201.jsonl
+                    # 从文件名提取日期 log_20251201_username.jsonl
                     filename = os.path.basename(log_file)
-                    date_str = filename.split('_')[1].split('.')[0]
-                    log_date = datetime.strptime(date_str, '%Y%m%d')
-                    
-                    if log_date < cutoff:
-                        os.remove(log_file)
-                        logger.info(f"🗑️ 已自动清理旧日志: {filename}")
+                    parts = filename.split('_')
+                    if len(parts) >= 2:
+                        date_str = parts[1]
+                        # 简单的日期校验
+                        if len(date_str) == 8 and date_str.isdigit():
+                            log_date = datetime.strptime(date_str, '%Y%m%d')
+                            
+                            if log_date < cutoff:
+                                os.remove(log_file)
+                                # logger实例此时可能还未完全初始化，使用print
+                                print(f"🗑️ [Logger] 已自动清理旧日志: {filename}")
                 except Exception:
                     continue
         except Exception as e:
-            logger.warning(e)
+            print(f"⚠️ [Logger] 清理旧日志失败: {e}")
     
     def log(self, stage, status, message, details=None):
         """记录日志到文件和终端"""

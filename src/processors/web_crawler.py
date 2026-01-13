@@ -231,13 +231,26 @@ class WebCrawler:
                 return True
         return False
 
-    def _extract_links(self, soup, base_url: str, exclude_patterns: List[str] = None) -> List[str]:
-        """提取页面中的所有链接"""
+    def _extract_links(self, soup, base_url: str, exclude_patterns: List[str] = None, keyword: str = None) -> List[str]:
+        """提取页面中的所有链接，并根据关键词进行极其严格的语义筛选"""
         links = []
         base_domain = urlparse(base_url).netloc
         
-        for link in soup.find_all('a', href=True):
+        # --- v5.5.8 核心锚定逻辑 ---
+        core_subject = ""
+        if keyword:
+            import re
+            # 找到关键词中最长的一个词（通常是主语，如 Google）
+            all_parts = re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z0-9]+', keyword)
+            if all_parts:
+                core_subject = max(all_parts, key=len).lower()
+
+        # 预先剔除导航栏、侧边栏、页脚，只在正文区找链接
+        search_area = soup.find('div', {'id': 'content'}) or soup.find('main') or soup.find('article') or soup
+        
+        for link in search_area.find_all('a', href=True):
             href = link.get('href')
+            link_text = link.get_text().strip().lower()
             if not href:
                 continue
             
@@ -245,6 +258,19 @@ class WebCrawler:
             full_url = urljoin(base_url, href)
             parsed_url = urlparse(full_url)
             
+            # --- v5.5.8 语义铁闸：核心主语强制校验 ---
+            if core_subject:
+                # 检查链接文字或URL路径是否包含【核心主语】
+                # 如果搜 Google，链接里必须有 google，只有“如何使用”是不够的
+                is_core_match = (core_subject in link_text) or (core_subject in parsed_url.path.lower())
+                
+                # 屏蔽维基百科系统路径
+                is_system = any(p in full_url for p in ['Special:', 'Help:', 'File:', 'Category:', 'Talk:', 'Template:', 'Portal:'])
+                
+                if is_system or not is_core_match:
+                    continue
+            # ---------------------------------------
+
             # 判断是否允许外部链接
             is_search_engine = any(se in base_domain for se in [
                 'google.com', 'bing.com', 'baidu.com', 'yahoo.com', 
@@ -398,6 +424,12 @@ class WebCrawler:
                     if status_callback:
                         status_callback(f"🔄 正在抓取 ({total_count+1}) 第{depth}层 ({i}/{len(current_level)}): {url}")
                     
+                    # --- [逻辑对齐] 终端同步打印详细 URL ---
+                    from src.app_logging import LogManager
+                    console_logger = LogManager()
+                    console_logger.info(f"🌐 [CRAWLING] Page {total_count+1} | Depth {depth} | URL: {url}")
+                    # ------------------------------------
+
                     # 使用智能请求方法
                     response = self._smart_request(url, status_callback)
                     if status_callback:
@@ -407,13 +439,31 @@ class WebCrawler:
                     
                     soup = BeautifulSoup(response.text, 'html.parser')
                     
-                    # 根据解析器类型提取内容
-                    content = self._extract_content_by_parser(soup, parser_type)
-                    if status_callback:
-                        status_callback(f"📝 内容提取: {len(content)} 字符 ({parser_type}模式)")
-                    
+                    # --- v5.5.8 铁甲逻辑：标题强制校验 ---
                     title = soup.title.string if soup.title else "No Title"
                     title = self._clean_text(title)
+                    
+                    current_kw = getattr(self, '_current_keyword', None)
+                    if current_kw:
+                        import re
+                        kw_parts = [w.lower() for w in re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z0-9]+', current_kw) if len(w) >= 2]
+                        # 检查标题是否包含任何关键词部分
+                        is_title_relevant = any(part in title.lower() for part in kw_parts)
+                        
+                        # 特殊处理：如果是起始页（第一页），允许通过（为了提取链接）
+                        is_start_page = (url == start_url)
+                        
+                        if not is_title_relevant and not is_start_page:
+                            if status_callback:
+                                status_callback(f"🗑️ 标题不相关，已丢弃: {title}")
+                            # 虽然丢弃内容，但仍允许从该页提取链接（如果是搜索结果页的话，逻辑在 _extract_links 里处理）
+                            content = ""
+                        else:
+                            # 根据解析器类型提取内容
+                            content = self._extract_content_by_parser(soup, parser_type)
+                    else:
+                        content = self._extract_content_by_parser(soup, parser_type)
+                    # ------------------------------------
                     
                     # 保存内容
                     filepath = self._save_content(url, title, content)
@@ -430,7 +480,10 @@ class WebCrawler:
                     
                     # 如果还没达到最大深度，提取下一级链接
                     if depth < max_depth:
-                        links = self._extract_links(soup, url, exclude_patterns)
+                        # 获取关键词（如果可用，从 start_url 的上下文或外部传入）
+                        # 这里我们尝试从 start_url 中提取潜在关键词，或者让调用者显式传入
+                        current_kw = getattr(self, '_current_keyword', None)
+                        links = self._extract_links(soup, url, exclude_patterns, keyword=current_kw)
                         # 🔥 关键修复：每个页面提取所有有效链接，不限制数量
                         # 让下一层的数量限制来控制递归规模
                         next_level.extend(links)

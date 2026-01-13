@@ -62,8 +62,51 @@ class KnowledgeBaseLoader:
         """加载知识库"""
         db_path = os.path.join(self.output_base, kb_name)
         
+        # --- [v5.6.5] 深度路径自愈逻辑：彻底解决 UI 脱敏导致的加载失败 ---
+        if not os.path.exists(db_path) or not os.path.isdir(db_path):
+            try:
+                # 规范化搜索关键词
+                search_term = kb_name.strip()
+                available_dirs = [d for d in os.listdir(self.output_base) if os.path.isdir(os.path.join(self.output_base, d))]
+                
+                # 策略1: 后缀匹配 (最精准，如 admin_KBID)
+                matches = [d for d in available_dirs if d.endswith(f"_{search_term}")]
+                
+                # 策略2: 包含匹配 (处理前缀未知的情况)
+                if not matches:
+                    matches = [d for d in available_dirs if search_term in d]
+                
+                # 策略3: 反向包含匹配 (处理 search_term 反而更长的情况)
+                if not matches:
+                    matches = [d for d in available_dirs if d in search_term]
+
+                if matches:
+                    # 按照修改时间排序，选最新的那个
+                    matches.sort(key=lambda x: os.path.getmtime(os.path.join(self.output_base, x)), reverse=True)
+                    best_match = matches[0]
+                    logger.success(f"💡 [自愈] 路径纠偏成功: '{kb_name}' -> '{best_match}'", stage="路径挂载")
+                    kb_name = best_match
+                    db_path = os.path.join(self.output_base, kb_name)
+                    # 反哺 Session State 确保全局同步
+                    if 'current_kb_id' in st.session_state:
+                        st.session_state.current_kb_id = kb_name
+            except Exception as e:
+                logger.warning(f"⚠️ 路径深度自愈失败: {e}")
+
         if not os.path.exists(db_path):
-            return None, "知识库不存在", None
+            cwd = os.getcwd()
+            # 尝试列出当前存在的目录，辅助调试
+            try:
+                available = os.listdir(self.output_base)
+            except:
+                available = ["(无法读取目录)"]
+                
+            logger.error(f"❌ 知识库路径不存在: {db_path}")
+            logger.error(f"   - CWD: {cwd}")
+            logger.error(f"   - Base: {self.output_base}")
+            logger.error(f"   - Available: {available}")
+            
+            return None, f"知识库路径异常: '{kb_name}' \n(目标路径: {db_path} 不存在)", None
         
         try:
             logger.log("INFO", f"开始加载知识库: {kb_name}", stage="知识库加载")

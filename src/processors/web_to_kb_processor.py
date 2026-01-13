@@ -199,31 +199,75 @@ class WebToKBProcessor:
                     kb_name = self.generate_kb_name_from_url(url, content_preview)
             
             elif keyword:
-                # 关键词搜索模式
-                if not sites:
-                    sites = ["维基百科", "百度百科"]  # 默认搜索网站
+                # 关键词搜索模式 (v5.5.8 增强：相关性优先)
+                # 1. 自动清洗关键词标点
+                import re
+                clean_kw = re.sub(r'^[^\w\u4e00-\u9fff]+|[^\w\u4e00-\u9fff]+$', '', keyword).strip()
+                crawler._current_keyword = clean_kw 
                 
                 if status_callback:
-                    status_callback(f"🔍 搜索关键词: {keyword}")
+                    status_callback(f"🔍 关键词已优化: {clean_kw}")
                 
-                search_results = self.search_preset_sites(keyword, sites)
+                if not sites:
+                    # 使用智能推荐源
+                    sites = self.recommend_sites_for_keyword(clean_kw)[:3]
+                
+                if status_callback:
+                    status_callback(f"🔍 正在智能规划搜索源: {', '.join(sites)}")
+                
+                search_results = self.search_preset_sites(clean_kw, sites)
                 
                 # 抓取搜索结果
-                for result in search_results[:2]:  # 限制搜索结果数量
+                for result in search_results:
                     if status_callback:
-                        status_callback(f"🌐 抓取 {result['site']}: {result['url']}")
+                        status_callback(f"🌐 正在从 {result['site']} 提取相关条目...")
                     
                     try:
+                        # v5.5.8 核心逻辑：强制首层相关性校验
                         files = crawler.crawl_advanced(
                             start_url=result['url'],
-                            max_depth=2,  # 搜索结果需要抓取2层
+                            max_depth=2,
                             max_pages=max_pages // len(search_results),
                             status_callback=status_callback
                         )
-                        crawled_files.extend(files)
+                        # 过滤逻辑增强 (v5.5.8 最终方案)
+                        relevant_files = []
+                        for f_path in files:
+                            try:
+                                with open(f_path, 'r', encoding='utf-8') as f:
+                                    content = f.read()
+                                    lines = content.split('\n')
+                                    # 提取 Markdown 标题 (通常是第 3 行，因为第 1 行是 URL，第 2 行是空行)
+                                    title = ""
+                                    for line in lines:
+                                        if line.startswith('# '):
+                                            title = line.replace('# ', '').strip()
+                                            break
+                                    
+                                    # 1. 识别并排除搜索结果页、系统页、门户页
+                                    is_noise_page = any(p in content for p in ["Special:Search", "search?", "维基百科:", "Portal:", "帮助:"])
+                                    # 3. 统计核心主语频率 (v5.5.8 强制实体校验)
+                                    import re
+                                    parts = re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z0-9]+', clean_kw)
+                                    core_subject = max(parts, key=len).lower() if parts else clean_kw.lower()
+                                    
+                                    kw_count = content.lower().count(core_subject)
+                                    
+                                    # 最终判定逻辑：不能是噪音页，且标题相关，且核心词频 >= 3
+                                    if not is_noise_page and (is_title_relevant or kw_count >= 3):
+                                        relevant_files.append(f_path)
+                                        from src.app_logging import LogManager
+                                        LogManager().info(f"✅ [RELEVANT] {title} | Entity '{core_subject}' matches: {kw_count}")
+                                    else:
+                                        os.remove(f_path) 
+                                        from src.app_logging import LogManager
+                                        LogManager().warning(f"🗑️ [PURGED] {title if title else f_path} | Matches: {kw_count} (Too Low)")
+                            except Exception as e:
+                                continue
+                        crawled_files.extend(relevant_files)
                     except Exception as e:
                         if status_callback:
-                            status_callback(f"❌ {result['site']} 抓取失败: {e}")
+                            status_callback(f"⚠️ {result['site']} 抓取条目部分受限: {e}")
                         continue
                 
                 # 生成知识库名称

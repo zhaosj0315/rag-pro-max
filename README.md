@@ -12,25 +12,20 @@
 
 # RAG Pro Max - 智能文档问答系统
 
-**版本**: v3.4.5  
-**更新日期**: 2026-01-10  
-**适用范围**: 企业级部署与运维
+**版本**: v5.5.8  
+![Version](https://img.shields.io/badge/version-v5.5.8-brightgreen)
 
-![Version](https://img.shields.io/badge/version-v3.4.5-brightgreen)
-![Status](https://img.shields.io/badge/status-Stable-blue)
-![Last Update](https://img.shields.io/badge/last%20update-2026--01--10-orange)
+# 🚀 RAG Pro Max v5.5.8
+### 📦 数据主权与全量导出 (v5.5.8 重磅升级)
+- **终极五福资产包**: 一键导出 01-06 完整结构，包含原始文献、历史对话、战略模型、元数据及索引。
+- **跨目录文件打捞**: 智能搜索结果自动回溯打捞，确保“信息全量带走”。
+- **管理员资产全览**: 侧边栏管理后台新增“资产全览”，支持跨用户批量筛选、审计与物理清理。
+- **逻辑全链路对齐**: 统一搜索、爬虫、上传底层逻辑，实现真正的“全感应业务开模”。
+- **权限自愈日志**: 彻底解决 macOS 权限导致的启动拦截，支持日志路径动态迁移。
 
-# 🚀 RAG Pro Max v3.4.5
-
-> **企业级 RAG (Retrieval Augmented Generation) 知识库系统 - 智能推荐与极速检索的终极进化**
-...
-**🎯 核心优势**: 现代化配置中心 • 插件式自定义厂商 • 语义防火墙 • 专家级智能研究
-
----
-
-## ✨ 核心功能
-
-### 🕷️ 纯净 Markdown 爬虫 (v3.4.5 重构)
+### 💎 全域开模与战略建模 (v5.5.8 重构)
+- **全宽流式布局**: Artifacts 看板支持 1:3 黄金比例展示。
+- **macOS 性能模式**: 自动启用线程池并发，彻底解决 Fork 崩溃。
 - **结构化引擎**: 摒弃传统文本抓取，自动将网页转换为层级清晰的 Markdown 格式，保留标题、列表与表格结构。
 - **智能去噪**: 内置 Wikipedia/新闻/技术文档专属清洗规则，自动剥离侧边栏、广告与无关导航。
 - **双重溯源**: 文件头部注入 `**URL:**` 元数据，同时写入 macOS 系统级扩展属性 (Extended Attributes)。

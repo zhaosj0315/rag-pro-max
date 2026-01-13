@@ -1,20 +1,19 @@
 {
-  "version": "3.5.0",
-  "release_date": "2026-01-10",
-  "build_number": "20260110.2",
+  "version": "5.6.8",
+  "release_date": "2026-01-13",
+  "build_number": "20260113.02",
   "status": "stable",
   "major_features": [
-    "Data Analyst 6.0: Active Business Inference & Visualization Dashboard",
-    "Data Analyst 4.0: Simulation & Modeling System",
-    "Thematic Batch Authorization & Guest KB Empowerment",
-    "Role 2.0 Permission Middle-end",
-    "Industrial-grade Security Audit Logging"
+    "🔄 Robust Session Switching: Fixed navigation deadlock using URL-first synchronization",
+    "💾 Intelligent History Persistence: Added memory-priority titles and custom naming protection",
+    "🏗️ Comprehensive Asset Export: All-in-one ZIP now correctly captures every historical session",
+    "🩺 Knowledge Base Self-healing: Fuzzy path matching to resolve mounting failures after refresh"
   ],
   "compatibility": {
     "python": ">=3.9",
     "platforms": ["macOS", "Linux", "Windows"],
-    "dependencies_updated": "2026-01-08"
+    "dependencies_updated": "2026-01-13"
   },
   "changelog_url": "CHANGELOG.md",
-  "documentation_updated": "2026-01-08"
+  "documentation_updated": "2026-01-13"
 }

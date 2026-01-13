@@ -74,42 +74,33 @@ def render_search_interface():
     
     # 执行搜索
     if search_clicked or search_query:
-        # 模拟文档数据
-        mock_documents = [
-            {
-                'id': '1',
-                'filename': 'AI技术报告.pdf',
-                'title': '人工智能技术发展报告',
-                'content': '人工智能技术在近年来取得了显著进展，深度学习、机器学习等技术广泛应用...',
-                'file_type': 'PDF',
-                'size': 2048000,
-                'date': '2024-12-10',
-                'tags': ['AI', '技术', '报告']
-            },
-            {
-                'id': '2', 
-                'filename': '项目文档.docx',
-                'title': '项目开发文档',
-                'content': '本项目采用Python开发，使用Streamlit框架构建用户界面，集成了多种AI模型...',
-                'file_type': 'DOCX',
-                'size': 1024000,
-                'date': '2024-12-12',
-                'tags': ['项目', '开发', 'Python']
-            },
-            {
-                'id': '3',
-                'filename': '会议纪要.txt', 
-                'title': '技术讨论会议纪要',
-                'content': '会议讨论了AI技术的应用场景，包括自然语言处理、计算机视觉等领域...',
-                'file_type': 'TXT',
-                'size': 512000,
-                'date': '2024-12-08',
-                'tags': ['会议', '讨论', 'AI']
-            }
-        ]
+        # 获取当前知识库中的真实文档
+        kb_name = st.session_state.get('kb_selected')
+        if not kb_name:
+            st.warning("请先选择知识库")
+            return
+            
+        kb_path = os.path.join("vector_db_storage", kb_name)
+        from src.config.manifest_manager import ManifestManager
+        manifest = ManifestManager.load(kb_path)
+        real_files = manifest.get('files', [])
+        
+        # 转换为搜索引擎需要的格式
+        documents = []
+        for i, f in enumerate(real_files):
+            documents.append({
+                'id': f.get('id', str(i)),
+                'filename': f.get('filename', 'Unknown'),
+                'title': f.get('title', f.get('filename', 'Unknown')),
+                'content': f.get('summary', '') or f.get('filename', ''),
+                'file_type': f.get('type', 'Unknown'),
+                'size': f.get('size_bytes', 0),
+                'date': f.get('added_at', ''),
+                'tags': f.get('tags', [])
+            })
         
         # 应用搜索和过滤
-        results = mock_documents
+        results = documents
         
         if search_query:
             results = search_engine.full_text_search(search_query, results)

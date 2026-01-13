@@ -1,24 +1,53 @@
 # 初始化环境配置
 import warnings
-# 极其早地抑制 Pydantic 警告，防止第三方库加载时触发
+import os
+import sys
+import time
+import json
+import glob
+import re
+
+# --- Monkey Patch: 修复 Streamlit FileWatcher Race Condition ---
+# 捕获 watchdog 线程中的 FileNotFoundError (通常由临时文件快速删除引起)
+try:
+    import streamlit.watcher.util
+    
+    # 1. Patch path_modification_time
+    _original_path_modification_time = streamlit.watcher.util.path_modification_time
+    def _safe_path_modification_time(path, allow_nonexistent=False):
+        try:
+            return _original_path_modification_time(path, allow_nonexistent)
+        except (FileNotFoundError, OSError):
+            return 0.0
+    streamlit.watcher.util.path_modification_time = _safe_path_modification_time
+
+    # 2. Patch calc_md5_with_blocking_retries (针对本报错的核心修复)
+    _original_calc_md5 = streamlit.watcher.util.calc_md5_with_blocking_retries
+    def _safe_calc_md5(path, **kwargs):
+        try:
+            return _original_calc_md5(path, **kwargs)
+        except (FileNotFoundError, OSError):
+            # 返回一个哑值的MD5，避免崩溃
+            return "0" * 32
+    streamlit.watcher.util.calc_md5_with_blocking_retries = _safe_calc_md5
+    
+except ImportError:
+    pass
+# -----------------------------------------------------------
+
+# 极其早地初始化日志，防止任何模块在加载时触发
+from src.app_logging import LogManager
+logger = LogManager()
+
+# 极其早地抑制 Pydantic 警告
 warnings.filterwarnings("ignore", category=UserWarning, message=".*UnsupportedFieldAttributeWarning.*")
 warnings.filterwarnings("ignore", message=".*validate_default.*")
 
 # 环境变量设置 - 减少启动警告
-__version__ = "3.2.7"
-
-import os
+__version__ = "4.5.2"
 os.environ['DISABLE_MODEL_SOURCE_CHECK'] = 'True'
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
-# 抑制烦人的 Pydantic 警告
-import warnings
-warnings.filterwarnings("ignore", message=".*UnsupportedFieldAttributeWarning.*")
-
-
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.core.environment import initialize_environment
 initialize_environment()
 
@@ -63,6 +92,31 @@ os.environ['VECLIB_MAXIMUM_THREADS'] = '1'  # Apple Accelerate只用1个线程
 
 import streamlit as st
 
+# --- [逻辑对齐] 处理分享链接 (Session Sharing) ---
+if "share" in st.query_params:
+    share_id = st.query_params["share"]
+    from src.chat.share_manager import ShareManager
+    share_data = ShareManager.get_share(share_id)
+    
+    if share_data:
+        st.info(f"📑 正在查看分享会话: **{share_data['kb_name']}** (由 {share_data['creator']} 分享于 {share_data['created_at'][:10]})")
+        
+        # 渲染快照消息
+        for msg in share_data["messages"]:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+        
+        if st.button("返回我的工作台", use_container_width=True):
+            del st.query_params["share"]
+            st.rerun()
+        st.stop() # 停止后续正常逻辑渲染
+    else:
+        st.error("❌ 分享链接已失效或 ID 不正确")
+        if st.button("进入系统"):
+            del st.query_params["share"]
+            st.rerun()
+        st.stop()
+
 # 防止HTML内容被截断
 st.set_page_config(
     page_title="RAG Pro Max",
@@ -79,6 +133,10 @@ import ollama
 import re
 import subprocess
 from urllib.parse import urlparse
+
+# 引入日志模块 (提前初始化防止后续逻辑报错)
+from src.app_logging import LogManager
+logger = LogManager()
 
 # 🧹 启动时自动清理临时文件
 from src.common.utils import cleanup_temp_files
@@ -255,9 +313,6 @@ from llama_index.core.schema import Document
 # 导入自定义嵌入
 from src.custom_embeddings import create_custom_embedding
 
-# 引入日志模块
-from src.app_logging import LogManager
-logger = LogManager()
 # terminal_logger 已被 logger 替代
 from src.chat_utils_improved import generate_follow_up_questions_safe as generate_follow_up_questions
 from src.chat.unified_suggestion_engine import get_unified_suggestion_engine
@@ -670,7 +725,48 @@ if 'app_initialized' not in st.session_state:
     st.session_state.app_initialized = True
     if 'current_session_id' not in st.session_state:
         st.session_state.current_session_id = None
+    
+    # --- [v5.6.3] 现场恢复：基于 URL 参数持久化活跃会话 ---
+    if "kb_id" in st.query_params and st.session_state.get('current_kb_id') is None:
+        target_kb = st.query_params["kb_id"]
+        st.session_state.current_kb_id = target_kb
+        # 设置导航显示格式以匹配侧边栏
+        st.session_state.current_nav = f"☑️ 📂 {target_kb}"
+        # 如果有 session_id，一并恢复
+        if "sess_id" in st.query_params:
+            st.session_state.current_session_id = st.query_params["sess_id"]
+        
+        logger.info(f"🔄 正在从 URL 恢复现场: KB={target_kb}", stage="现场恢复")
+
     logger.success("应用初始化完成")
+
+# 每次运行时同步当前状态到 URL，确保刷新不丢失
+if st.session_state.get('current_kb_id'):
+    st.query_params["kb_id"] = st.session_state.current_kb_id
+    if st.session_state.get('current_session_id'):
+        st.query_params["sess_id"] = st.session_state.current_session_id
+
+# --- 自动登录逻辑 (v4.5.2) ---
+# 必须在登录拦截之前执行
+if not st.session_state.get("logged_in"):
+    token = st.query_params.get("session_token")
+    if token:
+        try:
+            from src.auth.session_manager import validate_session
+            from src.auth.user_auth import load_users
+            
+            username = validate_session(token)
+            if username:
+                users = load_users()
+                user_info = users.get(username)
+                if user_info and user_info.get('is_active', True):
+                    st.session_state.logged_in = True
+                    st.session_state.user = username
+                    st.session_state.role = user_info.get('role', 'standard_user')
+                    logger.info(f"自动登录成功: {username}")
+                    st.toast(f"👋 欢迎回来, {username}", icon="✨")
+        except Exception as e:
+            logger.warning(f"自动登录失败: {e}")
 
 # ==========================================
 # 登录拦截逻辑 (管理为先)
@@ -987,31 +1083,138 @@ with st.sidebar:
                 
                 # 新建会话按钮
                 if st.button("➕ 新建会话", use_container_width=True, key="sidebar_new_chat"):
+                    # [v5.6.6 核心修复] 在切换前，先保存当前正在进行的会话，防止标题丢失
+                    if st.session_state.get('messages'):
+                        old_sess_id = st.session_state.get('current_session_id')
+                        HistoryManager.save_session(current_active_kb, st.session_state.messages, old_sess_id)
+                        logger.info(f"💾 已在切换前自动保存旧会话: {old_sess_id or 'default'}")
+
                     import uuid
                     new_id = str(uuid.uuid4())[:8]
                     st.session_state.current_session_id = new_id
-                    st.session_state.messages = []
-                    st.session_state.suggestions_history = []
-                    HistoryManager.save_session(current_active_kb, [], new_id)
+                    st.query_params["sess_id"] = new_id # 同步到 URL
+                    
+                    # --- [逻辑对齐] 注入初始状态 (Initial State) ---
+                    kb_path = os.path.join("vector_db_storage", current_active_kb)
+                    from src.config.manifest_manager import ManifestManager
+                    manifest = ManifestManager.load(kb_path)
+                    
+                    initial_msg = []
+                    summary = manifest.get('summary', "👋 知识库已就绪，您可以开始提问了。")
+                    sug = manifest.get('suggestions', [])
+                    
+                    # 构造初始欢迎消息
+                    initial_msg.append({
+                        "role": "assistant", 
+                        "content": f"### 📊 知识库初始化完成\n\n{summary}",
+                        "suggestions": sug,
+                        "is_initial": True
+                    })
+                    
+                    st.session_state.messages = initial_msg
+                    st.session_state.suggestions_history = sug
+                    
+                    HistoryManager.save_session(current_active_kb, initial_msg, new_id)
                     st.rerun()
                 
-                # 会话列表
-                for sess in sessions:
-                    sess_id = sess['id']
-                    label = sess['title']
-                    is_active = (sess_id == st.session_state.get('current_session_id'))
-                    
-                    if sess.get('is_default'):
-                        label = "📝 默认会话"
-                    
-                    btn_type = "primary" if is_active else "secondary"
-                    icon = "📂" if is_active else "📄"
-                    
-                    if st.button(f"{icon} {label}", key=f"sess_{sess_id}", use_container_width=True, type=btn_type):
-                        st.session_state.current_session_id = sess_id
-                        st.session_state.messages = HistoryManager.load_session(current_active_kb, sess_id)
-                        st.session_state.suggestions_history = []
+                # 显示刚才生成的分享 ID
+                if st.session_state.get('last_share_id'):
+                    st.code(f"http://localhost:8501/?share={st.session_state.last_share_id}", language="markdown")
+                    if st.button("关闭分享提示", key="close_share"):
+                        del st.session_state['last_share_id']
                         st.rerun()
+
+                # 会话列表
+                total_sess = len(sessions)
+                for i, sess in enumerate(sessions):
+                    sess_id = sess['id']
+                    # 为每个会话生成一个专门的编号
+                    display_idx = total_sess - i
+                    label = f"#{display_idx} {sess['title']}"
+                    
+                    is_active = (sess_id == st.session_state.get('current_session_id'))
+                    is_pinned = sess.get('pinned', False)
+                    
+                    # 使用列布局放置操作按钮 [标题(6), 置顶(1), 分享(1), 重命名(1), 删除(1)]
+                    c_title, c_pin, c_share, c_edit, c_del = st.columns([5.5, 1.2, 1.2, 1.2, 1.2])
+                    
+                    with c_title:
+                        icon = "📌" if is_pinned else ("📂" if is_active else "📄")
+                        btn_type = "primary" if is_active else "secondary"
+                        # 确保 key 唯一
+                        safe_sess_id = str(sess_id) if sess_id else "default"
+                        
+                        if st.button(f"{icon} {label}", key=f"sess_btn_{safe_sess_id}", use_container_width=True, type=btn_type, help=label):
+                            # [v5.6.8 核心修复] 切换前，保存当前正在进行的会话状态
+                            if st.session_state.get('messages'):
+                                current_old_id = st.session_state.get('current_session_id')
+                                HistoryManager.save_session(current_active_kb, st.session_state.messages, current_old_id)
+                            
+                            # 立即更新内存和 URL，防止初始化逻辑抢跑
+                            st.session_state.current_session_id = sess_id
+                            st.query_params["sess_id"] = sess_id if sess_id else ""
+                            
+                            st.session_state.messages = HistoryManager.load_session(current_active_kb, sess_id)
+                            # 恢复建议
+                            st.session_state.suggestions_history = []
+                            if st.session_state.messages:
+                                last_msg = st.session_state.messages[-1]
+                                if isinstance(last_msg, dict) and last_msg.get('suggestions'):
+                                    st.session_state.suggestions_history = last_msg['suggestions']
+                            st.rerun()
+                            
+                    with c_pin:
+                        pin_icon = "🔓" if is_pinned else "📌"
+                        pin_help = "取消置顶" if is_pinned else "置顶会话"
+                        if st.button(pin_icon, key=f"sess_pin_{safe_sess_id}", help=pin_help):
+                            HistoryManager.toggle_pin_session(current_active_kb, sess_id)
+                            st.rerun()
+
+                    with c_share:
+                        if st.button("🔗", key=f"sess_share_{safe_sess_id}", help="生成分享链接"):
+                            from src.chat.share_manager import ShareManager
+                            # 加载该会话的完整消息
+                            share_msgs = HistoryManager.load_session(current_active_kb, sess_id)
+                            s_id = ShareManager.create_share(current_active_kb, share_msgs, st.session_state.get('user', 'admin'))
+                            st.session_state.last_share_id = s_id
+                            st.toast(f"✅ 分享链接已生成")
+                            
+                    with c_edit:
+                        if st.button("✏️", key=f"sess_edit_{safe_sess_id}", help="重命名"):
+                            st.session_state[f"renaming_sess_{safe_sess_id}"] = True
+                    
+                    with c_del:
+                        if st.button("🗑️", key=f"sess_del_{safe_sess_id}", help="删除会话"):
+                            # 增加二次确认 (利用 session_state)
+                            st.session_state[f"confirm_del_{safe_sess_id}"] = True
+                    
+                    # 内联重命名区域
+                    if st.session_state.get(f"renaming_sess_{safe_sess_id}"):
+                        with st.container():
+                            new_name = st.text_input("新名称", value=label, key=f"input_ren_{safe_sess_id}", label_visibility="collapsed")
+                            rc1, rc2 = st.columns(2)
+                            if rc1.button("保存", key=f"save_ren_{safe_sess_id}", use_container_width=True):
+                                HistoryManager.rename_session(current_active_kb, sess_id, new_name)
+                                del st.session_state[f"renaming_sess_{safe_sess_id}"]
+                                st.rerun()
+                            if rc2.button("取消", key=f"cancel_ren_{safe_sess_id}", use_container_width=True):
+                                del st.session_state[f"renaming_sess_{safe_sess_id}"]
+                                st.rerun()
+                                
+                    # 内联删除确认区域
+                    if st.session_state.get(f"confirm_del_{safe_sess_id}"):
+                        st.warning("确定删除?")
+                        dc1, dc2 = st.columns(2)
+                        if dc1.button("是", key=f"yes_del_{safe_sess_id}", type="primary", use_container_width=True):
+                            HistoryManager.delete_session(current_active_kb, sess_id)
+                            if is_active:
+                                st.session_state.current_session_id = None
+                                st.session_state.messages = []
+                            del st.session_state[f"confirm_del_{safe_sess_id}"]
+                            st.rerun()
+                        if dc2.button("否", key=f"no_del_{safe_sess_id}", use_container_width=True):
+                            del st.session_state[f"confirm_del_{safe_sess_id}"]
+                            st.rerun()
 
         if selected_nav != st.session_state.get('current_nav'):
             st.session_state.pop('suggestions_history', None) 
@@ -1033,7 +1236,53 @@ with st.sidebar:
             else:
                 # 兼容带统计信息的格式
                 raw_name = selected_nav.split("📂 ")[1] if "📂 " in selected_nav else ""
-                current_kb_name = raw_name.split(" (")[0].strip() if not is_create_mode and raw_name else None
+                short_name = raw_name.split(" (")[0].strip() if not is_create_mode and raw_name else None
+                
+                # --- [v5.6.4 核心修复] 建立短名到全名的映射逻辑 ---
+                if short_name:
+                    # 优先检查 session_state 里保存的全名
+                    if st.session_state.get('current_kb_id') and short_name in st.session_state.current_kb_id:
+                        current_kb_name = st.session_state.current_kb_id
+                    else:
+                        # 兜底：从实际存在的目录中找匹配的库 (防止刷新丢失)
+                        all_kbs = kb_manager.list_all()
+                        matches = [k for k in all_kbs if k.endswith(f"_{short_name}") or k == short_name]
+                        current_kb_name = matches[0] if matches else short_name
+                else:
+                    current_kb_name = None
+
+        # --- [逻辑对齐补丁] 自动恢复最近一次历史会话 ---
+        if current_kb_name and current_kb_name != "pure_chat" and not is_create_mode:
+            # 强化物理路径校验：确保 ID 对应真实的 docstore.json
+            kb_full_path = os.path.join(output_base, current_kb_name)
+            if not os.path.exists(os.path.join(kb_full_path, "docstore.json")):
+                # 如果找不到，尝试自愈 (在已有的库里找同名但带前缀的)
+                all_kbs = kb_manager.list_all()
+                for k in all_kbs:
+                    if k.endswith(f"_{current_kb_name}"):
+                        current_kb_name = k
+                        break
+
+            # 如果知识库切换了，或者当前没有加载消息
+            if st.session_state.get('last_loaded_kb') != current_kb_name or not st.session_state.get('messages'):
+                from src.chat.history_manager import HistoryManager
+                st.session_state.current_kb_id = current_kb_name
+                sessions = HistoryManager.list_sessions(current_kb_name)
+                if sessions:
+                    # 默认加载第一个（通常是最近更新的）
+                    latest_sess_id = sessions[0]['id']
+                    st.session_state.current_session_id = latest_sess_id
+                    st.session_state.messages = HistoryManager.load_session(current_kb_name, latest_sess_id)
+                    # 恢复建议历史
+                    if st.session_state.messages:
+                        last_msg = st.session_state.messages[-1]
+                        if isinstance(last_msg, dict) and last_msg.get('suggestions'):
+                            st.session_state.suggestions_history = last_msg['suggestions']
+                
+                st.session_state.last_loaded_kb = current_kb_name
+                # 仅在真正需要时触发刷新，避免无限循环
+                if st.session_state.get('messages'):
+                    st.rerun()
 
         # 统一的数据源处理逻辑
         uploaded_files = st.session_state.get('uploader') # 优先从 uploader 获取，支持多模式
@@ -1077,10 +1326,11 @@ with st.sidebar:
             if source_mode == "📊 数据分析":
                 st.info("💡 **数据分析模式**: 适合上传 CSV、Excel 或包含报表的文档。系统将自动提取表格结构并支持复杂的 SQL 统计查询。")
                 da_files = st.file_uploader(
-                    "上传数据文件", 
-                    type=['csv', 'xlsx', 'xls', 'pdf', 'docx'],
-                    accept_multiple_files=True,
-                    key="data_analyst_uploader"
+                    "上传业务表单或数据字典", 
+                    accept_multiple_files=True, 
+                    type=['csv', 'xlsx', 'xls', 'md', 'markdown'],
+                    key="da_uploader",
+                    label_visibility="collapsed"
                 )
                 if da_files:
                     st.session_state.is_data_analysis_mode = True
@@ -1106,8 +1356,8 @@ with st.sidebar:
                     accept_multiple_files=True, 
                     key="uploader",
                     label_visibility="collapsed",
-                    help="支持格式: PDF, DOCX, TXT, MD, Excel, CSV",
-                    type=['pdf', 'docx', 'txt', 'md', 'xlsx', 'xls', 'csv', 'pptx', 'jpg', 'png', 'jpeg'],
+                    help="支持格式: PDF, DOCX, TXT, MD, Excel, CSV, 图片",
+                    type=['pdf', 'docx', 'txt', 'md', 'markdown', 'xlsx', 'xls', 'csv', 'pptx', 'jpg', 'png', 'jpeg'],
                     disabled=not can_upload
                 )
                 
@@ -1232,13 +1482,21 @@ with st.sidebar:
             with manage_title_col1:
                 st.markdown("📤 **添加文档**")
             with manage_title_col2:
-                if st.button("🔄", help="重建索引 (覆盖该库)", use_container_width=True):
-                    # 触发重建逻辑
-                    st.session_state.uploaded_path = os.path.join("vector_db_storage", current_kb_name)
-                    # 这里需要一种方式标记为 NEW 模式，并通过 trigger_btn_start 强制触发
-                    st.session_state.trigger_rebuild = True
-                    st.session_state.trigger_btn_start = True
-                    st.rerun()
+                # 权限检查：重建索引
+                from src.auth.permission_manager import permission_manager
+                current_user = st.session_state.get('user', 'guest_user')
+                can_rebuild = permission_manager.has_permission(current_user, "kb_rebuild_index")
+                
+                if can_rebuild:
+                    if st.button("🔄", help="重建索引 (覆盖该库)", use_container_width=True):
+                        # 触发重建逻辑
+                        st.session_state.uploaded_path = os.path.join("vector_db_storage", current_kb_name)
+                        # 这里需要一种方式标记为 NEW 模式，并通过 trigger_btn_start 强制触发
+                        st.session_state.trigger_rebuild = True
+                        st.session_state.trigger_btn_start = True
+                        st.rerun()
+                else:
+                    st.button("🔒", help="无重建索引权限", disabled=True, use_container_width=True)
 
             # 追加模式的文件上传
             action_mode = "APPEND"
@@ -1753,7 +2011,16 @@ with st.sidebar:
                 # 选项布局：如果非新建模式，显示强制重建索引
                 # 新建模式下隐藏强制重建（本身就是新建）
                 if not is_create_mode:
-                    force_reindex = st.checkbox("🔄 强制重建索引", value=default_val, key="kb_force_reindex", help="删除现有索引，重新构建")
+                    # 权限检查
+                    from src.auth.permission_manager import permission_manager
+                    current_user = st.session_state.get('user', 'guest_user')
+                    can_rebuild = permission_manager.has_permission(current_user, "kb_rebuild_index")
+                    
+                    if can_rebuild:
+                        force_reindex = st.checkbox("🔄 强制重建索引", value=default_val, key="kb_force_reindex", help="删除现有索引，重新构建")
+                    else:
+                        st.checkbox("🔄 强制重建索引 (🔒)", value=False, disabled=True, help="无重建索引权限")
+                        force_reindex = False
                 else:
                     force_reindex = False
 
@@ -1855,12 +2122,19 @@ with st.sidebar:
                             st.rerun()
                 
                 with op_row1[1]:
-                    if st.button("🧹 清空", use_container_width=True, disabled=len(state.get_messages()) == 0, help="清空当前对话记录"):
+                    if st.button("➕ 新对话", use_container_width=True, disabled=len(state.get_messages()) == 0, help="保存当前记录并开始新对话"):
+                        import uuid
+                        # 生成新会话ID
+                        new_id = str(uuid.uuid4())[:8]
+                        # 切换到新会话 (旧会话已自动保存)
+                        st.session_state.current_session_id = new_id
                         st.session_state.messages = []
                         st.session_state.suggestions_history = []
+                        # 初始化存储
                         if current_kb_name:
-                            HistoryManager.save_session(current_kb_name, [], st.session_state.get('current_session_id'))
-                        st.toast("✅ 已清空")
+                            HistoryManager.save_session(current_kb_name, [], new_id)
+                        
+                        st.toast("✅ 已开启新会话，旧记录可在左侧历史中查看")
                         time.sleep(0.5)
                         st.rerun()
                 
@@ -1896,7 +2170,8 @@ with st.sidebar:
                 with confirm_col1:
                     if st.button("✅ 确认删除", type="primary", use_container_width=True):
                         from src.auth.audit_logger import AuditLogger
-                        AuditLogger.log(st.session_state.get('user'), "DELETE_KB", f"永久删除了知识库: {current_kb_name}", status="warning")
+                        from src.common.utils import get_client_ip
+                        AuditLogger.log(st.session_state.get('user'), "DELETE_KB", f"永久删除了知识库: {current_kb_name}", status="warning", ip=get_client_ip())
                         kb_manager.delete(current_kb_name) # 确保实际调用删除逻辑
                         st.toast(f"🗑️ 已删除知识库: {current_kb_name}")
                         # 重置状态
@@ -1952,147 +2227,188 @@ with st.sidebar:
             perf_monitor.render_panel()
     
     with tab_help:
-        st.markdown("### 📖 RAG Pro Max 帮助中心")
+        st.markdown("### 📖 RAG Pro Max 智能门户")
         
-        # 版本信息
+        # 1. 搜索栏
+        help_search = st.text_input("🔍 搜索功能、配置或疑难解答...", placeholder="例如：GPU 加速、API、部署...", key="help_search_input")
+        
+        if help_search:
+            # 简单的关键词检索逻辑
+            from src.utils.doc_search import search_docs
+            results = search_docs(help_search)
+            if results:
+                st.markdown(f"**找到 {len(results)} 条相关结果:**")
+                for res in results:
+                    with st.expander(f"📄 {res['title']}", expanded=True):
+                        st.markdown(res['preview'])
+                        if st.button(f"查看完整文档: {res['file']}", key=f"view_full_{res['file']}"):
+                            st.session_state.full_doc_to_show = res['file']
+                st.divider()
+            else:
+                st.warning("未找到匹配内容，请尝试更简单的关键词。")
+
+        # 2. 动态导航与快速入口
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.info("📦 **版本**: v3.2.2")
+            if st.button("🚀 快速上手", use_container_width=True):
+                st.session_state.help_active_tab = "onboarding"
         with col2:
-            st.info("🚀 **状态**: 稳定版")
+            if st.button("🔌 API 文档", use_container_width=True):
+                st.session_state.help_active_tab = "api"
         with col3:
-            st.info("📅 **更新**: 2026-01-03")
+            if st.button("❓ 常见问题", use_container_width=True):
+                st.session_state.help_active_tab = "faq"
+
+        # 3. 核心内容区
+        active_tab = st.session_state.get('help_active_tab', 'onboarding')
         
-        # 快速导航
-        st.markdown("#### 🧭 快速导航")
-        
-        help_tabs = st.tabs(["🚀 快速开始", "💡 使用技巧", "🔧 功能说明", "❓ 常见问题", "📞 获取支持"])
-        
-        with help_tabs[0]:  # 快速开始
-            st.markdown("##### 🚀 快速开始指南")
-            
+        if active_tab == "onboarding":
+            # --- 1. Hero Header: 产品概览 ---
             st.markdown("""
-            **第一步：创建知识库**
-            1. 点击左侧 "➕ 新建知识库..."
-            2. 选择创建方式：文件上传、粘贴文本、网址抓取
-            3. 输入知识库名称，点击 "立即创建"
+            <div style="background: linear-gradient(120deg, #fdfbfb 0%, #ebedee 100%); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; border: 1px solid #e0e0e0;">
+                <h1 style="color: #1a1a1a; margin-bottom: 0.5rem;">🌌 RAG Pro Max <span style="font-size: 1rem; color: #666; font-weight: normal;">v5.6.0 Enterprise</span></h1>
+                <p style="color: #4a4a4a; font-size: 1.1rem; line-height: 1.6;">
+                    <b>云原生级私有化知识中台</b> — 专为高价值数据设计的下一代认知引擎。<br>
+                    融合了 <b>OCR 视觉解析</b>、<b>混合语义检索</b> 与 <b>CoT 深度推理</b>，让您的文档真正“开口说话”。
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # --- 2. 核心能力矩阵 (仿阿里云功能特性) ---
+            st.markdown("#### ✨ 核心能力矩阵")
+            cap_col1, cap_col2, cap_col3, cap_col4 = st.columns(4)
             
-            **第二步：开始对话**
-            1. 选择已创建的知识库
-            2. 在下方输入框输入问题
-            3. 系统自动检索并生成回答
+            with cap_col1:
+                with st.container(border=True):
+                    st.markdown("#### 📄 全模态解析")
+                    st.caption("不仅仅是文本。支持 PDF 表格还原、Excel 数据透视及图片 OCR 识别。")
+                    st.markdown("`PDF` `Excel` `Image` `Markdown`")
             
-            **第三步：高级功能**
-            - 🌐 开启 "联网搜索" 获取最新信息
-            - 🧠 启用 "智能研究" 进行深度分析
-            - 🎭 切换不同角色获得专业回答
+            with cap_col2:
+                with st.container(border=True):
+                    st.markdown("#### 🔍 混合检索")
+                    st.caption("BM25 关键词匹配 + BGE 向量语义召回，确保专业术语与模糊语义都不遗漏。")
+                    st.markdown("`Hybrid Search` `Rerank`")
+
+            with cap_col3:
+                with st.container(border=True):
+                    st.markdown("#### 🧠 深度思考")
+                    st.caption("内置 Chain-of-Thought (CoT) 推理链，支持多步推演与专家会审模式。")
+                    st.markdown("`CoT` `Multi-Agent` `Reasoning`")
+            
+            with cap_col4:
+                with st.container(border=True):
+                    st.markdown("#### 🛡️ 数据主权")
+                    st.caption("100% 本地化部署。支持 RBAC 细粒度权限管控与全量资产加密导出。")
+                    st.markdown("`Local First` `RBAC` `Encrypted`")
+
+            st.markdown("---")
+
+            # --- 3. 快速行动区 ---
+            st.markdown("#### 🚀 快速开始")
+            action_col1, action_col2, action_col3 = st.columns([1, 1, 2])
+            
+            with action_col1:
+                if st.button("➕ 新建知识库", use_container_width=True, type="primary"):
+                    st.session_state.show_new_kb_dialog = True
+                    st.rerun()
+                st.caption("开始构建您的第一个知识大脑")
+            
+            with action_col2:
+                if st.button("💬 纯对话模式", use_container_width=True):
+                    st.session_state.current_kb_id = "pure_chat"
+                    st.session_state.chat_engine = "pure_chat"
+                    st.rerun()
+                st.caption("直接与底层大模型进行交互")
+            
+            with action_col3:
+                # 状态检查清单 (优化版)
+                with st.expander("✅ 环境自检清单 (System Health)", expanded=False):
+                    check_cols = st.columns(2)
+                    check_cols[0].success("Python 3.10+ Runtime Ready")
+                    check_cols[0].success("Vector DB (Chroma) Connected")
+                    check_cols[1].success("LLM/Embedding Model Loaded")
+                    check_cols[1].success("GPU Acceleration Enabled")
+
+            st.markdown("---")
+
+            # --- 4. 系统架构图 (Mermaid) ---
+            st.markdown("#### 🏗️ 逻辑架构视图")
+            st.markdown("""
+            ```mermaid
+            graph LR
+                A[📂 非结构化数据] -->|OCR/Parser| B(统一文档对象)
+                B -->|Chunking| C{混合索引引擎}
+                C -->|Embedding| D[向量数据库]
+                C -->|Tokenize| E[倒排索引库]
+                
+                U[👤 用户提问] -->|Rewrite| Q[优化查询]
+                Q -->|Retrieve| D & E
+                D & E -->|Fusion| R[重排序结果]
+                R -->|Context| L[🧠 LLM 推理核心]
+                L -->|Answer| O[💡 最终答案]
+                
+                style C fill:#e1f5fe,stroke:#01579b
+                style L fill:#fff3e0,stroke:#ff6f00
+                style U fill:#f3e5f5,stroke:#7b1fa2
+            ```
             """)
-            
-            if st.button("🎯 立即开始创建知识库"):
-                st.success("💡 请点击左侧 '➕ 新建知识库...' 开始！")
-        
-        with help_tabs[1]:  # 使用技巧
-            st.markdown("##### 💡 使用技巧")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("""
-                **📝 提问技巧**
-                - 问题越具体，回答越准确
-                - 可以要求"详细解释"或"简要概括"
-                - 支持多轮对话，可以追问细节
-                
-                **🔍 搜索优化**
-                - 联网搜索适合时效性问题
-                - 智能研究适合复杂分析
-                - 组合使用效果更佳
-                
-                **📚 知识库管理**
-                - 定期更新文档内容
-                - 合理命名便于识别
-                - 删除过时的知识库
-                """)
-            
-            with col2:
-                st.markdown("""
-                **⚡ 性能优化**
-                - 文档大小控制在50MB以内
-                - PDF文档效果最佳
-                - 避免重复上传相同内容
-                
-                **🎭 角色切换**
-                - 技术问题选择"技术专家"
-                - 商务问题选择"商务顾问"
-                - 学术问题选择"学术研究员"
-                
-                **🛠️ 故障排除**
-                - 清空浏览器缓存
-                - 检查网络连接
-                - 重新启动应用
-                """)
-        
-        with help_tabs[2]:  # 功能说明
-            st.markdown("##### 🔧 功能说明")
-            
-            features = [
-                ("🌐 联网搜索", "自动搜索互联网最新信息，补充知识库内容", "适用于时效性强的问题"),
-                ("🧠 智能研究", "Deep Research模式，多专家视角深度分析", "适用于复杂问题的全面分析"),
-                ("🎭 角色切换", "不同专业角色提供专业化回答", "根据问题类型选择合适角色"),
-                ("📊 实时监控", "系统性能和资源使用监控", "了解系统运行状态"),
-                ("📈 进度追踪", "任务处理进度和历史记录", "跟踪文档处理状态"),
-                ("⚙️ 智能调度", "自动优化系统资源配置", "提升处理效率")
-            ]
-            
-            for icon_name, description, usage in features:
-                with st.expander(f"{icon_name}"):
-                    st.write(f"**功能**: {description}")
-                    st.write(f"**适用场景**: {usage}")
-        
-        with help_tabs[3]:  # 常见问题
-            st.markdown("##### ❓ 常见问题")
-            
+            st.caption("RAG Pro Max 数据流转示意图")
+
+        elif active_tab == "api":
+            st.markdown("#### 🔌 开发者与 API 集成")
+            st.code("""
+# 快速查询示例
+import requests
+resp = requests.post("http://localhost:8000/query", 
+                     json={"query": "核心逻辑是什么?", "kb_name": "tech_doc"})
+print(resp.json()["answer"])
+            """, language="python")
+            st.caption("详细接口说明请参考根目录下的 `API_DOCUMENTATION.md`")
+
+        elif active_tab == "faq":
+            st.markdown("#### ❓ 常见问题汇总")
             faqs = [
-                ("为什么上传文档后没有反应？", "请检查文档格式是否支持，文件大小是否超限，网络连接是否正常。支持的格式：PDF、DOCX、TXT、MD等。"),
-                ("联网搜索没有结果怎么办？", "请检查网络连接，尝试更换关键词，或者关闭后重新开启联网搜索功能。"),
-                ("如何提高回答质量？", "1) 上传高质量的相关文档 2) 使用具体明确的问题 3) 开启智能研究模式 4) 选择合适的角色"),
-                ("系统运行缓慢怎么办？", "1) 检查系统资源使用情况 2) 清理临时文件 3) 重启应用 4) 减少同时处理的任务数量"),
-                ("如何备份知识库？", "知识库数据存储在 vector_db_storage 目录中，可以直接备份该目录。"),
-                ("支持哪些文档格式？", "PDF、DOCX、XLSX、TXT、MD、HTML、RTF等主流格式，以及图片中的文字（OCR）。")
+                ("为什么分析图表无法显示？", "请确保查询涉及结构化数据。系统会自动感应数据特征并切换模式。"),
+                ("如何迁移知识库？", "导出“终极五福资产包” ZIP，在目标机器解压至 `vector_db_storage` 即可。"),
+                ("GPU 占用过高怎么办？", "可在配置中心调低“并发工作进程数”或切换至 CPU 模式。")
             ]
-            
-            for question, answer in faqs:
-                with st.expander(f"❓ {question}"):
-                    st.write(answer)
-        
-        with help_tabs[4]:  # 获取支持
-            st.markdown("##### 📞 获取支持")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("""
-                **📚 文档资源**
-                - [用户手册](USER_MANUAL.md) - 详细使用说明
-                - [API文档](API_DOCUMENTATION.md) - 开发者接口
-                - [更新日志](CHANGELOG.md) - 版本更新记录
-                - [常见问题](FAQ.md) - 问题解答集合
-                """)
-                
-                if st.button("📖 打开用户手册"):
-                    st.info("💡 请查看项目根目录的 USER_MANUAL.md 文件")
-            
-            with col2:
-                st.markdown("""
-                **🛠️ 技术支持**
-                - GitHub Issues - 报告问题和建议
-                - 社区论坛 - 用户交流讨论
-                - 技术文档 - 深入了解系统
-                - 开发指南 - 二次开发参考
-                """)
-                
-                if st.button("🐛 报告问题"):
-                    st.info("💡 请在GitHub仓库中创建Issue，描述具体问题和复现步骤")
+            for q, a in faqs:
+                with st.expander(f"Q: {q}"):
+                    st.write(f"A: {a}")
+
+        # 4. 底部快捷文档访问
+        st.divider()
+        st.markdown("**📚 完整技术文档库**")
+        doc_cols = st.columns(4)
+        docs = [
+            ("架构设计", "ARCHITECTURE.md"),
+            ("用户手册", "USER_MANUAL.md"),
+            ("部署指南", "DEPLOYMENT.md"),
+            ("更新日志", "CHANGELOG.md")
+        ]
+        for i, (label, file) in enumerate(docs):
+            with doc_cols[i % 4]:
+                if st.button(label, key=f"doc_btn_{i}", use_container_width=True):
+                    # 联动侧边栏的文档查看逻辑
+                    try:
+                        with open(file, 'r', encoding='utf-8') as f:
+                            st.toast(f"正在加载 {file}...")
+                            # 这里可以触发一个 dialog 显示内容
+                            st.session_state.full_doc_content = f.read()
+                            st.session_state.show_doc_dialog = True
+                    except:
+                        st.error("文档读取失败")
+
+    # 全局文档弹窗
+    if st.session_state.get('show_doc_dialog'):
+        @st.dialog("📄 技术文档预览", width="large")
+        def show_doc():
+            st.markdown(st.session_state.full_doc_content)
+            if st.button("关闭", use_container_width=True):
+                st.session_state.show_doc_dialog = False
+                st.rerun()
+        show_doc()
         
         # 系统信息
         st.markdown("---")
@@ -2146,8 +2462,8 @@ if st.session_state.get('main_mode', 'rag') == 'sql':
         st.markdown("###### 📁 数据导入")
         
         uploaded_data = st.file_uploader(
-            "上传Excel/CSV文件", 
-            type=['xlsx', 'csv'],
+            "上传Excel/CSV/MD字典文件", 
+            type=['xlsx', 'csv', 'md', 'markdown'],
             key="main_data_uploader"
         )
         
@@ -2399,56 +2715,81 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
         status_container.update(label="❌ 路径无效", state="error")
         raise ValueError(f"路径无效: {current_target_path}")
 
+    # [v5.5.5] 全量物理归档：确保所有原始材料（PDF/Word/CSV等）永久留存
+    try:
+        raw_sources_dir = os.path.join(persist_dir, "raw_sources")
+        if not os.path.exists(raw_sources_dir):
+            os.makedirs(raw_sources_dir)
+            
+        if current_target_path and os.path.exists(current_target_path):
+            import shutil
+            status_container.write("📦 正在执行原始文献的物理归档与持久化...")
+            if os.path.isdir(current_target_path):
+                # 递归拷贝整个上传目录
+                for root, dirs, files in os.walk(current_target_path):
+                    for file in files:
+                        if file.startswith('.'): continue
+                        src_file = os.path.join(root, file)
+                        shutil.copy2(src_file, os.path.join(raw_sources_dir, file))
+            else:
+                shutil.copy2(current_target_path, os.path.join(raw_sources_dir, os.path.basename(current_target_path)))
+            
+            logger.info(f"✅ [Data Sovereignty] 所有源材料已安全归档至: {raw_sources_dir}")
+    except Exception as e:
+        logger.warning(f"⚠️ 原始文件归档失败: {e}")
+
     # --- 核心增强：数据分析 5.0 业务推演 ---
     is_da_mode = st.session_state.get('is_data_analysis_mode', False)
-    if is_da_mode:
-        try:
-            status_container.write("📂 [专项] 启动业务语义大脑引擎...")
-            
-            # 强制热重载以应用 Hotfix
-            import importlib
-            import src.processors.data_analyst
-            importlib.reload(src.processors.data_analyst)
-            from src.processors.data_analyst import DataAnalystEngine
-            from src.utils.model_manager import load_llm_model
-            
-            da_engine = DataAnalystEngine(persist_dir, logger)
-            llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
-            
-            # 1. 执行 RAG 预扫描以获取文本（用于非结构化建模）
-            # 这里先运行 builder._scan_files 和 _read_documents 以获取 docs 对象
-            docs, _ = builder._read_documents(current_target_path, 0, None)
-            
-            # 2. 深度 Schema 建模 (核心升级：从文档推导演算法)
-            status_container.write("🧠 正在从文档中提取数据字典与表结构...")
-            schemas = da_engine.extract_schema_from_docs(docs, llm)
-            
+    
+    # 扫描数据文件用于建模 (CSV/XLSX/MD)
+    import glob
+    data_files = []
+    if os.path.exists(raw_sources_dir):
+        csvs = glob.glob(os.path.join(raw_sources_dir, "**/*.csv"), recursive=True)
+        excels = glob.glob(os.path.join(raw_sources_dir, "**/*.xlsx"), recursive=True) + glob.glob(os.path.join(raw_sources_dir, "**/*.xls"), recursive=True)
+        mds = glob.glob(os.path.join(raw_sources_dir, "**/*.md"), recursive=True) + glob.glob(os.path.join(raw_sources_dir, "**/*.markdown"), recursive=True)
+        data_files = csvs + excels + mds
+    
+    if is_da_mode or data_files:
+        status_container.write("📂 [专项] 启动业务语义大脑引擎...")
+        from src.processors.data_analyst import DataAnalystEngine
+        from src.utils.model_manager import load_llm_model
+        
+        da_engine = DataAnalystEngine(persist_dir, logger)
+        llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
+        
+        if data_files:
+             status_container.write(f"📊 检测到 {len(data_files)} 个业务源文件，正在执行物理归档与战略建模...")
+             logger.info(f"📊 [Strategic Workshop] 检测到 {len(data_files)} 个业务源文件，启动战略建模...")
+             res = da_engine.process_files(data_files, llm)
+             if res['success']:
+                 status_container.success(f"✅ 战略大脑初始化完成 (已归档并导入 {len(res['tables'])} 张表)")
+                 logger.success(f"✅ [Strategic Workshop] 战略大脑初始化完成 (已导入 {len(res['tables'])} 张表)")
+
+        # 1. 执行 RAG 预扫描以获取文本（用于非结构化建模）
+        docs, _ = builder._read_documents(current_target_path, 0, None)
+        
+        # 2. 深度 Schema 建模 (核心升级：从文档推导演算法)
+        if docs:
+            status_container.write("🧠 正在执行深度业务语义建模...")
+            logger.info("🧠 [Strategic Workshop] 正在从源材料中提取业务元模型与逻辑通路...")
+            if not os.path.exists(da_engine.schema_path):
+                schemas = da_engine.extract_schema_from_docs(docs, llm)
+            else:
+                status_container.write("⏩ 已存在物理表结构，跳过纯文档提取...")
+                with open(da_engine.schema_path, 'r') as f:
+                    schemas = json.load(f)
+        
             # 3. 业务蓝图推演
             status_container.write("🌐 正在构建业务全景图与关联路径...")
-            try:
-                # 增加类型检查日志
-                logger.info(f"DEBUG: Schemas type: {type(schemas)}")
-                blueprint = da_engine.infer_business_blueprint(schemas, llm)
-            except Exception as e:
-                logger.error(f"❌ 业务蓝图推演严重错误: {e}")
-                # 兜底防止崩溃
-                blueprint = {
-                    "business_scenario": "推演中断",
-                    "core_logic": "系统错误",
-                    "metrics": []
-                }
-            status_container.info(f"📍 识别业务场景: {blueprint.get('business_scenario', '未知业务')}")
-            
-            status_container.write("✅ 业务语义建模已就绪 (去RAG纯分析模式已激活)")
-            allow_empty_docs = True
-            
-        except Exception as e:
-            import traceback
-            error_details = traceback.format_exc()
-            logger.error(f"❌ 数据分析模式崩溃: {error_details}")
-            status_container.error(f"数据分析引擎初始化失败: {str(e)}")
-            st.expander("🔍 错误详情").code(error_details)
-            allow_empty_docs = False # 回退到普通模式
+            blueprint = da_engine.infer_business_blueprint(schemas, llm)
+            scenario = blueprint.get('business_scenario', '未知业务')
+            status_container.info(f"📍 识别业务场景: {scenario}")
+            logger.info(f"📍 [Strategic Workshop] 业务蓝图识别完成: {scenario}")
+        
+        status_container.write("✅ 业务语义建模已就绪")
+        logger.success("✨ [Strategic Workshop] 全域业务语义建模就绪")
+        allow_empty_docs = True
     else:
         allow_empty_docs = False
 
@@ -2642,14 +2983,39 @@ else:
     active_kb_name = current_kb_name if not is_create_mode else None
 
 # 自动加载逻辑
-if active_kb_name and active_kb_name != st.session_state.current_kb_id:
+# 优化：增加 messages 为空的判断，确保刷新页面后能触发首次加载
+if active_kb_name and (active_kb_name != st.session_state.current_kb_id or not st.session_state.get('messages')):
     # 只在没有正在处理的问题时才切换
     if not st.session_state.get('is_processing', False):
         st.session_state.current_kb_id = active_kb_name
         st.session_state.chat_engine = None
+        
+        # [关键修复] 优先使用 URL 中的 sess_id，否则获取该库最近活跃的会话 ID
+        if not st.session_state.get('current_session_id'):
+            latest_id = HistoryManager.get_latest_session_id(active_kb_name)
+            st.session_state.current_session_id = latest_id
+        
         with st.spinner("📜 正在加载对话历史..."):
-            st.session_state.messages = HistoryManager.load_session(active_kb_name, st.session_state.get('current_session_id'))
+            st.session_state.messages = HistoryManager.load_session(active_kb_name, st.session_state.current_session_id)
+        
+        # 恢复状态：从最后一条消息恢复建议列表 (v5.6.3 增强)
         st.session_state.suggestions_history = []
+        if st.session_state.messages:
+            last_msg = st.session_state.messages[-1]
+            if isinstance(last_msg, dict) and last_msg.get('suggestions'):
+                st.session_state.suggestions_history = last_msg['suggestions']
+            elif isinstance(last_msg, dict) and 'suggestions' not in last_msg:
+                # 尝试向前追溯一条（防止最后一条是用户消息）
+                if len(st.session_state.messages) >= 2:
+                    prev_msg = st.session_state.messages[-2]
+                    if isinstance(prev_msg, dict) and prev_msg.get('suggestions'):
+                        st.session_state.suggestions_history = prev_msg['suggestions']
+        
+        # [关键修复] 如果已有历史记录，禁止触发自动摘要/引导，防止覆盖旧状态
+        if st.session_state.messages and len(st.session_state.messages) > 0:
+            st.session_state.skip_auto_summary = True
+        else:
+            st.session_state.skip_auto_summary = False
     else:
         st.warning("⚠️ 正在处理问题，请等待完成后再切换知识库")
         st.session_state.current_nav = f"📂 {st.session_state.current_kb_id}"
@@ -2826,38 +3192,30 @@ if btn_start:
                     }
                     
                     try:
-                        logger.log("网页抓取", "info", f"🚀 开始创建知识库: {kb_name}")
-                        logger.log("网页抓取", "info", f"📁 目标路径: {target_path}")
+                        logger.log("网页抓取", "info", f"🚀 正在通过标准逻辑创建知识库: {kb_name}")
+                        # [v5.5.7] 强制锚定路径，确保物理归档生效
+                        st.session_state.uploaded_path = target_path
                         
-                        success = processor.process_knowledge_base(kb_name, target_path, process_options)
+                        process_knowledge_base_logic(
+                            kb_name=kb_name,
+                            action_mode='NEW',
+                            use_ocr=current_use_ocr,
+                            extract_metadata=current_extract_metadata,
+                            generate_summary=current_generate_summary,
+                            force_reindex=current_force_reindex,
+                            owner=st.session_state.get('user', 'admin')
+                        )
                         
-                        if success:
-                            logger.log("网页抓取", "success", f"✅ 知识库创建成功: {kb_name}")
-                            st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
-                            
-                            # 跳转到新创建的知识库
-                            logger.log("网页抓取", "info", f"📍 网页抓取模式: 准备调用跳转函数")
-                            jump_to_knowledge_base(kb_name, output_base)
-                            logger.log("网页抓取", "info", f"📍 网页抓取模式: 跳转函数调用完成")
-                            
-                            # 清理session_state中的网页抓取参数
-                            for key in ['crawl_url', 'crawl_depth', 'max_pages', 'parser_type', 'url_quality_threshold']:
-                                if key in st.session_state:
-                                    del st.session_state[key]
-                            
-                            # 设置标记，防止重复执行文件处理逻辑
-                            st.session_state.web_crawl_completed = True
-                            
-                            logger.log("网页抓取", "info", f"🔄 网页抓取模式: 执行页面刷新")
-                            st.rerun()
-                        else:
-                            st.error(f"❌ 知识库创建失败")
+                        logger.log("网页抓取", "success", f"✅ 知识库创建并归档成功: {kb_name}")
+                        st.success(f"🎉 网页抓取知识库 '{kb_name}' 创建成功！")
+                        
+                        # 设置标记，防止重复执行
+                        st.session_state.web_crawl_completed = True
+                        time.sleep(1); st.rerun()
                         
                     except Exception as e:
-                        logger.log("网页抓取", "error", f"❌ 知识库创建异常: {str(e)}")
-                        logger.log("网页抓取", "error", f"🔍 异常类型: {type(e).__name__}")
                         st.error(f"❌ 知识库创建失败: {str(e)}")
-                        logger.error(f"知识库创建错误: {str(e)}")
+                        logger.error(f"知识库创建异常: {str(e)}")
                     
                 else:
                     st.error("❌ 网页抓取失败，未获取到任何文件")
@@ -2903,29 +3261,36 @@ if btn_start:
                     is_medical = any(med_word in keyword_lower for med_word in medical_keywords)
                     is_tech = any(tech_word in keyword_lower for tech_word in tech_keywords)
                     
+                    import urllib.parse
+                    q = urllib.parse.quote(keyword)
+                    
+                    # 核心改动：引入通用搜索引擎作为强力跳板
+                    # 使用 HTML 版以减少反爬干扰和解析难度
+                    general_engines = [
+                        f"https://www.bing.com/search?q={q}",
+                        f"https://html.duckduckgo.com/html/?q={q}"
+                    ]
+
                     if is_medical:
-                        return [
-                            "https://zh.wikipedia.org/",
-                            "https://baike.baidu.com/",
+                        return general_engines + [
+                            f"https://zh.wikipedia.org/w/index.php?search={q}",
+                            f"https://baike.baidu.com/search/none?word={q}",
                             "https://www.39.net/",
-                            "https://www.xywy.com/",
-                            "https://www.familydoctor.com.cn/"
+                            "https://www.xywy.com/"
                         ]
                     elif is_tech:
-                        return [
-                            "https://www.runoob.com/",
-                            "https://docs.python.org/zh-cn/3/",
-                            "https://help.aliyun.com/",
-                            "https://zh.wikipedia.org/",
-                            "https://www.zhihu.com/"
+                        return general_engines + [
+                            f"https://www.runoob.com/?s={q}",
+                            f"https://help.aliyun.com/search_search.htm?k={q}",
+                            f"https://so.csdn.net/so/search?q={q}",
+                            f"https://zh.wikipedia.org/w/index.php?search={q}"
                         ]
                     else:
-                        return [
-                            "https://zh.wikipedia.org/",
-                            "https://baike.baidu.com/",
-                            "https://www.zhihu.com/",
-                            "https://www.icourse163.org/",
-                            "https://www.eastmoney.com/"
+                        return general_engines + [
+                            f"https://zh.wikipedia.org/w/index.php?search={q}",
+                            f"https://baike.baidu.com/search/none?word={q}",
+                            f"https://www.zhihu.com/search?type=content&q={q}",
+                            f"https://www.icourse163.org/search.htm?search={q}"
                         ]
                 
                 search_engines = get_smart_search_engines(search_keyword)
@@ -2939,9 +3304,15 @@ if btn_start:
                 status_text = st.empty()
                 
                 def update_status(msg):
-                    status_text.text(f"🔍 {msg}")
-                    logger.info(f"🔍 智能搜索: {msg}")
-                
+                    try:
+                        # 防御性编程：确保 logger 存在
+                        from src.app_logging import LogManager
+                        local_logger = LogManager()
+                        status_text.caption(f"🌐 **实时进度**: {msg}")
+                        local_logger.info(f"🔍 智能搜索: {msg}")
+                    except Exception:
+                        pass
+
                 logger.info(f"🔍 开始智能搜索: {search_keyword} (深度:{crawl_depth}, 页数:{max_pages})")
                 
                 with st.spinner("智能搜索中..."):
@@ -2951,53 +3322,58 @@ if btn_start:
                     
                     concurrent_crawler = ConcurrentCrawler(max_workers=3)
                     content_analyzer = ContentQualityAnalyzer()
-                    
+
                     def enhanced_progress_callback(message, progress=None):
-                        update_status(message)
-                        if progress is not None:
-                            progress_bar.progress(progress)
+                        # 回调函数可能在不同上下文中被调用，确保安全
+                        try:
+                            update_status(message)
+                            if progress is not None:
+                                progress_bar.progress(progress)
+                        except Exception:
+                            pass
+                
+                # 执行并发爬取
+                crawl_results = concurrent_crawler.crawl_with_depth(
+                    search_engines,
+                    max_depth=crawl_depth,
+                    max_pages_per_level=max_pages,
+                    keyword=search_keyword,
+                    progress_callback=enhanced_progress_callback
+                )
+                
+                # 保存结果到文件
+                saved_files = []
+                if crawl_results:
+                    import os
+                    os.makedirs(unique_output_dir, exist_ok=True)
                     
-                    # 执行并发爬取
-                    crawl_results = concurrent_crawler.crawl_with_depth(
-                        search_engines,
-                        max_depth=crawl_depth,
-                        max_pages_per_level=max_pages,
-                        progress_callback=enhanced_progress_callback
-                    )
-                    
-                    # 保存结果到文件
-                    saved_files = []
-                    if crawl_results:
-                        import os
-                        os.makedirs(unique_output_dir, exist_ok=True)
-                        
-                        for i, result in enumerate(crawl_results):
-                            if result['success'] and result['content']:
-                                # 使用网页标题作为文件名，如果没有标题则使用默认名称
-                                title = result.get('title', '').strip()
-                                if title:
-                                    # 清理标题，移除不合法的文件名字符
-                                    safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
-                                    safe_title = safe_title.replace(' ', '_')[:50]  # 限制长度
-                                    filename = f"{safe_title}_{i+1:03d}.md"
-                                else:
-                                    filename = f"quality_content_{i+1:03d}.md"
-                                
-                                filepath = os.path.join(unique_output_dir, filename)
-                                
-                                # 确保导入 (防止多进程或动态加载导致的 NameError)
-                                from src.utils.file_system_utils import set_where_from_metadata
-                                
-                                with open(filepath, 'w', encoding='utf-8') as f:
-                                    # 🔥 核心修正：使用 Markdown 格式，以便溯源引擎识别和更好展示
-                                    f.write(f"**URL:** {result['url']}\n\n")
-                                    f.write(f"# {result['title']}\n\n")
-                                    f.write(f"**内容:**\n\n{result['content']}\n")
-                                
-                                # 为文件设置 macOS 下载来源元数据
-                                set_where_from_metadata(filepath, result['url'])
-                                
-                                saved_files.append(filepath)
+                    for i, result in enumerate(crawl_results):
+                        if result['success'] and result['content']:
+                            # 使用网页标题作为文件名，如果没有标题则使用默认名称
+                            title = result.get('title', '').strip()
+                            if title:
+                                # 清理标题，移除不合法的文件名字符
+                                safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
+                                safe_title = safe_title.replace(' ', '_')[:50]  # 限制长度
+                                filename = f"{safe_title}_{i+1:03d}.md"
+                            else:
+                                filename = f"quality_content_{i+1:03d}.md"
+                            
+                            filepath = os.path.join(unique_output_dir, filename)
+                            
+                            # 确保导入 (防止多进程或动态加载导致的 NameError)
+                            from src.utils.file_system_utils import set_where_from_metadata
+                            
+                            with open(filepath, 'w', encoding='utf-8') as f:
+                                # 🔥 核心修正：使用 Markdown 格式，以便溯源引擎识别和更好展示
+                                f.write(f"**URL:** {result['url']}\n\n")
+                                f.write(f"# {result['title']}\n\n")
+                                f.write(f"**内容:**\n\n{result['content']}\n")
+                            
+                            # 为文件设置 macOS 下载来源元数据
+                            set_where_from_metadata(filepath, result['url'])
+                            
+                            saved_files.append(filepath)
                 
                 # 搜索完成后自动创建知识库
                 if saved_files:
@@ -3040,36 +3416,28 @@ if btn_start:
                     }
                     
                     try:
-                        logger.log("智能搜索", "info", f"🚀 开始创建知识库: {kb_name}")
-                        logger.log("智能搜索", "info", f"📁 目标路径: {target_path}")
+                        logger.log("智能搜索", "info", f"🚀 正在通过标准逻辑创建知识库: {kb_name}")
+                        # [v5.5.7] 强制锚定搜索路径
+                        st.session_state.uploaded_path = target_path
                         
-                        success = processor.process_knowledge_base(kb_name, target_path, process_options)
+                        process_knowledge_base_logic(
+                            kb_name=kb_name,
+                            action_mode='NEW',
+                            use_ocr=current_use_ocr,
+                            extract_metadata=current_extract_metadata,
+                            generate_summary=current_generate_summary,
+                            force_reindex=current_force_reindex,
+                            owner=st.session_state.get('user', 'admin')
+                        )
                         
-                        if success:
-                            logger.log("智能搜索", "success", f"✅ 知识库创建成功: {kb_name}")
-                            st.success(f"🎉 知识库 '{kb_name}' 创建成功！")
-                            
-                            # 跳转到新创建的知识库
-                            logger.log("智能搜索", "info", f"📍 智能搜索模式: 准备调用跳转函数")
-                            jump_to_knowledge_base(kb_name, output_base)
-                            logger.log("智能搜索", "info", f"📍 智能搜索模式: 跳转函数调用完成")
-                            
-                            # 清理session_state中的搜索参数
-                            for key in ['search_keyword', 'search_crawl_depth', 'search_max_pages', 'search_parser_type', 'quality_threshold']:
-                                if key in st.session_state:
-                                    del st.session_state[key]
-                            
-                            # 设置标记，防止重复执行文件处理逻辑
-                            st.session_state.smart_search_completed = True
-                            
-                            logger.log("智能搜索", "info", f"🔄 智能搜索模式: 执行页面刷新")
-                            st.rerun()
-                        else:
-                            st.error(f"❌ 知识库创建失败")
+                        logger.log("智能搜索", "success", f"✅ 知识库创建并归档成功: {kb_name}")
+                        st.success(f"🎉 智能搜索知识库 '{kb_name}' 创建成功！")
                         
+                        st.session_state.smart_search_completed = True
+                        time.sleep(1); st.rerun()
                     except Exception as e:
                         st.error(f"❌ 知识库创建失败: {str(e)}")
-                        logger.error(f"知识库创建错误: {str(e)}")
+                        logger.error(f"知识库创建异常: {str(e)}")
                         
                 else:
                     st.error("❌ 智能搜索失败，未获取到任何文件")
@@ -3194,6 +3562,13 @@ if btn_start:
                 # 仅在新建时强制加前缀，追加模式保持原名
                 if not final_kb_name.startswith(f"{current_user}_"):
                     final_kb_name = f"{current_user}_{final_kb_name}"
+            
+            # [v3.5.0 修复] 确保拖拽上传的临时路径被正确同步给处理引擎
+            # 如果 uploaded_files 有内容但 path 为空，立即调用保存函数获取路径
+            if 'uploaded_files' in locals() and uploaded_files and not st.session_state.get('uploaded_path'):
+                from src.common.utils import save_uploaded_files
+                st.session_state.uploaded_path = save_uploaded_files(uploaded_files, "temp_uploads")
+                logger.info(f"📂 [修正] 拖拽上传路径已锚定: {st.session_state.uploaded_path}")
 
             process_knowledge_base_logic(
                 kb_name=final_kb_name,
@@ -3300,7 +3675,12 @@ elif active_kb_name:
                 import pandas as pd
                 import json
                 from datetime import datetime
+                from src.auth.permission_manager import permission_manager
                 
+                # 获取当前用户
+                current_user = st.session_state.get('user', 'guest_user')
+                can_download = permission_manager.has_permission(current_user, "download_knowledge_base")
+
                 # --- A. 快速资产导出 ---
                 st.markdown("**🧠 核心知识 (轻量)**")
                 if doc_manager.manifest.get('files'):
@@ -3318,14 +3698,22 @@ elif active_kb_name:
                             })
                         df = pd.DataFrame(df_data)
                         csv_data = df.to_csv(index=False).encode('utf-8-sig')
-                        st.download_button(label="📊 CSV 索引", data=csv_data, file_name=f"{active_kb_name}_索引.csv", mime='text/csv', use_container_width=True, key=f"dl_csv_h_{active_kb_name}")
+                        
+                        if can_download:
+                            st.download_button(label="📊 CSV 索引", data=csv_data, file_name=f"{active_kb_name}_索引.csv", mime='text/csv', use_container_width=True, key=f"dl_csv_h_{active_kb_name}")
+                        else:
+                            st.button("📊 CSV 索引", disabled=True, key=f"dl_csv_h_{active_kb_name}_disabled", help="无下载权限")
 
                     with col_rpt:
                         # 2. Markdown 报告内容生成
                         report_md = f"# 知识库全量报告: {active_kb_name}\n\n- 导出时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                         for info in doc_manager.manifest['files']:
                             report_md += f"## 📄 {info.get('name')}\n- **分类**: {info.get('category', '未分类')}\n- **摘要**: {info.get('summary', '暂无摘要')}\n\n---\n"
-                        st.download_button(label="📝 MD 报告", data=report_md, file_name=f"{active_kb_name}_报告.md", mime='text/markdown', use_container_width=True, key=f"dl_md_h_{active_kb_name}")
+                        
+                        if can_download:
+                            st.download_button(label="📝 MD 报告", data=report_md, file_name=f"{active_kb_name}_报告.md", mime='text/markdown', use_container_width=True, key=f"dl_md_h_{active_kb_name}")
+                        else:
+                            st.button("📝 MD 报告", disabled=True, key=f"dl_md_h_{active_kb_name}_disabled", help="无下载权限")
 
                 st.divider()
                 
@@ -3334,18 +3722,17 @@ elif active_kb_name:
                 st.caption("包含报告、索引、元数据、原始文档及全量向量数据库")
                 
                 # 权限拦截逻辑 (实时校验 - 颗粒化)
-                from src.auth.permission_manager import permission_manager
-                current_user = st.session_state.get('user', 'guest_user')
-                
                 can_export_full = permission_manager.has_permission(current_user, "kb_export_full")
-                can_export_report = permission_manager.has_permission(current_user, "kb_export_report")
+                # can_download 也是必要条件之一 (逻辑上全量导出包含下载)
+                final_export_permission = can_export_full and can_download
                 
-                if not can_export_full:
+                if not final_export_permission:
                     st.warning("🔒 权限不足：当前角色无法导出全量镜像。")
                 
-                if st.button("🌟 一键生成全量资产包 (ZIP)", use_container_width=True, key=f"dl_all_in_one_{active_kb_name}", type="primary", disabled=not can_export_full):
+                if st.button("🌟 一键生成全量资产包 (ZIP)", use_container_width=True, key=f"dl_all_in_one_{active_kb_name}", type="primary", disabled=not final_export_permission):
                     from src.auth.audit_logger import AuditLogger
-                    AuditLogger.log(current_user, "EXPORT_FULL_SNAPSHOT", f"导出知识库全量镜像: {active_kb_name}")
+                    from src.common.utils import get_client_ip
+                    AuditLogger.log(current_user, "EXPORT_FULL_SNAPSHOT", f"导出知识库全量镜像: {active_kb_name}", ip=get_client_ip())
                     with st.status("正在进行全量数据打包 (含历史对话)...", expanded=True) as status:
                         # 确保元数据已序列化
                         manifest_json = json.dumps(doc_manager.manifest, indent=4, ensure_ascii=False)
@@ -3358,57 +3745,123 @@ elif active_kb_name:
 
                         zip_buffer = io.BytesIO()
                         with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
-                            # 1. 知识报告与索引
-                            status.write("正在生成知识报告与索引...")
+                            # [1] 核心资产报告与索引
+                            status.write("正在打包 [1/6] 知识报告与索引清单...")
                             zip_file.writestr("01_核心资产/知识摘要报告.md", report_md)
                             zip_file.writestr("01_核心资产/结构化资产清单.csv", csv_data)
                             
-                            # 2. 对话历史导出
-                            status.write("正在检索并格式化对话历史...")
-                            user_name = st.session_state.get('user', 'guest')
-                            history_dir = os.path.join("chat_histories", user_name)
+                            # [2] 对话历史备份 (MD 级)
+                            status.write("正在打包 [2/6] 历史对话纪要...")
+                            # 核心修复：直接扫描根目录，因为 HistoryManager 默认不存子目录
+                            history_dir = "chat_histories"
                             chat_history_md = f"# 对话历史备份: {active_kb_name}\n\n"
-                            
                             has_chats = False
+                            
+                            # 🔥 [v5.6.0] 核心增强：强制捕获内存中的最新活跃会话
+                            current_msgs = st.session_state.get('messages', [])
+                            current_sess_id = st.session_state.get('current_session_id')
+                            
+                            if current_msgs:
+                                has_chats = True
+                                chat_history_md += f"### 🔴 当前活跃会话 (最新内存快照)\n"
+                                chat_history_md += f"> 导出时刻：{datetime.now().strftime('%H:%M:%S')}\n\n"
+                                zip_file.writestr("02_历史对话/raw_json/CURRENT_ACTIVE_SESSION.json", json.dumps({"messages": current_msgs}, indent=4, ensure_ascii=False))
+                                
+                                for msg in current_msgs:
+                                    role_tag = "👤 用户" if msg['role'] == 'user' else "🤖 AI"
+                                    chat_history_md += f"**{role_tag}**: {msg['content']}\n\n"
+                                chat_history_md += "---\n\n"
+                            
                             if os.path.exists(history_dir):
                                 for chat_file in os.listdir(history_dir):
-                                    if chat_file.endswith(".json"):
+                                    # 匹配规则：文件名以 KBID 开头 (涵盖默认.json和带@session.json)
+                                    if chat_file.endswith(".json") and (chat_file.startswith(f"{active_kb_name}.") or chat_file.startswith(f"{active_kb_name}@")):
                                         try:
+                                            # 跳过正在内存中处理的同一个 session，避免重复
+                                            if current_sess_id and f"@{current_sess_id}.json" in chat_file:
+                                                continue
+                                                
                                             with open(os.path.join(history_dir, chat_file), 'r', encoding='utf-8') as f:
                                                 chat_data = json.load(f)
-                                                # 仅备份与当前知识库相关的对话
-                                                if chat_data.get('kb_name') == active_kb_name or active_kb_name in chat_file:
-                                                    has_chats = True
-                                                    # 存入原始 JSON 供迁移
-                                                    zip_file.write(os.path.join(history_dir, chat_file), arcname=f"02_历史对话/raw_json/{chat_file}")
-                                                    # 格式化 MD 供阅读
-                                                    chat_history_md += f"### 📅 会话: {chat_file.replace('.json','')}\n"
-                                                    for msg in chat_data.get('messages', []):
-                                                        role = "👤 用户" if msg['role'] == 'user' else "🤖 AI"
-                                                        chat_history_md += f"**{role}**: {msg['content']}\n\n"
-                                                    chat_history_md += "---\n\n"
+                                                msgs = chat_data.get('messages', [])
+                                                if not msgs: continue
+                                                
+                                                has_chats = True
+                                                zip_file.write(os.path.join(history_dir, chat_file), arcname=f"02_历史对话/raw_json/{chat_file}")
+                                                
+                                                chat_history_md += f"### 📅 归档会话: {chat_file.replace('.json','')}\n"
+                                                for msg in msgs:
+                                                    role_tag = "👤 用户" if msg['role'] == 'user' else "🤖 AI"
+                                                    chat_history_md += f"**{role_tag}**: {msg['content']}\n\n"
+                                                chat_history_md += "---\n\n"
                                         except: continue
                             
-                            if has_chats:
-                                zip_file.writestr("02_历史对话/对话纪要_可阅读.md", chat_history_md)
+                            if not has_chats:
+                                chat_history_md += "(当前无相关对话历史)"
+                            zip_file.writestr("02_历史对话/对话纪要_可阅读.md", chat_history_md)
                             
-                            # 3. 系统底层元数据
-                            zip_file.writestr("03_系统配置文件/底层元数据.json", manifest_json)
+                            # [3] 战略大脑模型
+                            status.write("正在打包 [3/6] 战略业务模型...")
+                            schema_file = os.path.join(db_path, "business_schema.json")
+                            blueprint_file = os.path.join(db_path, "business_blueprint.json")
+                            if os.path.exists(schema_file):
+                                zip_file.write(schema_file, arcname="03_战略大脑/表结构模型_schema.json")
+                            else:
+                                zip_file.writestr("03_战略大脑/说明.txt", "未在此知识库中检测到战略建模数据")
+                            if os.path.exists(blueprint_file):
+                                zip_file.write(blueprint_file, arcname="03_战略大脑/业务蓝图_blueprint.json")
                             
-                            # 4. 递归写入整个数据库目录 (包含向量库和源文件)
-                            status.write("正在打包向量数据库与物理文件...")
-                            target_dir = db_path
-                            for root, dirs, files in os.walk(target_dir):
+                            # [4] 系统配置文件
+                            status.write("正在打包 [4/6] 底层系统元数据...")
+                            zip_file.writestr("04_系统配置文件/底层元数据_manifest.json", manifest_json)
+                            
+                            # [5] 原始文档库 (v5.5.8 跨目录全量打捞)
+                            status.write("正在打包 [5/6] 原始文档库 (全格式检索)...")
+                            raw_dir_path = os.path.join(db_path, "raw_sources")
+                            found_any_raw = False
+                            
+                            # 策略 A: 标准归档目录
+                            if os.path.exists(raw_dir_path):
+                                for root, dirs, files in os.walk(raw_dir_path):
+                                    for file in files:
+                                        if file.startswith('.'): continue
+                                        abs_path = os.path.join(root, file)
+                                        zip_file.write(abs_path, arcname=os.path.join("05_原始文档库", os.path.relpath(abs_path, raw_dir_path)))
+                                        found_any_raw = True
+                            
+                            # 策略 B: 跨目录深度打捞 (针对智能搜索残留件)
+                            if not found_any_raw:
+                                logger.info(f"📍 [Rescue] 知识库 {active_kb_name} 触发深度打捞逻辑...")
+                                # 从 manifest 中提取可能存在的原始目录线索
+                                for f_meta in doc_manager.manifest.get('files', []):
+                                    src_p = f_meta.get('file_path') or f_meta.get('local_path')
+                                    if src_p and os.path.exists(src_p):
+                                        found_any_raw = True
+                                        zip_file.write(src_p, arcname=os.path.join("05_原始文档库", os.path.basename(src_p)))
+                                    elif 'Search_' in str(src_p):
+                                        # 针对路径中包含 Search 的特殊打捞 (即使原始路径已变)
+                                        base_name = os.path.basename(src_p)
+                                        # 尝试在 temp_uploads 下全域搜索同名文件
+                                        for root, _, files in os.walk("temp_uploads"):
+                                            if base_name in files:
+                                                abs_p = os.path.join(root, base_name)
+                                                zip_file.write(abs_p, arcname=os.path.join("05_原始文档库", base_name))
+                                                found_any_raw = True
+                                                break
+                            
+                            if not found_any_raw:
+                                zip_file.writestr("05_原始文档库/说明.txt", "未发现可导出的原始源文件原件。")
+
+                            # [6] 向量引擎快照
+                            status.write("正在打包 [6/6] 向量引擎快照...")
+                            for root, dirs, files in os.walk(db_path):
                                 for file in files:
-                                    abs_path = os.path.join(root, file)
-                                    rel_path = os.path.relpath(abs_path, target_dir)
-                                    if "raw_files" in rel_path:
-                                        arc_path = os.path.join("04_原始文档", os.path.basename(rel_path))
-                                    else:
-                                        arc_path = os.path.join("05_向量引擎数据", rel_path)
-                                    zip_file.write(abs_path, arcname=arc_path)
+                                    if file in ["docstore.json", "index_store.json", "vector_store.json", "data_level.db", "business_data.db"]:
+                                        abs_path = os.path.join(root, file)
+                                        rel_path = os.path.relpath(abs_path, db_path)
+                                        zip_file.write(abs_path, arcname=os.path.join("06_向量引擎快照", rel_path))
                         
-                        status.update(label="✅ 终极全量打包完成 (含对话记录)！", state="complete")
+                        status.update(label="✅ 终极六福资产包打包完成！信息已全量就绪。", state="complete")
                         st.download_button(
                             label=f"⬇️ 立即下载全量资产包 (.zip)",
                             data=zip_buffer.getvalue(),
@@ -3420,8 +3873,16 @@ elif active_kb_name:
                 
                 st.info("💡 提示：全量包可直接用于系统迁移或永久离线归档。")
 
-        if rename_col.button("✏️", help="重命名"): 
-            st.session_state.renaming = True
+        # 权限检查：重命名
+        from src.auth.permission_manager import permission_manager
+        current_user = st.session_state.get('user', 'guest_user')
+        can_rename = permission_manager.has_permission(current_user, "kb_rename")
+        
+        if can_rename:
+            if rename_col.button("✏️", help="重命名"): 
+                st.session_state.renaming = True
+        else:
+            rename_col.button("🔒", disabled=True, help="无重命名权限")
     
     # 文件管理
     with st.container(key="kb_details_container"):
@@ -3534,27 +3995,38 @@ elif active_kb_name:
             # 快速操作按钮组 - 合并为单行
             op_col1, op_col2, op_col3, op_col4 = st.columns(4)
             
+            # 权限检查：文件系统访问
+            from src.auth.permission_manager import permission_manager
+            current_user = st.session_state.get('user', 'guest_user')
+            can_access_fs = permission_manager.has_permission(current_user, "kb_filesystem_access")
+            
             # 1. 打开知识库目录
             with op_col1:
-                if st.button("📂 打开目录", use_container_width=True, help="在Finder中打开知识库文件夹"):
-                    import webbrowser
-                    import urllib.parse
-                    try:
-                        file_url = 'file://' + urllib.parse.quote(os.path.abspath(db_path))
-                        webbrowser.open(file_url)
-                        st.toast("✅ 已在Finder中打开")
-                    except Exception as e:
-                        st.error(f"打开失败: {e}")
+                if can_access_fs:
+                    if st.button("📂 打开目录", use_container_width=True, help="在Finder中打开知识库文件夹"):
+                        import webbrowser
+                        import urllib.parse
+                        try:
+                            file_url = 'file://' + urllib.parse.quote(os.path.abspath(db_path))
+                            webbrowser.open(file_url)
+                            st.toast("✅ 已在Finder中打开")
+                        except Exception as e:
+                            st.error(f"打开失败: {e}")
+                else:
+                    st.button("📂 打开目录", use_container_width=True, disabled=True, help="无文件系统访问权限")
             
             # 2. 复制路径
             with op_col2:
-                if st.button("📋 复制路径", use_container_width=True, help="复制知识库路径到剪贴板"):
-                    try:
-                        import subprocess
-                        subprocess.run(["pbcopy"], input=db_path.encode(), check=True)
-                        st.toast(f"✅ 已复制")
-                    except Exception as e:
-                        st.info(f"📁 路径: {db_path}")
+                if can_access_fs:
+                    if st.button("📋 复制路径", use_container_width=True, help="复制知识库路径到剪贴板"):
+                        try:
+                            import subprocess
+                            subprocess.run(["pbcopy"], input=db_path.encode(), check=True)
+                            st.toast(f"✅ 已复制")
+                        except Exception as e:
+                            st.info(f"📁 路径: {db_path}")
+                else:
+                    st.button("📋 复制路径", use_container_width=True, disabled=True, help="无文件系统访问权限")
             
             # 准备摘要数据
             files_without_summary = [f for f in doc_manager.manifest['files'] if not f.get('summary') and f.get('doc_ids')]
@@ -3573,11 +4045,19 @@ elif active_kb_name:
 
             # 4. 导出清单
             with op_col4:
-                if st.button("📥 导出清单", use_container_width=True, help="导出当前文件列表"):
-                    export_data = f"知识库: {active_kb_name}\n文件数: {stats['file_cnt']}\n片段数: {stats['total_chunks']}\n\n文件列表:\n"
-                    for f in doc_manager.manifest['files']:
-                        export_data += f"- {f['name']} ({f['type']}, {len(f.get('doc_ids', []))} 片段)\n"
-                    st.download_button("下载", export_data, f"{active_kb_name}_清单.txt", use_container_width=True)
+                # 权限检查
+                from src.auth.permission_manager import permission_manager
+                current_user = st.session_state.get('user', 'guest_user')
+                can_download = permission_manager.has_permission(current_user, "download_knowledge_base")
+                
+                if can_download:
+                    if st.button("📥 导出清单", use_container_width=True, help="导出当前文件列表"):
+                        export_data = f"知识库: {active_kb_name}\n文件数: {stats['file_cnt']}\n片段数: {stats['total_chunks']}\n\n文件列表:\n"
+                        for f in doc_manager.manifest['files']:
+                            export_data += f"- {f['name']} ({f['type']}, {len(f.get('doc_ids', []))} 片段)\n"
+                        st.download_button("下载", export_data, f"{active_kb_name}_清单.txt", use_container_width=True)
+                else:
+                    st.button("📥 导出清单", use_container_width=True, disabled=True, help="无下载权限")
 
             # 执行摘要生成逻辑
             if run_summary and files_without_summary:
@@ -4333,7 +4813,7 @@ if active_kb_name:
     st.divider()
 
 # 自动摘要 (仅在知识库首次加载且无历史消息时触发，排除纯对话模式)
-if active_kb_name and active_kb_name != "pure_chat" and st.session_state.chat_engine and not st.session_state.messages:
+if active_kb_name and active_kb_name != "pure_chat" and st.session_state.chat_engine and not st.session_state.messages and not st.session_state.get('skip_auto_summary'):
     with st.chat_message("assistant", avatar="🤖"):
         summary_placeholder = st.empty()
         with st.status("✨ 正在分析文档生成摘要...", expanded=True) as status:
@@ -4379,62 +4859,27 @@ if active_kb_name and active_kb_name != "pure_chat" and st.session_state.chat_en
                     logger.error(f"❌ 摘要生成失败: {e}")
                 st.session_state.messages.append({"role": "assistant", "content": "👋 知识库已就绪。"})
 
-# 渲染消息
+# --- 主界面布局：单栏流水架构 (v4.2.3) ---
+chat_layout = st.container()
+workspace_col = None
+
+# 使用渲染容器代理
+chat_col = chat_layout.container()
+
+# 渲染消息 (注入 chat_col)
 for msg_idx, msg in enumerate(state.get_messages()):
     role = msg["role"]
     avatar = "🤖" if role == "assistant" else "🧑‍💻"
-    with st.chat_message(role, avatar=avatar):
-        # --- [新增] 渲染历史中的数据分析结果 ---
-        if role == "assistant" and msg.get("da_sql"):
-            # 如果包含数据分析结果，优先渲染结构化内容
-            if msg.get("prompt_role"):
-                st.markdown(f"<span style='background:#f5f5f5; padding:2px 6px; border-radius:4px; font-size:0.8rem; color:#666;'>🎭 {msg['prompt_role']}</span>", unsafe_allow_html=True)
-            
-            with st.expander("🛠️ 查看执行指令 (SQL)", expanded=False):
-                st.code(msg["da_sql"], language="sql")
-            
-            if msg.get("da_data"):
-                import pandas as pd
-                df_history = pd.DataFrame(msg["da_data"])
-                st.markdown(f"✅ **查询结果**：返回 {len(df_history)} 条数据")
-                st.dataframe(df_history, use_container_width=True)
-                
-                if len(df_history.columns) >= 2 and len(df_history) > 1:
-                    # 增加防呆检查：必须有数值列
-                    numeric_cols_hist = df_history.select_dtypes(include=['number']).columns.tolist()
-                    if numeric_cols_hist:
-                        with st.expander("📈 数据可视化", expanded=True):
-                            st.bar_chart(df_history.set_index(df_history.columns[0]))
-            
-            # 最后显示 AI 结论文字
-            st.markdown(msg["content"]) 
-            
-            # 渲染引用按钮
-            if st.button("📌 引用此回复", key=f"quote_{msg_idx}"):
-                st.session_state.quote_content = msg["content"]
-                st.rerun()
-            continue
-
+    with chat_col.chat_message(role, avatar=avatar):
         # --- 渲染持久化研究详情 (v2.9.4) ---
         if role == "assistant":
             # 1. 联网搜索历史结果
             if msg.get("search_results"):
                 search_meta = msg["search_results"]
-                # 兼容旧版本格式 (如果 search_results 直接是列表)
-                if isinstance(search_meta, list):
-                    results_list = search_meta
-                    opt_query = msg.get('optimized_query', '未知')
-                    status_label = f"✅ 已获取 {len(results_list)} 条联网结果"
-                else:
-                    results_list = search_meta.get('results', [])
-                    opt_query = search_meta.get('optimized_query', '未知')
-                    status_label = f"✅ 已精选 {search_meta.get('selected')} 条高分联网结果 (检索 {search_meta.get('total_raw')} 条, 耗时 {search_meta.get('duration')}s)"
-                
-                with st.status(status_label, expanded=False, state="complete"):
-                    st.caption(f"🎯 搜索关键词：{opt_query}")
+                results_list = search_meta.get('results', []) if isinstance(search_meta, dict) else search_meta
+                with st.status(f"✅ 已获取 {len(results_list)} 条联网结果", expanded=False, state="complete"):
                     for i, res in enumerate(results_list, 1):
-                        emoji, label = res.get('quality_label', ("⭐", "中等质量"))
-                        st.markdown(f"**{i}. {emoji} {res.get('title')}**")
+                        st.markdown(f"**{i}. {res.get('title')}**")
                         st.caption(f"{res.get('summary', '')[:150]}...")
                         st.markdown(f"🔗 [{urlparse(res.get('href', '')).netloc}]({res.get('href')})")
                         if i < len(results_list): st.divider()
@@ -4448,6 +4893,28 @@ for msg_idx, msg in enumerate(state.get_messages()):
                     st.write(res_meta.get('perspectives'))
                     with st.expander("🧐 查看审计细节"):
                         st.write(res_meta.get('critique'))
+
+            # 3. [v5.0 补丁] 渲染历史数据分析报告
+            if msg.get("is_data_report"):
+                st.markdown("---")
+                st.markdown("#### 🏦 5.0 极光战略推演工作台 (History)")
+                for stage_h in msg.get("stages", []):
+                    m_h = stage_h["meta"]
+                    with st.expander(f"📍 Stage {m_h['stage_id']}: {m_h['title']}", expanded=False):
+                        import pandas as pd
+                        import plotly.express as px
+                        df_h = pd.DataFrame(stage_h["data"])
+                        if not df_h.empty:
+                            v_tabs_h = st.tabs(["📊 对比", "📈 趋势", "🍰 占比"])
+                            h_key_base = f"hist_{msg_idx}_{m_h['stage_id']}"
+                            with v_tabs_h[0]:
+                                st.plotly_chart(px.bar(df_h, x=df_h.columns[0], y=df_h.columns[-1], template="plotly_white"), use_container_width=True, key=f"{h_key_base}_bar")
+                        st.markdown("**💻 DataWorks SQL**")
+                        st.code(stage_h.get("sqls", {}).get("dataworks", "-- N/A"), language="sql")
+                        st.markdown("**🧪 SQLite (Local)**")
+                        st.code(stage_h.get("sqls", {}).get("sqlite", "-- N/A"), language="sql")
+                        if stage_h.get("is_simulated"):
+                            st.info("✨ 此阶段基于业务模型仿真推演")
 
         # 显示角色标签 (v2.7.4)
         if role == "assistant" and msg.get("prompt_role"):
@@ -4576,16 +5043,73 @@ for msg_idx, msg in enumerate(state.get_messages()):
 
         suggestions_fragment()
 
+# --- 🚀 极致全宽分析工作台 (v4.2.4) ---
+if st.session_state.get('artifacts'):
+    st.divider()
+    with st.container():
+        st.markdown("### 🏛️ 深度分析成果库 (Artifacts)")
+        
+        # 强制主内容区与图表全宽的 CSS 补丁
+        st.markdown("""
+            <style>
+                /* 核心：主内容区 100% 宽度 */
+                .main .block-container {
+                    max-width: 100% !important;
+                    padding-left: 5rem !important; /* 增加边距感 */
+                    padding-right: 5rem !important;
+                }
+                /* 强制 Plotly 容器撑满 */
+                .stPlotlyChart {
+                    width: 100% !important;
+                }
+                /* 聊天消息气泡也全宽 */
+                [data-testid="stChatMessage"] {
+                    max-width: 100% !important;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+        
+        # 改为单列全宽遍历，确保空间利用率 100%
+        artifacts_data = list(reversed(st.session_state.artifacts[-5:])) # 显示最近5个
+        for idx, art in enumerate(artifacts_data):
+            with st.container(border=True):
+                col_text, col_chart = st.columns([1, 3], gap="large") # 内部比例：结论占小部分，图表占大部分
+                
+                with col_text:
+                    st.markdown(f"##### 📊 {art['title']}")
+                    st.caption(f"🕒 {art['timestamp']}")
+                    st.markdown(art["summary"])
+                    with st.expander("📝 查看详细结论", expanded=False):
+                        st.write("此处可根据需要展示更多技术细节或 SQL 脚本。")
+                
+                with col_chart:
+                    import plotly.express as px
+                    df_art = pd.DataFrame(art["data"])
+                    if not df_art.empty:
+                        aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA']
+                        # 自动选择最合适的列进行展示
+                        fig = px.bar(df_art, x=df_art.columns[0], y=df_art.columns[1] if len(df_art.columns)>1 else df_art.columns[0],
+                                    template="plotly_white",
+                                    color_discrete_sequence=[aurora_colors[idx % len(aurora_colors)]])
+                        
+                        fig.update_layout(
+                            margin=dict(l=10, r=10, t=30, b=10), 
+                            height=350, # 全宽模式下，高度提升到 350px 视觉更佳
+                            hovermode="x unified"
+                        )
+                        st.plotly_chart(fig, use_container_width=True, key=f"v424_art_{idx}")
+
 # 极简工具栏：模型与设置
 with st.container():
     # Tools: Leading Spacer | Provider | Model | Deep | Web | Research | Filter | Clear | Stop/Trailing Spacer
     # 调整比例以容纳 智能研究 (v2.9)
+    # 计算动态列宽
     if st.session_state.get('is_processing'):
-        cols = st.columns([0.03, 0.12, 0.22, 0.11, 0.11, 0.11, 0.04, 0.04, 0.12], gap="small")
-        c_lead, c_prov, c_model, c_deep, c_web, c_research, c_filter, c_clear, c_stop = cols
+        cols = st.columns([0.5, 1.2, 1.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8])
+        c_lead, c_prov, c_model, c_deep, c_web, c_research, c_da, c_filter, c_clear, c_stop = cols
     else:
-        cols = st.columns([0.03, 0.12, 0.22, 0.11, 0.11, 0.11, 0.04, 0.04, 0.12], gap="small")
-        c_lead, c_prov, c_model, c_deep, c_web, c_research, c_filter, c_clear, c_spacer = cols
+        cols = st.columns([0.5, 1.2, 1.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8])
+        c_lead, c_prov, c_model, c_deep, c_web, c_research, c_da, c_filter, c_clear, c_spacer = cols
     
     # --- 0. 前置留白 (c_lead 不放置内容) ---
 
@@ -4709,7 +5233,17 @@ with st.container():
             
         idx = available_models.index(current_model) if current_model in available_models else 0
 
+        # 权限检查：管理系统配置 (v4.5.2)
+        from src.auth.permission_manager import permission_manager
+        current_user = st.session_state.get('user', 'guest_user')
+        can_manage_config = permission_manager.has_permission(current_user, "manage_system_config")
+
         def on_model_change():
+            # 二次权限校验
+            if not can_manage_config:
+                st.toast("⚠️ 权限不足：只有管理员可修改系统全局模型配置", icon="🔒")
+                return
+
             new_model = st.session_state.toolbar_model_selector
             if new_model not in ["未配置模型", ""]:
                 if update_all_model_configs(new_model):
@@ -4736,7 +5270,9 @@ with st.container():
                 index=idx,
                 key="toolbar_model_selector",
                 on_change=on_model_change,
-                label_visibility="collapsed"
+                label_visibility="collapsed",
+                disabled=not can_manage_config,
+                help="系统全局模型配置 (仅管理员可修改)" if not can_manage_config else None
             )
         with col_refresh:
             if st.button("🔄", key="toolbar_model_refresh", help="刷新模型列表"):
@@ -4768,8 +5304,30 @@ with st.container():
         st.session_state.enable_web_search = web_search_on
 
     with c_research:
-        research_on = st.toggle("智能研究", value=st.session_state.get('enable_deep_research', False), help="启用深度研究模式 (v2.9)")
-        st.session_state.enable_deep_research = research_on
+        # 权限检查：智能研究
+        from src.auth.permission_manager import permission_manager
+        current_user = st.session_state.get('user', 'guest_user')
+        can_research = permission_manager.has_permission(current_user, "deep_research")
+        
+        if not can_research:
+            st.toggle("智能研究 (🔒)", value=False, disabled=True, help="请联系管理员开启深度研究权限")
+            st.session_state.enable_deep_research = False
+        else:
+            research_on = st.toggle("智能研究", value=st.session_state.get('enable_deep_research', False), help="启用深度研究模式 (v2.9)")
+            st.session_state.enable_deep_research = research_on
+
+    with c_da:
+        # 权限检查：数据分析
+        from src.auth.permission_manager import permission_manager
+        current_user = st.session_state.get('user', 'guest_user')
+        can_analyze = permission_manager.has_permission(current_user, "data_analysis")
+        
+        if not can_analyze:
+            st.toggle("数据分析 (🔒)", value=False, disabled=True, help="请联系管理员开启数据分析权限")
+            st.session_state.is_data_analysis_mode = False
+        else:
+            da_on = st.toggle("数据分析", value=st.session_state.get('is_data_analysis_mode', False), help="手动触发宏观数据分析与推演 (v4.5)")
+            st.session_state.is_data_analysis_mode = da_on
 
     # --- 4. 操作按钮 (Popover/Button) ---
     if st.session_state.get('is_processing'):
@@ -4914,59 +5472,33 @@ if st.session_state.prompt_trigger:
         st.session_state.question_queue.append(st.session_state.prompt_trigger)
     st.session_state.prompt_trigger = None
 
-# 显示队列状态
-queue_len = len(st.session_state.question_queue)
-if st.session_state.get('is_processing'):
-    # 核心安全机制：检测处理时长
-    process_start = st.session_state.get('process_start_time', time.time())
-    elapsed = time.time() - process_start
-    if elapsed > 180: # 3 minutes
-        st.warning(f"⚠️ 处理已持续 {elapsed:.0f}s，可能发生死锁或引擎响应过慢。")
-        if st.button("🚨 强制重置系统状态", type="primary"):
-            st.session_state.is_processing = False
-            st.session_state.question_queue = []
-            st.toast("✅ 系统已强制重置")
-            st.rerun()
-
-    if queue_len > 0:
-        # 显示队列中的问题
-        with st.expander(f"⏳ 正在处理问题，队列中还有 {queue_len} 个问题等待...", expanded=True):
-            for i, q in enumerate(st.session_state.question_queue, 1):
-                # 截断过长的问题
-                display_q = q[:50] + "..." if len(q) > 50 else q
-                st.caption(f"{i}. {display_q}")
-            
-            # 添加队列重置按钮
-            if st.button("🔄 重置队列（如果卡住）", key="reset_queue"):
-                st.session_state.is_processing = False
-                st.session_state.question_queue = []
-                st.success("✅ 队列已重置")
-                st.rerun()
-    else:
-        st.info("⏳ 正在处理问题...")
-        # 添加重置按钮（防止卡住）
-        if st.button("🔄 重置状态", key="reset_processing"):
-            st.session_state.is_processing = False
-            st.success("✅ 处理状态已重置")
-            st.rerun()
-elif queue_len > 0:
-    # 显示待处理的问题列表
-    with st.expander(f"📝 队列中有 {queue_len} 个问题待处理", expanded=True):
-        for i, q in enumerate(st.session_state.question_queue, 1):
-            display_q = q[:50] + "..." if len(q) > 50 else q
-            st.caption(f"{i}. {display_q}")
-        
-        # 添加清空队列按钮
-        if st.button("🗑️ 清空队列", key="clear_queue"):
-            st.session_state.question_queue = []
-            st.success("✅ 队列已清空")
-            st.rerun()
-
-# 从队列中取出问题处理
-if not st.session_state.get('is_processing', False) and st.session_state.question_queue:
-    # 记录开始时间用于死锁检测
+# --- 核心调度逻辑 (v4.5.5 彻底修复死锁) ---
+# 1. 自动从队列消费 (如果当前空闲且队列有任务)
+if not st.session_state.get('is_processing') and st.session_state.question_queue:
+    st.session_state.current_active_query = st.session_state.question_queue.pop(0)
+    st.session_state.is_processing = True
     st.session_state.process_start_time = time.time()
-    final_prompt = st.session_state.question_queue.pop(0)
+    st.rerun()
+
+# 2. 状态监控：如果处理超时(180s)，强制释放 (防止死锁)
+if st.session_state.get('is_processing'):
+    elapsed = time.time() - st.session_state.get('process_start_time', time.time())
+    if elapsed > 180:
+        st.warning(f"⚠️ 处理超时 ({elapsed:.0f}s)，系统已强制重置")
+        st.session_state.is_processing = False
+        st.rerun()
+
+# 3. 如果正在处理任务，提取当前问题
+final_prompt = st.session_state.get('current_active_query')
+
+# 核心问答处理引擎入口
+if st.session_state.get('is_processing') and final_prompt:
+    # 消费掉任务标记 (转移到局部变量)
+    del st.session_state.current_active_query
+    
+    # [审计] 记录用户提问行为
+    from src.auth.audit_logger import AuditLogger
+    AuditLogger.log(st.session_state.get('user', 'unknown'), "USER_QUERY", f"问: {final_prompt[:100]}", status="success")
     
     # 记录当前角色状态 (v2.7.4)
     from src.config.prompt_manager import PromptManager
@@ -4975,111 +5507,40 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
     role_name = next((p['name'] for p in all_prompts if p['id'] == current_role_id), current_role_id)
     
     logger.info(f"🎭 当前角色: {role_name}")
-    logger.info(f"🚀 开始处理队列问题: {final_prompt[:50]}...")
+    logger.info(f"🚀 开始处理对话任务: {final_prompt[:50]}...")
     
-    # 联网搜索 - 在所有模式之前执行
+    # --- 阶段 A: 联网搜索 (Pre-processing) ---
     if st.session_state.get('enable_web_search', False):
         # 使用增强的联网搜索功能
         with st.status("🌐 正在联网搜索...", expanded=False) as status:
             st.write("🔍 智能分析搜索关键词...")
-            
-            # 调用增强搜索函数
             search_results = enhanced_web_search(final_prompt, logger)
-            
             if search_results:
                 st.write(f"✅ 找到 {len(search_results)} 条相关结果")
                 
-                # 简单关键词提取用于显示
                 def extract_display_keywords(query):
+                    # (精简后的关键词提取逻辑)
                     import re
-                    
-                    # 如果查询过长（超过100字符），尝试提取核心概念
-                    if len(query) > 100:
-                        # 查找专有名词和关键概念
-                        if 'AnalyticDB' in query:
-                            return ['阿里云AnalyticDB', '云原生数据仓库', 'Alibaba Cloud AnalyticDB']
-                        elif '数据技术' in query and '发展趋势' in query:
-                            return ['数据技术趋势', '实时数据处理', 'big data trends']
-                        elif '知识库' in query and '数据' in query:
-                            return ['企业知识库', '数据治理', 'enterprise data management']
-                    
-                    # 移除疑问词和连接词
-                    remove_words = ['什么是', '哪些', '如何', '怎么', '为什么', '是什么', '有哪些', '会导致', '导致', '的', '了', '吗', '呢', '能否', '可以', '一份', '包含', '提供', '具体会', '会产生', '产生']
+                    remove_words = ['什么是', '哪些', '如何', '怎么', '为什么', '是什么']
                     cleaned = query
-                    for word in remove_words:
-                        cleaned = cleaned.replace(word, ' ')
-                    
-                    # 特殊查询模式识别
-                    if '数仓' in query or '数据仓库' in query:
-                        return ['数据仓库', '数仓集群', 'data warehouse']
-                    elif '缓存' in query and '元数据' in query:
-                        return ['缓存失效', '元数据缺失', 'cache metadata']
-                    elif 'DS' in query and '术语表' in query:
-                        return ['数据科学术语', 'DS术语表', 'data science glossary']
-                    elif '术语表' in query and ('专业' in query or '通俗' in query):
-                        return ['行业术语表', '专业术语', 'technical glossary']
-                    elif 'OpenAI' in query and 'Deep Research' in query:
-                        if '中国' in query and ('科研' in query or '就业' in query):
-                            return ['OpenAI Deep Research', '中国科研就业', 'AI research jobs China']
-                        else:
-                            return ['OpenAI Deep Research', 'AI research automation', 'knowledge work AI']
-                    elif 'DeepSeek' in query and ('o1' in query or 'OpenAI' in query):
-                        # AI模型对比查询
-                        if '准确率' in query or 'accuracy' in query:
-                            return ['DeepSeek vs OpenAI o1', '模型性能对比', 'AI model benchmark']
-                        else:
-                            return ['DeepSeek R1', 'OpenAI o1', 'AI model comparison']
-                    elif 'AnalyticDB' in query or ('阿里云' in query and '数据仓库' in query):
-                        return ['阿里云AnalyticDB', '云原生数据仓库', 'Alibaba Cloud AnalyticDB']
-                    elif 'AI' in query and ('岗位' in query or '工作' in query or '就业' in query):
-                        return ['AI工作岗位', 'AI jobs', 'artificial intelligence careers']
-                    else:
-                        # 先提取英文词汇和缩写
-                        english_words = re.findall(r'[a-zA-Z]+', query)
-                        # 提取中文词汇 (2-5个字，避免截断)
-                        chinese_words = re.findall(r'[\u4e00-\u9fff]{2,5}', cleaned)
-                        
-                        # 过滤常见词
-                        filtered_chinese = [w for w in chinese_words if w not in [
-                            '可以', '能够', '应该', '需要', '进行', '问题', '方法', '情况', '时候', '地方', '方面', '内容', '系统', '功能', '影响', '作用', '效果'
-                        ]]
-                        filtered_english = [w for w in english_words if w.lower() not in [
-                            'can', 'should', 'need', 'will', 'have', 'what', 'how', 'the', 'and', 'for', 'are', 'with', 'that', 'this'
-                        ]]
-                        
-                        # 合并并去重，保持顺序，优先保留英文专有名词
-                        all_keywords = []
-                        # 先加入英文词汇（通常是专有名词）
-                        for word in filtered_english:
-                            if len(word) >= 2 and word not in all_keywords:
-                                all_keywords.append(word)
-                        # 再加入中文词汇
-                        for word in filtered_chinese:
-                            if word not in all_keywords:
-                                all_keywords.append(word)
-                        
-                        return all_keywords[:3]
+                    for word in remove_words: cleaned = cleaned.replace(word, ' ')
+                    words = re.findall(r'[\u4e00-\u9fff]{2,5}', cleaned)
+                    return words[:3]
                 
-                # 保存搜索结果到session_state，确保持久显示
                 st.session_state.last_web_search_results = {
                     'query': final_prompt,
                     'results': search_results,
                     'timestamp': __import__('time').strftime('%H:%M:%S'),
-                    'keywords': extract_display_keywords(final_prompt)  # 保存搜索关键词
+                    'keywords': extract_display_keywords(final_prompt)
                 }
                 
-                # 将搜索结果整合到查询中
                 web_context = "以下是联网搜索到的相关信息：\n\n"
                 for i, result in enumerate(search_results[:5], 1):
-                    web_context += f"{i}. {result.get('title', 'No Title')}\n"
-                    web_context += f"   {result.get('body', 'No content')[:200]}...\n"
-                    web_context += f"   来源: {result.get('href', 'No URL')}\n\n"
+                    web_context += f"{i}. {result.get('title')}\n   {result.get('body')[:200]}...\n\n"
                 
-                # 将联网信息添加到查询中
-                final_prompt = f"{final_prompt}\n\n{web_context}请结合以上联网搜索信息和知识库内容进行回答。"
-                
+                final_prompt = f"{final_prompt}\n\n{web_context}请结合以上联网搜索信息进行回答。"
             else:
-                st.write("❌ 未找到相关结果，请尝试其他关键词")
+                st.write("❌ 未找到联网结果")
     
     if active_kb_name == "multi_kb_mode":
         # 多知识库模式处理
@@ -5325,6 +5786,10 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                 st.session_state.messages.append({"role": "user", "content": final_prompt})
                 st.session_state.messages.append({"role": "assistant", "content": integrated_answer})
                 
+                # [关键修复] 立即保存会话历史 (Multi-KB)
+                if active_kb_name: 
+                    HistoryManager.save_session(active_kb_name, st.session_state.messages, st.session_state.get('current_session_id'))
+                
             else:
                 st.error("❌ 所有知识库查询都失败了")
             
@@ -5482,91 +5947,159 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
             # 使用一个连贯的spinner包装整个问答流程
             with st.spinner("🧠 正在进行深度业务逻辑推演..."):
                 try:
-                    # --- 核心增强：数据分析 7.0 (自愈式业务语义模式) ---
-                    db_path = os.path.join(output_base, active_kb_name)
-                    schema_path = os.path.join(db_path, "business_schema.json")
+                    # --- 核心增强：数据分析 5.0 (业务语义模式) ---
+                    manual_da_on = st.session_state.get('is_data_analysis_mode', False)
                     
-                    # 1. 初始化引擎
-                    from src.processors.data_analyst import DataAnalystEngine
-                    da_engine = DataAnalystEngine(db_path, logger)
-                    
-                    # 2. 自愈逻辑：如果发现是 CSV 库但缺少 Schema，现场补建
-                    if not os.path.exists(schema_path):
-                        from src.config.manifest_manager import ManifestManager
-                        manifest = ManifestManager.load(db_path)
-                        has_csv = any(f.get('name', '').endswith('.csv') for f in manifest.get('files', []))
+                    if active_kb_name and active_kb_name not in ["pure_chat", "multi_kb_mode"]:
+                        db_path = os.path.join(output_base, active_kb_name)
+                        schema_path = os.path.join(db_path, "business_schema.json")
                         
-                        if has_csv:
-                            logger.info("🧪 发现 CSV 资产但缺少 Schema，启动实时自愈建模...")
-                            st.toast("🔍 正在初始化数据分析引擎...")
+                        # A. 唤醒与脑补逻辑 (仅当 Schema 缺失时)
+                        if not os.path.exists(schema_path):
+                            import glob
+                            data_files = glob.glob(os.path.join(db_path, "*.csv")) + \
+                                         glob.glob(os.path.join(db_path, "*.xlsx")) + \
+                                         glob.glob(os.path.join(db_path, "*.md"))
                             
-                            # 尝试获取文档对象用于建模
-                            from llama_index.core import StorageContext, load_index_from_storage
-                            try:
-                                # 简单的文本提取用于 Schema 建模
-                                from src.file_processor import scan_directory_safe
-                                # 找到原始文件的存放位置 (通常在 manifest 记录里)
-                                sample_docs = []
-                                for f_info in manifest.get('files', []):
-                                    f_p = f_info.get('file_path')
-                                    if f_p and os.path.exists(f_p):
-                                        from llama_index.core import Document
-                                        with open(f_p, 'r', encoding='utf-8', errors='ignore') as f:
-                                            sample_docs.append(Document(text=f.read()[:5000], metadata={"file_name": f_info['name']}))
-                                
-                                if sample_docs:
-                                    # 传递当前使用的 LLM
-                                    current_llm = Settings.llm
-                                    da_engine.extract_schema_from_docs(sample_docs, current_llm)
-                                    da_engine.infer_business_blueprint("自动触发自愈建模", current_llm)
-                                    logger.success("✅ 数据分析自愈建模完成")
-                            except Exception as se:
-                                logger.error(f"自愈建模失败: {se}")
+                            is_data_kb = any(k in active_kb_name.lower() for k in ["csv", "excel", "spec", "dict", "schema", "mapping"])
+                            
+                            if data_files or is_data_kb or manual_da_on:
+                                try:
+                                    from src.processors.data_analyst import DataAnalystEngine
+                                    from src.utils.model_manager import load_llm_model
+                                    da_engine = DataAnalystEngine(db_path, logger)
+                                    llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
+                                    
+                                    if data_files:
+                                        da_engine.process_files(data_files)
+                                    
+                                    # 如果还是没 schema (纯 MD 或手动开启)，强制触发一次脑补
+                                    if not os.path.exists(schema_path):
+                                        from llama_index.core import SimpleDirectoryReader
+                                        reader = SimpleDirectoryReader(input_dir=db_path)
+                                        docs = reader.load_data()
+                                        if docs: da_engine.extract_schema_from_docs(docs, llm)
+                                except Exception as e:
+                                    logger.warning(f"⚠️ 引擎唤醒异常: {e}")
 
-                    # 3. 执行分析 (如果此时 schema 存在了)
-                    if os.path.exists(schema_path):
-                        # 获取当前使用的 LLM
-                        llm = Settings.llm
-                        analysis_res = da_engine.execute_analysis(final_prompt, llm)
-                        
-                        # 只有在真正成功拿到 SQL 且有结果时才拦截 RAG 流程
-                        if analysis_res.get("success") and analysis_res.get("sql"):
-                            # --- [UI 调整] 数据优先：SQL 和表格放在最上面 ---
-                            with st.expander("🛠️ 查看执行指令 (SQL)", expanded=False):
-                                st.code(analysis_res["sql"], language="sql")
+                        # B. 战略推演工作坊逻辑
+                        if os.path.exists(schema_path) and (manual_da_on or "is_data_kb" in locals()):
+                            from src.processors.data_analyst import DataAnalystEngine
+                            from src.utils.model_manager import load_llm_model
+                            da_engine = DataAnalystEngine(db_path, logger)
+                            llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
                             
-                            if analysis_res["data"]:
-                                import pandas as pd
-                                df_res = pd.DataFrame(analysis_res["data"])
-                                st.markdown(f"✅ **实时查询成功**：返回 {len(df_res)} 条数据")
-                                st.dataframe(df_res, use_container_width=True)
+                            logger.info(f"🔮 [Strategic Workshop] 启动链式推演...")
+                            analysis_res = da_engine.execute_analysis(final_prompt, llm)
+                            
+                            if analysis_res.get("success", False):
+                                st.markdown(f"### 🏗️ 5.2.4 极光战略工作坊 (工程化闭环)")
+                                if analysis_res.get("macro_context"):
+                                    st.info(f"🎯 **核心战略目标**: {analysis_res['macro_context']}")
+                                    
+                                # 1. 核心推演报告 (总领全文)
+                                report_placeholder = st.empty()
+                                full_report = ""
+                                logic_stream = analysis_res.get("logic_gen")
+                                if logic_stream:
+                                    for token in logic_stream:
+                                        full_report += token
+                                        report_placeholder.markdown(full_report + "▌")
                                 
-                                # 自动可视化 (增加防呆检查：必须有数值列)
-                                numeric_cols = df_res.select_dtypes(include=['number']).columns.tolist()
-                                if len(df_res.columns) >= 2 and len(df_res) > 1 and numeric_cols:
-                                    with st.expander("📈 数据可视化", expanded=True):
-                                        st.bar_chart(df_res.set_index(df_res.columns[0]))                            
-                            # 1. 最后显示逻辑推演报告
-                            st.markdown(analysis_res["logic"])
-                            
-                            # 归档消息并彻底阻断后续 RAG 流程
-                            st.session_state.messages.append({
-                                "role": "assistant", 
-                                "content": analysis_res["logic"],
-                                "prompt_role": role_name,
-                                "da_sql": analysis_res.get("sql"),
-                                "da_data": analysis_res.get("data"),
-                                "da_success": analysis_res.get("success")
-                            })
-                            st.session_state.is_processing = False
-                            st.rerun() 
-                        else:
-                            logger.warning("数据分析引擎未产生有效结果，回退至普通 RAG 模式")                    
-                    # --- 如果没进入数据分析，继续执行原始 RAG 逻辑 ---
+                                report_placeholder.markdown(full_report)
+                                # 2. 循环渲染每个逻辑阶段
+                                for stage in analysis_res.get("stages", []):
+                                    meta = stage["meta"]
+                                    with st.expander(f"📍 Stage {meta['stage_id']}: {meta['title']}", expanded=True):
+                                        st.markdown(f"**分析目标**: {meta['goal']}")
+                                        
+                                        # --- [v5.2] 数据流转全演示 ---
+                                        with st.container(border=True):
+                                            st.markdown("##### 🧬 数据演进演示 (Lineage Demo)")
+                                            
+                                            # A. 查询前：原始数据
+                                            st.markdown("**1. 查询前：业务表采样 (Before)**")
+                                            if stage.get("source_samples"):
+                                                s_tabs = st.tabs(list(stage["source_samples"].keys()))
+                                                for idx, t_name in enumerate(stage["source_samples"]):
+                                                    with s_tabs[idx]:
+                                                        import pandas as pd
+                                                        st.dataframe(pd.DataFrame(stage["source_samples"][t_name]), use_container_width=True)
+                                            
+                                            # B. 加工中：逻辑脚本
+                                            st.markdown("**2. 执行中：工程逻辑 (The Logic)**")
+                                            sqls = stage.get("sqls", {})
+                                            sql_tabs = st.tabs(["🧪 SQLite (本地验证)", "🐘 Standard SQL", "💻 DataWorks (生产)"])
+                                            with sql_tabs[0]:
+                                                st.caption("SQL 语言: SQLite (Local Sim)")
+                                                st.code(sqls.get("sqlite", ""), language="sql")
+                                            with sql_tabs[1]:
+                                                st.caption("SQL 语言: Standard ANSI SQL")
+                                                st.code(sqls.get("standard", ""), language="sql")
+                                            with sql_tabs[2]:
+                                                st.caption("SQL 语言: MaxCompute / DataWorks")
+                                                st.code(sqls.get("dataworks", ""), language="sql")
+                                            
+                                            # C. 查询后：结果产出
+                                            st.markdown("**3. 查询后：汇聚结果表 (After)**")
+                                            import pandas as pd
+                                            import plotly.express as px
+                                            df_s = pd.DataFrame(stage["data"])
+                                            if not df_s.empty:
+                                                st.dataframe(df_s, use_container_width=True)
+                                                
+                                                # --- 可视化画板 ---
+                                                st.markdown("---")
+                                                v_tabs = st.tabs(["📊 对比", "📈 趋势", "🍰 占比"])
+                                                aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA']
+                                                with v_tabs[0]:
+                                                    st.plotly_chart(px.bar(df_s, x=df_s.columns[0], y=df_s.columns[-1], template="plotly_white", color_discrete_sequence=aurora_colors), use_container_width=True, key=f"bar_{meta['stage_id']}_{time.time()}")
+                                                if len(df_s.columns) >= 2:
+                                                    with v_tabs[1]: st.plotly_chart(px.line(df_s, x=df_s.columns[0], y=df_s.columns[-1], template="plotly_white"), use_container_width=True, key=f"line_{meta['stage_id']}_{time.time()}")
+                                                    with v_tabs[2]: st.plotly_chart(px.pie(df_s, names=df_s.columns[0], values=df_s.columns[-1], hole=0.4), use_container_width=True, key=f"pie_{meta['stage_id']}_{time.time()}")
+                                        
+                                            if stage.get("is_simulated"):
+                                                st.warning("✨ 本阶段结果基于战略业务模型仿真得出")
+
+                                # 3. [v5.2.3 恢复] 生成最新的战略建议追问
+                                try:
+                                    from src.chat.unified_suggestion_engine import get_unified_suggestion_engine
+                                    sug_engine = get_unified_suggestion_engine(active_kb_name)
+                                    # 结合提问与最终报告内容作为生成上下文
+                                    suggestion_context = f"用户提问: {final_prompt}\n战略推演报告: {full_report}"
+                                    new_sugs = sug_engine.generate_suggestions(
+                                        context=suggestion_context,
+                                        source_type='chat',
+                                        query_engine=st.session_state.chat_engine,
+                                        num_questions=3
+                                    )
+                                    if new_sugs:
+                                        st.session_state.suggestions_history = new_sugs[:3]
+                                        st.session_state.current_suggestions = new_sugs[:3]
+                                except Exception as e:
+                                    logger.warning(f"⚠️ 战略追问生成失败: {e}")
+
+                                # 归档并中断
+                                st.session_state.messages.append({
+                                    "role": "assistant", 
+                                    "content": full_report, 
+                                    "is_data_report": True, 
+                                    "stages": analysis_res["stages"], 
+                                    "macro_context": analysis_res.get("macro_context"),
+                                    "suggestions": st.session_state.get('current_suggestions', [])
+                                })
+                                
+                                # [关键修复] 立即保存会话历史 (Data Analysis)
+                                if active_kb_name: 
+                                    HistoryManager.save_session(active_kb_name, st.session_state.messages, st.session_state.get('current_session_id'))
+                                
+                                st.session_state.is_processing = False
+                                st.rerun()
+
+
+
+                    # --- 原始 RAG 逻辑 (仅当不是分析模式或分析失败时执行) ---
                     start_time = time.time()
-                except Exception as e:
-                    logger.error(f"数据分析流程异常 (回退 RAG): {e}")
-                    start_time = time.time() # 确保 RAG 计时器初始化
                     
                     # 显示启用的检索增强功能
                     enhancements = []
@@ -5752,13 +6285,21 @@ if not st.session_state.get('is_processing', False) and st.session_state.questio
                     logger.info(f"🔧 推荐引擎返回 {len(initial_sugs)} 个问题")
                     
                     if initial_sugs:
-                        st.session_state.suggestions_history = initial_sugs[:3]
+                        sug_list = initial_sugs[:3]
+                        st.session_state.suggestions_history = sug_list
+                        st.session_state.current_suggestions = sug_list # 确保双重缓存同步
+                        
+                        # [关键修复] 将建议直接注入到最后一条消息中，确保渲染器能抓取到
+                        if st.session_state.messages and st.session_state.messages[-1]['role'] == 'assistant':
+                            st.session_state.messages[-1]['suggestions'] = sug_list
+                            
                         logger.info(f"✨ 生成 {len(initial_sugs)} 个推荐问题")
-                        for i, q in enumerate(initial_sugs[:3], 1):
+                        for i, q in enumerate(sug_list, 1):
                             logger.info(f"   {i}. {q}")
                     else:
                         logger.warning("⚠️ 推荐引擎未返回任何问题 (严格模式)")
                         st.session_state.suggestions_history = []
+                        st.session_state.current_suggestions = []
                     
                     # 延迟保存：确认所有步骤都成功后再保存
                     if active_kb_name: HistoryManager.save_session(active_kb_name, state.get_messages(), st.session_state.get('current_session_id'))

@@ -1,0 +1,5 @@
+promo_id,promo_name,discount_rate,start_date,end_date
+PR001,New Year Mega Sale,0.15,2025-01-01,2025-01-31
+PR002,Member Appreciation,0.10,2025-01-15,2025-02-28
+PR003,Spring Shopping Festival,0.20,2025-03-01,2025-03-31
+PR004,Flash Deal Friday,0.25,2025-04-01,2025-04-30
