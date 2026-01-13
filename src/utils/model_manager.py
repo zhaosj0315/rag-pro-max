@@ -185,7 +185,7 @@ def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: s
             return Ollama(
                 model=model_name,
                 base_url=base_url,
-                request_timeout=360.0,
+                request_timeout=1200.0,
                 temperature=temperature,
                 system_prompt=system_prompt
             )
@@ -230,7 +230,7 @@ def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: s
                 api_key=api_key if api_key else "EMPTY",
                 api_base=api_url,
                 temperature=temperature,
-                request_timeout=120.0,
+                request_timeout=1200.0,
                 system_prompt=system_prompt
             )
             

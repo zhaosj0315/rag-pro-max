@@ -18,7 +18,9 @@ class DataAnalystEngine:
         [v4.5.0 战略版] 宏观语义提取：从文档中识别表结构、业务拓扑及【宏观战略目标】。
         """
         all_text = "\n".join([d.text for d in docs[:30]]) 
-        
+        # [Safe Guard] 防止上下文过长导致超时
+        if len(all_text) > 60000:
+            all_text = all_text[:60000] + "...(truncated)"        
         prompt = f"""
 你是一名资深首席架构师与业务战略专家。请从以下文档中提取业务模型与宏观背景。
 文档内容：{all_text}
