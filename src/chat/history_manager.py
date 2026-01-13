@@ -31,11 +31,16 @@ class HistoryManager:
     @classmethod
     def list_sessions(cls, kb_id: str) -> List[Dict]:
         """获取知识库的所有会话列表"""
+        import streamlit as st
         sessions = []
         if not os.path.exists(cls.HISTORY_DIR):
             os.makedirs(cls.HISTORY_DIR, exist_ok=True)
             
-        # 1. 添加默认会话
+        # 1. 获取内存中的实时数据（用于立即反映变化）
+        active_sess_id = st.session_state.get('current_session_id')
+        active_messages = st.session_state.get('messages', [])
+            
+        # 2. 添加默认会话
         default_path = cls._get_path(kb_id)
         default_session_exists = os.path.exists(default_path)
         
@@ -60,6 +65,12 @@ class HistoryManager:
                         if first_msg:
                             default_title = first_msg[:20].strip() + ("..." if len(first_msg)>20 else "")
             except: pass
+        
+        # 实时补偿：如果是当前正在聊的默认会话，优先用内存里的首问做标题
+        if active_sess_id is None and active_messages and default_title == "默认会话":
+            first_msg = next((m['content'] for m in active_messages if m['role'] == 'user'), None)
+            if first_msg:
+                default_title = first_msg[:20].strip() + ("..." if len(first_msg)>20 else "")
             
         sessions.append({
             "id": None, 
@@ -69,7 +80,7 @@ class HistoryManager:
             "pinned": default_pinned
         })
             
-        # 2. 扫描命名会话
+        # 3. 扫描命名会话
         prefix = f"{kb_id}@"
         for f in os.listdir(cls.HISTORY_DIR):
             if f.startswith(prefix) and f.endswith(".json"):
@@ -95,6 +106,14 @@ class HistoryManager:
                                     title = first_msg[:20].strip() + ("..." if len(first_msg)>20 else "")
                     except: pass
                     
+                    # 实时补偿：如果是当前正在聊的命名会话
+                    if active_sess_id == session_id and active_messages:
+                        # 如果标题仍然是原始ID，尝试用首问替换
+                        if title.startswith("会话 ") or title == "默认会话":
+                            first_msg = next((m['content'] for m in active_messages if m['role'] == 'user'), None)
+                            if first_msg:
+                                title = first_msg[:20].strip() + ("..." if len(first_msg)>20 else "")
+
                     sessions.append({
                         "id": session_id,
                         "title": title,
@@ -162,12 +181,13 @@ class HistoryManager:
                 if "meta" not in data: data["meta"] = {}
                 data["meta"]["updated_at"] = datetime.now().isoformat()
             
-            # 自动标题生成
-            if messages and (not data["meta"].get("title") or data["meta"].get("title") == "默认会话"):
-                first_msg = next((m['content'] for m in messages if m['role'] == 'user'), None)
-                if first_msg:
-                    clean_title = first_msg.strip()[:30].replace('\n', ' ')
-                    data["meta"]["title"] = clean_title
+            # 自动标题生成 - 仅当没有手动标题且当前是默认名时触发
+            if messages and not data["meta"].get("is_custom_title"):
+                if not data["meta"].get("title") or data["meta"].get("title") == "默认会话":
+                    first_msg = next((m['content'] for m in messages if m['role'] == 'user'), None)
+                    if first_msg:
+                        clean_title = first_msg.strip()[:30].replace('\n', ' ')
+                        data["meta"]["title"] = clean_title
             
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
@@ -205,6 +225,7 @@ class HistoryManager:
                 
                 if "meta" not in data: data["meta"] = {}
                 data["meta"]["title"] = new_title
+                data["meta"]["is_custom_title"] = True
                 
                 with open(path, 'w', encoding='utf-8') as f:
                     json.dump(data, f, indent=2, ensure_ascii=False)

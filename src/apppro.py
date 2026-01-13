@@ -1083,9 +1083,16 @@ with st.sidebar:
                 
                 # 新建会话按钮
                 if st.button("➕ 新建会话", use_container_width=True, key="sidebar_new_chat"):
+                    # [v5.6.6 核心修复] 在切换前，先保存当前正在进行的会话，防止标题丢失
+                    if st.session_state.get('messages'):
+                        old_sess_id = st.session_state.get('current_session_id')
+                        HistoryManager.save_session(current_active_kb, st.session_state.messages, old_sess_id)
+                        logger.info(f"💾 已在切换前自动保存旧会话: {old_sess_id or 'default'}")
+
                     import uuid
                     new_id = str(uuid.uuid4())[:8]
                     st.session_state.current_session_id = new_id
+                    st.query_params["sess_id"] = new_id # 同步到 URL
                     
                     # --- [逻辑对齐] 注入初始状态 (Initial State) ---
                     kb_path = os.path.join("vector_db_storage", current_active_kb)
@@ -1138,7 +1145,15 @@ with st.sidebar:
                         safe_sess_id = str(sess_id) if sess_id else "default"
                         
                         if st.button(f"{icon} {label}", key=f"sess_btn_{safe_sess_id}", use_container_width=True, type=btn_type, help=label):
+                            # [v5.6.8 核心修复] 切换前，保存当前正在进行的会话状态
+                            if st.session_state.get('messages'):
+                                current_old_id = st.session_state.get('current_session_id')
+                                HistoryManager.save_session(current_active_kb, st.session_state.messages, current_old_id)
+                            
+                            # 立即更新内存和 URL，防止初始化逻辑抢跑
                             st.session_state.current_session_id = sess_id
+                            st.query_params["sess_id"] = sess_id if sess_id else ""
+                            
                             st.session_state.messages = HistoryManager.load_session(current_active_kb, sess_id)
                             # 恢复建议
                             st.session_state.suggestions_history = []
@@ -3737,29 +3752,20 @@ elif active_kb_name:
                             
                             # [2] 对话历史备份 (MD 级)
                             status.write("正在打包 [2/6] 历史对话纪要...")
-                            user_name_folder = st.session_state.get('user', 'admin')
-                            history_dir = os.path.join("chat_histories", user_name_folder)
+                            # 核心修复：直接扫描根目录，因为 HistoryManager 默认不存子目录
+                            history_dir = "chat_histories"
                             chat_history_md = f"# 对话历史备份: {active_kb_name}\n\n"
                             has_chats = False
                             
                             # 🔥 [v5.6.0] 核心增强：强制捕获内存中的最新活跃会话
-                            # 即使磁盘文件未同步，这里也能保证导出的是"这一秒"看到的记录
                             current_msgs = st.session_state.get('messages', [])
+                            current_sess_id = st.session_state.get('current_session_id')
+                            
                             if current_msgs:
                                 has_chats = True
                                 chat_history_md += f"### 🔴 当前活跃会话 (最新内存快照)\n"
                                 chat_history_md += f"> 导出时刻：{datetime.now().strftime('%H:%M:%S')}\n\n"
-                                
-                                # 保存为独立 JSON 快照
-                                current_snapshot = {
-                                    "kb_name": active_kb_name,
-                                    "export_time": datetime.now().isoformat(),
-                                    "messages": current_msgs
-                                }
-                                zip_file.writestr(
-                                    "02_历史对话/raw_json/CURRENT_ACTIVE_SESSION.json", 
-                                    json.dumps(current_snapshot, indent=4, ensure_ascii=False)
-                                )
+                                zip_file.writestr("02_历史对话/raw_json/CURRENT_ACTIVE_SESSION.json", json.dumps({"messages": current_msgs}, indent=4, ensure_ascii=False))
                                 
                                 for msg in current_msgs:
                                     role_tag = "👤 用户" if msg['role'] == 'user' else "🤖 AI"
@@ -3768,24 +3774,26 @@ elif active_kb_name:
                             
                             if os.path.exists(history_dir):
                                 for chat_file in os.listdir(history_dir):
-                                    if chat_file.endswith(".json") and (active_kb_name in chat_file):
+                                    # 匹配规则：文件名以 KBID 开头 (涵盖默认.json和带@session.json)
+                                    if chat_file.endswith(".json") and (chat_file.startswith(f"{active_kb_name}.") or chat_file.startswith(f"{active_kb_name}@")):
                                         try:
+                                            # 跳过正在内存中处理的同一个 session，避免重复
+                                            if current_sess_id and f"@{current_sess_id}.json" in chat_file:
+                                                continue
+                                                
                                             with open(os.path.join(history_dir, chat_file), 'r', encoding='utf-8') as f:
                                                 chat_data = json.load(f)
-                                                # 避免完全重复（简单去重：如果文件内容完全等于内存，则跳过 md 展示，但仍保留 raw 文件）
-                                                is_duplicate = False
-                                                if current_msgs and chat_data.get('messages') == current_msgs:
-                                                    is_duplicate = True
+                                                msgs = chat_data.get('messages', [])
+                                                if not msgs: continue
                                                 
                                                 has_chats = True
                                                 zip_file.write(os.path.join(history_dir, chat_file), arcname=f"02_历史对话/raw_json/{chat_file}")
                                                 
-                                                if not is_duplicate:
-                                                    chat_history_md += f"### 📅 归档会话: {chat_file.replace('.json','')}\n"
-                                                    for msg in chat_data.get('messages', []):
-                                                        role_tag = "👤 用户" if msg['role'] == 'user' else "🤖 AI"
-                                                        chat_history_md += f"**{role_tag}**: {msg['content']}\n\n"
-                                                    chat_history_md += "---\n\n"
+                                                chat_history_md += f"### 📅 归档会话: {chat_file.replace('.json','')}\n"
+                                                for msg in msgs:
+                                                    role_tag = "👤 用户" if msg['role'] == 'user' else "🤖 AI"
+                                                    chat_history_md += f"**{role_tag}**: {msg['content']}\n\n"
+                                                chat_history_md += "---\n\n"
                                         except: continue
                             
                             if not has_chats:
