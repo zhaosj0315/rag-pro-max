@@ -1,19 +1,19 @@
 {
-  "version": "5.6.1",
-  "release_date": "2026-01-12",
-  "build_number": "20260112.03",
+  "version": "5.6.5",
+  "release_date": "2026-01-13",
+  "build_number": "20260113.01",
   "status": "stable",
   "major_features": [
-    "🔍 Multi-Source Meta-Search: Integrated Bing/DuckDuckGo as entry springboards",
-    "📦 Ultimate Asset Export v2: Full capture of in-memory active sessions and automated deduplication",
-    "🛡️ Intelligent Crawler Filter: Hybrid springboard logic (loose entry, strict depth) for precise relevance",
-    "🧼 Technical Debt Cleanup: Zero-noise logging and robust xattr/shutil compatibility"
+    "💾 Persistent Session Memory: URL-based field recovery for knowledge bases and chat history",
+    "🩺 Deep Path Self-healing: Fuzzy folder matching to solve UI desensitization and prefix mismatch",
+    "🕷️ High-Fidelity Web Crawler: Optimized Alibaba Cloud content extraction with html2text backend",
+    "📜 Robust Log Engine: Enhanced .jsonl support with 0o666 auto-permission and large file optimization"
   ],
   "compatibility": {
     "python": ">=3.9",
     "platforms": ["macOS", "Linux", "Windows"],
-    "dependencies_updated": "2026-01-12"
+    "dependencies_updated": "2026-01-13"
   },
   "changelog_url": "CHANGELOG.md",
-  "documentation_updated": "2026-01-12"
+  "documentation_updated": "2026-01-13"
 }
