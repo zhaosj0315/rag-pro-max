@@ -145,8 +145,9 @@ class DataAnalystEngine:
 
 要求：
 1. 输出标准的 SQL INSERT 语句（适配 SQLite）。
-2. 数据必须符合业务常识（如金额不为负，日期连续等）。
-3. 仅输出 SQL 语句，不要解释。
+2. **严格的字符串转义**：字符串值必须用单引号包裹（如 'Value'）。如果内容包含单引号，必须使用双单引号转义（例如：'Men''s T-Shirt'）。
+3. **严禁使用双引号**包裹字符串值（双引号仅用于列名）。
+4. 仅输出 SQL 语句，不要解释。
 """
                 try:
                     mock_sql = model_client.complete(mock_prompt).text
