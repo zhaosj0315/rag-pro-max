@@ -7,7 +7,11 @@ def render_login_page():
     # --- 1. 数字化指挥中心样式表 (Digital Command Center) ---
     st.markdown("""
         <style>
-        /* 1. 动态噪点极光背景 - 强制锁定深色 */
+        /* 1. 动态噪点极光背景 - 强制锁定深色且禁止滚动 */
+        html, body, [data-testid="stAppViewContainer"] {
+            overflow: hidden !important;
+            height: 100vh !important;
+        }
         .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stToolbar"] {
             background: radial-gradient(circle at 50% 50%, #1e1b4b 0%, #0f172a 50%, #020617 100%) !important;
             background-attachment: fixed !important;
@@ -59,8 +63,8 @@ def render_login_page():
             background: rgba(30, 41, 59, 0.5);
             border-left: 4px solid transparent;
             border-radius: 0 16px 16px 0;
-            padding: 1.2rem;
-            margin-bottom: 1rem;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .guide-card:hover {
@@ -232,7 +236,6 @@ def render_login_page():
     col_brand, col_spacer, col_auth = st.columns([1.4, 0.1, 1])
 
     with col_brand:
-        st.markdown("<div style='margin-top: 1.5rem;'></div>", unsafe_allow_html=True)
         st.markdown("<h1 class='brand-header'>RAG Pro Max</h1>", unsafe_allow_html=True)
         st.markdown(f"<h2 style='color: #60a5fa; font-weight: 800; letter-spacing: 1px; text-shadow: 0 4px 12px rgba(0,0,0,0.5); margin-top: -10px;'>{greeting}</h2>", unsafe_allow_html=True)
         
@@ -273,8 +276,6 @@ def render_login_page():
         st.markdown(f"<div class='quote-box'>{daily_quote}</div>", unsafe_allow_html=True)
 
     with col_auth:
-        st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
-        
         tab_login, tab_register = st.tabs(["🔐 身份验证", "✨ 开启新账户"])
         
         with tab_login:
@@ -331,7 +332,7 @@ def render_login_page():
 
     # --- 页脚 ---
     st.markdown("""
-    <div style='margin-top: 4rem; padding-bottom: 2rem; width: 100%; text-align: center; color: rgba(255,255,255,0.2); font-size: 0.75rem; font-family: monospace;'>
+    <div style='position: fixed; bottom: 0; left: 0; width: 100%; padding: 10px 0; background: rgba(0,0,0,0.2); backdrop-filter: blur(5px); text-align: center; color: rgba(255,255,255,0.2); font-size: 0.75rem; font-family: monospace; z-index: 100;'>
         SYSTEM STATUS: ONLINE | ENCRYPTION: AES-256 | RAG PRO MAX v5.6.8
     </div>
     """, unsafe_allow_html=True)
