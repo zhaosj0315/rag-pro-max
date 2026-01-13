@@ -1,52 +1,50 @@
-# RAG Pro Max v5.5.8 企业级系统架构文档
+# RAG Pro Max v5.6.8 企业级系统架构文档
 
-**版本**: v5.5.8 (Data Sovereignty Edition)  
-**更新日期**: 2026-01-12  
-**适用范围**: 企业级全资产管理、战略推演与高性能 RAG 平台  
-**核心特性**: 全量资产导出 (01-06)、跨域文件营救、管理员资产治理、权限自愈环境
-
----
-
-## 🏗️ 整体架构图
-
-### 1. 表现层 (Presentation Layer - Fluid UI)
-- **Asset Hub Dashboard**: 管理员专属资产治理看板，支持多选与物理级一键清除。
-- **Full-Export Interaction**: 具备 6 个子任务状态感应的 ZIP 打包交互逻辑。
-
-### 2. 服务层 (Service Layer)
-- **Knowledge Governance Service (v5.5)**: 
-    - **全量打包引擎**: 负责对 01-06 文件夹（摘要、对话、模型、配置、原件、快照）进行物理聚合。
-    - **跨域打捞逻辑**: 具备越狱探测能力，能从 `temp_uploads` 打捞智能搜索遗留件。
-- **Admin Management API**: 提供基于所有人与时间跨度的物理资产审计接口。
-
-### 3. 系统韧性层 (Resilience Layer)
-- **Permission Failsafe**: 针对日志系统的动态路径迁移逻辑，确保生产环境 100% 启动成功。
+**版本**: v5.6.8 (Production Stability Edition)  
+**更新日期**: 2026-01-13  
+**核心特性**: URL 现场恢复、路径深度自愈 (Self-healing)、高保真文档爬取、666 权限日志引擎
 
 ---
 
-## 🧩 核心流程演进 (v5.5.8)
+## 🏗️ 核心架构演进 (v5.6.x)
 
-### 1. 终极资产导出流程 (Data Sovereignty)
+### 1. 状态管理层 (State Management - Persistent Memory)
+- **URL Parameter Sync**: 将活跃的 `kb_id` 和 `sess_id` 实时同步至浏览器地址栏。应用启动时优先通过 URL 恢复现场，实现“刷新即秒回”。
+- **Memory-Priority Titles**: 引入内存补偿机制，侧边栏标题在对话生成瞬间即可反映内容变化，不再依赖异步落盘延迟。
+
+### 2. 系统韧性层 (Resilience Layer - Self-healing)
+- **Path Self-healing Engine**: 针对 UI 脱敏后的短名，实现了模糊前缀匹配算法。系统能自动识别 `admin_` 等前缀并修正物理挂载路径，解决“docstore.json 丢失”问题。
+- **Auto-Permission Hardening**: 日志引擎内置 `chmod 666` 逻辑，确保不同所有权进程（Root/Standard）产生的日志能被所有标准用户读取显示。
+
+---
+
+## 🧩 核心流程演进 (v5.6.8)
+
+### 1. 对话现场恢复流程 (Persistent Memory)
 ```
-点击下载
+页面刷新 / 重新登录
     ↓
-[01] 摘要报告生成
+获取 URL 参数 (kb_id, sess_id)
     ↓
-[02] 历史对话 MD 格式化
+路径自愈引擎 (寻找带前缀的物理路径)
     ↓
-[03] 战略模型镜像提取
+加载历史 JSON 记录 (HistoryManager)
     ↓
-[04] 路径探测 (raw_sources -> temp_uploads 打捞)
+内存补偿渲染 (同步侧边栏标题)
     ↓
-[05] 原始文献聚合
-    ↓
-[06] 二进制向量快照
+挂载知识库向量索引 (RAG Ready)
 ```
 
----
-
-## 🛡️ 安全与审计架构
-
-- **管理员上帝视角**: 实现了跨用户的物理资产穿透审计与一键清理。
-- **物理链路闭环**: 统一了所有模式（搜索/爬虫/上传）的持久化归档标准。
+### 2. 高保真爬取流程 (Advanced Crawl)
+```
+输入 URL 
+    ↓
+路径前缀锁定 (锁定 Scope 防止扩散)
+    ↓
+html2text 引擎 + body_width=0
+    ↓
+URL 路径映射文件名 (结构化展示)
+    ↓
+自动化元数据打标 (Mac xattr 来源追踪)
+```
 
