@@ -1,13 +1,13 @@
 {
-  "version": "5.6.5",
+  "version": "5.6.8",
   "release_date": "2026-01-13",
-  "build_number": "20260113.01",
+  "build_number": "20260113.02",
   "status": "stable",
   "major_features": [
-    "💾 Persistent Session Memory: URL-based field recovery for knowledge bases and chat history",
-    "🩺 Deep Path Self-healing: Fuzzy folder matching to solve UI desensitization and prefix mismatch",
-    "🕷️ High-Fidelity Web Crawler: Optimized Alibaba Cloud content extraction with html2text backend",
-    "📜 Robust Log Engine: Enhanced .jsonl support with 0o666 auto-permission and large file optimization"
+    "🔄 Robust Session Switching: Fixed navigation deadlock using URL-first synchronization",
+    "💾 Intelligent History Persistence: Added memory-priority titles and custom naming protection",
+    "🏗️ Comprehensive Asset Export: All-in-one ZIP now correctly captures every historical session",
+    "🩺 Knowledge Base Self-healing: Fuzzy path matching to resolve mounting failures after refresh"
   ],
   "compatibility": {
     "python": ">=3.9",
