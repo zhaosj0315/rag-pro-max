@@ -164,10 +164,11 @@ class DataAnalystEngine:
         conn.commit()
         conn.close()
 
-    def execute_analysis(self, query: str, model_client, context_text: str = "") -> Dict[str, Any]:
+    def execute_analysis(self, query: str, model_client, context_text: str = "", status_callback=None) -> Dict[str, Any]:
         """
         [v5.0 极光战略工作坊] 链式推演引擎：需求拆解 -> 多阶脚本 -> 闭环仿真 -> 综合研判
         """
+        if status_callback: status_callback("🧠 正在初始化业务语义环境...")
         if not os.path.exists(self.schema_path):
              return {"success": False, "logic": "未找到数据结构定义，请上传文档或表单。"}
 
@@ -182,6 +183,7 @@ class DataAnalystEngine:
             "relationships": [r for r in full_schemas.get("relationships", []) if r["source"] in relevant_table_names or r["target"] in relevant_table_names]
         }
 
+        if status_callback: status_callback("🎯 正在拆解战略目标与分析路径...")
         decomposition_prompt = f"""
 你是一名顶级商业技术顾问。针对用户需求，请将其拆解为 2 个逻辑递进的分析阶段。
 需求：{query}
@@ -208,7 +210,8 @@ class DataAnalystEngine:
         final_stages_data = []
         full_analysis_context = ""
 
-        for meta in stages_meta:
+        for i, meta in enumerate(stages_meta):
+            if status_callback: status_callback(f"⚙️ [Stage {meta['stage_id']}/{len(stages_meta)}] 正在构建工程逻辑: {meta['title']}...")
             analysis_path = meta.get('transformation', meta.get('title', '业务逻辑推演'))
             # [v5.2.6] SQL 生成指令优化：调整输出顺序优先级 (DataWorks > Standard > SQLite)
             sql_prompt = f"""
@@ -235,6 +238,7 @@ class DataAnalystEngine:
                 sqls = json.loads(sql_res.strip().replace("```json", "").replace("```", ""))
             except: pass
 
+            if status_callback: status_callback(f"🧪 [Stage {meta['stage_id']}] 正在执行逻辑验证与仿真...")
             execution_res = {"success": False, "data": []}
             is_simulated = False
             source_samples = {}
@@ -276,6 +280,7 @@ class DataAnalystEngine:
             final_stages_data.append(stage_entry)
             full_analysis_context += f"阶段 {meta['stage_id']} ({meta['title']}) 结论数据: {json.dumps(stage_entry['data'][:3], ensure_ascii=False)}\n"
 
+        if status_callback: status_callback("📝 正在撰写首席执行官战略报告...")
         summary_prompt = f"""
 你是一名首席战略官。请基于以下【多阶段链式推演】的实际结果撰写最终战略报告。
 用户原始需求: {query}
