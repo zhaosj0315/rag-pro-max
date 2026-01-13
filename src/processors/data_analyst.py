@@ -220,14 +220,16 @@ class DataAnalystEngine:
         try:
             decomp_res = model_client.complete(decomposition_prompt).text
             stages_meta = json.loads(decomp_res.strip().replace("```json", "").replace("```", ""))
+            if status_callback: status_callback(f"✅ 拆解完成: 已规划 {len(stages_meta)} 个核心分析阶段")
         except:
             stages_meta = [{"stage_id": 1, "title": "核心逻辑分析", "goal": "执行基础数据摸排", "logic": "直接针对需求进行多表关联分析"}]
+            if status_callback: status_callback("⚠️ 拆解异常，降级为单阶段通用分析")
 
         final_stages_data = []
         full_analysis_context = ""
 
         for i, meta in enumerate(stages_meta):
-            if status_callback: status_callback(f"⚙️ [Stage {meta['stage_id']}/{len(stages_meta)}] 正在构建工程逻辑: {meta['title']}...")
+            if status_callback: status_callback(f"⚙️ [Stage {meta['stage_id']}/{len(stages_meta)}] 正在构建: {meta['title']} (生成SQL中...)")
             analysis_path = meta.get('transformation', meta.get('title', '业务逻辑推演'))
             # [v5.2.6] SQL 生成指令优化：调整输出顺序优先级 (DataWorks > Standard > SQLite)
             sql_prompt = f"""
@@ -252,9 +254,11 @@ class DataAnalystEngine:
             try:
                 sql_res = model_client.complete(sql_prompt).text
                 sqls = json.loads(sql_res.strip().replace("```json", "").replace("```", ""))
-            except: pass
+                if status_callback: status_callback(f"✅ SQL生成完毕 (覆盖 {len(sqls)} 种方言)")
+            except: 
+                if status_callback: status_callback("⚠️ SQL生成异常，将使用空模板")
 
-            if status_callback: status_callback(f"🧪 [Stage {meta['stage_id']}] 正在执行逻辑验证与仿真...")
+            if status_callback: status_callback(f"🧪 [Stage {meta['stage_id']}] 正在执行逻辑验证...")
             execution_res = {"success": False, "data": []}
             is_simulated = False
             source_samples = {}
@@ -270,6 +274,7 @@ class DataAnalystEngine:
                 execution_res = self.execute_sql(sqls["sqlite"])
                 if not execution_res["success"] or not execution_res["data"]:
                     is_simulated = True
+                    if status_callback: status_callback(f"🎲 [Stage {meta['stage_id']}] 本地数据不足，启动战略仿真模式 (生成虚拟趋势数据)...")
                     sim_prompt = f"""【战略仿真模式】为阶段：{meta['title']} 制造 10 条反映宏观趋势的“黄金模拟数据”。
 业务背景：{pruned_schemas['macro_context']}
 逻辑依赖：{meta['logic']}
@@ -294,6 +299,8 @@ class DataAnalystEngine:
                 "is_simulated": is_simulated
             }
             final_stages_data.append(stage_entry)
+            rows_count = len(stage_entry['data'])
+            if status_callback: status_callback(f"📊 [Stage {meta['stage_id']}] 阶段完成: 产出 {rows_count} 条结论数据")
             full_analysis_context += f"阶段 {meta['stage_id']} ({meta['title']}) 结论数据: {json.dumps(stage_entry['data'][:3], ensure_ascii=False)}\n"
 
         if status_callback: status_callback("📝 正在撰写首席执行官战略报告...")
