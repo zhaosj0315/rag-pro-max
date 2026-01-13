@@ -1221,13 +1221,37 @@ with st.sidebar:
             else:
                 # 兼容带统计信息的格式
                 raw_name = selected_nav.split("📂 ")[1] if "📂 " in selected_nav else ""
-                current_kb_name = raw_name.split(" (")[0].strip() if not is_create_mode and raw_name else None
+                short_name = raw_name.split(" (")[0].strip() if not is_create_mode and raw_name else None
+                
+                # --- [v5.6.4 核心修复] 建立短名到全名的映射逻辑 ---
+                if short_name:
+                    # 优先检查 session_state 里保存的全名
+                    if st.session_state.get('current_kb_id') and short_name in st.session_state.current_kb_id:
+                        current_kb_name = st.session_state.current_kb_id
+                    else:
+                        # 兜底：从实际存在的目录中找匹配的库 (防止刷新丢失)
+                        all_kbs = kb_manager.list_all()
+                        matches = [k for k in all_kbs if k.endswith(f"_{short_name}") or k == short_name]
+                        current_kb_name = matches[0] if matches else short_name
+                else:
+                    current_kb_name = None
 
         # --- [逻辑对齐补丁] 自动恢复最近一次历史会话 ---
         if current_kb_name and current_kb_name != "pure_chat" and not is_create_mode:
+            # 强化物理路径校验：确保 ID 对应真实的 docstore.json
+            kb_full_path = os.path.join(output_base, current_kb_name)
+            if not os.path.exists(os.path.join(kb_full_path, "docstore.json")):
+                # 如果找不到，尝试自愈 (在已有的库里找同名但带前缀的)
+                all_kbs = kb_manager.list_all()
+                for k in all_kbs:
+                    if k.endswith(f"_{current_kb_name}"):
+                        current_kb_name = k
+                        break
+
             # 如果知识库切换了，或者当前没有加载消息
             if st.session_state.get('last_loaded_kb') != current_kb_name or not st.session_state.get('messages'):
                 from src.chat.history_manager import HistoryManager
+                st.session_state.current_kb_id = current_kb_name
                 sessions = HistoryManager.list_sessions(current_kb_name)
                 if sessions:
                     # 默认加载第一个（通常是最近更新的）

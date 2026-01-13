@@ -62,26 +62,36 @@ class KnowledgeBaseLoader:
         """加载知识库"""
         db_path = os.path.join(self.output_base, kb_name)
         
-        # 智能路径修复逻辑 (v4.5.3)
-        if not os.path.exists(db_path):
+        # --- [v5.6.5] 深度路径自愈逻辑：彻底解决 UI 脱敏导致的加载失败 ---
+        if not os.path.exists(db_path) or not os.path.isdir(db_path):
             try:
-                available_dirs = os.listdir(self.output_base)
+                # 规范化搜索关键词
+                search_term = kb_name.strip()
+                available_dirs = [d for d in os.listdir(self.output_base) if os.path.isdir(os.path.join(self.output_base, d))]
                 
-                # 策略1: 尝试添加 admin_ 前缀
-                if f"admin_{kb_name}" in available_dirs:
-                    logger.warning(f"⚠️ 自动路径修正: {kb_name} -> admin_{kb_name}")
-                    kb_name = f"admin_{kb_name}"
-                    db_path = os.path.join(self.output_base, kb_name)
+                # 策略1: 后缀匹配 (最精准，如 admin_KBID)
+                matches = [d for d in available_dirs if d.endswith(f"_{search_term}")]
                 
-                # 策略2: 尝试后缀匹配 (针对被截断的前缀)
-                elif any(d.endswith(f"_{kb_name}") for d in available_dirs):
-                    match = next(d for d in available_dirs if d.endswith(f"_{kb_name}"))
-                    logger.warning(f"⚠️ 自动路径修正: {kb_name} -> {match}")
-                    kb_name = match
+                # 策略2: 包含匹配 (处理前缀未知的情况)
+                if not matches:
+                    matches = [d for d in available_dirs if search_term in d]
+                
+                # 策略3: 反向包含匹配 (处理 search_term 反而更长的情况)
+                if not matches:
+                    matches = [d for d in available_dirs if d in search_term]
+
+                if matches:
+                    # 按照修改时间排序，选最新的那个
+                    matches.sort(key=lambda x: os.path.getmtime(os.path.join(self.output_base, x)), reverse=True)
+                    best_match = matches[0]
+                    logger.success(f"💡 [自愈] 路径纠偏成功: '{kb_name}' -> '{best_match}'", stage="路径挂载")
+                    kb_name = best_match
                     db_path = os.path.join(self.output_base, kb_name)
-                    
+                    # 反哺 Session State 确保全局同步
+                    if 'current_kb_id' in st.session_state:
+                        st.session_state.current_kb_id = kb_name
             except Exception as e:
-                logger.warning(f"路径自动修复失败: {e}")
+                logger.warning(f"⚠️ 路径深度自愈失败: {e}")
 
         if not os.path.exists(db_path):
             cwd = os.getcwd()
