@@ -78,7 +78,7 @@ class V23Integration:
     
     def render_monitoring_tab(self):
         """渲染监控标签页"""
-        tab1, tab2, tab3 = st.tabs(["📊 系统监控", "📈 进度追踪", "⚙️ 智能调度"])
+        tab1, tab2, tab3, tab4 = st.tabs(["📊 系统监控", "📈 进度追踪", "⚙️ 智能调度", "📋 终端日志"])
         
         with tab1:
             # 添加实时监控选择
@@ -107,6 +107,10 @@ class V23Integration:
         
         with tab3:
             self._render_scheduler_panel()
+
+        with tab4:
+            from src.utils.compact_log_display import render_compact_log_management
+            render_compact_log_management()
     
     def _render_scheduler_panel(self):
         """渲染调度器面板"""

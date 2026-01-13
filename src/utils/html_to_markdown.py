@@ -98,6 +98,9 @@ class HtmlToMarkdown:
         """提取主要内容区域"""
         # 1. 尝试常用内容选择器 (优先级从高到低)
         content_selectors = [
+            # 阿里云文档专用核心容器
+            '.content-wrapper', '.article', '.article-body', '.doc-content',
+            
             # Wikipedia / MediaWiki 核心内容区
             '#bodyContent', 
             '.mw-parser-output',
@@ -106,12 +109,12 @@ class HtmlToMarkdown:
             'article', 'main', '[role="main"]',
             
             # 常见正文容器 Class/ID
-            '.article-body', '.post-body', '.content-body',
-            '.article', '.content', '.post', '.main-content', 
+            '.post-body', '.content-body',
+            '.content', '.post', '.main-content', 
             '#content', '#main', '.article-content', '.post-content',
             
             # 特定平台/框架
-            '.markdown-body', '.doc-content', '.documentation',
+            '.markdown-body', '.documentation',
             '.ContentBody', '.main-text', '.news-content', '#artical_real',
             '.rich_media_content', '.answer-text', '.zm-item-rich-text'
         ]
@@ -146,6 +149,28 @@ class HtmlToMarkdown:
         # 3. 实在找不到，返回body或整个soup
         return soup.body if soup.body else soup
     
+    @staticmethod
+    def convert_with_html2text(html_content: str) -> str:
+        """使用 html2text 进行高保真转换 (针对表格和技术文档优化)"""
+        try:
+            import html2text
+            h = html2text.HTML2Text()
+            h.body_width = 0  # 禁用自动换行，保持语义完整
+            h.ignore_links = False
+            h.ignore_images = False
+            h.protect_links = True
+            h.unicode_snob = True
+            
+            # 提取正文后再转换，避免页眉页脚干扰
+            soup = BeautifulSoup(html_content, 'html.parser')
+            HtmlToMarkdown._clean_soup(soup)
+            content_soup = HtmlToMarkdown._extract_main_content(soup)
+            
+            return h.handle(str(content_soup))
+        except ImportError:
+            # 降级到内置转换
+            return HtmlToMarkdown.convert(html_content)
+
     @staticmethod
     def _process_element(element) -> str:
         """处理单个元素"""

@@ -173,39 +173,53 @@ class AsyncWebCrawler:
             
             return None
     
-    def extract_links(self, html_content: str, base_url: str, max_links: int = 8) -> List[str]:
-        """提取链接"""
+    def extract_links(self, html_content: str, base_url: str, max_links: int = 999) -> List[str]:
+        """提取链接 - 优化：增加默认提取上限以适配大型文档库"""
         try:
             soup = BeautifulSoup(html_content, 'html.parser')
             links = []
-            base_domain = urlparse(base_url).netloc
+            
+            # 自动获取起始路径前缀 (例如 .../analyticdb-for-mysql/)
+            parsed_base = urlparse(base_url)
+            base_domain = parsed_base.netloc
+            # 路径前缀：保留到倒数第二个斜杠
+            base_path_prefix = parsed_base.path
+            if not base_path_prefix.endswith('/'):
+                base_path_prefix = base_path_prefix.rsplit('/', 1)[0] + '/'
             
             for link in soup.find_all('a', href=True):
                 href = link.get('href')
-                if not href:
+                if not href or href.startswith(('#', 'javascript:', 'mailto:')):
                     continue
                 
-                # 构建完整URL
-                full_url = urljoin(base_url, href)
+                # 构建完整URL并去除参数/锚点
+                full_url = urljoin(base_url, href).split('#')[0].split('?')[0].rstrip('/')
                 parsed = urlparse(full_url)
                 
-                # 只爬取同域名
-                if parsed.netloc == base_domain and full_url not in self.visited_urls:
-                    links.append(full_url)
+                # 策略：必须是同域名，且优先匹配路径前缀
+                if parsed.netloc == base_domain:
+                    # 只有当 URL 包含基准路径时才抓取 (防止跑向全站)
+                    if base_path_prefix in parsed.path or parsed.path.startswith(base_path_prefix):
+                        if full_url not in self.visited_urls and full_url not in links:
+                            links.append(full_url)
                 
                 if len(links) >= max_links:
                     break
             
             return links
-        except:
+        except Exception as e:
+            logger.warning(f"提取链接失败: {e}")
+            return []
             return []
     
     def extract_content(self, html_content: str) -> str:
-        """提取页面内容 (转换为Markdown)"""
+        """提取页面内容 (使用高保真 HTML2Text 转换)"""
         try:
+            # 优先使用带 html2text 后端的转换器
+            return HtmlToMarkdown.convert_with_html2text(html_content)
+        except Exception as e:
+            logger.warning(f"⚠️ 转换失败，降级到标准转换: {e}")
             return HtmlToMarkdown.convert(html_content)
-        except:
-            return ""
     
     async def crawl_url(self, url: str, status_callback: Optional[Callable] = None, ignore_robots: bool = False) -> Optional[Dict]:
         """爬取单个URL"""
@@ -386,17 +400,33 @@ class AsyncWebCrawler:
                 
                 level_success += 1
                 
-                # 保存文件
+                # 保存文件 - 优化文件名映射逻辑 (参考用户提供的阿里云优化方案)
+                url = result.get('url', '')
                 title = result.get('title', '').strip()
-                if title:
-                    # 清理标题，移除不合法的文件名字符
-                    safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
-                    safe_title = safe_title.replace(' ', '_')[:50]  # 限制长度
-                    filename = f"{safe_title}_{len(saved_files)+1:03d}.md"
-                else:
-                    filename = f"page_{len(saved_files)+1}_{int(time.time())}.md"
                 
+                # 方案 A: 优先使用 URL 路径生成文件名 (更适合技术文档结构)
+                path = urlparse(url).path
+                if path.startswith('/'): path = path[1:]
+                # 将路径中的斜杠替换为下划线
+                url_filename = path.replace('/', '_').strip('_')
+                
+                if url_filename:
+                    # 确保文件名合法
+                    url_filename = "".join(c for c in url_filename if c.isalnum() or c in ('-', '_')).strip()
+                    filename = f"{url_filename}.md"
+                elif title:
+                    # 方案 B: 使用标题
+                    safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
+                    safe_title = safe_title.replace(' ', '_')[:50]
+                    filename = f"{safe_title}.md"
+                else:
+                    filename = f"page_{int(time.time())}_{len(saved_files)+1}.md"
+                
+                # 检查文件名是否已存在，防止覆盖
                 filepath = output_path / filename
+                if filepath.exists():
+                    filename = f"{filename[:-3]}_{len(saved_files)+1}.md"
+                    filepath = output_path / filename
                 
                 async with aiofiles.open(filepath, 'w', encoding='utf-8') as f:
                     await f.write(f"**URL:** {result['url']}\n\n")
@@ -417,17 +447,17 @@ class AsyncWebCrawler:
                     next_level.extend(links)
             
             # 去重并准备下一层
-            current_level = list(set(next_level))
+            current_level = [u for u in list(set(next_level)) if u not in self.visited_urls]
             
             if status_callback:
-                status_callback(f"🎯 第{depth}层完成: 成功 {level_success} 页，发现 {len(current_level)} 个下级链接")
-                if depth < max_depth and current_level:
-                    next_layer_limit = max_pages_per_level ** (depth + 1)
-                    actual_next = min(len(current_level), next_layer_limit)
-                    status_callback(f"📊 递归统计: 第{depth+1}层将处理前 {actual_next} 个链接")
+                status_callback(f"🎯 第{depth}层完成: 成功 {level_success} 页，发现 {len(current_level)} 个待抓取链接")
             
             # 定期保存状态
             await self.save_state()
+            
+            # 如果当前层没有抓到任何东西，或者下一层没链接了，提前结束
+            if not current_level:
+                break
         
         if status_callback:
             status_callback(f"🎉 异步爬取完成！获取 {len(saved_files)} 个页面")

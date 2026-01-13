@@ -725,7 +725,26 @@ if 'app_initialized' not in st.session_state:
     st.session_state.app_initialized = True
     if 'current_session_id' not in st.session_state:
         st.session_state.current_session_id = None
+    
+    # --- [v5.6.3] 现场恢复：基于 URL 参数持久化活跃会话 ---
+    if "kb_id" in st.query_params and st.session_state.get('current_kb_id') is None:
+        target_kb = st.query_params["kb_id"]
+        st.session_state.current_kb_id = target_kb
+        # 设置导航显示格式以匹配侧边栏
+        st.session_state.current_nav = f"☑️ 📂 {target_kb}"
+        # 如果有 session_id，一并恢复
+        if "sess_id" in st.query_params:
+            st.session_state.current_session_id = st.query_params["sess_id"]
+        
+        logger.info(f"🔄 正在从 URL 恢复现场: KB={target_kb}", stage="现场恢复")
+
     logger.success("应用初始化完成")
+
+# 每次运行时同步当前状态到 URL，确保刷新不丢失
+if st.session_state.get('current_kb_id'):
+    st.query_params["kb_id"] = st.session_state.current_kb_id
+    if st.session_state.get('current_session_id'):
+        st.query_params["sess_id"] = st.session_state.current_session_id
 
 # --- 自动登录逻辑 (v4.5.2) ---
 # 必须在登录拦截之前执行
@@ -2925,25 +2944,33 @@ else:
     active_kb_name = current_kb_name if not is_create_mode else None
 
 # 自动加载逻辑
-if active_kb_name and active_kb_name != st.session_state.current_kb_id:
+# 优化：增加 messages 为空的判断，确保刷新页面后能触发首次加载
+if active_kb_name and (active_kb_name != st.session_state.current_kb_id or not st.session_state.get('messages')):
     # 只在没有正在处理的问题时才切换
     if not st.session_state.get('is_processing', False):
         st.session_state.current_kb_id = active_kb_name
         st.session_state.chat_engine = None
         
-        # [关键修复] 切换库时，自动获取该库最近活跃的会话 ID
-        latest_id = HistoryManager.get_latest_session_id(active_kb_name)
-        st.session_state.current_session_id = latest_id
+        # [关键修复] 优先使用 URL 中的 sess_id，否则获取该库最近活跃的会话 ID
+        if not st.session_state.get('current_session_id'):
+            latest_id = HistoryManager.get_latest_session_id(active_kb_name)
+            st.session_state.current_session_id = latest_id
         
         with st.spinner("📜 正在加载对话历史..."):
             st.session_state.messages = HistoryManager.load_session(active_kb_name, st.session_state.current_session_id)
         
-        # 恢复状态：从最后一条消息恢复建议列表
+        # 恢复状态：从最后一条消息恢复建议列表 (v5.6.3 增强)
         st.session_state.suggestions_history = []
         if st.session_state.messages:
             last_msg = st.session_state.messages[-1]
             if isinstance(last_msg, dict) and last_msg.get('suggestions'):
                 st.session_state.suggestions_history = last_msg['suggestions']
+            elif isinstance(last_msg, dict) and 'suggestions' not in last_msg:
+                # 尝试向前追溯一条（防止最后一条是用户消息）
+                if len(st.session_state.messages) >= 2:
+                    prev_msg = st.session_state.messages[-2]
+                    if isinstance(prev_msg, dict) and prev_msg.get('suggestions'):
+                        st.session_state.suggestions_history = prev_msg['suggestions']
         
         # [关键修复] 如果已有历史记录，禁止触发自动摘要/引导，防止覆盖旧状态
         if st.session_state.messages and len(st.session_state.messages) > 0:

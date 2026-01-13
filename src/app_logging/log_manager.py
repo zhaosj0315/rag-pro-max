@@ -35,6 +35,7 @@ class LogManager:
         if hasattr(self, '_initialized'):
             return
         self._initialized = True
+        self.enable_terminal = enable_terminal # 极其重要：先锚定终端标志
         
         # [v5.5.4] 权限自愈补丁：探测目录是否可写
         try:
@@ -48,26 +49,50 @@ class LogManager:
         except Exception:
             # 降级到用户主目录
             fallback_dir = os.path.expanduser("~/.rag_pro_max/app_logs")
-            os.makedirs(fallback_dir, exist_ok=True)
-            self.log_dir = fallback_dir
-            if enable_terminal:
-                print(f"⚠️ [WARNING] 默认日志目录 {log_dir} 无写入权限，已降级至 {fallback_dir}")
+            try:
+                os.makedirs(fallback_dir, exist_ok=True)
+                self.log_dir = fallback_dir
+                if self.enable_terminal:
+                    print(f"⚠️ [WARNING] 默认日志目录 {log_dir} 无写入权限，已降级至 {fallback_dir}")
+            except:
+                # 最后的最后：使用临时目录
+                import tempfile
+                self.log_dir = tempfile.gettempdir()
+                if self.enable_terminal:
+                    print(f"⚠️ [CRITICAL] 权限彻底锁定，日志降级至临时目录: {self.log_dir}")
 
-        self.enable_terminal = enable_terminal
-        
         # 使用当前用户名防止多用户冲突
         current_user = getpass.getuser()
         self.log_file = os.path.join(self.log_dir, f"log_{datetime.now().strftime('%Y%m%d')}_{current_user}.jsonl")
         
         # 再次确认文件写入权限，如果当前文件被root占用了，尝试重命名
         try:
-            with open(self.log_file, 'a', encoding='utf-8') as f:
-                pass
+            # 显式尝试以追加模式打开或创建
+            if not os.path.exists(self.log_file):
+                with open(self.log_file, 'a', encoding='utf-8') as f: pass
+            
+            # [核心修复] 强制设置文件权限为 666
+            try:
+                os.chmod(self.log_file, 0o666)
+                # 如果是 root 运行，尝试把组改回普通用户的组（通常是 staff）
+                if current_user == 'root':
+                    import pwd
+                    # 尝试寻找标准用户的 gid
+                    try:
+                        std_user = pwd.getpwnam('zhaosj')
+                        os.chown(self.log_file, -1, std_user.pw_gid)
+                    except: pass
+            except: pass 
         except PermissionError:
-             if enable_terminal:
+             if self.enable_terminal:
                 print(f"⚠️ [LogManager] {self.log_file} 权限被锁定，已自动切换到专属日志文件")
-             # 如果 log_20260112_zhaosj.jsonl 也被占用了（极少见），加个时间戳后缀
+             # 如果文件被占用了，加个时间戳后缀
              self.log_file = os.path.join(self.log_dir, f"log_{datetime.now().strftime('%Y%m%d')}_{current_user}_{int(time.time())}.jsonl")
+             # 对新文件也尝试设置权限
+             try:
+                 with open(self.log_file, 'a') as f: pass
+                 os.chmod(self.log_file, 0o666)
+             except: pass
         
         # Initialize metrics and tracking
         self.metrics: Dict[str, List[float]] = {}
