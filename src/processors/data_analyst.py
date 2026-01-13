@@ -264,11 +264,16 @@ class DataAnalystEngine:
 模型：{json.dumps(pruned_schemas['tables'], ensure_ascii=False)}
 
 要求：
-1. **必须包含详细注释**：使用 '--' 对每一段逻辑进行说明。
-2. **注释内容**：
-   - 标注使用的原始表业务含义。
-   - 标注关键字段或计算公式的业务逻辑。
-   - 标注 JOIN 关联的血缘依据。
+1. **必须包含详细的行级注释**：
+   - 使用 '--' 解释每一段核心逻辑（如 FILTER, JOIN, AGGREGATE）。
+   - 说明为什么要关联这张表（如 "关联订单表获取交易金额"）。
+   - 解释复杂的计算公式背后的业务含义。
+2. **严谨的 SQL 语法**：
+   - **SQLite 版本特别约束**：
+     - **严禁使用 QUALIFY** 关键字 (SQLite 不支持 Window Filter，请使用子查询)。
+     - **严禁使用 ? 占位符** (所有变量必须在 SQL 中直接展开为字面量，如 '2023-01-01')。
+     - 支持多语句脚本 (Script Mode)。
+     - 字段名若包含特殊字符请使用双引号包裹。
 3. 返回一个 JSON 对象，包含三个字段（注意顺序）：
    - "dataworks": "生产环境 SQL (MaxCompute语法)，必须包含 ${{bizdate}} 变量"
    - "standard": "标准 ANSI SQL (用于通用数据库验证)"
@@ -297,7 +302,8 @@ class DataAnalystEngine:
                     source_samples[t_name] = [{"info": f"正在基于 {t_name} 模型进行逻辑模拟..."}]
 
             if sqls.get("sqlite"):
-                execution_res = self.execute_sql(sqls["sqlite"])
+                # [v5.7.1] 引入智能自愈执行机制
+                execution_res = self.execute_sql(sqls["sqlite"], model_client=model_client)
                 
                 # [v5.6.5] 增加 SQL 执行透明度日志
                 row_count = len(execution_res.get("data", []))
@@ -414,28 +420,100 @@ class DataAnalystEngine:
             conn.close()
         except: pass
 
-    def execute_sql(self, sql: str) -> Dict[str, Any]:
+    def execute_sql(self, sql: str, model_client=None) -> Dict[str, Any]:
+        """
+        [v5.7.1] 增强型 SQL 执行器：
+        1. 支持多语句 (Script Mode) 并在同一事务中执行。
+        2. 增加 SQL 自动修复 (Auto-Healing) 功能。
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            # 使用 Row factory 保证结果是字典列表
+            conn.row_factory = lambda c, r: dict([(col[0], r[idx]) for idx, col in enumerate(c.description)])
+            cursor = conn.cursor()
+
+            # A. 预处理：移除尾部分号并按分号分割，过滤空语句
+            statements = [s.strip() for s in sql.split(';') if s.strip()]
+            
+            if not statements:
+                return {"success": True, "data": []}
+            
+            rows = []
+            
+            # B. 执行逻辑：顺序执行所有语句，只捕获最后一个 SELECT 的结果
+            for idx, stmt in enumerate(statements):
+                try:
+                    cursor.execute(stmt)
+                    # 如果是最后一条语句，且是 SELECT，则获取结果
+                    if idx == len(statements) - 1 and stmt.upper().startswith("SELECT"):
+                        rows = cursor.fetchall()
+                except Exception as step_error:
+                    # [v5.7.1] 自动修复逻辑
+                    error_msg = str(step_error).lower()
+                    
+                    # 仅在模型可用且错误类型可修复时触发
+                    is_fixable = any(k in error_msg for k in ["syntax", "bindings", "no such column", "qualify", "unrecognized token"])
+                    
+                    if is_fixable and model_client:
+                        if self.logger: self.logger.warning(f"🔧 SQL执行报错，尝试自动修复: {error_msg}")
+                        fix_prompt = f"""
+Auto-Fix SQLite Error:
+Error: {step_error}
+Bad SQL Statement: {stmt}
+
+Constraint:
+1. SQLite does NOT support 'QUALIFY' (Use subquery).
+2. SQLite does NOT support '?' placeholder without bindings (Use literal values).
+3. Output ONLY the fixed SQL statement.
+"""
+                        try:
+                            fixed_sql = model_client.complete(fix_prompt).text.strip().replace("```sql", "").replace("```", "")
+                            cursor.execute(fixed_sql)
+                            if idx == len(statements) - 1 and fixed_sql.upper().startswith("SELECT"):
+                                rows = cursor.fetchall()
+                            if self.logger: self.logger.success(f"✅ SQL自动修复成功")
+                            continue # 修复成功，继续下一条
+                        except Exception as fix_err:
+                            if self.logger: self.logger.error(f"❌ 自动修复失败: {fix_err}")
+                            if "SELECT" in stmt.upper(): raise step_error
+
+                    # 默认行为：如果不是 SELECT，可能是 DROP/CREATE 失败，尝试忽略；如果是 SELECT 失败则抛出
+                    if "SELECT" in stmt.upper():
+                        raise step_error 
+            
+            conn.commit()
+            conn.close()
+            return {"success": True, "data": rows}
+            
+        except Exception as e:
+            error_str = str(e)
+            # 自动修复机制：如果表不存在，尝试从 docstore 恢复
+            if "no such table" in error_str.lower():
+                try:
+                    self._recover_data_from_docstore()
+                    # 恢复后重试（递归调用一次）
+                    return self._retry_single_query(sql) 
+                except: pass
+            
+            return {"success": False, "error": str(e), "data": []}
+
+    def _retry_single_query(self, sql: str) -> Dict[str, Any]:
+        """简单的单查询重试"""
         try:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = lambda c, r: dict([(col[0], r[idx]) for idx, col in enumerate(c.description)])
             cursor = conn.cursor()
-            cursor.execute(sql)
-            rows = cursor.fetchall()
-            conn.close()
-            return {"success": True, "data": rows}
+            # 这里的 sql 可能是多语句，所以简单分割取最后一条
+            statements = [s.strip() for s in sql.split(';') if s.strip()]
+            last_select = next((s for s in reversed(statements) if s.upper().startswith("SELECT")), None)
+            
+            if last_select:
+                cursor.execute(last_select)
+                rows = cursor.fetchall()
+                conn.close()
+                return {"success": True, "data": rows}
+            return {"success": False, "error": "No SELECT found in retry", "data": []}
         except Exception as e:
-            error_str = str(e)
-            if "no such table" in error_str.lower():
-                try:
-                    self._recover_data_from_docstore()
-                    conn = sqlite3.connect(self.db_path)
-                    conn.row_factory = lambda c, r: dict([(col[0], r[idx]) for idx, col in enumerate(c.description)])
-                    cursor = conn.cursor()
-                    cursor.execute(sql)
-                    rows = cursor.fetchall()
-                    conn.close()
-                    return {"success": True, "data": rows}
-                except: pass
             return {"success": False, "error": str(e), "data": []}
 
     def process_files(self, file_paths: List[str], model_client=None, status_callback=None) -> Dict[str, Any]:
