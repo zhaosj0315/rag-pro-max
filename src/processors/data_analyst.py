@@ -264,17 +264,21 @@ class DataAnalystEngine:
 模型：{json.dumps(pruned_schemas['tables'], ensure_ascii=False)}
 
 要求：
-1. **必须包含详细的行级注释**：
+1. **严格限制表名**：
+   - **绝对禁止**使用模型中不存在的表名（如 monitoring_discounts, temp_analysis 等）。
+   - **仅允许**使用上述【模型】JSON 中明确定义的 key 作为表名。
+   - 如果需要中间结果，请使用 Common Table Expression (WITH clause)。
+2. **必须包含详细的行级注释**：
    - 使用 '--' 解释每一段核心逻辑（如 FILTER, JOIN, AGGREGATE）。
    - 说明为什么要关联这张表（如 "关联订单表获取交易金额"）。
    - 解释复杂的计算公式背后的业务含义。
-2. **严谨的 SQL 语法**：
+3. **严谨的 SQL 语法**：
    - **SQLite 版本特别约束**：
      - **严禁使用 QUALIFY** 关键字 (SQLite 不支持 Window Filter，请使用子查询)。
      - **严禁使用 ? 占位符** (所有变量必须在 SQL 中直接展开为字面量，如 '2023-01-01')。
      - 支持多语句脚本 (Script Mode)。
      - 字段名若包含特殊字符请使用双引号包裹。
-3. 返回一个 JSON 对象，包含三个字段（注意顺序）：
+4. 返回一个 JSON 对象，包含三个字段（注意顺序）：
    - "dataworks": "生产环境 SQL (MaxCompute语法)，必须包含 ${{bizdate}} 变量"
    - "standard": "标准 ANSI SQL (用于通用数据库验证)"
    - "sqlite": "本地验证 SQL (用于当前环境执行)"
