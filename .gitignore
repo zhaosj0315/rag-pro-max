@@ -99,4 +99,11 @@ scratchpad.txt
 # ===== 文档处理临时文件 =====
 ~$*.docx
 ~$*.xlsx
-~$*.pptxconfig/sessions.json
+~$*.pptx
+
+# ===== 本地资产与备份 (v5.6.0+ 非必要不推送) =====
+aliyun_adb_docs_*/
+aliyun_adb_mysql_docs_*/
+.gemini_backup/
+config/sessions.json
+config/users.json
