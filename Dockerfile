@@ -28,6 +28,13 @@ COPY . .
 # 创建必要的目录
 RUN mkdir -p vector_db_storage chat_histories temp_uploads hf_cache app_logs
 
+# 创建非root用户
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
+
+# 切换到非root用户
+USER appuser
+
 # 设置环境变量
 ENV STREAMLIT_SERVER_PORT=8501
 ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
