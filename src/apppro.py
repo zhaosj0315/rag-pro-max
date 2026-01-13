@@ -6048,15 +6048,48 @@ if st.session_state.get('is_processing') and final_prompt:
                                             if not df_s.empty:
                                                 st.dataframe(df_s, use_container_width=True)
                                                 
-                                                # --- 可视化画板 ---
+                                                # --- 可视化画板 (Smart Vis) ---
                                                 st.markdown("---")
-                                                v_tabs = st.tabs(["📊 对比", "📈 趋势", "🍰 占比"])
-                                                aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA']
-                                                with v_tabs[0]:
-                                                    st.plotly_chart(px.bar(df_s, x=df_s.columns[0], y=df_s.columns[-1], template="plotly_white", color_discrete_sequence=aurora_colors), use_container_width=True, key=f"bar_{meta['stage_id']}_{time.time()}")
-                                                if len(df_s.columns) >= 2:
-                                                    with v_tabs[1]: st.plotly_chart(px.line(df_s, x=df_s.columns[0], y=df_s.columns[-1], template="plotly_white"), use_container_width=True, key=f"line_{meta['stage_id']}_{time.time()}")
-                                                    with v_tabs[2]: st.plotly_chart(px.pie(df_s, names=df_s.columns[0], values=df_s.columns[-1], hole=0.4), use_container_width=True, key=f"pie_{meta['stage_id']}_{time.time()}")
+                                                
+                                                # 1. 智能列识别
+                                                from pandas.api.types import is_numeric_dtype
+                                                dim_col, metric_col = None, None
+                                                
+                                                # 寻找指标列 (Metric): 优先找最后一个数值列
+                                                for col in reversed(df_s.columns):
+                                                    if is_numeric_dtype(df_s[col]):
+                                                        metric_col = col
+                                                        break
+                                                
+                                                # 寻找维度列 (Dimension): 优先找第一个非数值列，如果没有则取第一个列
+                                                for col in df_s.columns:
+                                                    if col != metric_col:
+                                                        dim_col = col
+                                                        break
+                                                if not dim_col and len(df_s.columns) > 0: dim_col = df_s.columns[0]
+                                                
+                                                # 2. 渲染逻辑
+                                                if metric_col:
+                                                    # Case A: 单一数值 -> 指标卡
+                                                    if len(df_s) == 1 and len(df_s.columns) == 1:
+                                                        st.metric(label=metric_col, value=df_s.iloc[0][metric_col])
+                                                    else:
+                                                        # Case B: 图表渲染
+                                                        v_tabs = st.tabs(["📊 对比", "📈 趋势", "🍰 占比"])
+                                                        aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA']
+                                                        
+                                                        # X轴: 维度列, Y轴: 指标列
+                                                        with v_tabs[0]:
+                                                            st.plotly_chart(px.bar(df_s, x=dim_col, y=metric_col, template="plotly_white", color_discrete_sequence=aurora_colors), use_container_width=True, key=f"bar_{meta['stage_id']}_{time.time()}")
+                                                        
+                                                        # 只有行数 > 1 才画趋势和占比
+                                                        if len(df_s) > 1:
+                                                            with v_tabs[1]: 
+                                                                st.plotly_chart(px.line(df_s, x=dim_col, y=metric_col, markers=True, template="plotly_white"), use_container_width=True, key=f"line_{meta['stage_id']}_{time.time()}")
+                                                            with v_tabs[2]: 
+                                                                st.plotly_chart(px.pie(df_s, names=dim_col, values=metric_col, hole=0.4), use_container_width=True, key=f"pie_{meta['stage_id']}_{time.time()}")
+                                                else:
+                                                    st.caption("⚠️ 未检测到数值列，仅展示表格数据")
                                         
                                             if stage.get("is_simulated"):
                                                 st.warning("✨ 本阶段结果基于战略业务模型仿真得出")

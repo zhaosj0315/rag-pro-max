@@ -210,6 +210,7 @@ class DataAnalystEngine:
 
         for meta in stages_meta:
             analysis_path = meta.get('transformation', meta.get('title', '业务逻辑推演'))
+            # [v5.2.6] SQL 生成指令优化：调整输出顺序优先级 (DataWorks > Standard > SQLite)
             sql_prompt = f"""
 基于分析路径："{analysis_path}"，请编写高度可读、带有详细业务注释的多方言 SQL。
 业务背景：{pruned_schemas['macro_context']}
@@ -221,14 +222,14 @@ class DataAnalystEngine:
    - 标注使用的原始表业务含义。
    - 标注关键字段或计算公式的业务逻辑。
    - 标注 JOIN 关联的血缘依据。
-3. 返回一个 JSON 对象，包含三个字段：
-   - "sqlite": "带有注释的本地验证 SQL"
-   - "dataworks": "带有注释的适配 MaxCompute 语法的 SQL，包含 ${{bizdate}} 变量"
-   - "standard": "带有注释 de ANSI SQL"
+3. 返回一个 JSON 对象，包含三个字段（注意顺序）：
+   - "dataworks": "生产环境 SQL (MaxCompute语法)，必须包含 ${{bizdate}} 变量"
+   - "standard": "标准 ANSI SQL (用于通用数据库验证)"
+   - "sqlite": "本地验证 SQL (用于当前环境执行)"
 
 仅返回 JSON，不要有其他解释。"""
             
-            sqls = {"sqlite": "", "dataworks": "", "standard": ""}
+            sqls = {"dataworks": "", "standard": "", "sqlite": ""}
             try:
                 sql_res = model_client.complete(sql_prompt).text
                 sqls = json.loads(sql_res.strip().replace("```json", "").replace("```", ""))
