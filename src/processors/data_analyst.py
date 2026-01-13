@@ -134,12 +134,18 @@ class DataAnalystEngine:
         
         tables_to_mock = []
         tables_ready = []
-        for t_name, info in schemas.get('tables', {}).items():
-            cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{t_name}'")
+        for t_name in schemas.get('tables', {}).items():
+            # [v5.6.5] 兼容性过滤: 跳过 SQLite 不支持的系统库格式 (如 information_schema.tables)
+            t_name_str = t_name[0] if isinstance(t_name, tuple) else t_name
+            if "." in t_name_str or t_name_str.lower().startswith("information_schema"):
+                if self.logger: self.logger.debug(f"跳过不支持的系统表: {t_name_str}")
+                continue
+
+            cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{t_name_str}'")
             if not cursor.fetchone():
-                tables_to_mock.append(t_name)
+                tables_to_mock.append(t_name_str)
             else:
-                tables_ready.append(t_name)
+                tables_ready.append(t_name_str)
         
         if tables_ready and status_callback:
             status_callback(f"✅ 已就绪业务表: {', '.join(tables_ready[:5])}...")
@@ -288,6 +294,14 @@ class DataAnalystEngine:
 
             if sqls.get("sqlite"):
                 execution_res = self.execute_sql(sqls["sqlite"])
+                
+                # [v5.6.5] 增加 SQL 执行透明度日志
+                row_count = len(execution_res.get("data", []))
+                if execution_res["success"]:
+                    if status_callback: status_callback(f"⚡ [Stage {meta['stage_id']}] SQL执行成功, 命中 {row_count} 行数据")
+                else:
+                    if status_callback: status_callback(f"⚠️ [Stage {meta['stage_id']}] SQL执行失败: {execution_res.get('error', 'unknown')}")
+
                 if not execution_res["success"] or not execution_res["data"]:
                     is_simulated = True
                     if status_callback: status_callback(f"🎲 [Stage {meta['stage_id']}] 本地数据不足，启动战略仿真模式 (生成虚拟趋势数据)...")
