@@ -4913,10 +4913,9 @@ for msg_idx, msg in enumerate(state.get_messages()):
                         import plotly.express as px
                         df_h = pd.DataFrame(stage_h["data"])
                         if not df_h.empty:
-                            v_tabs_h = st.tabs(["📊 对比", "📈 趋势", "🍰 占比"])
+                            # [v5.6.4] 简化历史图表显示
                             h_key_base = f"hist_{msg_idx}_{m_h['stage_id']}"
-                            with v_tabs_h[0]:
-                                st.plotly_chart(px.bar(df_h, x=df_h.columns[0], y=df_h.columns[-1], template="plotly_white"), use_container_width=True, key=f"{h_key_base}_bar")
+                            st.plotly_chart(px.bar(df_h, x=df_h.columns[0], y=df_h.columns[-1], template="plotly_white"), use_container_width=True, key=f"{h_key_base}_bar")
                         st.markdown("**💻 DataWorks SQL**")
                         st.code(stage_h.get("sqls", {}).get("dataworks", "-- N/A"), language="sql")
                         st.markdown("**🧪 SQLite (Local)**")
@@ -6092,19 +6091,12 @@ if st.session_state.get('is_processing') and final_prompt:
                                                         st.metric(label=metric_col, value=df_s.iloc[0][metric_col])
                                                     else:
                                                         # Case B: 图表渲染
-                                                        v_tabs = st.tabs(["📊 对比", "📈 趋势", "🍰 占比"])
+                                                        # [v5.6.4] 用户反馈趋势/占比按钮冗余，简化为单一视图
                                                         aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA']
                                                         
                                                         # X轴: 维度列, Y轴: 指标列
-                                                        with v_tabs[0]:
-                                                            st.plotly_chart(px.bar(df_s, x=dim_col, y=metric_col, template="plotly_white", color_discrete_sequence=aurora_colors), use_container_width=True, key=f"bar_{meta['stage_id']}_{time.time()}")
-                                                        
-                                                        # 只有行数 > 1 才画趋势和占比
-                                                        if len(df_s) > 1:
-                                                            with v_tabs[1]: 
-                                                                st.plotly_chart(px.line(df_s, x=dim_col, y=metric_col, markers=True, template="plotly_white"), use_container_width=True, key=f"line_{meta['stage_id']}_{time.time()}")
-                                                            with v_tabs[2]: 
-                                                                st.plotly_chart(px.pie(df_s, names=dim_col, values=metric_col, hole=0.4), use_container_width=True, key=f"pie_{meta['stage_id']}_{time.time()}")
+                                                        st.plotly_chart(px.bar(df_s, x=dim_col, y=metric_col, template="plotly_white", color_discrete_sequence=aurora_colors), use_container_width=True, key=f"bar_{meta['stage_id']}_{time.time()}")
+
                                                 else:
                                                     st.caption("⚠️ 未检测到数值列，仅展示表格数据")
                                         
@@ -6369,6 +6361,11 @@ if st.session_state.get('is_processing') and final_prompt:
                     st.rerun()
                 
                 except Exception as e: 
+                    # [v5.6.4] 修复 NameError: logger not defined
+                    if 'logger' not in locals() and 'logger' not in globals():
+                        from src.app_logging.log_manager import LogManager
+                        logger = LogManager()
+                    
                     error_msg = str(e)
                     logger.error(error_msg)
                     logger.error(f"查询处理失败: {error_msg}")

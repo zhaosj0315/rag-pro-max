@@ -50,8 +50,8 @@ class DataAnalystEngine:
             if self.logger: self.logger.success(f"✨ 业务架构定义已成功存入物理库: {self.schema_path}")
             if status_callback:
                 t_names = list(schema_data.get('tables', {}).keys())
-                t_preview = ", ".join(t_names[:5]) + ("..." if len(t_names) > 5 else "")
-                status_callback(f"✅ 架构提取完成: 识别到 {len(t_names)} 张业务表 ({t_preview}), 存入 {os.path.basename(self.schema_path)}")
+                t_preview = ", ".join(t_names)
+                status_callback(f"✅ 架构提取完成: 识别到 {len(t_names)} 张业务表 [{t_preview}], 存入 {os.path.basename(self.schema_path)}")
             return schema_data
         except Exception as e:
             if self.logger: self.logger.error(f"战略模型解析失败: {e}")
@@ -491,8 +491,8 @@ class DataAnalystEngine:
             
             if status_callback:
                 t_names = list(unified_schema['tables'].keys())
-                t_preview = ", ".join(t_names[:5]) + ("..." if len(t_names) > 5 else "")
-                status_callback(f"✅ 全域建模完成: 包含 {len(t_names)} 张表 ({t_preview}), 定义已存入 {os.path.basename(self.schema_path)}")
+                t_preview = ", ".join(t_names)
+                status_callback(f"✅ 全域建模完成: 包含 {len(t_names)} 张表 [{t_preview}], 定义已存入 {os.path.basename(self.schema_path)}")
             
             return {
                 "success": True, 
