@@ -116,7 +116,7 @@ class DataAnalystEngine:
             elif r["target"] in relevant and r["source"] not in relevant: extra.append(r["source"])
         return list(set(relevant + extra))[:10]
 
-    def _ensure_sandbox_ready(self, schemas: Dict[str, Any], model_client):
+    def _ensure_sandbox_ready(self, schemas: Dict[str, Any], model_client, status_callback=None):
         """
         [v5.3.1] 虚拟沙盒激活：增加 dual 表支持与仿真数据注入。
         """
@@ -130,14 +130,23 @@ class DataAnalystEngine:
             cursor.execute("INSERT INTO dual (dummy) VALUES ('X')")
         
         tables_to_mock = []
+        tables_ready = []
         for t_name, info in schemas.get('tables', {}).items():
             cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{t_name}'")
             if not cursor.fetchone():
                 tables_to_mock.append(t_name)
+            else:
+                tables_ready.append(t_name)
         
+        if tables_ready and status_callback:
+            status_callback(f"✅ 已就绪业务表: {', '.join(tables_ready[:5])}...")
+
         if tables_to_mock and model_client:
             if self.logger: self.logger.info(f"🚧 正在为虚拟表 {tables_to_mock} 制造仿真数据...")
-            for t_name in tables_to_mock:
+            if status_callback: status_callback(f"🚧 检测到 {len(tables_to_mock)} 张表暂无本地数据，正在启动仿真引擎...")
+            
+            for idx, t_name in enumerate(tables_to_mock):
+                if status_callback: status_callback(f"🎲 [{idx+1}/{len(tables_to_mock)}] 正在为 '{t_name}' 生成高保真仿真数据...")
                 t_info = schemas['tables'][t_name]
                 cols_str = ", ".join([f"{c['name']} (注释: {c.get('comment', '无')})" for c in t_info.get('cols', t_info.get('columns', []))])
                 
@@ -195,7 +204,7 @@ class DataAnalystEngine:
         with open(self.schema_path, 'r', encoding='utf-8') as f:
             full_schemas = json.load(f)
         
-        self._ensure_sandbox_ready(full_schemas, model_client)
+        self._ensure_sandbox_ready(full_schemas, model_client, status_callback=status_callback)
         relevant_table_names = self._get_relevant_tables(query, full_schemas)
         pruned_schemas = {
             "macro_context": full_schemas.get("macro_context", "通用业务分析"),
