@@ -158,7 +158,22 @@ class DataAnalystEngine:
                             if clean_sql.upper().startswith('INSERT') and "CREATE" not in mock_sql:
                                 cols_def = ", ".join([f"{c['name']} TEXT" for c in t_info.get('cols', t_info.get('columns', []))])
                                 cursor.execute(f"CREATE TABLE IF NOT EXISTS {t_name} ({cols_def})")
-                            cursor.execute(clean_sql)
+                            
+                            try:
+                                cursor.execute(clean_sql)
+                            except Exception as sql_err:
+                                # [v5.6.1] 自动修复机制：针对 'Men's T-Shirt' 等未转义问题
+                                if "syntax error" in str(sql_err) or "no such column" in str(sql_err):
+                                    if self.logger: self.logger.warning(f"⚠️ SQL执行失败，尝试自动修复: {clean_sql[:50]}...")
+                                    fix_prompt = f"Fix SQLite error: {str(sql_err)}\nBad SQL: {clean_sql}\nOutput ONLY the fixed SQL statement without markdown."
+                                    try:
+                                        fixed_sql = model_client.complete(fix_prompt).text.strip().replace("```sql", "").replace("```", "")
+                                        cursor.execute(fixed_sql)
+                                        if self.logger: self.logger.success(f"🔧 自动修复成功")
+                                    except:
+                                        raise sql_err
+                                else:
+                                    raise sql_err
                 except Exception as e:
                     if self.logger: self.logger.error(f"仿真数据注入失败 ({t_name}): {e}")
         
