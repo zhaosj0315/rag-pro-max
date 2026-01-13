@@ -134,15 +134,19 @@ class DataAnalystEngine:
         
         tables_to_mock = []
         tables_ready = []
-        for t_name in schemas.get('tables', {}).items():
-            # [v5.6.5] 兼容性过滤: 跳过 SQLite 不支持的系统库格式 (如 information_schema.tables)
+        # [v5.6.6] 增强型表存在性检查 (Case-Insensitive)
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        existing_tables = {row[0].lower() for row in cursor.fetchall()}
+        
+        for t_name in schemas.get('tables', {}).keys():
+            # [v5.6.5] 兼容性过滤
             t_name_str = t_name[0] if isinstance(t_name, tuple) else t_name
             if "." in t_name_str or t_name_str.lower().startswith("information_schema"):
                 if self.logger: self.logger.debug(f"跳过不支持的系统表: {t_name_str}")
                 continue
 
-            cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{t_name_str}'")
-            if not cursor.fetchone():
+            # 核心修复: 统一转小写对比，防止 Products != products 导致的重复生成
+            if t_name_str.lower() not in existing_tables:
                 tables_to_mock.append(t_name_str)
             else:
                 tables_ready.append(t_name_str)
@@ -335,17 +339,34 @@ class DataAnalystEngine:
 
         if status_callback: status_callback("📝 正在撰写首席执行官战略报告...")
         summary_prompt = f"""
-你是一名首席战略官。请基于以下【多阶段链式推演】的实际结果撰写最终战略报告。
+你是一名资深战略顾问（麦肯锡/波士 BCG 风格）。请基于以下【多阶段链式推演】的实际结果，采用 SCQA 架构撰写一份具备“便当盒 (Bento Grid)”布局感的首席执行官战略报告。
+
 用户原始需求: {query}
 业务宏观背景: {pruned_schemas['macro_context']}
 各阶段推演数据摘要:
 {full_analysis_context}
 
 要求（严格执行）：
-1. **真实性第一**：报告中的每一个百分比、每一个地区名称必须与“推演数据摘要”中提供的 JSON 内容完全一致。
-2. **严禁编造**：如果数据摘要中只有 East/West，严禁在报告中提到北美、欧洲等虚假信息。
-3. 如果数据是仿真的，请在开头明确标注：“当前分析基于业务架构模型仿真得出”。
-4. 报告结构包含：### 🗺️ 全局战略地图、### 🔬 阶段性洞察汇编、### 💻 工程落地指南、### 🚀 首席执行建议。
+1. **SCQA 叙事结构**：
+   - **S (Situation)**: 描述当前业务的稳定态或背景。
+   - **C (Complication)**: 揭示数据中发现的矛盾、下滑、异常或瓶颈点。
+   - **Q (Question)**: 提出需要决策者核心关注的 1-2 个灵魂问题。
+   - **A (Answer)**: 给出基于数据的终极结论与可执行建议。
+
+2. **Bento Grid 布局风格**：
+   - 使用 Markdown 的块引用 `> ` 来突出核心指标。
+   - 使用任务列表 `- [ ]` 来展示行动指南。
+   - 第一段必须是 **[结论先行 (BLUF)]**，用一句话概括最关键的发现。
+
+3. **真实性与逻辑防御**：
+   - 每一个关键结论后必须标注数据来源（例如：[数据来源: Stage 1]）。
+   - 严禁编造任何摘要中不存在的数据或地名。
+   - 如果数据是仿真的，必须在显著位置标注：“⚠️ 极光战略沙盘模拟”。
+
+报告模块结构：
+### 💎 核心洞察 (North Star Insight)
+### 📊 业务全景 (The SCQA Context)
+### 🚀 战略路线 (Action Plan)
 """
         
         def report_generator():

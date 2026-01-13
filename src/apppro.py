@@ -4908,7 +4908,7 @@ for msg_idx, msg in enumerate(state.get_messages()):
                 st.markdown("#### 🏦 5.0 极光战略推演工作台 (History)")
                 for stage_h in msg.get("stages", []):
                     m_h = stage_h["meta"]
-                    with st.expander(f"📍 Stage {m_h['stage_id']}: {m_h['title']}", expanded=False):
+                    with st.expander(f"📍 Stage {m_h['stage_id']}: {m_h['title']}", expanded=True):
                         import pandas as pd
                         import plotly.express as px
                         df_h = pd.DataFrame(stage_h["data"])
@@ -6086,16 +6086,77 @@ if st.session_state.get('is_processing') and final_prompt:
                                                 
                                                 # 2. 渲染逻辑
                                                 if metric_col:
-                                                    # Case A: 单一数值 -> 指标卡
-                                                    if len(df_s) == 1 and len(df_s.columns) == 1:
-                                                        st.metric(label=metric_col, value=df_s.iloc[0][metric_col])
+                                                    # Case A: 单一数值 -> 指标卡 (Bento Style)
+                                                    if len(df_s) == 1:
+                                                        cols = st.columns(len(df_s.columns))
+                                                        for idx, c in enumerate(df_s.columns):
+                                                            if is_numeric_dtype(df_s[c]):
+                                                                cols[idx].metric(label=c, value=df_s.iloc[0][c])
+                                                            else:
+                                                                cols[idx].markdown(f"**{c}**\n\n{df_s.iloc[0][c]}")
                                                     else:
                                                         # Case B: 图表渲染
-                                                        # [v5.6.4] 用户反馈趋势/占比按钮冗余，简化为单一视图
-                                                        aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA']
+                                                        # [v6.1 Smart Vis] 智能图表多态路由引擎
+                                                        import plotly.graph_objects as go
+                                                        import plotly.express as px
                                                         
-                                                        # X轴: 维度列, Y轴: 指标列
-                                                        st.plotly_chart(px.bar(df_s, x=dim_col, y=metric_col, template="plotly_white", color_discrete_sequence=aurora_colors), use_container_width=True, key=f"bar_{meta['stage_id']}_{time.time()}")
+                                                        # 1. 预计算特征
+                                                        is_time_series = any(x in str(dim_col).lower() for x in ['date', 'time', 'day', 'month', 'year', 'period', '日期', '时间']) or \
+                                                                         pd.api.types.is_datetime64_any_dtype(df_s[dim_col])
+                                                        cardinality = df_s[dim_col].nunique()
+                                                        has_negative = (df_s[metric_col] < 0).any()
+                                                        
+                                                        # 2. 瀑布图路由 (Waterfall): 明确的增减/差异语境
+                                                        is_waterfall_context = any(x in str(df_s[dim_col].values).lower() for x in ['total', 'net', 'sum']) or \
+                                                                               any(x in metric_col.lower() for x in ['delta', 'change', 'diff', '增长', '变动', '差异'])
+                                                        
+                                                        chart_key = f"viz_{meta['stage_id']}_{time.time()}"
+                                                        aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A', '#19D3F3', '#FF6692', '#B6E880']
+                                                        
+                                                        if is_waterfall_context and len(df_s) > 1:
+                                                            # 🌊 瀑布图: 强调归因
+                                                            fig = go.Figure(go.Waterfall(
+                                                                name = "归因", orientation = "v",
+                                                                measure = ["relative"] * (len(df_s)-1) + ["total"],
+                                                                x = df_s[dim_col],
+                                                                textposition = "outside",
+                                                                text = [f"{v:+}" if isinstance(v, (int, float)) else v for v in df_s[metric_col]],
+                                                                y = df_s[metric_col],
+                                                                connector = {"line":{"color":"rgb(63, 63, 63)"}},
+                                                            ))
+                                                            fig.update_layout(title=f"🌊 {metric_col} (归因分析)", template="plotly_white")
+                                                            st.plotly_chart(fig, use_container_width=True, key=chart_key)
+                                                            
+                                                        elif is_time_series:
+                                                            # 📈 面积图: 强调趋势与累积
+                                                            fig = px.area(df_s, x=dim_col, y=metric_col, title=f"📈 {metric_col} (趋势)", 
+                                                                          template="plotly_white", markers=True)
+                                                            fig.update_traces(line_color='#636EFA', fillcolor='rgba(99, 110, 250, 0.2)')
+                                                            st.plotly_chart(fig, use_container_width=True, key=chart_key)
+                                                            
+                                                        elif cardinality > 8:
+                                                            # 📊 水平条形图: 强调排名 (避免X轴标签拥挤)
+                                                            fig = px.bar(df_s.sort_values(metric_col, ascending=True), 
+                                                                         x=metric_col, y=dim_col, orientation='h',
+                                                                         title=f"🏆 {metric_col} (排名)", template="plotly_white",
+                                                                         text_auto='.2s')
+                                                            fig.update_traces(marker_color='#00CC96')
+                                                            st.plotly_chart(fig, use_container_width=True, key=chart_key)
+                                                            
+                                                        elif len(df_s) <= 5 and not has_negative:
+                                                            # 🍩 环形图: 强调占比 (仅当数据少且无负数时)
+                                                            fig = px.pie(df_s, names=dim_col, values=metric_col, hole=0.5,
+                                                                         title=f"🍰 {metric_col} (占比)", template="plotly_white",
+                                                                         color_discrete_sequence=aurora_colors)
+                                                            fig.update_traces(textposition='inside', textinfo='percent+label')
+                                                            st.plotly_chart(fig, use_container_width=True, key=chart_key)
+                                                            
+                                                        else:
+                                                            # 📊 默认柱状图: 强调对比
+                                                            fig = px.bar(df_s, x=dim_col, y=metric_col, 
+                                                                         title=f"📊 {metric_col} (对比)", template="plotly_white",
+                                                                         color_discrete_sequence=aurora_colors, text_auto='.2s')
+                                                            st.plotly_chart(fig, use_container_width=True, key=chart_key)
 
                                                 else:
                                                     st.caption("⚠️ 未检测到数值列，仅展示表格数据")
