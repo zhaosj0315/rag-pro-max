@@ -239,7 +239,8 @@ class DataAnalystEngine:
   "color": "分组/颜色字段名 (可选)",
   "path": ["层级1", "层级2"], (仅用于 treemap/sunburst),
   "title": "图表标题",
-  "reason": "推荐理由 (请从业务价值角度说明)"
+  "insight": "中英双语图表业务结论 (格式: '中文发现 | English Insight', 概括数据中的核心业务发现)",
+  "reason": "推荐理由 (请从业务价值角度说明为什么选择此图表)"
 }}
 """
         try:

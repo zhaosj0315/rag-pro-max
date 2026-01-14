@@ -4001,143 +4001,147 @@ elif active_kb_name:
                 if st.button("🌟 一键生成全量资产包 (ZIP)", use_container_width=True, key=f"dl_all_in_one_{active_kb_name}", type="primary", disabled=not final_export_permission):
                     from src.auth.audit_logger import AuditLogger
                     from src.common.utils import get_client_ip
-                    AuditLogger.log(current_user, "EXPORT_FULL_SNAPSHOT", f"导出知识库全量镜像: {active_kb_name}", ip=get_client_ip())
-                    with st.status("正在进行全量数据打包 (含历史对话)...", expanded=True) as status:
-                        # 确保元数据已序列化
-                        manifest_json = json.dumps(doc_manager.manifest, indent=4, ensure_ascii=False)
+                    AuditLogger.log(current_user, "EXPORT_FULL_SNAPSHOT", f"Exported: {active_kb_name}", ip=get_client_ip())
+                    
+                    with st.status("正在构建多维镜像资产包...", expanded=True) as status:
+                        import zipfile, io, pandas as pd, plotly.express as px
                         
-                        # 确保即使没有文件也能生成基础报告
-                        if 'report_md' not in locals():
-                            report_md = f"# 知识库全量报告: {active_kb_name}\n\n(无文件数据)"
-                        if 'csv_data' not in locals():
-                            csv_data = "文件名,分类,摘要,片段数,路径\n".encode('utf-8-sig')
+                        def process_multi_assets(msg, name, z):
+                            if msg.get('is_data_report') and msg.get('stages'):
+                                for s_idx, stage in enumerate(msg['stages']):
+                                    if not stage.get('data'): continue
+                                    try:
+                                        df_raw = pd.DataFrame(stage['data'])
+                                        for c in [col for col in df_raw.columns if not pd.api.types.is_numeric_dtype(df_raw[col])]:
+                                            df_raw[c] = df_raw[c].fillna("Unknown").astype(str)
+                                        num_cols = [c for c in df_raw.columns if pd.api.types.is_numeric_dtype(df_raw[c])]
+                                        
+                                        tasks = []
+                                        rec = stage.get('recommendation')
+                                        if rec:
+                                            v_t, v_x, v_y, v_c = rec.get('viz_type'), rec.get('x_axis'), rec.get('y_axis'), rec.get('color')
+                                            args = {'x':v_x, 'y':v_y, 'title': f"AI Rec: {rec.get('title')}", 'template':'plotly_white'}
+                                            if v_c and v_c in df_raw.columns: args['color'] = v_c
+                                            tasks.append(('ai', v_t, args))
+                                        
+                                        if len(num_cols) > 0:
+                                            tasks.append(('bar', 'bar', {'x': df_raw.columns[0], 'y': num_cols[0], 'title': 'Comparison View', 'template':'plotly_white'}))
+                                            if len(df_raw) > 1:
+                                                tasks.append(('line', 'line', {'x': df_raw.columns[0], 'y': num_cols[0], 'title': 'Trend View', 'template':'plotly_white', 'markers':True}))
 
+                                        for suffix, p_type, p_args in tasks:
+                                            try:
+                                                f_p = None
+                                                if p_type == 'bar': f_p = px.bar(df_raw, **p_args)
+                                                elif p_type == 'line': f_p = px.line(df_raw, **p_args)
+                                                elif p_type == 'pie': f_p = px.pie(df_raw, names=p_args['x'], values=p_args['y'], title=p_args['title'], hole=0.4)
+                                                
+                                                if f_p:
+                                                    cid = f"chart_{name}_s{s_idx}_{suffix}"
+                                                    z.writestr(f"02_历史对话/Charts_IMG/{cid}.png", f_p.to_image(format="png", scale=2))
+                                                    z.writestr(f"02_历史对话/Charts_HTML/{cid}.html", f_p.to_html(include_plotlyjs='cdn'))
+                                            except Exception as plot_err:
+                                                logger.warning(f"Plot failed for {suffix}: {plot_err}")
+                                    except Exception as e:
+                                        logger.warning(f"Asset process failed: {e}")
+
+                        def msg_to_md_multi(msg, name):
+                            r = "👤 用户 (User)" if msg['role'] == 'user' else "🤖 助手 (Assistant)"
+                            m = f"#### {r}\n{msg['content']}\n\n"
+                            if msg.get('stats'):
+                                s = msg['stats']
+                                m += f"> ⏱️ **耗时**: {s.get('time',0):.1f}s | 📝 **Tokens**: {s.get('tokens',0)}\n\n"
+                            
+                            if msg.get('is_data_report') and msg.get('stages'):
+                                m += "### 📊 极光战略推演全维度报告\n"
+                                for s_idx, stage in enumerate(msg['stages']):
+                                    s_meta = stage.get('meta', {})
+                                    m += f"#### 📍 阶段 {s_meta.get('stage_id')}: {s_meta.get('title')}\n"
+                                    if stage.get('data'):
+                                        try:
+                                            df_m = pd.DataFrame(stage['data'])
+                                            m += "##### 📋 核心数据采样:\n" + df_m.head(5).to_markdown(index=False) + "\n\n"
+                                        except: pass
+                                    
+                                    m += "##### 🎨 数据多维呈现 (Gallery):\n"
+                                    for suffix, label in [('ai', '🤖 AI 智能推荐'), ('bar', '📊 对比分布视角'), ('line', '📈 趋势分析视角')]:
+                                        cid = f"chart_{name}_s{s_idx}_{suffix}"
+                                        m += f"**{label}**\n\n![{label}](../Charts_IMG/{cid}.png)\n\n"
+                                        m += f"🔗 [点击全屏交互查看 {label}](../Charts_HTML/{cid}.html)\n\n"
+                                    
+                                    rec = stage.get('recommendation')
+                                    if rec and rec.get('insight'):
+                                        m += f"> 💡 **深度洞察 / Insight**: {rec['insight']}\n\n"
+                            
+                            if msg.get('sources'):
+                                m += "**📚 参考来源:**\n"
+                                for src in msg['sources'][:3]: m += f"- [{src.get('file_name')}] ({src.get('score',0):.2f})\n"
+                                m += "\n"
+                            return m + "---\n\n"
+
+                        manifest_json = json.dumps(doc_manager.manifest, indent=4, ensure_ascii=False)
                         zip_buffer = io.BytesIO()
                         with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
-                            # [1] 核心资产报告与索引
-                            status.write("正在打包 [1/6] 知识报告与索引清单...")
-                            zip_file.writestr("01_核心资产/知识摘要报告.md", report_md)
-                            zip_file.writestr("01_核心资产/结构化资产清单.csv", csv_data)
+                            status.write("正在打包资产清单与镜像记录...")
+                            zip_file.writestr("01_核心资产/知识摘要报告.md", report_md if 'report_md' in locals() else "# Report")
+                            zip_file.writestr("01_核心资产/数据资产清单.csv", csv_data if 'csv_data' in locals() else "Filename")
                             
-                            # [2] 对话历史备份 (MD 级)
-                            status.write("正在打包 [2/6] 历史对话纪要...")
-                            # 核心修复：直接扫描根目录，因为 HistoryManager 默认不存子目录
-                            history_dir = "chat_histories"
-                            chat_history_md = f"# 对话历史备份: {active_kb_name}\n\n"
-                            has_chats = False
-                            
-                            # 🔥 [v5.6.0] 核心增强：强制捕获内存中的最新活跃会话
-                            current_msgs = st.session_state.get('messages', [])
-                            current_sess_id = st.session_state.get('current_session_id')
-                            
-                            if current_msgs:
-                                has_chats = True
-                                chat_history_md += f"### 🔴 当前活跃会话 (最新内存快照)\n"
-                                chat_history_md += f"> 导出时刻：{datetime.now().strftime('%H:%M:%S')}\n\n"
-                                zip_file.writestr("02_历史对话/raw_json/CURRENT_ACTIVE_SESSION.json", json.dumps({"messages": current_msgs}, indent=4, ensure_ascii=False))
-                                
-                                for msg in current_msgs:
-                                    role_tag = "👤 用户" if msg['role'] == 'user' else "🤖 AI"
-                                    chat_history_md += f"**{role_tag}**: {msg['content']}\n\n"
-                                chat_history_md += "---\n\n"
-                            
-                            if os.path.exists(history_dir):
-                                for chat_file in os.listdir(history_dir):
-                                    # 匹配规则：文件名以 KBID 开头 (涵盖默认.json和带@session.json)
-                                    if chat_file.endswith(".json") and (chat_file.startswith(f"{active_kb_name}.") or chat_file.startswith(f"{active_kb_name}@")):
-                                        try:
-                                            # 跳过正在内存中处理的同一个 session，避免重复
-                                            if current_sess_id and f"@{current_sess_id}.json" in chat_file:
-                                                continue
-                                                
-                                            with open(os.path.join(history_dir, chat_file), 'r', encoding='utf-8') as f:
-                                                chat_data = json.load(f)
-                                                msgs = chat_data.get('messages', [])
-                                                if not msgs: continue
-                                                
-                                                has_chats = True
-                                                zip_file.write(os.path.join(history_dir, chat_file), arcname=f"02_历史对话/raw_json/{chat_file}")
-                                                
-                                                chat_history_md += f"### 📅 归档会话: {chat_file.replace('.json','')}\n"
-                                                for msg in msgs:
-                                                    role_tag = "👤 用户" if msg['role'] == 'user' else "🤖 AI"
-                                                    chat_history_md += f"**{role_tag}**: {msg['content']}\n\n"
-                                                chat_history_md += "---\n\n"
-                                        except: continue
-                            
-                            if not has_chats:
-                                chat_history_md += "(当前无相关对话历史)"
-                            zip_file.writestr("02_历史对话/对话纪要_可阅读.md", chat_history_md)
-                            
-                            # [3] 战略大脑模型
-                            status.write("正在打包 [3/6] 战略业务模型...")
-                            schema_file = os.path.join(db_path, "business_schema.json")
-                            blueprint_file = os.path.join(db_path, "business_blueprint.json")
-                            if os.path.exists(schema_file):
-                                zip_file.write(schema_file, arcname="03_战略大脑/表结构模型_schema.json")
-                            else:
-                                zip_file.writestr("03_战略大脑/说明.txt", "未在此知识库中检测到战略建模数据")
-                            if os.path.exists(blueprint_file):
-                                zip_file.write(blueprint_file, arcname="03_战略大脑/业务蓝图_blueprint.json")
-                            
-                            # [4] 系统配置文件
-                            status.write("正在打包 [4/6] 底层系统元数据...")
-                            zip_file.writestr("04_系统配置文件/底层元数据_manifest.json", manifest_json)
-                            
-                            # [5] 原始文档库 (v5.5.8 跨目录全量打捞)
-                            status.write("正在打包 [5/6] 原始文档库 (全格式检索)...")
-                            raw_dir_path = os.path.join(db_path, "raw_sources")
-                            found_any_raw = False
-                            
-                            # 策略 A: 标准归档目录
-                            if os.path.exists(raw_dir_path):
-                                for root, dirs, files in os.walk(raw_dir_path):
-                                    for file in files:
-                                        if file.startswith('.'): continue
-                                        abs_path = os.path.join(root, file)
-                                        zip_file.write(abs_path, arcname=os.path.join("05_原始文档库", os.path.relpath(abs_path, raw_dir_path)))
-                                        found_any_raw = True
-                            
-                            # 策略 B: 跨目录深度打捞 (针对智能搜索残留件)
-                            if not found_any_raw:
-                                logger.info(f"📍 [Rescue] 知识库 {active_kb_name} 触发深度打捞逻辑...")
-                                # 从 manifest 中提取可能存在的原始目录线索
-                                for f_meta in doc_manager.manifest.get('files', []):
-                                    src_p = f_meta.get('file_path') or f_meta.get('local_path')
-                                    if src_p and os.path.exists(src_p):
-                                        found_any_raw = True
-                                        zip_file.write(src_p, arcname=os.path.join("05_原始文档库", os.path.basename(src_p)))
-                                    elif 'Search_' in str(src_p):
-                                        # 针对路径中包含 Search 的特殊打捞 (即使原始路径已变)
-                                        base_name = os.path.basename(src_p)
-                                        # 尝试在 temp_uploads 下全域搜索同名文件
-                                        for root, _, files in os.walk("temp_uploads"):
-                                            if base_name in files:
-                                                abs_p = os.path.join(root, base_name)
-                                                zip_file.write(abs_p, arcname=os.path.join("05_原始文档库", base_name))
-                                                found_any_raw = True
-                                                break
-                            
-                            if not found_any_raw:
-                                zip_file.writestr("05_原始文档库/说明.txt", "未发现可导出的原始源文件原件。")
+                            curr_msgs = st.session_state.get('messages', [])
+                            if curr_msgs:
+                                ts_n = datetime.now().strftime('%H%M%S')
+                                md_act = f"# 活跃会话全维度快照 ({ts_n})\n\n"
+                                for m in curr_msgs:
+                                    md_act += msg_to_md_multi(m, f"ACTIVE_{ts_n}")
+                                    process_multi_assets(m, f"ACTIVE_{ts_n}", zip_file)
+                                zip_file.writestr(f"02_历史对话/MD_纪要/ACTIVE_SESSION_{ts_n}.md", md_act)
+                                zip_file.writestr(f"02_历史对话/Raw_JSON/ACTIVE_SESSION_{ts_n}.json", json.dumps({"messages": curr_msgs}, indent=4, ensure_ascii=False))
 
-                            # [6] 向量引擎快照
-                            status.write("正在打包 [6/6] 向量引擎快照...")
-                            for root, dirs, files in os.walk(db_path):
-                                for file in files:
-                                    if file in ["docstore.json", "index_store.json", "vector_store.json", "data_level.db", "business_data.db"]:
-                                        abs_path = os.path.join(root, file)
-                                        rel_path = os.path.relpath(abs_path, db_path)
-                                        zip_file.write(abs_path, arcname=os.path.join("06_向量引擎快照", rel_path))
-                        
-                        status.update(label="✅ 终极六福资产包打包完成！信息已全量就绪。", state="complete")
+                            history_dir = "chat_histories"
+                            if os.path.exists(history_dir):
+                                for chat_f in os.listdir(history_dir):
+                                    if chat_f.endswith(".json") and (chat_f.startswith(f"{active_kb_name}.") or chat_f.startswith(f"{active_kb_name}@")):
+                                        try:
+                                            with open(os.path.join(history_dir, chat_f), 'r', encoding='utf-8') as f:
+                                                cd = json.load(f)
+                                                if not cd.get('messages'): continue
+                                                t_h = cd.get('title','chat')
+                                                sn = "".join([c for c in t_h if c.isalnum() or c in (' ','_','-')]).strip()
+                                                hmd = f"# 会话镜像: {t_h}\n\n"
+                                                for m in cd['messages']:
+                                                    hmd += msg_to_md_multi(m, sn)
+                                                    process_multi_assets(m, sn, zip_file)
+                                                zip_file.writestr(f"02_历史对话/MD_纪要/{sn}.md", hmd)
+                                                zip_file.write(os.path.join(history_dir, chat_f), arcname=f"02_历史对话/Raw_JSON/{chat_f}")
+                                        except: continue
+
+                            status.write("打包业务数据库与归档文件...")
+                            ddb = os.path.join(db_path, "business_data.db")
+                            if os.path.exists(ddb): zip_file.write(ddb, arcname="03_战略大脑/business_data.db")
+                            for f in ["business_schema.json", "business_blueprint.json"]:
+                                fp = os.path.join(db_path, f)
+                                if os.path.exists(fp): zip_file.write(fp, arcname=f"03_战略大脑/{f}")
+
+                            zip_file.writestr("04_系统配置/manifest.json", manifest_json)
+                            raw_p = os.path.join(db_path, "raw_sources")
+                            if os.path.exists(raw_p):
+                                for root, _, files in os.walk(raw_p):
+                                    for file in files:
+                                        if not file.startswith('.'):
+                                            af = os.path.join(root, file)
+                                            zip_file.write(af, arcname=os.path.join("05_原始文档库", os.path.relpath(af, raw_p)))
+
+                            for f in ["docstore.json", "index_store.json", "vector_store.json", "graph_store.json"]:
+                                fp = os.path.join(db_path, f)
+                                if os.path.exists(fp): zip_file.write(fp, arcname=f"06_向量快照/{f}")
+
+                        status.update(label="✅ 全维度镜像资产包已生成！", state="complete")
                         st.download_button(
-                            label=f"⬇️ 立即下载全量资产包 (.zip)",
+                            label="⬇️ 下载全维度镜像包 (.zip)",
                             data=zip_buffer.getvalue(),
-                            file_name=f"ULTIMATE_BACKUP_{active_kb_name}_{datetime.now().strftime('%Y%m%d')}.zip",
+                            file_name=f"FULL_SNAPSHOT_{active_kb_name}_{datetime.now().strftime('%H%M%S')}.zip",
                             mime="application/zip",
                             use_container_width=True,
-                            key=f"dl_final_all_{active_kb_name}"
+                            key=f"dl_final_{active_kb_name}"
                         )
                 
                 st.info("💡 提示：全量包可直接用于系统迁移或永久离线归档。")
