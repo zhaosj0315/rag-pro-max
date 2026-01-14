@@ -653,6 +653,9 @@ Constraint:
       }} 
    }}
 3. "relationships": [ {{ "source": "表A", "target": "表B", "on": "关联字段", "logic": "业务流转逻辑" }} ]
+
+**CRITICAL**: 如果【业务材料】中的表名与【物理表结构】中的表名不同（例如 users vs Customers），**必须强制使用【物理表结构】中的表名**（如 users）。严禁修改已存在的物理表名。
+**CRITICAL**: 仅当【业务材料】中提到的表完全不存在于【物理表结构】中时，才可将其定义为新表（is_virtual=true）。不要添加非必要的虚拟表。
 """
                 res = model_client.complete(prompt).text
                 try:
