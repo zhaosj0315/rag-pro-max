@@ -2523,15 +2523,77 @@ if st.session_state.get('main_mode', 'rag') == 'sql':
                                     df = pd.DataFrame(result['data'])
                                     st.dataframe(df, use_container_width=True)
                                     
-                                    # 简单图表
-                                    if len(df.columns) >= 2 and len(df) > 1:
-                                        chart_col1, chart_col2 = st.columns(2)
-                                        with chart_col1:
-                                            if st.button("📊 柱状图"):
-                                                st.bar_chart(df.set_index(df.columns[0]))
-                                        with chart_col2:
-                                            if st.button("📈 折线图"):
-                                                st.line_chart(df.set_index(df.columns[0]))
+                                    # --- [v5.8.0] 智能可视化推荐引擎 ---
+                                    if len(df) > 0:
+                                        with st.spinner("🤖 正在思考最佳可视化方案..."):
+                                            try:
+                                                import plotly.express as px
+                                                
+                                                # 获取推荐
+                                                # da_engine 是在外面定义的，这里需要确保能访问到。
+                                                # 由于前面是在 `if is_da_mode or data_files:` 块里初始化的 da_engine，
+                                                # 但这里是 `if is_data_analysis_mode:` 块，可能不在同一个作用域。
+                                                # 幸运的是，`da_engine` 通常是按需初始化的。
+                                                # 我们需要重新获取 persist_dir 来初始化 da_engine
+                                                
+                                                # 获取当前知识库路径
+                                                current_kb_id = st.session_state.get('current_kb_id')
+                                                if current_kb_id:
+                                                    kb_path = os.path.join(output_base, current_kb_id)
+                                                    from src.processors.data_analyst import DataAnalystEngine
+                                                    temp_da_engine = DataAnalystEngine(kb_path, logger)
+                                                    
+                                                    rec = temp_da_engine.recommend_visualization(
+                                                        data_query, 
+                                                        df.columns.tolist(), 
+                                                        df.head(3).to_dict(orient='records'), 
+                                                        st.session_state.llm
+                                                    )
+                                                    
+                                                    viz_type = rec.get('viz_type', 'table')
+                                                    x_axis = rec.get('x_axis')
+                                                    y_axis = rec.get('y_axis')
+                                                    title = rec.get('title', '数据可视化')
+                                                    reason = rec.get('reason', '')
+                                                    
+                                                    if reason:
+                                                        st.caption(f"💡 AI建议: {reason}")
+                                                    
+                                                    if viz_type != 'table':
+                                                        st.markdown(f"### {title}")
+                                                        fig = None
+                                                        
+                                                        if viz_type == 'bar':
+                                                            fig = px.bar(df, x=x_axis, y=y_axis, title=title)
+                                                        elif viz_type == 'line':
+                                                            fig = px.line(df, x=x_axis, y=y_axis, title=title)
+                                                        elif viz_type == 'pie':
+                                                            fig = px.pie(df, names=x_axis, values=y_axis if isinstance(y_axis, str) else y_axis[0], title=title)
+                                                        elif viz_type == 'scatter':
+                                                            fig = px.scatter(df, x=x_axis, y=y_axis, title=title)
+                                                        elif viz_type == 'area':
+                                                            fig = px.area(df, x=x_axis, y=y_axis, title=title)
+                                                        
+                                                        if fig:
+                                                            st.plotly_chart(fig, use_container_width=True)
+                                                        else:
+                                                            st.info("无法生成图表，展示原始数据")
+                                                    
+                                            except ImportError:
+                                                # 降级方案
+                                                if len(df.columns) >= 2:
+                                                    chart_col1, chart_col2 = st.columns(2)
+                                                    with chart_col1:
+                                                        if st.button("📊 柱状图"):
+                                                            st.bar_chart(df.set_index(df.columns[0]))
+                                                    with chart_col2:
+                                                        if st.button("📈 折线图"):
+                                                            st.line_chart(df.set_index(df.columns[0]))
+                                            except Exception as e:
+                                                logger.warning(f"可视化生成失败: {e}")
+                                                # 降级方案
+                                                if len(df.columns) >= 2:
+                                                    st.bar_chart(df.set_index(df.columns[0]))
                                 else:
                                     st.info("查询无结果")
                             else:

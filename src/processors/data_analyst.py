@@ -206,6 +206,45 @@ class DataAnalystEngine:
         conn.commit()
         conn.close()
 
+    def recommend_visualization(self, query: str, columns: List[str], sample_data: List[Dict], model_client) -> Dict[str, Any]:
+        """
+        [v5.8.0] 智能可视化推荐引擎：根据查询意图和数据特征推荐最佳图表。
+        """
+        prompt = f"""
+你是一名资深数据可视化专家。请根据用户查询和返回的数据样本，推荐最适合的可视化图表类型。
+
+用户查询: {query}
+数据列: {columns}
+数据样本 (前3行): {json.dumps(sample_data[:3], ensure_ascii=False, default=str)}
+
+请从以下类型中选择一种: ["bar", "line", "pie", "scatter", "area", "table"]
+- bar: 适合比较不同类别的数值 (如: 各部门人数)。
+- line: 适合展示时间序列数据的趋势 (如: 销售额随时间变化)。
+- pie: 适合展示部分占整体的比例 (如: 市场份额)。
+- scatter: 适合展示两个变量之间的相关性。
+- area: 适合展示累积趋势。
+- table: 如果数据不适合绘图或仅为文本列表。
+
+请返回标准 JSON 格式:
+{{
+  "viz_type": "推荐的图表类型",
+  "x_axis": "X轴字段名 (如果适用)",
+  "y_axis": "Y轴字段名 (如果是多系列，可以是字段名列表)",
+  "title": "图表标题",
+  "reason": "推荐理由"
+}}
+"""
+        try:
+            response = model_client.complete(prompt).text
+            import re
+            json_match = re.search(r'(\{.*\})', response, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group(1))
+            return {"viz_type": "table", "reason": "无法解析推荐结果"}
+        except Exception as e:
+            if self.logger: self.logger.warning(f"可视化推荐失败: {e}")
+            return {"viz_type": "table", "reason": str(e)}
+
     def execute_analysis(self, query: str, model_client, context_text: str = "", status_callback=None) -> Dict[str, Any]:
         """
         [v5.0 极光战略工作坊] 链式推演引擎：需求拆解 -> 多阶脚本 -> 闭环仿真 -> 综合研判
