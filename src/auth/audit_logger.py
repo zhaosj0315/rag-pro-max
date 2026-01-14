@@ -9,22 +9,26 @@ class AuditLogger:
     _lock = threading.Lock()
 
     @staticmethod
-    def log(user, action, details, status="success", ip=None):
+    def log(user, action, details, action_type="GENERIC", status="success", ip=None, browser=None):
         """
-        记录审计日志
+        [v6.4.0] 企业级增强型审计记录
         :param user: 操作用户名
-        :param action: 动作名称
-        :param details: 详细描述
-        :param status: 状态
+        :param action: 动作名称 (如: UPLOAD_FILE)
+        :param details: 详细描述字符串或字典
+        :param action_type: 动作分类 (AUTH, KB_MGMT, DATA_PROCESS, ADMIN, SECURITY)
+        :param status: 状态 (success, failed, warning, intercepted)
         :param ip: 客户端IP
+        :param browser: 浏览器特征
         """
         log_entry = {
             "timestamp": datetime.now().isoformat(),
             "user": user,
+            "action_type": action_type,
             "action": action,
             "details": details,
             "status": status,
-            "ip": ip or "unknown"
+            "ip": ip or "unknown",
+            "ua": browser or "unknown"
         }
         
         # 确保目录存在

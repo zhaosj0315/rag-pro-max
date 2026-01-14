@@ -326,6 +326,9 @@ def render_login_page():
                         if nu and np:
                             success, msg = register_user(nu, np)
                             if success:
+                                from src.auth.audit_logger import AuditLogger
+                                from src.common.utils import get_client_ip
+                                AuditLogger.log(nu, "REGISTER", "注册新账号", action_type="AUTH", ip=get_client_ip())
                                 st.success("✅ 注册成功！请切换标签页登录。")
                             else:
                                 st.error(f"❌ {msg}")

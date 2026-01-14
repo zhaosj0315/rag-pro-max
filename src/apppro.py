@@ -916,9 +916,12 @@ if not st.session_state.get("logged_in"):
                 users = load_users()
                 user_info = users.get(username)
                 if user_info and user_info.get('is_active', True):
+                    from src.auth.audit_logger import AuditLogger
+                    from src.common.utils import get_client_ip
                     st.session_state.logged_in = True
                     st.session_state.user = username
                     st.session_state.role = user_info.get('role', 'standard_user')
+                    AuditLogger.log(username, "AUTO_LOGIN", "通过 Session Token 自动登录", action_type="AUTH", ip=get_client_ip())
                     logger.info(f"自动登录成功: {username}")
                     st.toast(f"👋 欢迎回来, {username}", icon="✨")
         except Exception as e:
@@ -6293,6 +6296,16 @@ if st.session_state.get('is_processing') and final_prompt:
 
                         # B. 战略推演工作坊逻辑
                         if os.path.exists(schema_path) and (manual_da_on or "is_data_kb" in locals()):
+                            from src.auth.audit_logger import AuditLogger
+                            from src.common.utils import get_client_ip
+                            AuditLogger.log(
+                                st.session_state.get('user', 'admin'), 
+                                "DATA_ANALYSIS_EXEC", 
+                                f"执行战略推演: {final_prompt[:100]}", 
+                                action_type="DATA_PROCESS", 
+                                ip=get_client_ip()
+                            )
+                            
                             from src.processors.data_analyst import DataAnalystEngine
                             from src.utils.model_manager import load_llm_model
                             da_engine = DataAnalystEngine(db_path, logger)

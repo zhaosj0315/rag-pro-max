@@ -361,9 +361,9 @@ def render_admin_management():
                     AuditLogger.log(st.session_state.get('user'), "ROLE_UPDATE", f"更新角色 {selected_role_id} 权限", ip=get_client_ip())
                     st.success("已保存"); st.rerun()
 
-    # --- Tab 5: 审计记录 (修复渲染版) ---
+    # --- Tab 5: 审计记录 (企业级监控面板) ---
     with tab_audit:
-        st.caption("系统全行为追踪：从管理指令到用户提问的深度审计流水")
+        st.caption("系统全行为追踪：从管理指令到 AI 推演的深度审计流水")
         raw_logs = AuditLogger.get_logs()
         if not raw_logs:
             st.info("暂无审计记录")
@@ -372,48 +372,118 @@ def render_admin_management():
             df_logs['timestamp'] = pd.to_datetime(df_logs['timestamp'])
             df_logs = df_logs.sort_values('timestamp', ascending=False)
             
-            # 1. 筛选矩阵
+            # 1. 筛选矩阵 (多维增强)
             with st.container(border=True):
                 c1, c2, c3, c4 = st.columns([1.2, 1, 1, 1.8])
-                # 时间范围筛选
+                # 时间范围
                 min_date = df_logs['timestamp'].min().date()
                 max_date = df_logs['timestamp'].max().date()
-                sel_range = c1.date_input("🕒 时间范围", value=(min_date, max_date), min_value=min_date, max_value=max_date, key="aud_range")
+                sel_range = c1.date_input("🕒 观察窗口", value=(min_date, max_date), key="aud_range_v2")
                 
-                sel_u = c2.multiselect("👤 用户", sorted(df_logs['user'].unique()), key="aud_u")
-                sel_a = c3.multiselect("⚡ 动作", sorted(df_logs['action'].unique()), key="aud_a")
-                search_det = c4.text_input("🔍 详情检索", placeholder="搜索详情内容...", key="audit_detail_search")
+                # 分类筛选 [v6.4.1] 修复旧日志无分类导致的 TypeError
+                if 'action_type' in df_logs:
+                    df_logs['action_type'] = df_logs['action_type'].fillna('GENERIC').astype(str)
+                    all_types = sorted([t for t in df_logs['action_type'].unique() if t])
+                else:
+                    all_types = []
+                sel_t = c2.multiselect("📂 动作分类", all_types, key="aud_type_f")
+                
+                # 状态筛选 [v6.4.1] 增加鲁棒性
+                df_logs['status'] = df_logs['status'].fillna('success').astype(str)
+                all_status = sorted([s for s in df_logs['status'].unique() if s])
+                sel_s = c3.multiselect("🚦 结果状态", all_status, key="aud_status_f")
+                
+                # [v6.4.2] 补齐丢失的搜索框逻辑
+                search_det = c4.text_input("🔍 详情穿透", placeholder="搜索用户、IP或动作详情...", key="audit_search_v2")
 
             # 过滤逻辑
             f_logs = df_logs.copy()
             if len(sel_range) == 2:
                 f_logs = f_logs[(f_logs['timestamp'].dt.date >= sel_range[0]) & (f_logs['timestamp'].dt.date <= sel_range[1])]
-            if sel_u: f_logs = f_logs[f_logs['user'].isin(sel_u)]
-            if sel_a: f_logs = f_logs[f_logs['action'].isin(sel_a)]
-            if search_det: f_logs = f_logs[f_logs['details'].str.contains(search_det, case=False, na=False)]
+            if sel_t: f_logs = f_logs[f_logs['action_type'].isin(sel_t)]
+            if sel_s: f_logs = f_logs[f_logs['status'].isin(sel_s)]
+            if search_det: 
+                mask = f_logs.apply(lambda row: search_det.lower() in str(row.values).lower(), axis=1)
+                f_logs = f_logs[mask]
 
-            # 2. 顶部看板 (随筛选联动)
+            # 2. 动态监控看板
             k1, k2, k3, k4 = st.columns(4)
-            k1.metric("匹配操作数", len(f_logs))
-            k2.metric("异常预警", len(f_logs[f_logs['status'] == 'failed']))
-            k3.metric("活跃IP", f_logs['ip'].nunique() if 'ip' in f_logs else 0)
+            k1.metric("匹配记录数", len(f_logs))
+            
+            failed_count = len(f_logs[f_logs['status'].isin(['failed', 'intercepted', 'warning'])])
+            k2.metric("异常/拦截告警", failed_count, delta=f"{failed_count}" if failed_count > 0 else "0", delta_color="inverse")
+            
+            active_users = f_logs['user'].nunique()
+            k3.metric("活跃执行者", active_users)
+            
             csv = f_logs.to_csv(index=False).encode('utf-8-sig')
-            k4.download_button("📥 导出筛选结果", data=csv, file_name=f"audit_export.csv", use_container_width=True)
+            k4.download_button("📥 导出审计报表", data=csv, file_name=f"audit_report_{datetime.now().strftime('%Y%m%d')}.csv", use_container_width=True)
 
             st.write("")
             
-            # 构建极致紧凑的 HTML
-            th = "<style>.at{width:100%;border-collapse:collapse;font-size:11px;color:#334;line-height:1.1}.at th{text-align:left;padding:4px 10px;background:#f8fafc;color:#64748b;border-bottom:1px solid #e2e8f0}.at td{padding:2px 10px;border-bottom:1px solid #f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px}.at tr:hover{background:#f1f5f9}</style><table class='at'><thead><tr><th style='width:14%'>🕒 时间</th><th style='width:10%'>👤 用户</th><th style='width:12%'>⚡ 动作</th><th style='width:46%'>📝 详情摘要</th><th style='width:8%'>🚦 状态</th><th style='width:10%'>🌐 IP</th></tr></thead><tbody>"
-            rows = ""
-            for _, row in f_logs.head(200).iterrows():
-                status = row.get('status', 'success')
-                icon = "🟢" if status == 'success' else "🔴" if status == 'failed' else "🟡"
-                ts_str = row['timestamp'].strftime('%m-%d %H:%M:%S')
-                raw_det = str(row['details']).replace("'", "&#39;").replace('"', "&quot;")
-                disp_det = (raw_det[:80] + '...') if len(raw_det) > 80 else raw_det
-                rows += f"<tr><td style='color:#94a3b8'>{ts_str}</td><td style='font-weight:600'>{row['user']}</td><td><span style='background:#f1f5f9;color:#475569;padding:1px 4px;border-radius:3px;font-size:9px;font-family:sans-serif;font-weight:600;'>{row['action']}</span></td><td title='{raw_det}'>{disp_det}</td><td>{icon} {status[:1].upper()}</td><td style='color:#94a3b8'>{row.get('ip','-.--')}</td></tr>"
+            # 3. 企业级 HTML 流水表 [v6.4.3] 修复缩进导致的源码显露问题
+            type_icons = {
+                "AUTH": "🔐", "KB_MGMT": "📂", "DATA_PROCESS": "🧠", 
+                "ADMIN": "🛠️", "SECURITY": "🛡️", "GENERIC": "📝"
+            }
+            status_colors = {
+                "success": ("#f0fdf4", "#166534", "✅"), 
+                "failed": ("#fef2f2", "#991b1b", "❌"),
+                "warning": ("#fffbeb", "#92400e", "⚠️"),
+                "intercepted": ("#faf5ff", "#6b21a8", "🚫")
+            }
+
+            # 关键修复：HTML 字符串行首绝对不能有空格，物理对齐到最左侧
+            table_html = """
+<style>
+.audit-table { width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 12px; color: #1e293b; }
+.audit-table th { background: #f8fafc; color: #64748b; padding: 12px 10px; text-align: left; border-bottom: 2px solid #e2e8f0; }
+.audit-table td { padding: 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.badge-type { padding: 2px 6px; border-radius: 4px; background: #f1f5f9; color: #475569; font-weight: 600; font-size: 10px; display: inline-block; }
+.badge-status { padding: 2px 10px; border-radius: 20px; font-weight: 600; font-size: 11px; text-transform: uppercase; }
+.details-cell { max-width: 350px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #475569; }
+.audit-table tr:hover { background: #f8fafc; }
+.ip-text { font-family: monospace; color: #94a3b8; font-size: 11px; }
+</style>
+<table class='audit-table'>
+<thead>
+<tr>
+<th style='width: 15%'>🕒 发生时间</th>
+<th style='width: 10%'>👤 执行者</th>
+<th style='width: 15%'>分类 / 动作</th>
+<th style='width: 40%'>📝 业务执行详情</th>
+<th style='width: 10%'>🚦 状态</th>
+<th style='width: 10%'>🌐 IP</th>
+</tr>
+</thead>
+<tbody>
+"""
             
-            st.markdown(th + rows + "</tbody></table>", unsafe_allow_html=True)
+            for _, row in f_logs.head(200).iterrows():
+                ts = row['timestamp'].strftime('%m-%d %H:%M:%S')
+                a_type = row.get('action_type', 'GENERIC')
+                icon = type_icons.get(a_type, "📝")
+                
+                s_val = row.get('status', 'success')
+                bg, fg, s_icon = status_colors.get(s_val, ("#f1f5f9", "#475569", "⚪"))
+                
+                details_raw = str(row['details']).replace('"', '&quot;')
+                
+                # 每一行都必须紧贴左侧
+                table_html += f"<tr>"
+                table_html += f"<td style='color: #64748b'>{ts}</td>"
+                table_html += f"<td style='font-weight: 700;'>{row['user']}</td>"
+                table_html += f"<td><span class='badge-type'>{icon} {a_type}</span><br><small style='color: #94a3b8;'>{row['action']}</small></td>"
+                table_html += f"<td class='details-cell' title='{details_raw}'>{details_raw}</td>"
+                table_html += f"<td><span class='badge-status' style='background: {bg}; color: {fg};'>{s_icon} {s_val.upper()}</span></td>"
+                table_html += f"<td class='ip-text'>{row.get('ip', '...')}</td>"
+                table_html += f"</tr>"
+            
+            table_html += "</tbody></table>"
+            st.markdown(table_html, unsafe_allow_html=True)
+            
+            table_html += "</tbody></table>"
+            st.markdown(table_html, unsafe_allow_html=True)
 
 def get_client_ip():
     from src.common.utils import get_client_ip
