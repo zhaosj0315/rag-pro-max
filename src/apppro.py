@@ -663,10 +663,20 @@ st.markdown("""
         height: auto !important;
     }
 
-    /* 4. 侧边栏独立滚动保护 */
+    /* 4. 侧边栏独立滚动保护 [v6.5.1] 彻底消除侧边栏多重嵌套滚动条 */
     [data-testid="stSidebar"] {
         height: 100vh !important;
         overflow-y: auto !important;
+        overflow-x: hidden !important;
+    }
+
+    /* 物理级禁止内层容器产生滚动主权 */
+    [data-testid="stSidebarContent"], 
+    [data-testid="stSidebarUserContent"],
+    [data-testid="stSidebarNav"] {
+        overflow: visible !important;
+        height: auto !important;
+        display: block !important;
     }
 </style>
 

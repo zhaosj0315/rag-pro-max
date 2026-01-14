@@ -330,13 +330,12 @@ class DataAnalystEngine:
 {sample_context}
 
 要求：
-1. **严格限制表名**：
+1. **严格限制字段与表名**：
    - **绝对禁止**使用模型中不存在的表名。
-   - **仅允许**使用上述【模型】JSON 中明确定义的 key 作为表名。
+   - **严禁凭空想象字段名**：必须且仅能使用下述【模型】和【数据样例】中明确出现的列名。例如：如果样例中只有 `price` 而没有 `cost_price`，你决不能在 SQL 中使用 `cost_price`。
    - 如果需要中间结果，请使用 Common Table Expression (WITH clause)。
 2. **必须包含详细的行级注释**：
    - 使用 '--' 解释每一段核心逻辑（如 FILTER, JOIN, AGGREGATE）。
-   - 说明为什么要关联这张表。
    - 解释复杂的计算公式背后的业务含义。
 3. **严谨的 SQL 语法**：
    - **SQLite 版本特别约束**：
@@ -746,12 +745,25 @@ class DataAnalystEngine:
                     if status_callback: status_callback(err_msg)
             
             conn.close()
-            
-            final_msg = f"🏁 数据库构建结束。共生成 {len(physical_tables)} 张业务表。"
-            if self.logger: self.logger.info(final_msg)
-            if status_callback: status_callback(final_msg)
 
-            unified_schema = {"tables": physical_tables, "macro_context": "通用业务分析", "relationships": []}
+            # [v6.5.5] 生成建模逻辑摘要：让用户知道系统是如何理解这批数据的
+            modeling_summary = "通用业务分析"
+            if self.logger and model_client:
+                t_list = list(physical_tables.keys())
+                summary_prompt = f"请根据这组物理表名及其字段，用一句话概括这套业务系统的核心逻辑：{json.dumps(physical_tables, ensure_ascii=False)}"
+                try:
+                    modeling_summary = model_client.complete(summary_prompt).text.strip()
+                except: pass
+                
+                msg = f"🧠 建模逻辑确认: {modeling_summary}\\n📂 构建业务表清单: {', '.join(t_list)}"
+                if self.logger: self.logger.success(msg)
+                if status_callback: status_callback(msg)
+
+            unified_schema = {
+                "tables": physical_tables, 
+                "macro_context": modeling_summary, 
+                "relationships": []
+            }
             
             if semantic_docs and model_client:
                 if self.logger: self.logger.info(f"🧠 正在从 {len(semantic_docs)} 个源材料中提取战略模型...")
