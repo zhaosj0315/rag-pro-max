@@ -3,6 +3,7 @@ import json
 import pandas as pd
 import sqlite3
 from typing import List, Dict, Any
+from datetime import datetime
 import hashlib
 
 class DataAnalystEngine:
@@ -338,6 +339,7 @@ class DataAnalystEngine:
    - 解释复杂的计算公式背后的业务含义。
 3. **严谨的 SQL 语法**：
    - **SQLite 版本特别约束**：
+     - **绝对禁止在 WHERE 子句中使用聚合函数** (如 AVG, SUM, COUNT)。如果需要基于聚合结果过滤，请使用 HAVING 子句或子查询。
      - **严禁使用 QUALIFY** 关键字。
      - **严禁使用 ? 占位符** (所有变量必须在 SQL 中直接展开为字面量)。
      - 字段名若包含特殊字符请使用双引号包裹。
@@ -493,8 +495,46 @@ class DataAnalystEngine:
                 res = model_client.complete(summary_prompt).text
                 for char in res: yield char
 
+        # [v6.3.6] 最终数据序列化加固：确保所有结果均为 JSON 兼容格式
+        def make_json_safe(obj):
+            if isinstance(obj, list):
+                return [make_json_safe(i) for i in obj]
+            if isinstance(obj, dict):
+                return {k: make_json_safe(v) for k, v in obj.items()}
+            
+            # 处理常见非序列化类型
+            import pandas as pd
+            import numpy as np
+            
+            # 1. 处理空值 (None, NaN, NaT)
+            if obj is None or pd.isna(obj):
+                return None
+            
+            # 2. 处理日期时间
+            if isinstance(obj, (pd.Timestamp, datetime)):
+                return obj.strftime('%Y-%m-%d %H:%M:%S')
+            
+            # 3. 处理数值类型 (处理 numpy 标量)
+            if isinstance(obj, (int, np.integer)):
+                return int(obj)
+            if isinstance(obj, (float, np.floating)):
+                if np.isinf(obj): return "Infinity"
+                return float(obj)
+            
+            # 4. 处理字节
+            if isinstance(obj, bytes):
+                return obj.decode('utf-8', errors='ignore')
+            
+            # 5. 最终保底：转为字符串
+            if not isinstance(obj, (str, bool)):
+                return str(obj)
+            
+            return obj
+
+        safe_stages = make_json_safe(final_stages_data)
+
         return {
-            "stages": final_stages_data,
+            "stages": safe_stages,
             "logic_gen": report_generator(),
             "success": True,
             "macro_context": pruned_schemas['macro_context']
@@ -573,17 +613,23 @@ class DataAnalystEngine:
                         if is_fixable and model_client:
                             if self.logger: self.logger.warning(f"🔧 SQL执行报错，尝试自动修复: {error_msg}")
                             fix_prompt = f"""
-Auto-Fix SQLite Error:
-Error: {step_error}
-Bad SQL Statement: {stmt}
+【致命错误修复请求】
+当前的 SQLite 语句执行失败。请根据报错信息，重新编写一条正确的 SQL。
 
-Constraint:
-1. SQLite does NOT support 'QUALIFY' (Use subquery).
-2. SQLite does NOT support '?' placeholder without bindings (Use literal values).
-3. Output ONLY the fixed SQL statement.
+错误信息: {step_error}
+原始 SQL: {stmt}
+
+【必须遵守的修正准则】：
+1. **严禁在 WHERE 子句中使用聚合函数**：如发现 `WHERE AVG(...)` 或 `WHERE SUM(...)`，必须将其移至 `HAVING` 子句中，或者改用子查询。
+2. **语法校对**：检查 `IS`、`LIKE` 等操作符是否符合 SQLite 语法（例如：IS NULL, NOT NULL）。
+3. **字段保护**：确保所有字段名与模型完全一致。
+4. **格式要求**：仅输出修复后的 SQL 语句，严禁包含任何 Markdown 格式或解释说明。
 """
                             try:
-                                fixed_sql = model_client.complete(fix_prompt).text.strip().replace("```sql", "").replace("```", "")
+                                fixed_sql_res = model_client.complete(fix_prompt).text.strip()
+                                # 彻底清理可能存在的 Markdown
+                                fixed_sql = re.sub(r'```sql|```', '', fixed_sql_res, flags=re.I).strip()
+                                
                                 cursor.execute(fixed_sql)
                                 if idx == len(statements) - 1 and fixed_sql.upper().startswith("SELECT"):
                                     rows = cursor.fetchall()

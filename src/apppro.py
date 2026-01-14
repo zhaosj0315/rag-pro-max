@@ -6644,7 +6644,15 @@ if st.session_state.get('is_processing') and final_prompt:
                     
                     logger.error(f"查询处理崩溃: {str(e)}\n{error_details}")
                     
-                    # 显式展示错误信息，不再静默 pop
+                    # [v6.3.7] 智能回滚保护：仅在必要时清理内存，防止“闪现消失”
+                    if st.session_state.messages and st.session_state.messages[-1]['role'] == 'assistant':
+                        last_msg = st.session_state.messages[-1]
+                        # 如果消息内容过短或标识为错误现场，才执行回滚
+                        if len(last_msg.get('content', '')) < 5:
+                            st.session_state.messages.pop()
+                            logger.warning("🗑️ 检测到残缺回答，已执行内存回滚")
+                    
+                    # 显式展示错误信息
                     st.error(f"❌ 系统执行异常")
                     with st.expander("🔍 查看技术细节"):
                         st.code(error_details)
@@ -6652,5 +6660,4 @@ if st.session_state.get('is_processing') and final_prompt:
                     # 释放内存
                     cleanup_memory()
                     st.session_state.is_processing = False
-                    # 不再自动 rerun，保留错误现场
                     st.stop()
