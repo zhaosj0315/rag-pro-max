@@ -3006,6 +3006,13 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
     # 4. [v5.5.5] 全量物理归档 (必须在 build 之后)
     try:
         raw_sources_dir = os.path.join(persist_dir, "raw_sources")
+        
+        # [v6.3.0] 物理隔离增强：如果是新建模式，清空原有的物理归档目录
+        if action_mode == "NEW" and os.path.exists(raw_sources_dir):
+            import shutil
+            status_container.write("🧹 正在清理旧版物理资产...")
+            shutil.rmtree(raw_sources_dir)
+            
         if not os.path.exists(raw_sources_dir):
             os.makedirs(raw_sources_dir)
             
@@ -3059,23 +3066,21 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
 
         # Schema 建模 (使用之前读取的 docs)
         if docs:
-            status_container.write("🧠 正在执行深度业务语义建模...")
-            logger.info("🧠 [Strategic Workshop] 正在从源材料中提取业务元模型与逻辑通路...")
-            if not os.path.exists(da_engine.schema_path):
-                schemas = da_engine.extract_schema_from_docs(docs, llm, status_callback=kb_status_callback)
-            else:
-                status_container.write("⏩ 已存在物理表结构，跳过纯文档提取...")
-                with open(da_engine.schema_path, 'r') as f:
-                    schemas = json.load(f)
-        
-            # 业务蓝图
-            status_container.write("🌐 正在构建业务全景图与关联路径...")
+            # [v6.3.0] 强制刷新业务模型：确保每次更新都能根据最新材料重新建模，防止表结构“粘滞”
+            status_container.write("🧠 正在提取最新业务元模型...")
+            logger.info("🧠 [Strategic Workshop] 正在从当前源材料中重构业务模型与逻辑通路...")
+            
+            # 不再判断文件是否存在，而是直接执行提取以覆盖旧模型
+            schemas = da_engine.extract_schema_from_docs(docs, llm, status_callback=kb_status_callback)
+            
+            # 业务蓝图推演
+            status_container.write("🌐 正在构建最新业务全景图与关联路径...")
             blueprint = da_engine.infer_business_blueprint(schemas, llm)
             scenario = blueprint.get('business_scenario', '未知业务')
             status_container.info(f"📍 识别业务场景: {scenario}")
-            logger.info(f"📍 [Strategic Workshop] 业务蓝图识别完成: {scenario}")
+            logger.info(f"📍 [Strategic Workshop] 业务蓝图更新完成: {scenario}")
         
-        status_container.write("✅ 业务语义建模已就绪")
+        status_container.write("✅ 业务语义建模已更新")
         logger.success("✨ [Strategic Workshop] 全域业务语义建模就绪")
     
     # --- 补丁: 写入所有权信息与模型对齐 ---
@@ -6257,33 +6262,34 @@ if st.session_state.get('is_processing') and final_prompt:
                         db_path = os.path.join(output_base, active_kb_name)
                         schema_path = os.path.join(db_path, "business_schema.json")
                         
-                        # A. 唤醒与脑补逻辑 (仅当 Schema 缺失时)
-                        if not os.path.exists(schema_path):
-                            import glob
-                            data_files = glob.glob(os.path.join(db_path, "*.csv")) + \
-                                         glob.glob(os.path.join(db_path, "*.xlsx")) + \
-                                         glob.glob(os.path.join(db_path, "*.md"))
-                            
-                            is_data_kb = any(k in active_kb_name.lower() for k in ["csv", "excel", "spec", "dict", "schema", "mapping"])
-                            
-                            if data_files or is_data_kb or manual_da_on:
-                                try:
-                                    from src.processors.data_analyst import DataAnalystEngine
-                                    from src.utils.model_manager import load_llm_model
-                                    da_engine = DataAnalystEngine(db_path, logger)
-                                    llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
-                                    
-                                    if data_files:
+                        # --- [v6.3.5] 逻辑隔离：仅在显式开启分析模式时执行战略推演 ---
+                        if manual_da_on:
+                            # A. 唤醒逻辑 (支持从归档目录恢复)
+                            if not os.path.exists(schema_path):
+                                import glob
+                                # [修正] 同时扫描根目录和物理归档目录
+                                raw_p = os.path.join(db_path, "raw_sources")
+                                data_files = glob.glob(os.path.join(db_path, "*.csv")) + \
+                                             glob.glob(os.path.join(db_path, "*.xlsx"))
+                                if os.path.exists(raw_p):
+                                    data_files += glob.glob(os.path.join(raw_p, "**/*.csv"), recursive=True) + \
+                                                  glob.glob(os.path.join(raw_p, "**/*.xlsx"), recursive=True)
+                                
+                                if data_files:
+                                    try:
+                                        from src.processors.data_analyst import DataAnalystEngine
+                                        from src.utils.model_manager import load_llm_model
+                                        da_engine = DataAnalystEngine(db_path, logger)
+                                        llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
                                         da_engine.process_files(data_files)
-                                    
-                                    # 如果还是没 schema (纯 MD 或手动开启)，强制触发一次脑补
-                                    if not os.path.exists(schema_path):
+                                        
+                                        # 强制重新提取业务含义
                                         from llama_index.core import SimpleDirectoryReader
-                                        reader = SimpleDirectoryReader(input_dir=db_path)
+                                        reader = SimpleDirectoryReader(input_dir=raw_p if os.path.exists(raw_p) else db_path)
                                         docs = reader.load_data()
                                         if docs: da_engine.extract_schema_from_docs(docs, llm)
-                                except Exception as e:
-                                    logger.warning(f"⚠️ 引擎唤醒异常: {e}")
+                                    except Exception as e:
+                                        logger.warning(f"⚠️ 引擎按需唤醒异常: {e}")
 
                         # B. 战略推演工作坊逻辑
                         if os.path.exists(schema_path) and (manual_da_on or "is_data_kb" in locals()):

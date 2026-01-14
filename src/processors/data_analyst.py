@@ -24,17 +24,24 @@ class DataAnalystEngine:
             all_text = all_text[:60000] + "...(truncated)"
             
         if status_callback: status_callback("🧠 正在请求大模型提取业务架构 (可能需要 1-2 分钟)...")
+        
+        # [v6.3.0] 强化指令：防止“标准模型”幻觉，强制锚定输入文档
         prompt = f"""
-你是一名资深首席架构师与业务战略专家。请从以下文档中提取业务模型与宏观背景。
-文档内容：{all_text}
+你是一名资深首席架构师。请从以下文档中【严谨提取】业务模型与宏观背景。
+
+【重要约束】：
+1. **严禁凭空想象**：不要生成文档中未提及的表结构。严禁默认输出“产品(Products)”、“订单(Orders)”等通用电商表，除非文档中明确出现了这些业务实体。
+2. **物理表对齐**：如果文档中包含物理表字段定义，请以物理表名为准。
+3. **识别业务领域**：基于文档真实内容推断 KPI 目标。
+
+文档内容：
+{all_text}
 
 要求输出标准的 JSON，必须包含：
-1. "macro_context": "基于文档推断的宏观业务背景、核心 KPI 目标和战略方向"
+1. "macro_context": "基于文档内容的业务背景与战略方向"
 2. "tables": {{ "表名": {{ "desc": "业务含义", "cols": [{{ "name": "字段名", "type": "类型", "comment": "解释" }}] }} }}
-3. "relationships": [ {{ "source": "表A", "target": "表B", "on": "关联字段", "logic": "宏观业务流转逻辑" }} ]
+3. "relationships": [ {{ "source": "表A", "target": "表B", "on": "关联字段", "logic": "业务流转逻辑" }} ]
 4. "business_domains": {{ "领域名": ["相关表名"] }}
-
-即使文档中仅有数据字典，也请根据字段名推断其在宏观业务中的价值。
 """
         response = model_client.complete(prompt)
         try:
