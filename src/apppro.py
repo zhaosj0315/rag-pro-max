@@ -302,6 +302,119 @@ def enhanced_web_search(final_prompt, logger):
     except Exception as e:
         logger.error(f"❌ 联网搜索失败: {e}")
         return []
+
+def render_smart_visualization(df, query, msg_idx, stage_id, recommendation=None):
+    """
+    [v5.8.8] 极致可视化画板：提供 AI 智能推荐与多标签页手动切换功能。
+    """
+    import pandas as pd
+    import plotly.express as px
+    import plotly.graph_objects as go
+    from pandas.api.types import is_numeric_dtype
+    import time
+
+    if df.empty:
+        st.info("数据为空，无法生成图表")
+        return
+
+    # 1. 自动识别列类型
+    num_cols = [c for c in df.columns if is_numeric_dtype(df[c])]
+    cat_cols = [c for c in df.columns if c not in num_cols]
+    
+    if not num_cols:
+        st.caption("⚠️ 未检测到数值列，仅展示表格数据")
+        st.dataframe(df, use_container_width=True)
+        return
+
+    # 2. 标签页切换
+    tab_titles = ["🤖 AI 推荐", "📊 柱状图", "📈 折线图", "🍰 饼图", "📦 箱线图", "📋 数据表"]
+    tabs = st.tabs(tab_titles)
+    
+    # 修复 Key 冲突：增加随机或高精度时间戳
+    key_base = f"vis_{msg_idx}_{stage_id}_{int(time.time()*1000)}"
+
+    # --- Tab 0: AI 推荐 ---
+    with tabs[0]:
+        if recommendation:
+            viz_type = recommendation.get('viz_type', 'bar')
+            x_axis = recommendation.get('x_axis')
+            y_axis = recommendation.get('y_axis')
+            color = recommendation.get('color')
+            title = recommendation.get('title', 'AI 智能视图')
+            reason = recommendation.get('reason', '')
+            
+            st.caption(f"💡 **AI 建议**: {reason}")
+            
+            try:
+                fig = None
+                common = {"title": title, "template": "plotly_white"}
+                # 检查字段是否存在于当前数据框中
+                valid_x = x_axis if x_axis in df.columns else df.columns[0]
+                valid_y = []
+                if isinstance(y_axis, list):
+                    valid_y = [y for y in y_axis if y in df.columns]
+                elif y_axis in df.columns:
+                    valid_y = [y_axis]
+                
+                if not valid_y: valid_y = num_cols[:1]
+                
+                if color and color in df.columns: common["color"] = color
+                
+                if viz_type == 'bar': fig = px.bar(df, x=valid_x, y=valid_y, **common)
+                elif viz_type == 'line': fig = px.line(df, x=valid_x, y=valid_y, **common)
+                elif viz_type == 'pie': fig = px.pie(df, names=valid_x, values=valid_y[0], title=title)
+                elif viz_type == 'scatter': fig = px.scatter(df, x=valid_x, y=valid_y, **common)
+                elif viz_type == 'area': fig = px.area(df, x=valid_x, y=valid_y, **common)
+                elif viz_type == 'box': fig = px.box(df, x=valid_x, y=valid_y, **common)
+                elif viz_type == 'histogram': fig = px.histogram(df, x=valid_x, y=valid_y, **common)
+                
+                if fig: st.plotly_chart(fig, use_container_width=True, key=f"{key_base}_ai")
+                else: st.dataframe(df, use_container_width=True)
+            except Exception as e:
+                st.warning(f"AI 视图渲染失败，请切换至手动模式。")
+        else:
+            st.info("AI 推荐不可用，请选择其他图表类型。")
+
+    # --- Tab 1: 柱状图 ---
+    with tabs[1]:
+        c1, c2, c3 = st.columns(3)
+        x = c1.selectbox("X轴 (类别)", df.columns, key=f"{key_base}_bar_x")
+        y = c2.multiselect("Y轴 (数值)", num_cols, default=num_cols[:1], key=f"{key_base}_bar_y")
+        c = c3.selectbox("分组 (可选)", [None] + cat_cols, key=f"{key_base}_bar_c")
+        if x and y:
+            fig = px.bar(df, x=x, y=y, color=c, barmode="group", template="plotly_white")
+            st.plotly_chart(fig, use_container_width=True, key=f"{key_base}_bar_fig")
+
+    # --- Tab 2: 折线图 ---
+    with tabs[2]:
+        c1, c2 = st.columns(2)
+        x = c1.selectbox("X轴 (时间/序列)", df.columns, key=f"{key_base}_line_x")
+        y = c2.multiselect("Y轴 (指标)", num_cols, default=num_cols[:1], key=f"{key_base}_line_y")
+        if x and y:
+            fig = px.line(df, x=x, y=y, markers=True, template="plotly_white")
+            st.plotly_chart(fig, use_container_width=True, key=f"{key_base}_line_fig")
+
+    # --- Tab 3: 饼图 ---
+    with tabs[3]:
+        c1, c2 = st.columns(2)
+        names = c1.selectbox("分类字段", cat_cols if cat_cols else df.columns, key=f"{key_base}_pie_n")
+        values = c2.selectbox("数值字段", num_cols, key=f"{key_base}_pie_v")
+        if names and values:
+            fig = px.pie(df, names=names, values=values, hole=0.3, template="plotly_white")
+            st.plotly_chart(fig, use_container_width=True, key=f"{key_base}_pie_fig")
+
+    # --- Tab 4: 箱线图 ---
+    with tabs[4]:
+        c1, c2 = st.columns(2)
+        y = c1.selectbox("分析数值", num_cols, key=f"{key_base}_box_y")
+        x = c2.selectbox("分组字段 (可选)", [None] + cat_cols, key=f"{key_base}_box_x")
+        if y:
+            fig = px.box(df, x=x, y=y, points="all", template="plotly_white")
+            st.plotly_chart(fig, use_container_width=True, key=f"{key_base}_box_fig")
+
+    # --- Tab 5: 数据表 ---
+    with tabs[5]:
+        st.dataframe(df, use_container_width=True)
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.llms.ollama import Ollama
 from llama_index.llms.openai import OpenAI
@@ -2553,6 +2666,7 @@ if st.session_state.get('main_mode', 'rag') == 'sql':
                                                     viz_type = rec.get('viz_type', 'table')
                                                     x_axis = rec.get('x_axis')
                                                     y_axis = rec.get('y_axis')
+                                                    color = rec.get('color') # [v5.8.1] 支持分组/颜色维度
                                                     title = rec.get('title', '数据可视化')
                                                     reason = rec.get('reason', '')
                                                     
@@ -2563,21 +2677,48 @@ if st.session_state.get('main_mode', 'rag') == 'sql':
                                                         st.markdown(f"### {title}")
                                                         fig = None
                                                         
-                                                        if viz_type == 'bar':
-                                                            fig = px.bar(df, x=x_axis, y=y_axis, title=title)
-                                                        elif viz_type == 'line':
-                                                            fig = px.line(df, x=x_axis, y=y_axis, title=title)
-                                                        elif viz_type == 'pie':
-                                                            fig = px.pie(df, names=x_axis, values=y_axis if isinstance(y_axis, str) else y_axis[0], title=title)
-                                                        elif viz_type == 'scatter':
-                                                            fig = px.scatter(df, x=x_axis, y=y_axis, title=title)
-                                                        elif viz_type == 'area':
-                                                            fig = px.area(df, x=x_axis, y=y_axis, title=title)
-                                                        
-                                                        if fig:
-                                                            st.plotly_chart(fig, use_container_width=True)
-                                                        else:
-                                                            st.info("无法生成图表，展示原始数据")
+                                                        try:
+                                                            # 智能绘图参数组装
+                                                            common_args = {'title': title}
+                                                            if color and color in df.columns:
+                                                                common_args['color'] = color
+                                                            
+                                                            if viz_type == 'bar':
+                                                                fig = px.bar(df, x=x_axis, y=y_axis, **common_args)
+                                                            elif viz_type == 'line':
+                                                                fig = px.line(df, x=x_axis, y=y_axis, **common_args)
+                                                            elif viz_type == 'pie':
+                                                                fig = px.pie(df, names=x_axis, values=y_axis if isinstance(y_axis, str) else y_axis[0], title=title)
+                                                            elif viz_type == 'scatter':
+                                                                fig = px.scatter(df, x=x_axis, y=y_axis, **common_args)
+                                                            elif viz_type == 'area':
+                                                                fig = px.area(df, x=x_axis, y=y_axis, **common_args)
+                                                            elif viz_type == 'box':
+                                                                fig = px.box(df, x=x_axis, y=y_axis, **common_args)
+                                                            elif viz_type == 'histogram':
+                                                                fig = px.histogram(df, x=x_axis, y=y_axis, **common_args)
+                                                            elif viz_type == 'heatmap':
+                                                                # 热力图通常需要三个维度：x, y, z(color)
+                                                                if len(df.columns) >= 3:
+                                                                    z_axis = y_axis if isinstance(y_axis, str) else y_axis[0]
+                                                                    fig = px.density_heatmap(df, x=x_axis, y=color or df.columns[1], z=z_axis, title=title)
+                                                                else:
+                                                                    # 降级为表格
+                                                                    viz_type = 'table'
+                                                            
+                                                            if fig:
+                                                                st.plotly_chart(fig, use_container_width=True)
+                                                            else:
+                                                                st.info("AI 建议展示表格")
+                                                                
+                                                        except Exception as plot_err:
+                                                            logger.warning(f"高级绘图失败 ({viz_type}): {plot_err}，尝试降级为 Bar Chart")
+                                                            try:
+                                                                # 降级尝试：基础柱状图
+                                                                fig = px.bar(df, x=x_axis, y=y_axis, title=f"{title} (降级展示)")
+                                                                st.plotly_chart(fig, use_container_width=True)
+                                                            except:
+                                                                st.warning("无法生成图表，请查看上方数据表。")
                                                     
                                             except ImportError:
                                                 # 降级方案
@@ -2777,7 +2918,49 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
         status_container.update(label="❌ 路径无效", state="error")
         raise ValueError(f"路径无效: {current_target_path}")
 
-    # [v5.5.5] 全量物理归档：确保所有原始材料（PDF/Word/CSV等）永久留存
+    # --- [v5.7.2 修复] 执行顺序重构：先构建索引(创建目录)，再归档数据 ---
+    # 原有问题：IndexBuilder.build 在 NEW 模式下会清空目录，导致先归档的文件被删
+    
+    # 1. 预扫描 (用于 DA 模式判断和 Schema 提取)
+    try:
+        docs, _ = builder._read_documents(current_target_path, 0, None)
+    except:
+        docs = []
+
+    # 2. 判断是否启用数据分析模式 & 是否允许空文档
+    is_da_mode = st.session_state.get('is_data_analysis_mode', False)
+    
+    has_data_files = False
+    if os.path.exists(current_target_path):
+        import glob
+        if os.path.isdir(current_target_path):
+            has_csv = bool(glob.glob(os.path.join(current_target_path, "**/*.csv"), recursive=True))
+            has_xlsx = bool(glob.glob(os.path.join(current_target_path, "**/*.xlsx"), recursive=True))
+            has_data_files = has_csv or has_xlsx
+        elif current_target_path.endswith(('.csv', '.xlsx', '.xls')):
+            has_data_files = True
+
+    allow_empty_docs = is_da_mode or has_data_files
+
+    # 3. 执行标准构建 (RAG + Indexing)
+    # 注意：build() 在 NEW 模式下会清空 persist_dir，所以必须先执行
+    try:
+        result = builder.build(
+            source_path=current_target_path,
+            force_reindex=force_reindex,
+            action_mode=action_mode,
+            status_callback=status_callback
+        )
+    except Exception as e:
+        if allow_empty_docs:
+            # 数据分析模式允许 RAG 读取失败
+            logger.warning(f"RAG索引构建跳过(数据分析模式): {e}")
+            from src.processors.index_builder import BuildResult
+            result = BuildResult(True, None, 0, 0, 0)
+        else:
+            raise e
+
+    # 4. [v5.5.5] 全量物理归档 (必须在 build 之后)
     try:
         raw_sources_dir = os.path.join(persist_dir, "raw_sources")
         if not os.path.exists(raw_sources_dir):
@@ -2800,10 +2983,8 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
     except Exception as e:
         logger.warning(f"⚠️ 原始文件归档失败: {e}")
 
-    # --- 核心增强：数据分析 5.0 业务推演 ---
-    is_da_mode = st.session_state.get('is_data_analysis_mode', False)
-    
-    # 扫描数据文件用于建模 (CSV/XLSX/MD)
+    # 5. 数据分析引擎处理 (必须在归档之后)
+    # 扫描归档后的文件
     import glob
     data_files = []
     if os.path.exists(raw_sources_dir):
@@ -2825,8 +3006,7 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
             logger.info(f"👉 {msg}")
         
         if data_files:
-             # [v5.7.0] 核心修复：始终处理数据文件以确保数据一致性 (覆盖追加/更新场景)
-             # 原有的 Idempotency Check (if not os.path.exists) 会导致追加文件时不更新 DB
+             # [v5.7.0] 核心修复：始终处理数据文件以确保数据一致性
              status_container.write(f"📊 检测到 {len(data_files)} 个业务源文件，正在执行物理归档与战略建模...")
              logger.info(f"📊 [Strategic Workshop] 检测到 {len(data_files)} 个业务源文件，启动战略建模...")
              res = da_engine.process_files(data_files, llm, status_callback=kb_status_callback)
@@ -2834,10 +3014,7 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
                  status_container.success(f"✅ 战略大脑初始化完成 (已归档并导入 {len(res['tables'])} 张表)")
                  logger.success(f"✅ [Strategic Workshop] 战略大脑初始化完成 (已导入 {len(res['tables'])} 张表)")
 
-        # 1. 执行 RAG 预扫描以获取文本（用于非结构化建模）
-        docs, _ = builder._read_documents(current_target_path, 0, None)
-        
-        # 2. 深度 Schema 建模 (核心升级：从文档推导演算法)
+        # Schema 建模 (使用之前读取的 docs)
         if docs:
             status_container.write("🧠 正在执行深度业务语义建模...")
             logger.info("🧠 [Strategic Workshop] 正在从源材料中提取业务元模型与逻辑通路...")
@@ -2848,7 +3025,7 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
                 with open(da_engine.schema_path, 'r') as f:
                     schemas = json.load(f)
         
-            # 3. 业务蓝图推演
+            # 业务蓝图
             status_container.write("🌐 正在构建业务全景图与关联路径...")
             blueprint = da_engine.infer_business_blueprint(schemas, llm)
             scenario = blueprint.get('business_scenario', '未知业务')
@@ -2857,25 +3034,6 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
         
         status_container.write("✅ 业务语义建模已就绪")
         logger.success("✨ [Strategic Workshop] 全域业务语义建模就绪")
-        allow_empty_docs = True
-    else:
-        allow_empty_docs = False
-
-    # 执行标准处理 (RAG + Indexing)
-    try:
-        result = builder.build(
-            source_path=current_target_path,
-            force_reindex=force_reindex,
-            action_mode=action_mode,
-            status_callback=status_callback
-        )
-    except Exception as e:
-        if allow_empty_docs:
-            # 数据分析模式允许 RAG 读取失败
-            logger.warning(f"RAG索引构建跳过(数据分析模式): {e}")
-            result = BuildResult(True, None, 0, 0, 0)
-        else:
-            raise e
     
     # --- 补丁: 写入所有权信息与模型对齐 ---
     try:
@@ -4998,90 +5156,19 @@ for msg_idx, msg in enumerate(state.get_messages()):
                             # C. 查询后：结果产出
                             st.markdown("**3. 查询后：汇聚结果表 (After)**")
                             import pandas as pd
-                            import plotly.express as px
-                            import time
                             df_h = pd.DataFrame(stage_h["data"])
                             
                             if not df_h.empty:
-                                st.dataframe(df_h, use_container_width=True)
-                                
-                                # --- 可视化画板 (Smart Vis - History Port) ---
-                                st.markdown("---")
-                                
-                                # 1. 智能列识别
-                                from pandas.api.types import is_numeric_dtype
-                                dim_col, metric_col = None, None
-                                
-                                # 寻找指标列
-                                for col in reversed(df_h.columns):
-                                    if is_numeric_dtype(df_h[col]):
-                                        metric_col = col
-                                        break
-                                
-                                # 寻找维度列
-                                for col in df_h.columns:
-                                    if col != metric_col:
-                                        dim_col = col
-                                        break
-                                if not dim_col and len(df_h.columns) > 0: dim_col = df_h.columns[0]
-                                
-                                # 2. 渲染逻辑 (Restore Quality)
-                                if metric_col:
-                                    h_key_base = f"hist_{msg_idx}_{m_h['stage_id']}_{time.time()}"
-                                    
-                                    # Case A: 单一数值
-                                    if len(df_h) == 1:
-                                        cols = st.columns(len(df_h.columns))
-                                        for idx, c in enumerate(df_h.columns):
-                                            if is_numeric_dtype(df_h[c]):
-                                                cols[idx].metric(label=c, value=df_h.iloc[0][c])
-                                            else:
-                                                cols[idx].markdown(f"**{c}**\n\n{df_h.iloc[0][c]}")
-                                    else:
-                                        # Case B: 图表渲染 (Smart Vis Logic)
-                                        import plotly.graph_objects as go
-                                        
-                                        # 预计算
-                                        is_time_series = any(x in str(dim_col).lower() for x in ['date', 'time', 'day', 'month', 'year', 'period', '日期', '时间']) or \
-                                                         pd.api.types.is_datetime64_any_dtype(df_h[dim_col])
-                                        cardinality = df_h[dim_col].nunique()
-                                        has_negative = (df_h[metric_col] < 0).any()
-                                        is_waterfall_context = any(x in str(df_h[dim_col].values).lower() for x in ['total', 'net', 'sum']) or \
-                                                               any(x in metric_col.lower() for x in ['delta', 'change', 'diff', '增长', '变动', '差异'])
-                                        
-                                        aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA']
-
-                                        if is_waterfall_context and len(df_h) > 1:
-                                            fig = go.Figure(go.Waterfall(
-                                                name = "归因", orientation = "v",
-                                                measure = ["relative"] * (len(df_h)-1) + ["total"],
-                                                x = df_h[dim_col],
-                                                textposition = "outside",
-                                                text = [f"{v:+}" if isinstance(v, (int, float)) else v for v in df_h[metric_col]],
-                                                y = df_h[metric_col],
-                                                connector = {"line":{"color":"rgb(63, 63, 63)"}},
-                                            ))
-                                            fig.update_layout(title=f"🌊 {metric_col} (归因分析)", template="plotly_white")
-                                            st.plotly_chart(fig, use_container_width=True, key=f"{h_key_base}_waterfall")
-                                        
-                                        elif is_time_series:
-                                            fig = px.area(df_h, x=dim_col, y=metric_col, title=f"📈 {metric_col} (趋势)", template="plotly_white")
-                                            st.plotly_chart(fig, use_container_width=True, key=f"{h_key_base}_area")
-                                        
-                                        elif cardinality > 8:
-                                            fig = px.bar(df_h.sort_values(metric_col, ascending=True), 
-                                                         x=metric_col, y=dim_col, orientation='h',
-                                                         title=f"🏆 {metric_col} (排名)", template="plotly_white")
-                                            st.plotly_chart(fig, use_container_width=True, key=f"{h_key_base}_bar_h")
-                                            
-                                        else:
-                                            fig = px.bar(df_h, x=dim_col, y=metric_col, 
-                                                         title=f"📊 {metric_col} (对比)", template="plotly_white",
-                                                         color_discrete_sequence=aurora_colors)
-                                            st.plotly_chart(fig, use_container_width=True, key=f"{h_key_base}_bar")
-                                else:
-                                    st.caption("⚠️ 未检测到数值列，仅展示表格数据")
-
+                                # 使用全功能可视化画板 [v5.8.8]
+                                render_smart_visualization(
+                                    df=df_h, 
+                                    query=m_h['title'], 
+                                    msg_idx=msg_idx, 
+                                    stage_id=m_h['stage_id'], 
+                                    recommendation=stage_h.get("recommendation")
+                                )
+                            else:
+                                st.info("该阶段未产出数据结果")
                             if stage_h.get("is_simulated"):
                                 st.info("✨ 此阶段基于业务模型仿真推演")
 
@@ -6221,108 +6308,18 @@ if st.session_state.get('is_processing') and final_prompt:
                                             # C. 查询后：结果产出
                                             st.markdown("**3. 查询后：汇聚结果表 (After)**")
                                             import pandas as pd
-                                            import plotly.express as px
                                             df_s = pd.DataFrame(stage["data"])
                                             if not df_s.empty:
-                                                st.dataframe(df_s, use_container_width=True)
-                                                
-                                                # --- 可视化画板 (Smart Vis) ---
-                                                st.markdown("---")
-                                                
-                                                # 1. 智能列识别
-                                                from pandas.api.types import is_numeric_dtype
-                                                dim_col, metric_col = None, None
-                                                
-                                                # 寻找指标列 (Metric): 优先找最后一个数值列
-                                                for col in reversed(df_s.columns):
-                                                    if is_numeric_dtype(df_s[col]):
-                                                        metric_col = col
-                                                        break
-                                                
-                                                # 寻找维度列 (Dimension): 优先找第一个非数值列，如果没有则取第一个列
-                                                for col in df_s.columns:
-                                                    if col != metric_col:
-                                                        dim_col = col
-                                                        break
-                                                if not dim_col and len(df_s.columns) > 0: dim_col = df_s.columns[0]
-                                                
-                                                # 2. 渲染逻辑
-                                                if metric_col:
-                                                    # Case A: 单一数值 -> 指标卡 (Bento Style)
-                                                    if len(df_s) == 1:
-                                                        cols = st.columns(len(df_s.columns))
-                                                        for idx, c in enumerate(df_s.columns):
-                                                            if is_numeric_dtype(df_s[c]):
-                                                                cols[idx].metric(label=c, value=df_s.iloc[0][c])
-                                                            else:
-                                                                cols[idx].markdown(f"**{c}**\n\n{df_s.iloc[0][c]}")
-                                                    else:
-                                                        # Case B: 图表渲染
-                                                        # [v6.1 Smart Vis] 智能图表多态路由引擎
-                                                        import plotly.graph_objects as go
-                                                        import plotly.express as px
-                                                        
-                                                        # 1. 预计算特征
-                                                        is_time_series = any(x in str(dim_col).lower() for x in ['date', 'time', 'day', 'month', 'year', 'period', '日期', '时间']) or \
-                                                                         pd.api.types.is_datetime64_any_dtype(df_s[dim_col])
-                                                        cardinality = df_s[dim_col].nunique()
-                                                        has_negative = (df_s[metric_col] < 0).any()
-                                                        
-                                                        # 2. 瀑布图路由 (Waterfall): 明确的增减/差异语境
-                                                        is_waterfall_context = any(x in str(df_s[dim_col].values).lower() for x in ['total', 'net', 'sum']) or \
-                                                                               any(x in metric_col.lower() for x in ['delta', 'change', 'diff', '增长', '变动', '差异'])
-                                                        
-                                                        chart_key = f"viz_{meta['stage_id']}_{time.time()}"
-                                                        aurora_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A', '#19D3F3', '#FF6692', '#B6E880']
-                                                        
-                                                        if is_waterfall_context and len(df_s) > 1:
-                                                            # 🌊 瀑布图: 强调归因
-                                                            fig = go.Figure(go.Waterfall(
-                                                                name = "归因", orientation = "v",
-                                                                measure = ["relative"] * (len(df_s)-1) + ["total"],
-                                                                x = df_s[dim_col],
-                                                                textposition = "outside",
-                                                                text = [f"{v:+}" if isinstance(v, (int, float)) else v for v in df_s[metric_col]],
-                                                                y = df_s[metric_col],
-                                                                connector = {"line":{"color":"rgb(63, 63, 63)"}},
-                                                            ))
-                                                            fig.update_layout(title=f"🌊 {metric_col} (归因分析)", template="plotly_white")
-                                                            st.plotly_chart(fig, use_container_width=True, key=chart_key)
-                                                            
-                                                        elif is_time_series:
-                                                            # 📈 面积图: 强调趋势与累积
-                                                            fig = px.area(df_s, x=dim_col, y=metric_col, title=f"📈 {metric_col} (趋势)", 
-                                                                          template="plotly_white", markers=True)
-                                                            fig.update_traces(line_color='#636EFA', fillcolor='rgba(99, 110, 250, 0.2)')
-                                                            st.plotly_chart(fig, use_container_width=True, key=chart_key)
-                                                            
-                                                        elif cardinality > 8:
-                                                            # 📊 水平条形图: 强调排名 (避免X轴标签拥挤)
-                                                            fig = px.bar(df_s.sort_values(metric_col, ascending=True), 
-                                                                         x=metric_col, y=dim_col, orientation='h',
-                                                                         title=f"🏆 {metric_col} (排名)", template="plotly_white",
-                                                                         text_auto='.2s')
-                                                            fig.update_traces(marker_color='#00CC96')
-                                                            st.plotly_chart(fig, use_container_width=True, key=chart_key)
-                                                            
-                                                        elif len(df_s) <= 5 and not has_negative:
-                                                            # 🍩 环形图: 强调占比 (仅当数据少且无负数时)
-                                                            fig = px.pie(df_s, names=dim_col, values=metric_col, hole=0.5,
-                                                                         title=f"🍰 {metric_col} (占比)", template="plotly_white",
-                                                                         color_discrete_sequence=aurora_colors)
-                                                            fig.update_traces(textposition='inside', textinfo='percent+label')
-                                                            st.plotly_chart(fig, use_container_width=True, key=chart_key)
-                                                            
-                                                        else:
-                                                            # 📊 默认柱状图: 强调对比
-                                                            fig = px.bar(df_s, x=dim_col, y=metric_col, 
-                                                                         title=f"📊 {metric_col} (对比)", template="plotly_white",
-                                                                         color_discrete_sequence=aurora_colors, text_auto='.2s')
-                                                            st.plotly_chart(fig, use_container_width=True, key=chart_key)
-
-                                                else:
-                                                    st.caption("⚠️ 未检测到数值列，仅展示表格数据")
-                                        
+                                                # 使用全功能可视化画板 [v5.8.8]
+                                                render_smart_visualization(
+                                                    df=df_s, 
+                                                    query=meta['title'], 
+                                                    msg_idx=999, 
+                                                    stage_id=meta['stage_id'], 
+                                                    recommendation=stage.get("recommendation")
+                                                )
+                                            else:
+                                                st.info("该阶段未产出数据结果")
                                             if stage.get("is_simulated"):
                                                 st.warning("✨ 本阶段结果基于战略业务模型仿真得出")
 

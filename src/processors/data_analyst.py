@@ -217,21 +217,27 @@ class DataAnalystEngine:
 数据列: {columns}
 数据样本 (前3行): {json.dumps(sample_data[:3], ensure_ascii=False, default=str)}
 
-请从以下类型中选择一种: ["bar", "line", "pie", "scatter", "area", "table"]
-- bar: 适合比较不同类别的数值 (如: 各部门人数)。
-- line: 适合展示时间序列数据的趋势 (如: 销售额随时间变化)。
-- pie: 适合展示部分占整体的比例 (如: 市场份额)。
-- scatter: 适合展示两个变量之间的相关性。
-- area: 适合展示累积趋势。
-- table: 如果数据不适合绘图或仅为文本列表。
+请深入分析数据特征（类别型、数值型、时间序列）和查询意图（对比、分布、趋势、占比），从以下类型中选择一种最能洞察数据的图表: 
+["bar", "line", "pie", "scatter", "area", "box", "histogram", "heatmap", "table"]
+
+- **bar (柱状图)**: 适合比较不同类别的数值大小。
+- **line (折线图)**: 适合展示连续时间序列的趋势变化。
+- **pie (饼图)**: 适合展示部分占整体的比例（当类别较少时）。
+- **scatter (散点图)**: 适合展示两个数值变量之间的相关性或分布模式。
+- **area (面积图)**: 适合展示累积趋势或部分与整体的关系。
+- **box (箱线图)**: 适合展示数据的分布情况、中位数及异常值（需要多个数值点）。
+- **histogram (直方图)**: 适合展示单一数值变量的频率分布。
+- **heatmap (热力图)**: 适合展示两个维度交叉的数值强度（如：时间x类别的销售额）。
+- **table (表格)**: 仅当数据无法有效可视化或需要精确数值时使用。
 
 请返回标准 JSON 格式:
 {{
   "viz_type": "推荐的图表类型",
-  "x_axis": "X轴字段名 (如果适用)",
-  "y_axis": "Y轴字段名 (如果是多系列，可以是字段名列表)",
-  "title": "图表标题",
-  "reason": "推荐理由"
+  "x_axis": "X轴字段名 (主要分类维度)",
+  "y_axis": "Y轴字段名 (主要数值指标，多系列可用列表)",
+  "color": "分组/颜色字段名 (可选，用于区分不同系列或层级)",
+  "title": "图表标题 (简洁概括)",
+  "reason": "推荐理由 (解释为什么这个图表比其他更适合)"
 }}
 """
         try:
@@ -296,38 +302,50 @@ class DataAnalystEngine:
         for i, meta in enumerate(stages_meta):
             if status_callback: status_callback(f"⚙️ [Stage {meta['stage_id']}/{len(stages_meta)}] 正在构建: {meta['title']} (生成SQL中...)")
             analysis_path = meta.get('transformation', meta.get('title', '业务逻辑推演'))
-            # [v5.2.6] SQL 生成指令优化：调整输出顺序优先级 (DataWorks > Standard > SQLite)
+            
+            # [v5.8.5] 增强型上下文注入：提供表采样数据，帮助 AI 生成准确的过滤条件
+            sample_context = ""
+            for t_name in relevant_table_names:
+                s_res = self.execute_sql(f"SELECT * FROM {t_name} LIMIT 2")
+                if s_res["success"] and s_res["data"]:
+                    sample_context += f"- 表 '{t_name}' 数据样例: {json.dumps(s_res['data'], ensure_ascii=False)}\n"
+
             sql_prompt = f"""
 基于分析路径："{analysis_path}"，请编写高度可读、带有详细业务注释的多方言 SQL。
 业务背景：{pruned_schemas['macro_context']}
 模型：{json.dumps(pruned_schemas['tables'], ensure_ascii=False)}
+数据样例（请参考真实的时间格式、状态值等）：
+{sample_context}
 
 要求：
 1. **严格限制表名**：
-   - **绝对禁止**使用模型中不存在的表名（如 monitoring_discounts, temp_analysis 等）。
+   - **绝对禁止**使用模型中不存在的表名。
    - **仅允许**使用上述【模型】JSON 中明确定义的 key 作为表名。
    - 如果需要中间结果，请使用 Common Table Expression (WITH clause)。
 2. **必须包含详细的行级注释**：
    - 使用 '--' 解释每一段核心逻辑（如 FILTER, JOIN, AGGREGATE）。
-   - 说明为什么要关联这张表（如 "关联订单表获取交易金额"）。
+   - 说明为什么要关联这张表。
    - 解释复杂的计算公式背后的业务含义。
 3. **严谨的 SQL 语法**：
    - **SQLite 版本特别约束**：
-     - **严禁使用 QUALIFY** 关键字 (SQLite 不支持 Window Filter，请使用子查询)。
-     - **严禁使用 ? 占位符** (所有变量必须在 SQL 中直接展开为字面量，如 '2023-01-01')。
-     - 支持多语句脚本 (Script Mode)。
+     - **严禁使用 QUALIFY** 关键字。
+     - **严禁使用 ? 占位符** (所有变量必须在 SQL 中直接展开为字面量)。
      - 字段名若包含特殊字符请使用双引号包裹。
-4. 返回一个 JSON 对象，包含三个字段（注意顺序）：
+4. 返回一个 JSON 对象，包含三个字段：
    - "dataworks": "生产环境 SQL (MaxCompute语法)，必须包含 ${{bizdate}} 变量"
    - "standard": "标准 ANSI SQL (用于通用数据库验证)"
    - "sqlite": "本地验证 SQL (用于当前环境执行)"
 
 仅返回 JSON，不要有其他解释。"""
             
+            # ... (原有 sqls 获取代码) ...
             sqls = {"dataworks": "", "standard": "", "sqlite": ""}
             try:
                 sql_res = model_client.complete(sql_prompt).text
-                sqls = json.loads(sql_res.strip().replace("```json", "").replace("```", ""))
+                import re
+                json_match = re.search(r'(\{.*\})', sql_res, re.DOTALL)
+                if json_match:
+                    sqls = json.loads(json_match.group(1))
                 if status_callback: status_callback(f"✅ SQL生成完毕 (覆盖 {len(sqls)} 种方言)")
             except: 
                 if status_callback: status_callback("⚠️ SQL生成异常，将使用空模板")
@@ -337,25 +355,44 @@ class DataAnalystEngine:
             is_simulated = False
             source_samples = {}
             
-            for t_name in relevant_table_names:
-                s_res = self.execute_sql(f"SELECT * FROM {t_name} LIMIT 3")
-                if s_res["success"] and s_res["data"]:
-                    source_samples[t_name] = s_res["data"]
-                else:
-                    source_samples[t_name] = [{"info": f"正在基于 {t_name} 模型进行逻辑模拟..."}]
+            # [v5.8.5] 获取现有表清单用于精准冲突判定
+            conn_check = sqlite3.connect(self.db_path)
+            cursor_check = conn_check.cursor()
+            cursor_check.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            existing_tables_set = {row[0].lower() for row in cursor_check.fetchall()}
+            conn_check.close()
 
             if sqls.get("sqlite"):
-                # [v5.7.1] 引入智能自愈执行机制
+                # 执行查询
                 execution_res = self.execute_sql(sqls["sqlite"], model_client=model_client)
-                
-                # [v5.6.5] 增加 SQL 执行透明度日志
                 row_count = len(execution_res.get("data", []))
+                
                 if execution_res["success"]:
                     if status_callback: status_callback(f"⚡ [Stage {meta['stage_id']}] SQL执行成功, 命中 {row_count} 行数据")
                 else:
                     if status_callback: status_callback(f"⚠️ [Stage {meta['stage_id']}] SQL执行失败: {execution_res.get('error', 'unknown')}")
 
-                if not execution_res["success"] or not execution_res["data"]:
+                # [v5.8.5] 核心冲突修复：只有在表确实不存在或为虚拟表时才启动仿真
+                # 如果表存在但查询结果为 0，视为真实业务结论，不再“乱投医”进行仿真
+                should_simulate = False
+                if not execution_res["success"]:
+                    should_simulate = True # 执行失败且无法修复，启用仿真保底
+                else:
+                    if row_count == 0:
+                        # 检查涉及到的表是否在数据库中
+                        # 简单正则提取表名
+                        tables_in_sql = re.findall(r'FROM\s+([a-zA-Z0-9_]+)|JOIN\s+([a-zA-Z0-9_]+)', sqls["sqlite"], re.I)
+                        flat_tables = [t for group in tables_in_sql for t in group if t]
+                        
+                        missing_any = any(t.lower() not in existing_tables_set for t in flat_tables)
+                        if missing_any:
+                            should_simulate = True # 确实缺表，需要仿真
+                        else:
+                            should_simulate = False # 表都在，只是没查到数据，保持现状
+                    else:
+                        should_simulate = False # 查到数据了，不仿真
+
+                if should_simulate:
                     is_simulated = True
                     if status_callback: status_callback(f"🎲 [Stage {meta['stage_id']}] 本地数据不足，启动战略仿真模式 (生成虚拟趋势数据)...")
                     sim_prompt = f"""【战略仿真模式】为阶段：{meta['title']} 制造 10 条反映宏观趋势的“黄金模拟数据”。
@@ -364,12 +401,10 @@ class DataAnalystEngine:
 表结构：{json.dumps(pruned_schemas['tables'], ensure_ascii=False)}
 
 要求：
-1. 数据必须逻辑闭环（如：金额必须符合业务常识，日期要有连续性）。
-2. **宏观特征**：模拟出的数据应包含 1-2 处“异常点”或“显著趋势”，以供战略分析使用。
-3. 仅返回 JSON 数组格式。"""
+1. 数据必须逻辑闭环。
+2. 仅返回 JSON 数组格式。"""
                     try:
                         sim_out = model_client.complete(sim_prompt).text
-                        import re
                         json_match = re.search(r'(\[.*\])', sim_out, re.DOTALL)
                         if json_match: execution_res = {"success": True, "data": json.loads(json_match.group(1))}
                     except: pass
@@ -381,6 +416,19 @@ class DataAnalystEngine:
                 "source_samples": source_samples,
                 "is_simulated": is_simulated
             }
+            
+            # [v5.8.8] 智能可视化预推荐：在执行阶段就生成建议，减少 UI 延迟
+            if execution_res.get("success") and execution_res.get("data"):
+                try:
+                    df_temp = pd.DataFrame(execution_res["data"])
+                    stage_entry["recommendation"] = self.recommend_visualization(
+                        query=meta["title"],
+                        columns=df_temp.columns.tolist(),
+                        sample_data=df_temp.head(3).to_dict(orient='records'),
+                        model_client=model_client
+                    )
+                except:
+                    stage_entry["recommendation"] = {"viz_type": "table", "reason": "预推荐生成失败"}
             final_stages_data.append(stage_entry)
             rows_count = len(stage_entry['data'])
             if status_callback: status_callback(f"📊 [Stage {meta['stage_id']}] 阶段完成: 产出 {rows_count} 条结论数据")
@@ -510,7 +558,7 @@ class DataAnalystEngine:
                         error_msg = str(step_error).lower()
                         
                         # 仅在模型可用且错误类型可修复时触发
-                        is_fixable = any(k in error_msg for k in ["syntax", "bindings", "no such column", "qualify", "unrecognized token"])
+                        is_fixable = any(k in error_msg for k in ["syntax", "bindings", "no such column", "qualify", "unrecognized token", "order by"])
                         
                         if is_fixable and model_client:
                             if self.logger: self.logger.warning(f"🔧 SQL执行报错，尝试自动修复: {error_msg}")
@@ -594,6 +642,8 @@ Constraint:
         """
         import re
         try:
+            if self.logger: self.logger.info(f"🏗️ 开始构建业务数据库: {self.db_path}")
+            
             if os.path.exists(self.db_path): os.remove(self.db_path)
             conn = sqlite3.connect(self.db_path)
             
@@ -612,6 +662,8 @@ Constraint:
                 table_name = re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', table_name)
                 
                 try:
+                    if self.logger: self.logger.info(f"📥 正在导入表 '{table_name}' (来源: {file_name})...")
+                    
                     if file_name.endswith('.csv'): df = pd.read_csv(file_path)
                     elif file_name.endswith(('.xls', '.xlsx')): df = pd.read_excel(file_path)
                     else: continue
@@ -619,14 +671,26 @@ Constraint:
                     df.columns = [re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', str(c)) for c in df.columns]
                     df.to_sql(table_name, conn, index=False, if_exists='replace')
                     
+                    # [v5.8.1] 立即验证导入结果
+                    row_count = conn.execute(f"SELECT count(*) FROM {table_name}").fetchone()[0]
+                    msg = f"✅ 表 '{table_name}' 构建完成，包含 {row_count} 行数据"
+                    if self.logger: self.logger.success(msg)
+                    if status_callback: status_callback(msg)
+                    
                     physical_tables[table_name] = {
                         "source": file_name,
                         "columns": [{"name": c, "type": str(t)} for c, t in df.dtypes.items()]
                     }
                 except Exception as e:
-                    if self.logger: self.logger.warning(f"物理表 {file_name} 解析跳过: {e}")
+                    err_msg = f"❌ 物理表 {file_name} 解析失败: {e}"
+                    if self.logger: self.logger.warning(err_msg)
+                    if status_callback: status_callback(err_msg)
             
             conn.close()
+            
+            final_msg = f"🏁 数据库构建结束。共生成 {len(physical_tables)} 张业务表。"
+            if self.logger: self.logger.info(final_msg)
+            if status_callback: status_callback(final_msg)
 
             unified_schema = {"tables": physical_tables, "macro_context": "通用业务分析", "relationships": []}
             
