@@ -187,6 +187,8 @@ def render_admin_management():
         st.caption("全量物理资产审计与治理：监控磁盘占用、所有权移交及深度清理")
         from src.config.manifest_manager import ManifestManager
         kb_storage_root = os.path.join(os.getcwd(), "vector_db_storage")
+        
+        # 1. 数据采集与状态同步
         asset_data = []
         for kb in all_kbs:
             kb_path = os.path.join(kb_storage_root, kb)
@@ -199,8 +201,12 @@ def render_admin_management():
                         total_size += os.path.getsize(os.path.join(root, f))
                         file_count += 1
             except: pass
+            
+            # 使用 session_state 维持选中状态 (支持跨筛选保留)
+            is_selected = st.session_state.get(f"asset_sel_{kb}", False)
+            
             asset_data.append({
-                "☑️ 选择": False,
+                "☑️ 选择": is_selected,
                 "知识库名称": kb, 
                 "所有人": manifest.get('owner', 'admin'), 
                 "文件数": file_count, 
@@ -208,16 +214,72 @@ def render_admin_management():
                 "raw_size": total_size
             })
 
-        if asset_data:
-            df_assets = pd.DataFrame(asset_data)
-            edited_df = st.data_editor(df_assets[["☑️ 选择", "知识库名称", "所有人", "文件数", "格式化大小"]], use_container_width=True, hide_index=True, key="asset_manager_editor")
+        # 2. 筛选区域
+        with st.container(border=True):
+            st.markdown("**🔍 资产筛选**")
+            f_col1, f_col2 = st.columns([1, 1.5])
+            with f_col1:
+                search_asset = st.text_input("按名称搜索", placeholder="输入知识库名称...", key="search_asset_input")
+            with f_col2:
+                all_owners = sorted(list(set([d['所有人'] for d in asset_data]))) if asset_data else []
+                filter_owners = st.multiselect("按所有人筛选", options=all_owners, key="filter_asset_owner")
+
+        # 3. 执行筛选
+        filtered_data = []
+        for item in asset_data:
+            if filter_owners and item['所有人'] not in filter_owners:
+                continue
+            if search_asset and search_asset.lower() not in item['知识库名称'].lower():
+                continue
+            filtered_data.append(item)
+
+        # 4. 批量操作工具栏
+        if filtered_data:
+            st.markdown(f"📊 **共找到 {len(filtered_data)} 个资产**")
             
-            selected_kbs = edited_df[edited_df["☑️ 选择"] == True]["知识库名称"].tolist()
+            # 全选/反选逻辑
+            sel_col1, sel_col2, sel_col3 = st.columns([1, 1, 4])
+            with sel_col1:
+                if st.button("✅ 全选列表", use_container_width=True, help="选中下方列表中的所有知识库"):
+                    for item in filtered_data:
+                         st.session_state[f"asset_sel_{item['知识库名称']}"] = True
+                    st.rerun()
+            with sel_col2:
+                if st.button("❌ 取消选择", use_container_width=True):
+                    for item in asset_data: # 清除所有，不仅仅是筛选后的
+                         st.session_state[f"asset_sel_{item['知识库名称']}"] = False
+                    st.rerun()
+            
+            # 更新数据源的选中状态 (确保 DataEditor 显示最新状态)
+            for item in filtered_data:
+                item['☑️ 选择'] = st.session_state.get(f"asset_sel_{item['知识库名称']}", False)
+
+            # 5. 数据表格
+            df_assets = pd.DataFrame(filtered_data)
+            
+            # 使用 key 确保 data_editor 更新时能回写
+            edited_df = st.data_editor(
+                df_assets[["☑️ 选择", "知识库名称", "所有人", "文件数", "格式化大小"]], 
+                use_container_width=True, 
+                hide_index=True, 
+                key="asset_manager_editor_v2",
+                disabled=["知识库名称", "所有人", "文件数", "格式化大小"]
+            )
+            
+            # 获取选中的项 (合并 session_state 和 手动编辑的结果)
+            # 注意：此处优先信任 edited_df，因为它是用户当前看到的最终状态
+            selected_rows = edited_df[edited_df["☑️ 选择"] == True]
+            selected_kbs = selected_rows["知识库名称"].tolist()
+            
+            # 6. 批量动作区域
             if selected_kbs:
-                st.write(f"**⚡ 批量治理 ({len(selected_kbs)} 项)**")
+                st.divider()
+                st.write(f"**⚡ 已选择 {len(selected_kbs)} 项进行操作**")
+                
                 ac1, ac2 = st.columns([2, 1])
-                target_owner = ac1.selectbox("选择接收者", options=list(users.keys()))
-                if ac2.button("👤 移交所有权", type="primary", use_container_width=True):
+                target_owner = ac1.selectbox("选择接收者", options=list(users.keys()), key="batch_asset_transfer_owner")
+                
+                if ac2.button("👤 批量移交所有权", type="primary", use_container_width=True):
                     for k in selected_kbs:
                         kp = os.path.join(kb_storage_root, k)
                         mf = ManifestManager.load(kp); mf['owner'] = target_owner
@@ -225,14 +287,41 @@ def render_admin_management():
                     AuditLogger.log(st.session_state.get('user'), "BATCH_TRANSFER", f"将 {len(selected_kbs)} 个库移交给 {target_owner}", ip=get_client_ip())
                     st.success("移交成功"); st.rerun()
                 
-                if st.button("🚨 物理删除资产包 (危险)", use_container_width=True):
-                    import shutil
-                    for k in selected_kbs: 
-                        shutil.rmtree(os.path.join(kb_storage_root, k))
-                        if os.path.exists(f"chat_histories/{k}.json"): os.remove(f"chat_histories/{k}.json")
-                    AuditLogger.log(st.session_state.get('user'), "BATCH_DELETE", f"物理删除了 {len(selected_kbs)} 个知识库资产", status="failed", ip=get_client_ip())
-                    st.rerun()
-        else: st.info("暂无物理资产数据")
+                # 危险操作区
+                with st.expander("🚨 危险操作区域 (物理删除)", expanded=False):
+                    st.warning("⚠️ 注意：物理删除操作不可恢复！将永久删除知识库文件和聊天记录。")
+                    if st.button("🗑️ 物理删除选中资产", use_container_width=True, type="secondary"):
+                         st.session_state.confirm_batch_delete = True
+                    
+                    if st.session_state.get("confirm_batch_delete"):
+                        st.error(f"❌ 确定要永久删除这 {len(selected_kbs)} 个知识库吗？")
+                        col_d1, col_d2 = st.columns(2)
+                        if col_d1.button("🔥 确认删除", type="primary", use_container_width=True):
+                            import shutil
+                            success_count = 0
+                            for k in selected_kbs: 
+                                try:
+                                    shutil.rmtree(os.path.join(kb_storage_root, k))
+                                    if os.path.exists(f"chat_histories/{k}.json"): os.remove(f"chat_histories/{k}.json")
+                                    # 清除选中状态
+                                    st.session_state[f"asset_sel_{k}"] = False
+                                    success_count += 1
+                                except Exception as e:
+                                    st.error(f"删除 {k} 失败: {e}")
+                            
+                            AuditLogger.log(st.session_state.get('user'), "BATCH_DELETE", f"物理删除了 {success_count} 个知识库资产", status="warning", ip=get_client_ip())
+                            del st.session_state.confirm_batch_delete
+                            st.rerun()
+                        
+                        if col_d2.button("取消", use_container_width=True):
+                            del st.session_state.confirm_batch_delete
+                            st.rerun()
+
+        else:
+            if asset_data:
+                st.info("🔍 未找到匹配的资产，请调整筛选条件")
+            else:
+                st.info("暂无物理资产数据")
 
     # --- Tab 4: 角色定义 ---
     with tab_roles:

@@ -374,9 +374,11 @@ class DataAnalystEngine:
    - 如果数据是仿真的，必须在显著位置标注：“⚠️ 极光战略沙盘模拟”。
 
 报告模块结构：
-### 💎 核心洞察 (North Star Insight)
+### 🎯 核心结论 (Core Conclusion)
 ### 📊 业务全景 (The SCQA Context)
 ### 🚀 战略路线 (Action Plan)
+
+请务必使用中文撰写完整的报告。
 """
         
         def report_generator():

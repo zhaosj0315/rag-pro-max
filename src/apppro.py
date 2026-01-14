@@ -2763,16 +2763,14 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
             logger.info(f"👉 {msg}")
         
         if data_files:
-             # [v5.6.2] Idempotency Check: Don't rebuild if schema exists to avoid delay
-             if not os.path.exists(da_engine.schema_path):
-                 status_container.write(f"📊 检测到 {len(data_files)} 个业务源文件，正在执行物理归档与战略建模...")
-                 logger.info(f"📊 [Strategic Workshop] 检测到 {len(data_files)} 个业务源文件，启动战略建模...")
-                 res = da_engine.process_files(data_files, llm, status_callback=kb_status_callback)
-                 if res['success']:
-                     status_container.success(f"✅ 战略大脑初始化完成 (已归档并导入 {len(res['tables'])} 张表)")
-                     logger.success(f"✅ [Strategic Workshop] 战略大脑初始化完成 (已导入 {len(res['tables'])} 张表)")
-             else:
-                 status_container.write("⏩ 业务语义模型已就绪，跳过重建...")
+             # [v5.7.0] 核心修复：始终处理数据文件以确保数据一致性 (覆盖追加/更新场景)
+             # 原有的 Idempotency Check (if not os.path.exists) 会导致追加文件时不更新 DB
+             status_container.write(f"📊 检测到 {len(data_files)} 个业务源文件，正在执行物理归档与战略建模...")
+             logger.info(f"📊 [Strategic Workshop] 检测到 {len(data_files)} 个业务源文件，启动战略建模...")
+             res = da_engine.process_files(data_files, llm, status_callback=kb_status_callback)
+             if res['success']:
+                 status_container.success(f"✅ 战略大脑初始化完成 (已归档并导入 {len(res['tables'])} 张表)")
+                 logger.success(f"✅ [Strategic Workshop] 战略大脑初始化完成 (已导入 {len(res['tables'])} 张表)")
 
         # 1. 执行 RAG 预扫描以获取文本（用于非结构化建模）
         docs, _ = builder._read_documents(current_target_path, 0, None)
