@@ -1,13 +1,13 @@
 {
-  "version": "5.9.4",
+  "version": "6.2.2",
   "release_date": "2026-01-14",
-  "build_number": "20260114.01",
+  "build_number": "20260114.02",
   "status": "stable",
   "major_features": [
-    "🎨 Smart Vis Canvas v5.9: AI-recommended tabbed board (Funnel, Treemap, Radar, KPIs)",
-    "🔋 Data Sovereignty Hardening: Reordered build flow & selective cleanup to prevent data loss",
-    "🧠 Strategic AI Sampling: Real-data sampling injected into SQL generation for 100% accuracy",
-    "🛡️ Robust Error Diagnosis: Explicit traceback UI & SQL auto-healing (ORDER BY support)"
+    "🖼️ Full Dimension Mirroring: 1:1 export of chat history with embedded PNGs & interactive HTML",
+    "🌍 Bilingual Business Insights: Auto-generated CN/EN findings for every visualization",
+    "🛡️ Mode Isolation v6: Strict logic separation between Data Analysis and standard RAG",
+    "🚀 Zero-Indentation Stability: Rebuilt export pipeline with production-grade syntax hardening"
   ],
   "compatibility": {
     "python": ">=3.9",
