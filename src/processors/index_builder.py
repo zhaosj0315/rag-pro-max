@@ -439,8 +439,17 @@ class IndexBuilder:
             if callback:
                 callback("info", "新建模式: 构建向量索引（异步优化）")
             
+            # [v5.8.2] 安全清理：仅删除索引文件，保留 raw_sources 和 business_data.db
+            # 原有的 shutil.rmtree 会误删数据分析引擎的数据库和归档文件
             if os.path.exists(self.persist_dir):
-                shutil.rmtree(self.persist_dir, ignore_errors=True)
+                for f in os.listdir(self.persist_dir):
+                    # 删除 LlamaIndex 生成的各类存储文件
+                    if f.endswith('.json') or f in ['docstore.json', 'index_store.json', 'graph_store.json', 'default__vector_store.json', 'image__vector_store.json']:
+                        try:
+                            os.remove(os.path.join(self.persist_dir, f))
+                        except: pass
+            else:
+                os.makedirs(self.persist_dir, exist_ok=True)
             
             # 使用优化的向量化包装器
             try:
