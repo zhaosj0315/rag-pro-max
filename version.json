@@ -1,13 +1,13 @@
 {
-  "version": "5.6.8",
-  "release_date": "2026-01-13",
-  "build_number": "20260113.02",
+  "version": "5.9.4",
+  "release_date": "2026-01-14",
+  "build_number": "20260114.01",
   "status": "stable",
   "major_features": [
-    "🔄 Robust Session Switching: Fixed navigation deadlock using URL-first synchronization",
-    "💾 Intelligent History Persistence: Added memory-priority titles and custom naming protection",
-    "🏗️ Comprehensive Asset Export: All-in-one ZIP now correctly captures every historical session",
-    "🩺 Knowledge Base Self-healing: Fuzzy path matching to resolve mounting failures after refresh"
+    "🎨 Smart Vis Canvas v5.9: AI-recommended tabbed board (Funnel, Treemap, Radar, KPIs)",
+    "🔋 Data Sovereignty Hardening: Reordered build flow & selective cleanup to prevent data loss",
+    "🧠 Strategic AI Sampling: Real-data sampling injected into SQL generation for 100% accuracy",
+    "🛡️ Robust Error Diagnosis: Explicit traceback UI & SQL auto-healing (ORDER BY support)"
   ],
   "compatibility": {
     "python": ">=3.9",

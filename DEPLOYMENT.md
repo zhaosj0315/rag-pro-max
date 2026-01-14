@@ -1,45 +1,36 @@
-# RAG Pro Max v5.5.8 企业级部署指南 (Stable Data Analysis Edition)
+# RAG Pro Max v5.9.4 企业级部署指南 (Advanced Visualization Edition)
 
-**版本**: v5.5.8  
-**更新日期**: 2026-01-11  
-**适用范围**: 生产环境部署、大数据量分析、macOS 深度优化版  
+**版本**: v5.9.4  
+**更新日期**: 2026-01-14  
+**适用范围**: 生产环境部署、多维业务数据分析、macOS/Linux 高可用版
 
-RAG Pro Max v5.5.8 企业级版本支持多种部署方式，从本地开发到生产环境，提供完整的部署解决方案。
+RAG Pro Max v5.9.4 是目前最稳定的企业级数据分析版本，集成了 Plotly 高级图表引擎与全量数据主权保护逻辑。
 
-**🔥 v5.5.8 企业级特性**:
-- 🏛️ **分析实验室 2.0**: 全宽流式 Artifacts 工作台，支持复杂数据可视化。
-- 🛡️ **企业级安全**: 完全离线部署，数据不出内网，支持 30+ 项文件元数据取证。
-- 🚀 **macOS 性能优化**: 针对 Darwin 内核自动启用高性能线程池并发模型。
-- 🏗️ **四层架构设计**: 模块化解耦，支持 RESTful API 与 Web UI 双重接入。
+**🔥 v5.9.4 企业级特性**:
+- 🎨 **智能可视化画板**: 自动推荐 8+ 种业务图表，支持实时交互与参数微调。
+- 🔋 **数据持久化加固**: 隔离 RAG 索引与 SQL 数据库，确保业务数据物理安全性。
+- 🛡️ **工业级容错**: 内置 SQL 自动修复引擎与显式异常诊断 UI。
+- 🚀 **真数采样技术**: 提升 AI 对 2025+ 未来年度数据的感知精度。
 
 ## 🏢 企业环境要求
 
 ### 🔒 安全要求
-- **网络隔离**: 支持完全内网环境部署。
-- **数据主权**: 所有数据本地存储，不依赖外部服务。
-- **审计合规**: 完整的操作日志与审计追踪。
+- **网络隔离**: 支持完全离线部署。
+- **数据主权**: 所有 CSV/DB 均存储在 `vector_db_storage` 的子目录中，支持物理迁移。
 
-### 💻 硬件配置 (针对分析实验室优化)
-- **最低配置**: 8GB RAM, 20GB 存储, **Python 3.9+** (必选)。
-- **推荐配置**: 16GB+ RAM, 100GB+ SSD, 8核 CPU。
-- **企业配置**: 32GB+ RAM, 100GB+ SSD, GPU 加速 (macOS 自动调用 MPS)。
+### 💻 硬件配置
+- **最低配置**: 8GB RAM, 20GB 存储, Python 3.10+ (推荐)。
+- **依赖库更新**: 必须安装 `plotly`, `pandas`, `sqlite3`。
 
 ## 🚀 快速部署
 
 ### 1. 一键部署脚本
-
-#### macOS/Linux
 ```bash
-# 克隆项目
-git clone https://github.com/zhaosj0315/rag-pro-max.git
-cd rag-pro-max
-
-# 自动部署 (Linux)
-chmod +x scripts/deploy_linux.sh
-./scripts/deploy_linux.sh
-
-# 手动安装 (macOS)
+# 安装核心依赖
 pip install -r requirements.txt
+
+# 验证可视化引擎
+python -c "import plotly; print(plotly.__version__)"
 ```
 
 #### Windows

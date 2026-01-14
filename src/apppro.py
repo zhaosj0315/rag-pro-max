@@ -305,7 +305,7 @@ def enhanced_web_search(final_prompt, logger):
 
 def render_smart_visualization(df, query, msg_idx, stage_id, recommendation=None):
     """
-    [v5.8.8] 极致可视化画板：提供 AI 智能推荐与多标签页手动切换功能。
+    [v5.9.3] 业务级全能画板：全局健壮性升级，彻底解决层级图表类型冲突。
     """
     import pandas as pd
     import plotly.express as px
@@ -326,11 +326,25 @@ def render_smart_visualization(df, query, msg_idx, stage_id, recommendation=None
         st.dataframe(df, use_container_width=True)
         return
 
-    # 2. 标签页切换
-    tab_titles = ["🤖 AI 推荐", "📊 柱状图", "📈 折线图", "🍰 饼图", "📦 箱线图", "📋 数据表"]
+    # 2. [v5.9.3] 全局数据清洗：防止 Plotly 在排序/层级处理时触发 TypeError
+    clean_df = df.copy()
+    for col in cat_cols:
+        clean_df[col] = clean_df[col].fillna("Unknown").astype(str)
+
+    # 3. 核心 KPI 汇总卡 (Bento 风格)
+    st.markdown("---")
+    kpi_cols = st.columns(min(len(num_cols), 4))
+    for i, col in enumerate(num_cols[:4]):
+        with kpi_cols[i]:
+            avg_val = df[col].mean()
+            sum_val = df[col].sum()
+            st.metric(label=f"平均 {col}", value=f"{avg_val:,.2f}")
+            st.caption(f"合计: {sum_val:,.0f}")
+
+    # 4. 标签页切换
+    tab_titles = ["🤖 AI 推荐", "🎯 业务转化", "🌲 层级分布", "📊 基础对比", "📦 更多分析", "📋 原始数据"]
     tabs = st.tabs(tab_titles)
     
-    # 修复 Key 冲突：增加随机或高精度时间戳
     key_base = f"vis_{msg_idx}_{stage_id}_{int(time.time()*1000)}"
 
     # --- Tab 0: AI 推荐 ---
@@ -340,79 +354,108 @@ def render_smart_visualization(df, query, msg_idx, stage_id, recommendation=None
             x_axis = recommendation.get('x_axis')
             y_axis = recommendation.get('y_axis')
             color = recommendation.get('color')
-            title = recommendation.get('title', 'AI 智能视图')
+            path = recommendation.get('path')
+            title = recommendation.get('title', 'AI 业务视图')
             reason = recommendation.get('reason', '')
             
-            st.caption(f"💡 **AI 建议**: {reason}")
+            st.caption(f"💡 **业务洞察**: {reason}")
             
             try:
                 fig = None
                 common = {"title": title, "template": "plotly_white"}
-                # 检查字段是否存在于当前数据框中
-                valid_x = x_axis if x_axis in df.columns else df.columns[0]
-                valid_y = []
-                if isinstance(y_axis, list):
-                    valid_y = [y for y in y_axis if y in df.columns]
-                elif y_axis in df.columns:
-                    valid_y = [y_axis]
                 
-                if not valid_y: valid_y = num_cols[:1]
+                # 校验字段
+                valid_x = x_axis if x_axis in clean_df.columns else clean_df.columns[0]
+                valid_y = y_axis if (isinstance(y_axis, str) and y_axis in clean_df.columns) or (isinstance(y_axis, list) and all(yi in clean_df.columns for yi in y_axis)) else num_cols[0]
                 
-                if color and color in df.columns: common["color"] = color
+                if viz_type == 'funnel':
+                    fig = px.funnel(clean_df, x=valid_y, y=valid_x, title=title)
+                elif viz_type == 'treemap':
+                    fig = px.treemap(clean_df, path=path or [valid_x], values=valid_y, title=title)
+                elif viz_type == 'sunburst':
+                    fig = px.sunburst(clean_df, path=path or [valid_x], values=valid_y, title=title)
+                elif viz_type == 'indicator':
+                    val = df[valid_y].iloc[0] if not df.empty else 0
+                    fig = go.Figure(go.Indicator(
+                        mode = "number+delta", value = val, title = {"text": title},
+                        domain = {'x': [0, 1], 'y': [0, 1]}
+                    ))
+                elif viz_type == 'radar' and len(num_cols) >= 3:
+                    fig = px.line_polar(clean_df, r=num_cols, theta=clean_df.columns[0], line_close=True, title=title)
+                else:
+                    if color and color in clean_df.columns: common["color"] = color
+                    if viz_type == 'bar': fig = px.bar(clean_df, x=valid_x, y=valid_y, **common)
+                    elif viz_type == 'line': fig = px.line(clean_df, x=valid_x, y=valid_y, **common)
+                    elif viz_type == 'pie': fig = px.pie(clean_df, names=valid_x, values=valid_y[0] if isinstance(valid_y, list) else valid_y, hole=0.4, title=title)
+                    elif viz_type == 'box': fig = px.box(clean_df, x=valid_x, y=valid_y, **common)
+                    elif viz_type == 'histogram': fig = px.histogram(clean_df, x=valid_x, y=valid_y, **common)
                 
-                if viz_type == 'bar': fig = px.bar(df, x=valid_x, y=valid_y, **common)
-                elif viz_type == 'line': fig = px.line(df, x=valid_x, y=valid_y, **common)
-                elif viz_type == 'pie': fig = px.pie(df, names=valid_x, values=valid_y[0], title=title)
-                elif viz_type == 'scatter': fig = px.scatter(df, x=valid_x, y=valid_y, **common)
-                elif viz_type == 'area': fig = px.area(df, x=valid_x, y=valid_y, **common)
-                elif viz_type == 'box': fig = px.box(df, x=valid_x, y=valid_y, **common)
-                elif viz_type == 'histogram': fig = px.histogram(df, x=valid_x, y=valid_y, **common)
-                
-                if fig: st.plotly_chart(fig, use_container_width=True, key=f"{key_base}_ai")
-                else: st.dataframe(df, use_container_width=True)
+                if fig:
+                    fig.update_layout(margin=dict(t=40, l=0, r=0, b=0))
+                    st.plotly_chart(fig, use_container_width=True, key=f"{key_base}_ai")
+                else:
+                    st.dataframe(df, use_container_width=True)
             except Exception as e:
                 st.warning(f"AI 视图渲染失败，请切换至手动模式。")
         else:
-            st.info("AI 推荐不可用，请选择其他图表类型。")
+            st.info("AI 正在根据数据学习业务模式...")
 
-    # --- Tab 1: 柱状图 ---
+    # --- Tab 1: 业务转化 (漏斗图) ---
     with tabs[1]:
+        c1, c2 = st.columns(2)
+        f_y = c1.selectbox("步骤/阶段 (维度)", clean_df.columns, key=f"{key_base}_f_y")
+        f_x = c2.selectbox("转化指标 (数值)", num_cols, key=f"{key_base}_f_x")
+        if f_x and f_y:
+            fig = px.funnel(clean_df, x=f_x, y=f_y, template="plotly_white", title="业务转化漏斗")
+            st.plotly_chart(fig, use_container_width=True, key=f"{key_base}_funnel_fig")
+
+    # --- Tab 2: 层级分布 (树图/旭日图) ---
+    with tabs[2]:
         c1, c2, c3 = st.columns(3)
-        x = c1.selectbox("X轴 (类别)", df.columns, key=f"{key_base}_bar_x")
-        y = c2.multiselect("Y轴 (数值)", num_cols, default=num_cols[:1], key=f"{key_base}_bar_y")
-        c = c3.selectbox("分组 (可选)", [None] + cat_cols, key=f"{key_base}_bar_c")
-        if x and y:
-            fig = px.bar(df, x=x, y=y, color=c, barmode="group", template="plotly_white")
+        h_mode = c1.radio("展示模式", ["矩形树图", "旭日图"], horizontal=True, key=f"{key_base}_h_mode")
+        h_path = c2.multiselect("层级路径 (可多选)", cat_cols or clean_df.columns[:2], default=cat_cols[:2] if len(cat_cols)>=2 else cat_cols, key=f"{key_base}_h_p")
+        h_val = c3.selectbox("数值权重", num_cols, key=f"{key_base}_h_v")
+        if h_path and h_val:
+            try:
+                if h_mode == "矩形树图": 
+                    fig = px.treemap(clean_df, path=h_path, values=h_val, template="plotly_white")
+                else: 
+                    fig = px.sunburst(clean_df, path=h_path, values=h_val, template="plotly_white")
+                st.plotly_chart(fig, use_container_width=True, key=f"{key_base}_hierarchy_fig")
+            except Exception as e:
+                st.caption(f"层级图表暂时无法显示 (原因: 包含不兼容的数据格式)")
+                st.dataframe(df[h_path + [h_val]], use_container_width=True)
+
+    # --- Tab 3: 基础对比 ---
+    with tabs[3]:
+        c1, c2, c3 = st.columns(3)
+        b_x = c1.selectbox("X轴 (分类)", clean_df.columns, key=f"{key_base}_b_x")
+        b_y = c2.multiselect("Y轴 (数值)", num_cols, default=num_cols[:1], key=f"{key_base}_b_y")
+        b_c = c3.selectbox("分组颜色 (可选)", [None] + cat_cols, key=f"{key_base}_b_c")
+        if b_x and b_y:
+            fig = px.bar(clean_df, x=b_x, y=b_y, color=b_c, barmode="group", template="plotly_white")
             st.plotly_chart(fig, use_container_width=True, key=f"{key_base}_bar_fig")
 
-    # --- Tab 2: 折线图 ---
-    with tabs[2]:
-        c1, c2 = st.columns(2)
-        x = c1.selectbox("X轴 (时间/序列)", df.columns, key=f"{key_base}_line_x")
-        y = c2.multiselect("Y轴 (指标)", num_cols, default=num_cols[:1], key=f"{key_base}_line_y")
-        if x and y:
-            fig = px.line(df, x=x, y=y, markers=True, template="plotly_white")
-            st.plotly_chart(fig, use_container_width=True, key=f"{key_base}_line_fig")
-
-    # --- Tab 3: 饼图 ---
-    with tabs[3]:
-        c1, c2 = st.columns(2)
-        names = c1.selectbox("分类字段", cat_cols if cat_cols else df.columns, key=f"{key_base}_pie_n")
-        values = c2.selectbox("数值字段", num_cols, key=f"{key_base}_pie_v")
-        if names and values:
-            fig = px.pie(df, names=names, values=values, hole=0.3, template="plotly_white")
-            st.plotly_chart(fig, use_container_width=True, key=f"{key_base}_pie_fig")
-
-    # --- Tab 4: 箱线图 ---
+    # --- Tab 4: 更多分析 ---
     with tabs[4]:
-        c1, c2 = st.columns(2)
-        y = c1.selectbox("分析数值", num_cols, key=f"{key_base}_box_y")
-        x = c2.selectbox("分组字段 (可选)", [None] + cat_cols, key=f"{key_base}_box_x")
-        if y:
-            fig = px.box(df, x=x, y=y, points="all", template="plotly_white")
-            st.plotly_chart(fig, use_container_width=True, key=f"{key_base}_box_fig")
+        sub_tabs = st.tabs(["📉 趋势分析", "📦 统计分布", "🕸️ 雷达评价"])
+        with sub_tabs[0]:
+            st.plotly_chart(px.area(clean_df, x=clean_df.columns[0], y=num_cols[:1], template="plotly_white", title="累计趋势图"), use_container_width=True, key=f"{key_base}_area_fig")
+        with sub_tabs[1]:
+            st.plotly_chart(px.box(clean_df, y=num_cols[0], template="plotly_white", title="数据分布箱线图"), use_container_width=True, key=f"{key_base}_box_fig")
+        with sub_tabs[2]:
+            if len(num_cols) >= 3:
+                try:
+                    radar_theta = cat_cols[0] if cat_cols else clean_df.columns[0]
+                    radar_r = [c for c in num_cols if c != radar_theta]
+                    if len(radar_r) >= 3:
+                        fig = px.line_polar(clean_df, r=radar_r, theta=radar_theta, line_close=True, title="多维属性对比", template="plotly_white")
+                        st.plotly_chart(fig, use_container_width=True, key=f"{key_base}_radar_fig")
+                except: st.info("雷达图生成受阻")
+            else:
+                st.info("💡 雷达图需要至少 3 个数值指标列。")
 
-    # --- Tab 5: 数据表 ---
+    # --- Tab 5: 原始数据 ---
     with tabs[5]:
         st.dataframe(df, use_container_width=True)
 from llama_index.core.node_parser import SentenceSplitter
@@ -6581,29 +6624,23 @@ if st.session_state.get('is_processing') and final_prompt:
                     st.rerun()
                 
                 except Exception as e: 
-                    # [v5.6.4] 修复 NameError: logger not defined
+                    # [v5.9.4] 错误诊断增强：禁止静默闪退，显式抛出异常详情
+                    import traceback
+                    error_details = traceback.format_exc()
+                    
                     if 'logger' not in locals() and 'logger' not in globals():
                         from src.app_logging.log_manager import LogManager
                         logger = LogManager()
                     
-                    error_msg = str(e)
-                    logger.error(error_msg)
-                    logger.error(f"查询处理失败: {error_msg}")
+                    logger.error(f"查询处理崩溃: {str(e)}\n{error_details}")
                     
-                    # 显示详细错误信息
-                    if "聊天引擎未初始化" in error_msg:
-                        st.error("❌ 聊天引擎未初始化，请先选择知识库")
-                    elif "stream_chat" in error_msg:
-                        st.error("❌ 查询处理失败，请检查知识库状态")
-                    else:
-                        st.error(f"❌ 查询出错: {error_msg}")
-                    
-                    # 发生错误，回滚最后一条消息（如果是 assistant 生成的）
-                    if st.session_state.messages and st.session_state.messages[-1]['role'] == 'assistant':
-                        st.session_state.messages.pop()
+                    # 显式展示错误信息，不再静默 pop
+                    st.error(f"❌ 系统执行异常")
+                    with st.expander("🔍 查看技术细节"):
+                        st.code(error_details)
                     
                     # 释放内存
                     cleanup_memory()
-                    logger.info("🧹 错误处理完成，内存已清理")
                     st.session_state.is_processing = False
-                    st.rerun()
+                    # 不再自动 rerun，保留错误现场
+                    st.stop()

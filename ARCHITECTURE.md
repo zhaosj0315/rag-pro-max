@@ -1,20 +1,23 @@
-# RAG Pro Max v5.6.8 企业级系统架构文档
+# RAG Pro Max v5.9.4 企业级系统架构文档
 
-**版本**: v5.6.8 (Production Stability Edition)  
-**更新日期**: 2026-01-13  
-**核心特性**: URL 现场恢复、路径深度自愈 (Self-healing)、高保真文档爬取、666 权限日志引擎
+**版本**: v5.9.4 (Advanced Visualization Edition)  
+**更新日期**: 2026-01-14  
+**核心特性**: 智能可视化画板、SQL 真数采样、多存储引擎共存隔离
 
 ---
 
-## 🏗️ 核心架构演进 (v5.6.x)
+## 🏗️ 核心架构演进 (v5.9.x)
 
-### 1. 状态管理层 (State Management - Persistent Memory)
-- **URL Parameter Sync**: 将活跃的 `kb_id` 和 `sess_id` 实时同步至浏览器地址栏。应用启动时优先通过 URL 恢复现场，实现“刷新即秒回”。
-- **Memory-Priority Titles**: 引入内存补偿机制，侧边栏标题在对话生成瞬间即可反映内容变化，不再依赖异步落盘延迟。
+### 1. 可视化呈现层 (Smart Visualization Engine)
+- **AI Recommendation Layer**: 引入绘图专家代理，根据 SQL 执行结果的语义特征自动推荐 `plotly.express` 渲染方案。
+- **Dynamic Tab Router**: 采用多态路由机制，支持 6 种以上可视化组件的动态挂载与参数双向绑定。
 
-### 2. 系统韧性层 (Resilience Layer - Self-healing)
-- **Path Self-healing Engine**: 针对 UI 脱敏后的短名，实现了模糊前缀匹配算法。系统能自动识别 `admin_` 等前缀并修正物理挂载路径，解决“docstore.json 丢失”问题。
-- **Auto-Permission Hardening**: 日志引擎内置 `chmod 666` 逻辑，确保不同所有权进程（Root/Standard）产生的日志能被所有标准用户读取显示。
+### 2. 数据持久化层 (Storage Sovereignty Hardening)
+- **Isolation Protection**: RAG 索引构建器（NEW 模式）现在仅对 `.json` 文件执行精准清理，不再调用 `shutil.rmtree`，确保 `raw_sources/` 和 `business_data.db` 的物理共存。
+- **Build Sequence Reordering**: 实现了“先建目录、后存数据”的流水线，彻底解决存储竞争导致的资产丢失。
+
+### 3. AI 策略层 (AI Strategy & Sampling)
+- **Real-Data Injection**: 在 Prompt 组装阶段增加“采样垫片”，自动提取物理表前 2 行数据注入 LLM 上下文，确保生成 SQL 的 100% 语境兼容。
 
 ---
 
