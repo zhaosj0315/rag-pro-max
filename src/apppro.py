@@ -636,23 +636,57 @@ from src.processors.document_parser import _parse_single_doc, _parse_batch_docs
 # ==========================================
 PageStyle.setup_page()
 
-# 注入 CSS
+# 注入 CSS [v6.4.9] 强化双滚动条消除方案
 st.markdown("""
 <style>
-    /* 彻底禁止横向滚动和左右拖动手势 - 强制锁定布局 */
-    html, body, [data-testid="stAppViewContainer"], .stApp, [data-testid="stApp"] {
-        overflow-x: hidden !important;
-        max-width: 100vw !important;
-        overscroll-behavior-x: none !important;
-        position: relative !important;
-    }
-    
-    /* 强制禁止任何容器产生横向位移 */
-    [data-testid="stMain"], [data-testid="stSidebar"] {
-        overflow-x: hidden !important;
-        max-width: 100% !important;
+    /* 1. 顶层强制锁定 */
+    html, body, .stApp {
+        overflow: hidden !important;
+        height: 100vh !important;
     }
 
+    /* 2. 唯一滚动入口 */
+    [data-testid="stAppViewContainer"] {
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        height: 100vh !important;
+    }
+    
+    /* 3. 原子级清理：强制所有内层容器放弃滚动主权 */
+    [data-testid="stMain"], 
+    [data-testid="stVerticalBlock"], 
+    [data-testid="stVerticalBlockChildContainer"],
+    [data-testid="stChatMessage"],
+    .element-container,
+    .stMarkdown {
+        overflow: visible !important;
+        height: auto !important;
+    }
+
+    /* 4. 侧边栏独立滚动保护 */
+    [data-testid="stSidebar"] {
+        height: 100vh !important;
+        overflow-y: auto !important;
+    }
+</style>
+
+<script>
+    // [v6.4.9] 异步守护进程：物理移除干扰滚动的内联属性
+    function fixScrollbars() {
+        const containers = document.querySelectorAll('[data-testid="stVerticalBlock"], [data-testid="stMain"]');
+        containers.forEach(el => {
+            if (el.style.overflow !== "visible") {
+                el.style.overflow = "visible";
+            }
+        });
+    }
+    
+    // 轮询与监听双重保障
+    setInterval(fixScrollbars, 500);
+    window.addEventListener('resize', fixScrollbars);
+</script>
+
+<style>
     /* 极致压缩侧边栏间距 */
     section[data-testid="stSidebar"] .stSelectbox > div {
         margin-bottom: 1px !important;
@@ -685,7 +719,6 @@ st.markdown("""
         pointer-events: none !important;
     }
 
-    
     /* 统计区域容器 */
     .stats-container {
         background: white !important;
@@ -743,9 +776,7 @@ st.markdown("""
         z-index: 1000 !important;
         pointer-events: none !important;
     }
-    
-
-        /* 完全修复参考片段显示 */
+    /* 完全修复参考片段显示 */
     .reference-snippet {
         background-color: #f8f9fa !important;
         border-left: 3px solid #1f77b4 !important;
@@ -783,7 +814,6 @@ st.markdown("""
         max-width: none !important;
         overflow: visible !important;
     }
-    
     .stMarkdown div[style*="border-left"] {
         max-width: 100% !important;
         overflow: visible !important;
@@ -818,7 +848,6 @@ st.markdown("""
         margin-bottom: 0.3rem !important;
         border: 1px solid rgba(0,0,0,0.05) !important;
     }
-    
     /* 欢迎页面 */
     .welcome-box {
         padding: 1.5rem !important;
@@ -6318,7 +6347,8 @@ if st.session_state.get('is_processing') and final_prompt:
                             
                             def da_status_callback(msg):
                                 da_status_box.write(msg)
-                                logger.info(f"👉 {msg}")
+                                # [v6.4.5] 同步输出到终端日志
+                                logger.info(msg, stage="Strategic Analysis")
                             
                             analysis_res = da_engine.execute_analysis(final_prompt, llm, status_callback=da_status_callback)
                             da_status_box.update(label="✅ 战略推演已完成", state="complete", expanded=False)
@@ -6338,6 +6368,12 @@ if st.session_state.get('is_processing') and final_prompt:
                                         report_placeholder.markdown(full_report + "▌")
                                 
                                 report_placeholder.markdown(full_report)
+                                
+                                # [v6.3.9] 实效性校验：确保至少有报告内容或分析阶段产出
+                                if not full_report.strip() and not analysis_res.get("stages"):
+                                    st.warning("📍 战略推演已完成，但基于当前数据和逻辑未发现可量化的显著结论。")
+                                    full_report = "### 📋 战略分析摘要\n本次分析未发现显著的模式差异或数据异常，建议调整查询维度后重试。"
+
                                 # 2. 循环渲染每个逻辑阶段
                                 for stage in analysis_res.get("stages", []):
                                     meta = stage["meta"]

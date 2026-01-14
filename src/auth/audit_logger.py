@@ -49,6 +49,11 @@ class AuditLogger:
                 
                 with open(AUDIT_LOG_PATH, 'w', encoding='utf-8') as f:
                     json.dump(logs, f, indent=4, ensure_ascii=False)
+                
+                # [v6.4.5] 权限自愈：强制设置 666 权限，防止 root 占用导致普通用户无法写入
+                try:
+                    os.chmod(AUDIT_LOG_PATH, 0o666)
+                except: pass
             except Exception as e:
                 print(f"Failed to write audit log: {e}")
 

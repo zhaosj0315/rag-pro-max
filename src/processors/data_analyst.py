@@ -2,6 +2,7 @@ import os
 import json
 import pandas as pd
 import sqlite3
+import re
 from typing import List, Dict, Any
 from datetime import datetime
 import hashlib
@@ -587,8 +588,10 @@ class DataAnalystEngine:
                 conn.row_factory = lambda c, r: dict([(col[0], r[idx]) for idx, col in enumerate(c.description)])
                 cursor = conn.cursor()
 
-                # A. 预处理：移除尾部分号并按分号分割，过滤空语句
-                statements = [s.strip() for s in sql.split(';') if s.strip()]
+                # A. 预处理 [v6.3.9]: 物理剔除反斜杠干扰并按分号分割
+                # LLM 经常误用 \ 作为换行符，这在 SQLite 中是非法的
+                clean_sql_block = sql.replace('\\\n', ' ').replace('\\', '')
+                statements = [s.strip() for s in clean_sql_block.split(';') if s.strip()]
                 
                 if not statements:
                     conn.close()
