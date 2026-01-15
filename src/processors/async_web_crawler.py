@@ -55,11 +55,12 @@ class AsyncWebCrawler:
         
         timeout = aiohttp.ClientTimeout(total=30, connect=10)
         
+        # [Aliyun Optimization] 使用与用户脚本完全一致的 UA
         self.session = aiohttp.ClientSession(
             connector=connector,
             timeout=timeout,
             headers={
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             }
         )
         
@@ -154,35 +155,75 @@ class AsyncWebCrawler:
             return None
     
     def extract_links(self, html_content: str, base_url: str, scope_prefix: str = None, max_links: int = 999) -> List[str]:
-        """提取链接 - 优化：支持自定义作用域前缀且保留目录语义"""
+        """提取链接 - 优化：支持自定义作用域前缀"""
         try:
             soup = BeautifulSoup(html_content, 'html.parser')
             links = []
+            
+            # [Aliyun Optimization] 如果有明确的作用域前缀，使用极简匹配逻辑 (复刻用户成功脚本)
+            if scope_prefix:
+                # 调试日志：打印当前 Scope
+                # logger.info(f"🔍 [Debug] 当前作用域: {scope_prefix}")
+                
+                count_total = 0
+                count_accepted = 0
+                
+                for link in soup.find_all('a', href=True):
+                    count_total += 1
+                    href = link.get('href')
+                    if not href or href.startswith(('#', 'javascript:', 'mailto:')):
+                        continue
+                    
+                    # 简单粗暴的拼接与清洗
+                    full_url = urljoin(base_url, href).split('#')[0].split('?')[0]
+                    
+                    # 核心判定：只看是否以作用域开头
+                    if full_url.startswith(scope_prefix):
+                        if full_url not in self.visited_urls and full_url not in links:
+                            links.append(full_url)
+                            count_accepted += 1
+                    
+                    if len(links) >= max_links:
+                        break
+                
+                # 调试日志：如果有大量拒绝，可能是 Scope 算错了
+                # if count_total > 100 and count_accepted < 10:
+                #     logger.warning(f"⚠️ [Debug] 链接提取率极低! 总数: {count_total}, 接受: {count_accepted}, Scope: {scope_prefix}")
+                
+                return links
+
+            # --- 以下为原有通用逻辑 (无 scope_prefix 时使用) ---
             parsed_base = urlparse(base_url)
             base_domain = parsed_base.netloc
             
+            # 如果没有指定作用域，默认使用当前URL的目录
             if not scope_prefix:
                 scope_prefix = parsed_base.path
                 if not scope_prefix.endswith('/'):
                     scope_prefix = scope_prefix.rsplit('/', 1)[0] + '/'
             
+            # 预处理作用域前缀，移除尾斜杠以确保根路径匹配
             check_prefix = scope_prefix.rstrip('/')
             
             for link in soup.find_all('a', href=True):
                 href = link.get('href')
-                if not href or href.startswith(('#', 'javascript:', 'mailto:')): continue
+                if not href or href.startswith(('#', 'javascript:', 'mailto:')):
+                    continue
                 
-                # 重要修复：不再 rstrip('/')，保留 URL 原始语义
+                # 构建完整URL并去除参数/锚点 (不再 rstrip，保持目录语义)
                 full_url = urljoin(base_url, href).split('#')[0].split('?')[0]
                 parsed = urlparse(full_url)
                 
+                # 策略：必须是同域名，且匹配作用域前缀
                 if parsed.netloc == base_domain:
-                    # 路径匹配：移除尾部斜杠进行前缀对比
+                    # 检查路径是否以作用域前缀开头 (移除尾斜杠进行比较)
                     if parsed.path.rstrip('/').startswith(check_prefix):
                         if full_url not in self.visited_urls and full_url not in links:
                             links.append(full_url)
                 
-                if len(links) >= max_links: break
+                if len(links) >= max_links:
+                    break
+            
             return links
         except Exception as e:
             logger.warning(f"提取链接失败: {e}")
@@ -282,7 +323,10 @@ class AsyncWebCrawler:
             level_success = 0
             
             for i, result in enumerate(results):
-                if isinstance(result, Exception) or result is None: continue
+                if isinstance(result, Exception):
+                    if status_callback: status_callback(f"❌ 错误: {current_level[i]} - {result}")
+                    continue
+                if result is None: continue
                 level_success += 1
                 
                 # 文件名映射 (完全对齐用户脚本)
