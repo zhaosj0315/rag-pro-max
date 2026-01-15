@@ -67,15 +67,17 @@ def render_login_page():
             padding-left: 5rem !important;
             padding-right: 5rem !important;
         }
-        /* 登录框样式优化 */
-        [data-testid="stVerticalBlock"] > div:has(div[style*="border"]) {
-            padding: 2.5rem !important;
-            border-radius: 24px !important;
-            background: rgba(15, 23, 42, 0.6) !important;
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.08) !important;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
-            margin-top: 0.5rem;
+        /* 移除登录框外壳，强化输入框质感 */
+        .stTextInput input {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            color: white !important;
+            border-radius: 8px !important;
+            padding: 10px 12px !important;
+        }
+        .stTextInput input:focus {
+            border-color: #60a5fa !important;
+            background-color: rgba(255, 255, 255, 0.1) !important;
         }
         .stTabs [data-baseweb="tab-list"] {
             gap: 8px;
@@ -85,6 +87,7 @@ def render_login_page():
             height: 3rem;
             padding: 0 1.5rem;
             font-size: 1rem;
+            background-color: transparent !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -134,44 +137,44 @@ def render_login_page():
     with col_auth:
         tab_login, tab_register = st.tabs(["🔐 登录", "✨ 注册"])
         with tab_login:
-            with st.container(border=True):
-                with st.form("login_form"):
-                    u = st.text_input("User", placeholder="用户名", label_visibility="collapsed")
-                    p = st.text_input("Pass", type="password", placeholder="密码", label_visibility="collapsed")
-                    if st.form_submit_button("进入指挥中心", use_container_width=True, type="primary"):
-                        if u and p:
-                            from src.auth.audit_logger import AuditLogger
-                            from src.common.utils import get_client_ip
-                            success, info = authenticate_user(u, p)
-                            if success:
-                                from src.auth.session_manager import create_session
-                                token, days = create_session(u)
-                                st.query_params["session_token"] = token
-                                st.session_state.logged_in = True
-                                st.session_state.user = u
-                                st.session_state.role = info.get('role', 'standard_user')
-                                AuditLogger.log(u, "LOGIN", "登录成功", ip=get_client_ip())
-                                st.rerun()
-                            else:
-                                st.error(f"❌ {info}")
-                if st.button("🚪 游客模式", use_container_width=True):
-                    st.session_state.logged_in = True
-                    st.session_state.user = "guest_user"; st.session_state.role = "guest"; st.rerun()
+            # 移除外层 container，直接渲染表单
+            with st.form("login_form"):
+                u = st.text_input("User", placeholder="用户名", label_visibility="collapsed")
+                p = st.text_input("Pass", type="password", placeholder="密码", label_visibility="collapsed")
+                if st.form_submit_button("进入指挥中心", use_container_width=True, type="primary"):
+                    if u and p:
+                        from src.auth.audit_logger import AuditLogger
+                        from src.common.utils import get_client_ip
+                        success, info = authenticate_user(u, p)
+                        if success:
+                            from src.auth.session_manager import create_session
+                            token, days = create_session(u)
+                            st.query_params["session_token"] = token
+                            st.session_state.logged_in = True
+                            st.session_state.user = u
+                            st.session_state.role = info.get('role', 'standard_user')
+                            AuditLogger.log(u, "LOGIN", "登录成功", ip=get_client_ip())
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {info}")
+            if st.button("🚪 游客模式", use_container_width=True):
+                st.session_state.logged_in = True
+                st.session_state.user = "guest_user"; st.session_state.role = "guest"; st.rerun()
 
         with tab_register:
-            with st.container(border=True):
-                with st.form("reg_form"):
-                    nu = st.text_input("New User", placeholder="新账号", label_visibility="collapsed")
-                    np = st.text_input("New Pass", type="password", placeholder="新密码", label_visibility="collapsed")
-                    if st.form_submit_button("提交注册", use_container_width=True, type="primary"):
-                        if nu and np:
-                            success, msg = register_user(nu, np)
-                            if success:
-                                from src.auth.audit_logger import AuditLogger
-                                from src.common.utils import get_client_ip
-                                AuditLogger.log(nu, "REGISTER", "注册成功", action_type="AUTH", ip=get_client_ip())
-                                st.success("✅ 注册成功！")
-                            else: st.error(f"❌ {msg}")
+            # 移除外层 container
+            with st.form("reg_form"):
+                nu = st.text_input("New User", placeholder="新账号", label_visibility="collapsed")
+                np = st.text_input("New Pass", type="password", placeholder="新密码", label_visibility="collapsed")
+                if st.form_submit_button("提交注册", use_container_width=True, type="primary"):
+                    if nu and np:
+                        success, msg = register_user(nu, np)
+                        if success:
+                            from src.auth.audit_logger import AuditLogger
+                            from src.common.utils import get_client_ip
+                            AuditLogger.log(nu, "REGISTER", "注册成功", action_type="AUTH", ip=get_client_ip())
+                            st.success("✅ 注册成功！")
+                        else: st.error(f"❌ {msg}")
 
     # --- [v7.9] 全局状态页脚：全屏居中 (脱离列限制) ---
     st.markdown(f"""
