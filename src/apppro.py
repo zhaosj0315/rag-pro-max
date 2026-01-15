@@ -5218,6 +5218,12 @@ for msg_idx, msg in enumerate(state.get_messages()):
             if msg.get("is_data_report"):
                 st.markdown("---")
                 st.markdown("#### 🏦 5.0 极光战略推演工作台 (History)")
+                
+                # [修复] 渲染保存在 report_text 中的报告文本
+                report_content = msg.get("report_text", msg.get("content", ""))
+                if report_content:
+                    st.markdown(report_content)
+                
                 for stage_h in msg.get("stages", []):
                     m_h = stage_h["meta"]
                     with st.expander(f"📍 Stage {m_h['stage_id']}: {m_h['title']}", expanded=True):
@@ -5276,7 +5282,8 @@ for msg_idx, msg in enumerate(state.get_messages()):
             </div>
             """, unsafe_allow_html=True)
             
-        st.markdown(msg["content"])
+        if msg.get("content"):
+            st.markdown(msg["content"])
         
         # 显示统计信息（如果有）- 使用新组件 (Stage 3.1)
         if "stats" in msg and msg["stats"]:
@@ -5289,7 +5296,7 @@ for msg_idx, msg in enumerate(state.get_messages()):
         # 引用按钮 (P2 恢复功能)
         if role == "assistant":
             if st.button("📌 引用此回复", key=f"quote_{msg_idx}"):
-                st.session_state.quote_content = msg["content"]
+                st.session_state.quote_content = msg.get("report_text", msg["content"])
                 st.rerun()
 
         # 渲染静态建议 (仅用于自动摘要)
@@ -6456,7 +6463,8 @@ if st.session_state.get('is_processing') and final_prompt:
                                 # 归档并中断
                                 st.session_state.messages.append({
                                     "role": "assistant", 
-                                    "content": full_report, 
+                                    "content": "", # [修复] 内容设为空，防止在历史消息渲染中重复输出
+                                    "report_text": full_report, # 将报告内容存入独立字段
                                     "is_data_report": True, 
                                     "stages": analysis_res["stages"], 
                                     "macro_context": analysis_res.get("macro_context"),
