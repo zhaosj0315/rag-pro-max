@@ -312,11 +312,16 @@ class AsyncWebCrawler:
             is_doc_mode = True
             max_depth = max(max_depth, 50) # 强制深度
             crawl_ignore_robots = True
-            self.semaphore = asyncio.Semaphore(3) # 降速防封
-            self.delay_range = (1.0, 3.0)
+            
+            # 🔥 彻底模仿原生脚本：并发强制设为 1，随机延迟 1-2 秒
+            self.max_concurrent = 1
+            self.semaphore = asyncio.Semaphore(1) 
+            self.delay_range = (1.0, 2.0)
+            
             if status_callback:
                 status_callback(f"🌐 锁定作用域: {global_scope}")
-                status_callback(f"📚 激活文档全量模式: 深度={max_depth}，解除页数截断，降速保护开启")
+                status_callback(f"📚 激活饱和爬取模式: 深度={max_depth}, 已解除页数限制")
+                status_callback(f"🐢 切换至单线程顺序爬取模式 (对齐原生脚本逻辑)")
         
         current_level = [start_url]
         saved_files = []
