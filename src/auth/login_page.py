@@ -136,13 +136,14 @@ def render_login_page():
         }
         .card-icon { font-size: 1.5rem; margin-bottom: 0.8rem; display: block; }
         .card-title { color: #fff; font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; display: block; }
-        /* 修复：描述文字强制纯白，拒绝隐身 */
-        .card-desc {
-            color: #FFFFFF !important; 
-            font-size: 0.85rem;
-            line-height: 1.5;
-            font-weight: 400;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        /* 紧急修复：描述文字强制高亮，拒绝隐身 */
+        .bento-card .card-desc {
+            color: #E5E7EB !important; 
+            font-size: 0.85rem !important;
+            line-height: 1.5 !important;
+            font-weight: 500 !important;
+            opacity: 1 !important;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
         }
 
         /* --- 右侧：登录控制台 (强制上提，消除间隙) --- */
