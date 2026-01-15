@@ -211,11 +211,23 @@ class DataAnalystEngine:
             physical_match = find_physical_match(t_name_str)
             
             if physical_match:
-                if physical_match != t_name_str:
-                    table_mapping[t_name_str] = physical_match
-                    if self.logger: self.logger.info(f"🔗 表名自动对齐: {t_name_str} -> {physical_match}")
-                tables_ready.append(physical_match)
+                # [v6.6.5] 数据持久化校验：表存在不代表有数据
+                try:
+                    row_count = cursor.execute(f"SELECT count(*) FROM {physical_match}").fetchone()[0]
+                except: row_count = 0
+
+                if row_count > 0:
+                    # 表存在且有数据 -> 完美复用
+                    if physical_match != t_name_str:
+                        table_mapping[t_name_str] = physical_match
+                        # if self.logger: self.logger.info(f"🔗 表名自动对齐: {t_name_str} -> {physical_match}")
+                    tables_ready.append(physical_match)
+                    if self.logger: self.logger.info(f"💾 复用现有数据: {physical_match} ({row_count} 行)")
+                else:
+                    # 表存在但为空 -> 需要补全数据
+                    tables_to_mock.append(t_name_str)
             else:
+                # 表不存在 -> 需要建表并仿真
                 tables_to_mock.append(t_name_str)
         
         if tables_to_mock and model_client:
