@@ -136,11 +136,13 @@ def render_login_page():
         }
         .card-icon { font-size: 1.5rem; margin-bottom: 0.8rem; display: block; }
         .card-title { color: #fff; font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; display: block; }
-        /* 修复：描述文字提亮，拒绝隐身 */
+        /* 修复：描述文字强制纯白，拒绝隐身 */
         .card-desc {
-            color: #e5e7eb !important; 
-            font-size: 0.8rem;
-            line-height: 1.4;
+            color: #FFFFFF !important; 
+            font-size: 0.85rem;
+            line-height: 1.5;
+            font-weight: 400;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
 
         /* --- 右侧：登录控制台 (强制上提，消除间隙) --- */
@@ -209,18 +211,18 @@ def render_login_page():
             <div class="flow-steps">
                 <div class="flow-step">
                     <span class="step-num">STEP 01</span>
-                    <span class="step-head">新建资产</span>
-                    <span class="step-desc">支持上传 PDF/Excel、粘贴文本或抓取网页 URL</span>
+                    <span class="step-head">构建基地</span>
+                    <span class="step-desc">新建知识库，一键挂载私有业务文档</span>
                 </div>
                 <div class="flow-step">
                     <span class="step-num">STEP 02</span>
-                    <span class="step-head">素材投喂</span>
-                    <span class="step-desc">拖拽上传，系统自动 OCR 识别并提取元数据</span>
+                    <span class="step-head">投喂素材</span>
+                    <span class="step-desc">全模态 OCR 识别，实时提取核心元数据</span>
                 </div>
                 <div class="flow-step">
                     <span class="step-num">STEP 03</span>
                     <span class="step-head">智能洞察</span>
-                    <span class="step-desc">开启 Deep Think 模式，进行多轮对话与溯源查证</span>
+                    <span class="step-desc">深度逻辑推演，产出镜像级业务报告</span>
                 </div>
             </div>
         </div>
@@ -229,19 +231,19 @@ def render_login_page():
         st.markdown("""
         <div class="bento-grid">
             <div class="bento-card">
-                <span class="card-icon">🖼️</span>
-                <span class="card-title">全模态解析</span>
-                <span class="card-desc">集成 macOS 原生 OCR，支持 JPG/PNG/PDF 混合解析，零配置即用。</span>
+                <span class="card-icon">📁</span>
+                <span class="card-title">新建资产</span>
+                <span class="card-desc">支持上传 PDF/Excel、粘贴文本或抓取网页 URL</span>
             </div>
             <div class="bento-card">
-                <span class="card-icon">🧠</span>
-                <span class="card-title">深度思考链</span>
-                <span class="card-desc">模拟专家级多步分析，事实核查与跨领域知识整合，提供严谨回答。</span>
+                <span class="card-icon">⚙️</span>
+                <span class="card-title">素材投喂</span>
+                <span class="card-desc">拖拽上传，系统自动 OCR 识别并提取元数据</span>
             </div>
             <div class="bento-card">
-                <span class="card-icon">⚡</span>
-                <span class="card-title">性能基准</span>
-                <span class="card-desc">PDF 处理 ~45秒 (10MB)，支持 GPU/Metal 加速，工业级日志引擎自愈。</span>
+                <span class="card-icon">💡</span>
+                <span class="card-title">智能洞察</span>
+                <span class="card-desc">开启 Deep Think 模式，进行多轮对话与溯源查证</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
