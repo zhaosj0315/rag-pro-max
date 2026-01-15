@@ -230,18 +230,33 @@ class AsyncWebCrawler:
             return []
 
     def _determine_scope(self, url: str) -> str:
-        """智能确定爬取作用域"""
+        """智能确定爬取作用域 - 返回完整URL前缀"""
         parsed = urlparse(url)
         path = parsed.path
-        if 'help.aliyun.com' in parsed.netloc:
+        scheme = parsed.scheme or "https"
+        netloc = parsed.netloc
+        
+        prefix = ""
+        
+        # 针对阿里云帮助文档的专项优化
+        # 格式: /zh/product-name/sub-product/...
+        if 'help.aliyun.com' in netloc:
             parts = path.strip('/').split('/')
             if len(parts) >= 2:
                 if len(parts) >= 3 and parts[0] in ['zh', 'en']:
-                     return '/' + '/'.join(parts[:3]) + '/'
+                     prefix = '/' + '/'.join(parts[:3]) + '/'
                 elif len(parts) >= 2:
-                     return '/' + '/'.join(parts[:2]) + '/'
-        if not path.endswith('/'): path = path.rsplit('/', 1)[0] + '/'
-        return path
+                     prefix = '/' + '/'.join(parts[:2]) + '/'
+        
+        if not prefix:
+            # 默认策略：保留当前目录
+            if not path.endswith('/'):
+                prefix = path.rsplit('/', 1)[0] + '/'
+            else:
+                prefix = path
+                
+        # 返回完整URL前缀 (scheme + netloc + path)
+        return f"{scheme}://{netloc}{prefix}"
     
     def extract_content(self, html_content: str) -> str:
         """提取页面内容"""
