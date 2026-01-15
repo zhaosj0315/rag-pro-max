@@ -674,8 +674,7 @@ class DataAnalystEngine:
                 conn.row_factory = lambda c, r: dict([(col[0], r[idx]) for idx, col in enumerate(c.description)])
                 cursor = conn.cursor()
 
-                clean_sql_block = sql.replace('\
-', ' ').replace('\', '')
+                clean_sql_block = sql.replace('\\\n', ' ').replace('\\', '')
                 statements = [s.strip() for s in clean_sql_block.split(';') if s.strip()]
                 
                 if not statements:
