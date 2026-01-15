@@ -173,19 +173,20 @@ class AsyncWebCrawler:
             
             return None
     
-    def extract_links(self, html_content: str, base_url: str, max_links: int = 999) -> List[str]:
-        """提取链接 - 优化：增加默认提取上限以适配大型文档库"""
+    def extract_links(self, html_content: str, base_url: str, scope_prefix: str = None, max_links: int = 999) -> List[str]:
+        """提取链接 - 优化：支持自定义作用域前缀"""
         try:
             soup = BeautifulSoup(html_content, 'html.parser')
             links = []
             
-            # 自动获取起始路径前缀 (例如 .../analyticdb-for-mysql/)
             parsed_base = urlparse(base_url)
             base_domain = parsed_base.netloc
-            # 路径前缀：保留到倒数第二个斜杠
-            base_path_prefix = parsed_base.path
-            if not base_path_prefix.endswith('/'):
-                base_path_prefix = base_path_prefix.rsplit('/', 1)[0] + '/'
+            
+            # 如果没有指定作用域，默认使用当前URL的目录
+            if not scope_prefix:
+                scope_prefix = parsed_base.path
+                if not scope_prefix.endswith('/'):
+                    scope_prefix = scope_prefix.rsplit('/', 1)[0] + '/'
             
             for link in soup.find_all('a', href=True):
                 href = link.get('href')
@@ -196,10 +197,10 @@ class AsyncWebCrawler:
                 full_url = urljoin(base_url, href).split('#')[0].split('?')[0].rstrip('/')
                 parsed = urlparse(full_url)
                 
-                # 策略：必须是同域名，且优先匹配路径前缀
+                # 策略：必须是同域名，且匹配作用域前缀
                 if parsed.netloc == base_domain:
-                    # 只有当 URL 包含基准路径时才抓取 (防止跑向全站)
-                    if base_path_prefix in parsed.path or parsed.path.startswith(base_path_prefix):
+                    # 检查路径是否以作用域前缀开头
+                    if parsed.path.startswith(scope_prefix):
                         if full_url not in self.visited_urls and full_url not in links:
                             links.append(full_url)
                 
@@ -210,7 +211,28 @@ class AsyncWebCrawler:
         except Exception as e:
             logger.warning(f"提取链接失败: {e}")
             return []
-            return []
+
+    def _determine_scope(self, url: str) -> str:
+        """智能确定爬取作用域"""
+        parsed = urlparse(url)
+        path = parsed.path
+        
+        # 针对阿里云帮助文档的专项优化
+        # 格式: /zh/product-name/sub-product/...
+        if 'help.aliyun.com' in parsed.netloc:
+            parts = path.strip('/').split('/')
+            if len(parts) >= 2:
+                # 保留前两级或三级作为根 (例如 /zh/analyticdb/analyticdb-for-mysql/)
+                # 通常是 /语言/一级产品/二级产品/
+                if len(parts) >= 3 and parts[0] in ['zh', 'en']:
+                     return '/' + '/'.join(parts[:3]) + '/'
+                elif len(parts) >= 2:
+                     return '/' + '/'.join(parts[:2]) + '/'
+        
+        # 默认策略：保留当前目录
+        if not path.endswith('/'):
+            path = path.rsplit('/', 1)[0] + '/'
+        return path
     
     def extract_content(self, html_content: str) -> str:
         """提取页面内容 (使用高保真 HTML2Text 转换)"""
@@ -357,6 +379,11 @@ class AsyncWebCrawler:
         output_path = Path(output_dir)
         output_path.mkdir(exist_ok=True)
         
+        # 🔥 计算全局作用域
+        global_scope = self._determine_scope(start_url)
+        if status_callback:
+            status_callback(f"🌐 锁定爬取作用域: {global_scope}")
+        
         current_level = [start_url]
         saved_files = []
         
@@ -441,9 +468,10 @@ class AsyncWebCrawler:
                 saved_files.append(str(filepath))
                 
                 # 如果还没到最大深度，提取下一级链接
-                # 🔥 关键修复：提取所有有效链接，不限制数量
+                # 🔥 关键修复：提取所有有效链接，并使用全局作用域过滤
                 if depth < max_depth:
-                    links = self.extract_links(result['html'], result['url'])  # 移除max_pages_per_level参数
+                    # 使用当前页面内容提取链接，但传入 GLOBAL scope_prefix
+                    links = self.extract_links(result['html'], result['url'], scope_prefix=global_scope)
                     next_level.extend(links)
             
             # 去重并准备下一层
