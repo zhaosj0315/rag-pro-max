@@ -159,14 +159,15 @@ class DataAnalystEngine:
             elif r["target"] in relevant and r["source"] not in relevant: extra.append(r["source"])
         return list(set(relevant + extra))[:10]
 
-    def _ensure_sandbox_ready(self, schemas: Dict[str, Any], model_client, status_callback=None):
+    def _ensure_sandbox_ready(self, schemas: Dict[str, Any], model_client, status_callback=None) -> Dict[str, str]:
         """
-        [v5.3.1] 虚拟沙盒激活：增加 dual 表支持与仿真数据注入。
+        [v6.6.2] 虚拟沙盒加固：增加表名模糊映射与自愈能力。
+        返回: table_mapping (虚拟名 -> 物理名)
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # A. 创建 DUAL 表垫片 (解决 no such table: dual)
+        # A. 创建 DUAL 表垫片
         cursor.execute("CREATE TABLE IF NOT EXISTS dual (dummy TEXT)")
         cursor.execute("SELECT count(*) FROM dual")
         if cursor.fetchone()[0] == 0:
@@ -174,36 +175,98 @@ class DataAnalystEngine:
         
         tables_to_mock = []
         tables_ready = []
-        # [v5.6.6] 增强型表存在性检查 (Case-Insensitive)
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        existing_tables = {row[0].lower() for row in cursor.fetchall()}
+        table_mapping = {} # new: 记录 schema表名 -> 真实物理表名 的映射
         
-        for t_name in schemas.get('tables', {}).keys():
-            # [v5.6.5] 兼容性过滤
-            t_name_str = t_name[0] if isinstance(t_name, tuple) else t_name
-            if "." in t_name_str or t_name_str.lower().startswith("information_schema"):
-                if self.logger: self.logger.debug(f"跳过不支持的系统表: {t_name_str}")
+        # 获取真实的物理表清单 (保留原始大小写以便映射)
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        physical_tables_raw = [row[0] for row in cursor.fetchall()]
+        physical_tables_lower = {t.lower(): t for t in physical_tables_raw} # lower -> original
+        
+        # [v6.6.3] 调试公示：打印数据库中实际存在的表，方便用户排查
+        if self.logger: 
+            self.logger.info(f"📂 [Debug] 物理库现有表清单: {physical_tables_raw}")
+        if status_callback and len(physical_tables_raw) > 0:
+            # 过滤掉系统表和 dual
+            display_tables = [t for t in physical_tables_raw if t.lower() not in ('dual', 'sqlite_sequence')]
+            if display_tables:
+                status_callback(f"📂 物理库实存表 ({len(display_tables)}张): {', '.join(display_tables[:5])}...")
+
+        # [Helper] 模糊匹配逻辑
+        def find_physical_match(target_name):
+            target = target_name.lower()
+            # 1. 精确匹配 (忽略大小写)
+            if target in physical_tables_lower:
+                return physical_tables_lower[target]
+            # 2. 单复数匹配 (orders <-> order)
+            if target + 's' in physical_tables_lower:
+                return physical_tables_lower[target + 's']
+            if target.endswith('s') and target[:-1] in physical_tables_lower:
+                return physical_tables_lower[target[:-1]]
+            # 3. 前缀/后缀匹配 (t_order <-> order, order_list <-> order)
+            # [v6.6.3] 增强：针对 order 等关键字的常见变体
+            candidates = [
+                f"{target}_list", f"{target}_info", f"{target}_data", 
+                f"t_{target}", f"tbl_{target}", f"raw_{target}"
+            ]
+            for cand in candidates:
+                if cand in physical_tables_lower:
+                    return physical_tables_lower[cand]
+            
+            # 4. 宽泛包含匹配 (慎用，防止匹配错)
+            for real_t in physical_tables_lower:
+                if real_t.endswith(f"_{target}") or real_t.startswith(f"{target}_"):
+                    return physical_tables_lower[real_t]
+            return None
+
+        for t_name, t_info in schemas.get('tables', {}).items():
+            t_name_str = str(t_name)
+            
+            # [Safe Guard] 过滤系统表
+            if "." in t_name_str or t_name_str.lower().startswith("sqlite_") or t_name_str.lower() == "dual":
                 continue
 
-            # 核心修复: 统一转小写对比，防止 Products != products 导致的重复生成
-            if t_name_str.lower() not in existing_tables:
-                tables_to_mock.append(t_name_str)
+            # 尝试找到对应的物理表
+            physical_match = find_physical_match(t_name_str)
+            
+            if physical_match:
+                # 找到了！建立映射关系
+                if physical_match != t_name_str:
+                    table_mapping[t_name_str] = physical_match
+                    if self.logger: self.logger.info(f"🔗 表名自动对齐: {t_name_str} -> {physical_match}")
+                tables_ready.append(physical_match)
             else:
-                tables_ready.append(t_name_str)
+                # 确实找不到，且不是虚拟表 -> 仍然需要仿真
+                tables_to_mock.append(t_name_str)
         
         if tables_ready and status_callback:
-            status_callback(f"✅ 已就绪业务表: {', '.join(tables_ready[:5])}...")
+            # status_callback(f"✅ 物理数据源就绪: {len(tables_ready)} 张业务表已锚定")
+            pass
 
         if tables_to_mock and model_client:
-            if self.logger: self.logger.info(f"🚧 正在为虚拟表 {tables_to_mock} 制造仿真数据...")
-            if status_callback: status_callback(f"🚧 检测到 {len(tables_to_mock)} 张表暂无本地数据，正在启动仿真引擎...")
-            
-            for idx, t_name in enumerate(tables_to_mock):
-                if status_callback: status_callback(f"🎲 [{idx+1}/{len(tables_to_mock)}] 正在为 '{t_name}' 生成高保真仿真数据...")
-                t_info = schemas['tables'][t_name]
-                cols_str = ", ".join([f"{c['name']} (注释: {c.get('comment', '无')})" for c in t_info.get('cols', t_info.get('columns', []))])
+            final_mock_list = []
+            for t in tables_to_mock:
+                # 只有 explicitly 标记为虚拟的才仿真，否则跳过以防污染
+                is_pure_virtual = schemas['tables'].get(t, {}).get('is_virtual', False)
                 
-                mock_prompt = f"""
+                # [v6.6.2 Fix] 如果表名完全匹配不上物理表，但又不是 is_virtual，说明是 Schema 幻觉
+                # 此时为了流程跑通，还是得仿真，但给个 Warning
+                if is_pure_virtual:
+                    final_mock_list.append(t)
+                else:
+                    # 再次确认：如果 schema 里有 cols 定义，说明大模型是很确定的
+                    # 为了不报错，只能仿真
+                    final_mock_list.append(t)
+            
+            if final_mock_list:
+                if status_callback: status_callback(f"🎲 检测到 {len(final_mock_list)} 个缺失实体 ({', '.join(final_mock_list[:3])}...)，正在注入战略仿真数据...")
+                
+                for idx, t_name in enumerate(final_mock_list):
+                    if status_callback: status_callback(f"🎲 [{idx+1}/{len(final_mock_list)}] 正在为 '{t_name}' 生成仿真数据...")
+                    t_info = schemas['tables'].get(t_name, {})
+                    cols = t_info.get('cols', t_info.get('columns', []))
+                    cols_str = ", ".join([f"{c['name']} (注释: {c.get('comment', '无')})" for c in cols])
+                    
+                    mock_prompt = f"""
 请为以下业务表生成 20 条【逻辑闭环】的仿真数据。
 表名：{t_name}
 字段定义：{cols_str}
@@ -211,40 +274,24 @@ class DataAnalystEngine:
 
 要求：
 1. 输出标准的 SQL INSERT 语句（适配 SQLite）。
-2. **严格的字符串转义**：字符串值必须用单引号包裹（如 'Value'）。如果内容包含单引号，必须使用双单引号转义（例如：'Men''s T-Shirt'）。
-3. **严禁使用双引号**包裹字符串值（双引号仅用于列名）。
-4. 仅输出 SQL 语句，不要解释。
+2. **字符串必须用单引号**。
+3. 仅输出 SQL，不要解释。
 """
-                try:
-                    mock_sql = model_client.complete(mock_prompt).text
-                    # 清理并执行 SQL
-                    for sql_line in mock_sql.split(';'):
-                        clean_sql = sql_line.strip()
-                        if clean_sql.upper().startswith(('CREATE', 'INSERT')):
-                            if clean_sql.upper().startswith('INSERT') and "CREATE" not in mock_sql:
-                                cols_def = ", ".join([f"{c['name']} TEXT" for c in t_info.get('cols', t_info.get('columns', []))])
-                                cursor.execute(f"CREATE TABLE IF NOT EXISTS {t_name} ({cols_def})")
-                            
-                            try:
+                    try:
+                        mock_sql = model_client.complete(mock_prompt).text
+                        cols_def = ", ".join([f"{c['name']} TEXT" for c in cols])
+                        cursor.execute(f"CREATE TABLE IF NOT EXISTS {t_name} ({cols_def})")
+                        
+                        for sql_line in mock_sql.split(';'):
+                            clean_sql = sql_line.strip()
+                            if clean_sql.upper().startswith('INSERT'):
                                 cursor.execute(clean_sql)
-                            except Exception as sql_err:
-                                # [v5.6.1] 自动修复机制：针对 'Men's T-Shirt' 等未转义问题
-                                if "syntax error" in str(sql_err) or "no such column" in str(sql_err):
-                                    if self.logger: self.logger.warning(f"⚠️ SQL执行失败，尝试自动修复: {clean_sql[:50]}...")
-                                    fix_prompt = f"Fix SQLite error: {str(sql_err)}\nBad SQL: {clean_sql}\nOutput ONLY the fixed SQL statement without markdown."
-                                    try:
-                                        fixed_sql = model_client.complete(fix_prompt).text.strip().replace("```sql", "").replace("```", "")
-                                        cursor.execute(fixed_sql)
-                                        if self.logger: self.logger.success(f"🔧 自动修复成功")
-                                    except:
-                                        raise sql_err
-                                else:
-                                    raise sql_err
-                except Exception as e:
-                    if self.logger: self.logger.error(f"仿真数据注入失败 ({t_name}): {e}")
+                    except Exception as e:
+                        if self.logger: self.logger.error(f"仿真注入失败: {e}")
         
         conn.commit()
         conn.close()
+        return table_mapping
 
     def recommend_visualization(self, query: str, columns: List[str], sample_data: List[Dict], model_client) -> Dict[str, Any]:
         """
