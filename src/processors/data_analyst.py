@@ -490,9 +490,9 @@ class DataAnalystEngine:
                     for chunk in response_gen:
                         if hasattr(chunk, 'delta') and chunk.delta:
                             yield chunk.delta
-                            # update last_text if needed, though delta path usually doesn't need it for tracking 
-                            # unless we mix delta and content usage. 
-                            # Safe approach: if we use delta, we assume it's correct.
+                            # [v6.3.8] Sync state: update last_text even when using delta
+                            # This prevents duplication if we later fall back to content-based logic
+                            last_text += chunk.delta
                         elif hasattr(chunk, 'message') and hasattr(chunk.message, 'content'):
                             # [v6.3.7] Fix for non-delta streaming (e.g. some OpenAI compatible APIs)
                             # Calculate delta from accumulated content
