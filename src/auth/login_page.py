@@ -4,7 +4,7 @@ import os
 from src.auth.user_auth import authenticate_user, register_user
 
 def render_login_page():
-    # --- 1. 数字化指挥中心样式表 (v8.3 高可用加固版) ---
+    # --- 1. 数字化指挥中心样式表 (v8.4 终极标题重构版) ---
     st.markdown("""
         <style>
         /* 全局容器设定 */
@@ -14,7 +14,7 @@ def render_login_page():
             font-family: 'Inter', sans-serif;
         }
         
-        /* 核心背景：增加亮度，减少屏幕反光黑洞感 */
+        /* 核心背景 */
         .stApp {
             background-color: #0f172a;
             background-image: 
@@ -33,25 +33,24 @@ def render_login_page():
             max-width: 100% !important;
         }
 
-        /* --- 左侧：品牌展示区 --- */
+        /* --- 左侧品牌区 --- */
         .hero-title {
             font-size: 5rem;
             font-weight: 900;
             letter-spacing: -2px;
-            color: #ffffff !important; /* 强制纯白 */
+            color: #ffffff !important; 
             margin-bottom: 1rem;
             line-height: 1.1;
             text-shadow: 0 0 40px rgba(59, 130, 246, 0.5);
         }
         .hero-subtitle {
             font-size: 1.5rem;
-            color: #f1f5f9; /* 提亮至 Slate-100 */
+            color: #f1f5f9;
             font-weight: 400;
             margin-bottom: 3rem;
             max-width: 650px;
             line-height: 1.6;
         }
-        
         .stat-value {
             font-size: 2rem;
             font-weight: 700;
@@ -60,36 +59,53 @@ def render_login_page():
         }
         .stat-label {
             font-size: 0.95rem;
-            color: #e2e8f0; /* 提亮标签 */
+            color: #e2e8f0;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
 
-        /* --- 右侧：登录控制台 (彻底消灭死角) --- */
+        /* --- 右侧：登录控制台 (v8.4 优化版) --- */
         .login-panel {
             background: rgba(15, 23, 42, 0.8);
             backdrop-filter: blur(24px);
             border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 24px;
-            padding: 3rem;
+            padding: 2.5rem 3rem 3rem 3rem; /* 调整顶部内边距 */
             box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.8);
+            position: relative; /* 为呼吸灯定位 */
         }
         
-        /* 1. 输入框抢修：淡灰蓝背景 + 纯黑字 + 深灰提示词 */
+        /* 呼吸灯效果 */
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(74, 222, 128, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background-color: #4ade80;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            animation: pulse-green 2s infinite;
+        }
+        
+        /* 1. 输入框 */
         .stTextInput input {
-            background-color: #f8fafc !important; /* 极其淡的蓝色，不刺眼但极清晰 */
+            background-color: #f8fafc !important;
             border: 2px solid #cbd5e1 !important;
-            color: #000000 !important; /* 输入内容纯黑 */
+            color: #000000 !important;
             height: 3.5rem; 
             font-size: 1.1rem;
             border-radius: 10px !important;
         }
         .stTextInput input::placeholder {
-            color: #475569 !important; /* 加深提示词至 Slate-600 */
+            color: #475569 !important;
             opacity: 1 !important;
         }
         
-        /* 2. Label 标签抢修：纯白加粗 */
+        /* 2. Label */
         .stTextInput label p {
             color: #ffffff !important;
             font-size: 1.05rem !important;
@@ -97,9 +113,9 @@ def render_login_page():
             text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
         
-        /* 3. 选项卡抢修：提亮未选中状态 */
+        /* 3. Tabs */
         .stTabs [data-baseweb="tab"] {
-            color: #cbd5e1 !important; /* 提升亮度，不再像 Disabled */
+            color: #cbd5e1 !important;
             font-size: 1.2rem !important;
             font-weight: 600 !important;
             padding-bottom: 12px !important;
@@ -157,24 +173,29 @@ def render_login_page():
         
         st.markdown('<div class="login-panel">', unsafe_allow_html=True)
         
-        # 1. 点亮标题区：纯白粗体，移除背景框
+        # 1. 标题区重构：名副其实的“门头”
         st.markdown("""
-        <h1 style='color:white; margin:0 0 2rem 0; font-size:2.2rem; font-weight:800; letter-spacing:1px;'>Command Center</h1>
+        <div style="margin-bottom: 2rem;">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+                <h1 style='color:white; margin:0; font-size:2.2rem; font-weight:800; letter-spacing:1px; line-height:1.2;'>Command Center</h1>
+                <div style="display:flex; align-items:center; background:rgba(74,222,128,0.1); padding:4px 8px; border-radius:12px; border:1px solid rgba(74,222,128,0.3);">
+                    <div class="status-dot"></div>
+                    <span style="color:#4ade80; font-size:0.7rem; font-weight:700; letter-spacing:0.5px;">ONLINE</span>
+                </div>
+            </div>
+            <div style="color:#94a3b8; font-size:0.9rem; letter-spacing:1px; margin-top:4px; font-weight:500;">SECURE ACCESS TERMINAL</div>
+        </div>
         """, unsafe_allow_html=True)
-        
-        # 移除了所有多余的间距 div，防止产生“黑洞”感
         
         tab_login, tab_register = st.tabs(["Access Login", "Create Account"])
         
         with tab_login:
-            # 2. 头像冲突抢修：在此页面彻底禁用/移除任何浮动头像
             with st.form("login_form"):
                 u = st.text_input("Username", placeholder="Enter your ID", label_visibility="visible")
                 p = st.text_input("Password", type="password", placeholder="Enter your password", label_visibility="visible")
                 
                 st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
                 
-                # 按钮加大，确保不被遮挡
                 if st.form_submit_button("Launch Command System", use_container_width=True, type="primary"):
                     if u and p:
                         from src.auth.audit_logger import AuditLogger
