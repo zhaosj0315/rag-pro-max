@@ -14,6 +14,37 @@ class DataAnalystEngine:
         self.db_path = os.path.join(kb_path, "business_data.db")
         self.schema_path = os.path.join(kb_path, "business_schema.json")
         self.blueprint_path = os.path.join(kb_path, "business_blueprint.json")
+        self.memory_path = os.path.join(kb_path, "business_sql_memory.json")
+
+    def _load_memory(self) -> List[Dict]:
+        """[v6.6.0] 加载分析记忆库"""
+        if os.path.exists(self.memory_path):
+            try:
+                with open(self.memory_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except: pass
+        return []
+
+    def _save_memory(self, query: str, sql: str, goal: str):
+        """[v6.6.0] 沉淀分析经验"""
+        try:
+            memories = self._load_memory()
+            # 简单的去重策略
+            for m in memories:
+                if m['query'] == query: return
+            
+            memories.append({
+                "query": query,
+                "goal": goal,
+                "sql": sql,
+                "timestamp": datetime.now().isoformat()
+            })
+            # 保持最近 50 条记忆
+            if len(memories) > 50: memories = memories[-50:]
+            
+            with open(self.memory_path, 'w', encoding='utf-8') as f:
+                json.dump(memories, f, indent=2, ensure_ascii=False)
+        except: pass
 
     def extract_schema_from_docs(self, docs: List[Any], model_client, status_callback=None) -> Dict[str, Any]:
         """
@@ -284,9 +315,16 @@ class DataAnalystEngine:
 
         if status_callback: status_callback("🎯 正在拆解战略目标与分析路径...")
         decomposition_prompt = f"""
-你是一名顶级商业技术顾问。针对用户需求，请将其拆解为 2 个逻辑递进的分析阶段。
+你是一名顶级商业技术顾问。针对用户需求，请将其拆解为 2-3 个逻辑递进的分析阶段。
 需求：{query}
 业务模型：{json.dumps(pruned_schemas, ensure_ascii=False)}
+
+【关键策略】：
+1. **数据依赖 (Drill Down)**：如果需求涉及深入分析（如“找出异常并分析原因”），请确保 Stage 2 的逻辑能利用 Stage 1 的产出（例如：Stage 1 找出 ID，Stage 2 使用 WHERE id IN (...)）。
+2. **逻辑递进**：
+   - Stage 1: 现象摸排/范围圈定 (Broad Scan)
+   - Stage 2: 核心指标计算/归因 (Core Analysis)
+   - Stage 3: 趋势预测/细分对比 (Optional Deep Dive)
 
 请返回标准的 JSON 数组，格式如下：
 [
@@ -296,7 +334,7 @@ class DataAnalystEngine:
     "requirement": "【需求理解】本阶段要解决的业务核心痛点是什么",
     "transformation": "【技术转化】本阶段将如何通过数据加工（逻辑、表、指标）来满足上述需求",
     "goal": "具体执行目标", 
-    "logic": "核心算法说明" 
+    "logic": "核心算法说明 (如：利用 Stage 1 产出的 user_id 列表进行二次筛选)" 
   }},
   ...
 ]"""
@@ -322,28 +360,55 @@ class DataAnalystEngine:
                 if s_res["success"] and s_res["data"]:
                     sample_context += f"- 表 '{t_name}' 数据样例: {json.dumps(s_res['data'], ensure_ascii=False)}\n"
 
+            # [v6.6.0] 跨阶段上下文注入 (Cross-Stage Context Injection)
+            # 将前序阶段的分析结果注入到当前 SQL 生成 Prompt 中，实现“数据依赖”
+            prior_context_str = ""
+            if full_analysis_context:
+                prior_context_str = f"\n【前序阶段分析结论 (关键上下文)】:\n{full_analysis_context}\n\n**重要指令**：如果前序结论中包含特定的 ID、日期或异常值，请务必在 SQL 的 WHERE 子句中使用它们（例如 `WHERE id IN (...)`），以实现深入分析。"
+
+            # [v6.6.0] 分析记忆唤醒 (Analysis Memory Recall)
+            memory_context_str = ""
+            try:
+                memories = self._load_memory()
+                relevant_mems = []
+                keywords = meta.get('logic', meta['title'])[:10] # 简单取前10个字作为关键词
+                for m in memories:
+                    if any(k in m['query'] or k in m['goal'] for k in list(keywords)):
+                        relevant_mems.append(f"- 历史参考SQL ({m['goal']}): {m['sql']}")
+                
+                if relevant_mems:
+                    memory_context_str = "\n【历史成功案例 (Few-Shot)】:\n" + "\n".join(relevant_mems[-2:]) # 取最近2条
+            except: pass
+
             sql_prompt = f"""
 基于分析路径："{analysis_path}"，请编写高度可读、带有详细业务注释的多方言 SQL。
 业务背景：{pruned_schemas['macro_context']}
 模型：{json.dumps(pruned_schemas['tables'], ensure_ascii=False)}
 数据样例（请参考真实的时间格式、状态值等）：
 {sample_context}
+{prior_context_str}
+{memory_context_str}
 
 要求：
 1. **严格限制字段与表名**：
    - **绝对禁止**使用模型中不存在的表名。
-   - **严禁凭空想象字段名**：必须且仅能使用下述【模型】和【数据样例】中明确出现的列名。例如：如果样例中只有 `price` 而没有 `cost_price`，你决不能在 SQL 中使用 `cost_price`。
-   - 如果需要中间结果，请使用 Common Table Expression (WITH clause)。
-2. **必须包含详细的行级注释**：
-   - 使用 '--' 解释每一段核心逻辑（如 FILTER, JOIN, AGGREGATE）。
+   - **严禁凭空想象字段名**：必须且仅能使用下述【模型】和【数据样例】中明确出现的列名。
+   - 字段名若包含特殊字符请使用双引号包裹。
+
+2. **强制使用模块化编程 (CTE)**：
+   - **严禁写超过 15 行的嵌套子查询**。必须使用 `WITH ... AS (...)` 将逻辑拆解为多个独立、命名的步骤。
+   - **命名规范**：CTE 名称必须反映业务含义（如 `active_users`, `monthly_revenue`），禁止使用 `t1`, `temp`。
+
+3. **面向小白的详细注释**：
+   - **在每个 CTE 代码块之前**，必须加一段中文注释，解释“这一步是为了算什么”。
    - 解释复杂的计算公式背后的业务含义。
-3. **严谨的 SQL 语法**：
-   - **SQLite 版本特别约束**：
-     - **绝对禁止在 WHERE 子句中使用聚合函数** (如 AVG, SUM, COUNT)。如果需要基于聚合结果过滤，请使用 HAVING 子句或子查询。
-     - **严禁使用 QUALIFY** 关键字。
-     - **严禁使用 ? 占位符** (所有变量必须在 SQL 中直接展开为字面量)。
-     - 字段名若包含特殊字符请使用双引号包裹。
-4. 返回一个 JSON 对象，包含三个字段：
+
+4. **严谨的 SQL 语法 (SQLite 兼容)**：
+   - **绝对禁止在 WHERE 子句中使用聚合函数** (如 AVG, SUM)。必须将其移至 HAVING 子句中。
+   - **严禁使用 QUALIFY** 关键字。
+   - **严禁使用 ? 占位符** (所有变量必须在 SQL 中直接展开为字面量)。
+
+5. 返回一个 JSON 对象，包含三个字段：
    - "dataworks": "生产环境 SQL (MaxCompute语法)，必须包含 ${{bizdate}} 变量"
    - "standard": "标准 ANSI SQL (用于通用数据库验证)"
    - "sqlite": "本地验证 SQL (用于当前环境执行)"
@@ -381,6 +446,9 @@ class DataAnalystEngine:
                 
                 if execution_res["success"]:
                     if status_callback: status_callback(f"⚡ [Stage {meta['stage_id']}] SQL执行成功, 命中 {row_count} 行数据")
+                    # [v6.6.0] 沉淀成功经验
+                    if row_count > 0 and sqls.get("sqlite"):
+                        self._save_memory(query=analysis_path, sql=sqls["sqlite"], goal=meta['title'])
                 else:
                     if status_callback: status_callback(f"⚠️ [Stage {meta['stage_id']}] SQL执行失败: {execution_res.get('error', 'unknown')}")
 
