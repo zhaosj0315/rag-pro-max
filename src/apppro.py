@@ -30,6 +30,24 @@ try:
             # 返回一个哑值的MD5，避免崩溃
             return "0" * 32
     streamlit.watcher.util.calc_md5_with_blocking_retries = _safe_calc_md5
+
+    # 3. Patch LocalSourcesWatcher.on_path_changed (修复 dictionary changed size during iteration)
+    from streamlit.watcher.local_sources_watcher import LocalSourcesWatcher
+    _original_on_path_changed = LocalSourcesWatcher.on_path_changed
+    
+    def _safe_on_path_changed(self, path):
+        try:
+            # 这里的核心修复：将 _watched_modules 转换为 list 副本进行迭代
+            # 避免在迭代过程中其他线程修改字典导致 RuntimeError
+            # 原逻辑: for watched_dir in self._watched_modules:
+            for watched_dir in list(self._watched_modules):
+                if path.startswith(watched_dir):
+                    self._on_file_changed(path)
+                    return
+        except Exception:
+            pass # 忽略即时重载错误，保持主进程稳定
+            
+    LocalSourcesWatcher.on_path_changed = _safe_on_path_changed
     
 except ImportError:
     pass
