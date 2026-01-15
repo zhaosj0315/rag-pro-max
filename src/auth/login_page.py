@@ -4,7 +4,7 @@ import os
 from src.auth.user_auth import authenticate_user, register_user
 
 def render_login_page():
-    # --- 1. 数字化指挥中心样式表 (v7.8 均衡大气版) ---
+    # --- 1. 数字化指挥中心样式表 (v7.9 极效居中版) ---
     st.markdown("""
         <style>
         html, body, [data-testid="stAppViewContainer"] {
@@ -15,7 +15,7 @@ def render_login_page():
             background: radial-gradient(circle at 50% 50%, #1e1b4b 0%, #020617 100%) !important;
         }
         .brand-header {
-            font-size: 3.2rem; /* 恢复大气字号 */
+            font-size: 3.2rem;
             font-weight: 900;
             background: linear-gradient(135deg, #60a5fa 0%, #f472b6 100%);
             -webkit-background-clip: text;
@@ -23,12 +23,6 @@ def render_login_page():
             margin-top: -1.5rem; 
             margin-bottom: 0.5rem;
             letter-spacing: -1px;
-        }
-        .intro-text {
-            font-size: 1.1rem;
-            color: #94a3b8;
-            margin-bottom: 1.5rem;
-            line-height: 1.6;
         }
         .feature-card {
             background: rgba(255, 255, 255, 0.03);
@@ -67,7 +61,7 @@ def render_login_page():
             font-size: 0.8rem;
         }
         .block-container {
-            padding-top: 2rem !important; /* 再上移一点，从容不迫 */
+            padding-top: 2rem !important;
             padding-bottom: 0rem !important;
             max-width: 95% !important;
             padding-left: 5rem !important;
@@ -81,7 +75,7 @@ def render_login_page():
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
-            margin-top: 1rem; /* 保持与左侧视觉齐平 */
+            margin-top: 1rem;
         }
         .stTabs [data-baseweb="tab-list"] {
             gap: 8px;
@@ -99,13 +93,13 @@ def render_login_page():
     now = datetime.now()
     greeting = "🚀 智慧中台 · 全速进化" if 5 <= now.hour < 18 else "🌙 深夜备战 · 永不熄灯"
 
+    # --- 顶层布局：品牌与认证 ---
     col_brand, col_space, col_auth = st.columns([1.2, 0.2, 1]) 
 
     with col_brand:
         st.markdown(f"<h1 class='brand-header'>RAG Pro Max</h1>", unsafe_allow_html=True)
-        st.markdown(f"<p style='color: #60a5fa; font-weight: 600; margin-bottom: 1.5rem; font-size:1rem; display:flex; align-items:center;'><span style='margin-right:8px'></span>{greeting}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color: #60a5fa; font-weight: 600; margin-bottom: 1.5rem; font-size:1rem; display:flex; align-items:center;'>{greeting}</p>", unsafe_allow_html=True)
         
-        # --- [v7.8] 卡片式指引 ---
         steps = [
             ("📁 投喂素材", "左侧工具栏上传 PDF/CSV 或抓取网页"),
             ("⚙️ 模式选径", "切换标准对话或数据分析，精准匹配需求"),
@@ -124,7 +118,6 @@ def render_login_page():
             </div>
             """, unsafe_allow_html=True)
 
-        # --- [v7.8] 核心能力速览 (微调间距) ---
         st.markdown("""
         <div style='display: flex; gap: 12px; margin-top: 1rem;'>
             <div style='flex: 1; background: rgba(16,185,129,0.05); border: 1px solid rgba(16,185,129,0.2); padding: 10px; border-radius: 10px; text-align: center;'>
@@ -135,14 +128,6 @@ def render_login_page():
                 <div style='color: #60a5fa; font-weight: bold; font-size: 0.9rem; margin-bottom: 2px;'>📊 数据推演</div>
                 <div style='color: #64748b; font-size: 0.7rem;'>业务逻辑 深度洞察</div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown(f"""
-        <div style="margin-top: 1.5rem; color: #475569; font-size: 0.75rem; font-family: monospace; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px; display: flex; justify-content: space-between; align-items: center;">
-            <span>STATUS: <span style="color:#10b981">● READY</span></span>
-            <span>ACCELERATION: <span style="color:#60a5fa">METAL</span></span>
-            <span>v6.6.0</span>
         </div>
         """, unsafe_allow_html=True)
 
@@ -187,3 +172,12 @@ def render_login_page():
                                 AuditLogger.log(nu, "REGISTER", "注册成功", action_type="AUTH", ip=get_client_ip())
                                 st.success("✅ 注册成功！")
                             else: st.error(f"❌ {msg}")
+
+    # --- [v7.9] 全局状态页脚：全屏居中 (脱离列限制) ---
+    st.markdown(f"""
+    <div style="margin-top: 2rem; color: #475569; font-size: 0.75rem; font-family: monospace; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px; display: flex; justify-content: center; gap: 60px; align-items: center; width: 100%;">
+        <span>STATUS: <span style="color:#10b981">● READY</span></span>
+        <span>ACCELERATION: <span style="color:#60a5fa">METAL</span></span>
+        <span>v6.6.0</span>
+    </div>
+    """, unsafe_allow_html=True)
