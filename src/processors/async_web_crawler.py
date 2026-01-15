@@ -188,6 +188,9 @@ class AsyncWebCrawler:
                 if not scope_prefix.endswith('/'):
                     scope_prefix = scope_prefix.rsplit('/', 1)[0] + '/'
             
+            # 预处理作用域前缀，移除尾斜杠以确保根路径匹配
+            check_prefix = scope_prefix.rstrip('/')
+            
             for link in soup.find_all('a', href=True):
                 href = link.get('href')
                 if not href or href.startswith(('#', 'javascript:', 'mailto:')):
@@ -199,8 +202,8 @@ class AsyncWebCrawler:
                 
                 # 策略：必须是同域名，且匹配作用域前缀
                 if parsed.netloc == base_domain:
-                    # 检查路径是否以作用域前缀开头
-                    if parsed.path.startswith(scope_prefix):
+                    # 检查路径是否以作用域前缀开头 (移除尾斜杠进行比较)
+                    if parsed.path.rstrip('/').startswith(check_prefix):
                         if full_url not in self.visited_urls and full_url not in links:
                             links.append(full_url)
                 
@@ -246,50 +249,35 @@ class AsyncWebCrawler:
     async def crawl_url(self, url: str, status_callback: Optional[Callable] = None, ignore_robots: bool = False) -> Optional[Dict]:
         """爬取单个URL"""
         if status_callback:
-            status_callback(f"🔍 开始处理URL: {url}")
+            status_callback(f"🔍 正在处理: {url}")
             
         if url in self.visited_urls:
-            if status_callback:
-                status_callback(f"⏭️ URL已访问，跳过: {url}")
             return None
             
         if url in self.failed_urls:
-            if status_callback:
-                status_callback(f"⏭️ URL之前失败，跳过: {url}")
             return None
         
         # 检查robots.txt（可选）
         if not ignore_robots and not await self.check_robots_txt(url):
             if status_callback:
-                status_callback(f"🚫 robots.txt禁止访问: {url}")
+                status_callback(f"🚫 robots.txt 禁止: {url}")
             return None
-        
-        if status_callback:
-            status_callback(f"🔄 异步爬取: {url}")
         
         html_content = await self.fetch_with_retry(url)
         if not html_content:
             if status_callback:
-                status_callback(f"❌ 获取HTML失败: {url}")
+                status_callback(f"❌ 获取失败: {url}")
             return None
         
         # 提取内容
         content = self.extract_content(html_content)
         
-        # 调试信息
-        if status_callback:
-            status_callback(f"📊 HTML长度: {len(html_content)}, 提取内容长度: {len(content)}")
-        
         # 检查内容是否为空或太短
         if len(content.strip()) < 100:
-            if status_callback:
-                status_callback(f"⚠️ 内容太短，跳过: {url} (长度: {len(content)})")
             return None
         
         # 内容去重检查
         if self.is_duplicate_content(content):
-            if status_callback:
-                status_callback(f"🔄 跳过重复内容: {url}")
             return None
         
         # 提取标题
@@ -303,7 +291,7 @@ class AsyncWebCrawler:
         self.visited_urls.add(url)
         
         if status_callback:
-            status_callback(f"✅ 已爬取: {title} ({len(content)} 字符)")
+            status_callback(f"✅ 已保存: {title} ({len(content)} 字符)")
         
         return {
             'url': url,
@@ -381,8 +369,17 @@ class AsyncWebCrawler:
         
         # 🔥 计算全局作用域
         global_scope = self._determine_scope(start_url)
-        if status_callback:
-            status_callback(f"🌐 锁定爬取作用域: {global_scope}")
+        
+        # [Aliyun Optimization] 专项优化：文档全量模式
+        is_doc_mode = False
+        crawl_ignore_robots = self.ignore_robots
+        if global_scope and len(global_scope) > 1: # 确保不是根目录
+            is_doc_mode = True
+            max_depth = max(max_depth, 50) # 强制扩展深度至50层
+            crawl_ignore_robots = True # 文档模式下强制忽略 robots.txt 以确保全量
+            if status_callback:
+                status_callback(f"🌐 锁定爬取作用域: {global_scope}")
+                status_callback(f"📚 激活文档全量模式: 深度扩展至 {max_depth}，解除单层页数限制，忽略 robots.txt")
         
         current_level = [start_url]
         saved_files = []
@@ -399,16 +396,20 @@ class AsyncWebCrawler:
                 break
             
             # 🔥 关键修复：每层的页面数量应该是 max_pages_per_level^depth
-            current_layer_limit = max_pages_per_level ** depth
+            # [Aliyun Optimization] 文档模式下解除限制
+            if is_doc_mode:
+                current_layer_limit = 999999 # 无限宽
+            else:
+                current_layer_limit = max_pages_per_level ** depth
             
             # 限制当前层处理的URL数量
             current_level = current_level[:current_layer_limit]
             
             if status_callback:
-                status_callback(f"📂 第{depth}层: 并发处理 {len(current_level)} 个URL (限制: {current_layer_limit})")
+                status_callback(f"📂 第{depth}层: 并发处理 {len(current_level)} 个URL")
             
             # 并发爬取当前层级的所有URL
-            tasks = [self.crawl_url(url, status_callback, ignore_robots=self.ignore_robots) for url in current_level]
+            tasks = [self.crawl_url(url, status_callback, ignore_robots=crawl_ignore_robots) for url in current_level]
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
             next_level = []
@@ -421,35 +422,29 @@ class AsyncWebCrawler:
                     continue
                 
                 if result is None:
-                    if status_callback:
-                        status_callback(f"⚠️ 爬取返回None: {current_level[i]}")
                     continue
                 
                 level_success += 1
                 
-                # 保存文件 - 优化文件名映射逻辑 (参考用户提供的阿里云优化方案)
+                # 保存文件
                 url = result.get('url', '')
                 title = result.get('title', '').strip()
                 
-                # 方案 A: 优先使用 URL 路径生成文件名 (更适合技术文档结构)
+                # 方案 A: 优先使用 URL 路径生成文件名
                 path = urlparse(url).path
                 if path.startswith('/'): path = path[1:]
-                # 将路径中的斜杠替换为下划线
                 url_filename = path.replace('/', '_').strip('_')
                 
                 if url_filename:
-                    # 确保文件名合法
                     url_filename = "".join(c for c in url_filename if c.isalnum() or c in ('-', '_')).strip()
                     filename = f"{url_filename}.md"
                 elif title:
-                    # 方案 B: 使用标题
                     safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
                     safe_title = safe_title.replace(' ', '_')[:50]
                     filename = f"{safe_title}.md"
                 else:
                     filename = f"page_{int(time.time())}_{len(saved_files)+1}.md"
                 
-                # 检查文件名是否已存在，防止覆盖
                 filepath = output_path / filename
                 if filepath.exists():
                     filename = f"{filename[:-3]}_{len(saved_files)+1}.md"
@@ -462,34 +457,29 @@ class AsyncWebCrawler:
                     await f.write(f"**Content Length:** {len(result['content'])}\n\n")
                     await f.write(f"**Content:**\n\n{result['content']}")
                 
-                # 为文件设置 macOS 下载来源元数据
                 set_where_from_metadata(str(filepath), result['url'])
-                
                 saved_files.append(str(filepath))
                 
                 # 如果还没到最大深度，提取下一级链接
-                # 🔥 关键修复：提取所有有效链接，并使用全局作用域过滤
                 if depth < max_depth:
-                    # 使用当前页面内容提取链接，但传入 GLOBAL scope_prefix
-                    links = self.extract_links(result['html'], result['url'], scope_prefix=global_scope)
+                    # [Aliyun Optimization] 解除单页链接提取上限
+                    extract_limit = 100000 if is_doc_mode else 999
+                    links = self.extract_links(result['html'], result['url'], scope_prefix=global_scope, max_links=extract_limit)
                     next_level.extend(links)
             
             # 去重并准备下一层
             current_level = [u for u in list(set(next_level)) if u not in self.visited_urls]
             
             if status_callback:
-                status_callback(f"🎯 第{depth}层完成: 成功 {level_success} 页，发现 {len(current_level)} 个待抓取链接")
+                status_callback(f"🎯 第{depth}层完成: 成功 {level_success} 页，新发现 {len(current_level)} 个待爬取链接")
             
-            # 定期保存状态
             await self.save_state()
             
-            # 如果当前层没有抓到任何东西，或者下一层没链接了，提前结束
             if not current_level:
                 break
         
         if status_callback:
             status_callback(f"🎉 异步爬取完成！获取 {len(saved_files)} 个页面")
-            status_callback(f"📈 统计: 访问 {len(self.visited_urls)} 个URL，失败 {len(self.failed_urls)} 个")
         
         return saved_files
 
