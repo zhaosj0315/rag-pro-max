@@ -164,8 +164,8 @@ def render_login_page():
         st.markdown("""
         <div class="stats-row">
             <div class="stat-item">
-                <span class="stat-value">Multi-Modal</span>
-                <span class="stat-label">全模态解析</span>
+                <span class="stat-value">多模态解析</span>
+                <span class="stat-label">Multi-Modal</span>
             </div>
             <div class="stat-item">
                 <span class="stat-value">Deep Think</span>
@@ -179,32 +179,34 @@ def render_login_page():
         """, unsafe_allow_html=True)
 
     with col_right:
-        # 直接输出登录面板容器，移除所有干扰项，添加负 margin 强制上移对齐
-        st.markdown('<div class="login-panel" style="margin-top: -0.5rem;">', unsafe_allow_html=True)
+        # 移除了所有顶部占位符 div，让面板自然上浮
         
-        # 1. 标题区：紧凑对齐，移除所有多余外壳
+        st.markdown('<div class="login-panel">', unsafe_allow_html=True)
+        
+        # 标题区：紧凑设计
         st.markdown("""
         <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
             <div style="display:flex; align-items:center; justify-content:space-between;">
-                <h1 style='color:white; margin:0; font-size:2rem; font-weight:800; letter-spacing:0.5px;'>Command Center</h1>
+                <h1 style='color:white; margin:0; font-size:2rem; font-weight:800; letter-spacing:0.5px;'>指挥中心</h1>
                 <div style="display:flex; align-items:center; background:rgba(74,222,128,0.1); padding:4px 10px; border-radius:20px; border:1px solid rgba(74,222,128,0.3);">
                     <div class="status-dot"></div>
-                    <span style="color:#4ade80; font-size:0.7rem; font-weight:700; letter-spacing:0.5px;">ONLINE</span>
+                    <span style="color:#4ade80; font-size:0.7rem; font-weight:700; letter-spacing:0.5px;">在线</span>
                 </div>
             </div>
-            <div style="color:#94a3b8; font-size:0.85rem; letter-spacing:1px; margin-top:6px; font-weight:500;">SECURE ACCESS TERMINAL v6.6.0</div>
+            <div style="color:#94a3b8; font-size:0.85rem; letter-spacing:1px; margin-top:6px; font-weight:500;">安全接入终端 v6.6.0</div>
         </div>
         """, unsafe_allow_html=True)
         
-        tab_login, tab_register = st.tabs(["Access Login", "Create Account"])
+        tab_login, tab_register = st.tabs(["账号登录", "注册账号"])
         
         with tab_login:
-            # 彻底移除头像组件，保持纯净表单
             with st.form("login_form"):
-                u = st.text_input("Username", placeholder="Enter your ID", label_visibility="visible")
-                p = st.text_input("Password", type="password", placeholder="Enter your password", label_visibility="visible")
+                u = st.text_input("用户名", placeholder="请输入用户名", label_visibility="visible")
+                p = st.text_input("密码", type="password", placeholder="请输入密码", label_visibility="visible")
+                
                 st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
-                if st.form_submit_button("Launch Command System", use_container_width=True, type="primary"):
+                
+                if st.form_submit_button("启动指挥系统", use_container_width=True, type="primary"):
                     if u and p:
                         from src.auth.audit_logger import AuditLogger
                         from src.common.utils import get_client_ip
@@ -221,32 +223,34 @@ def render_login_page():
                         else:
                             st.error(f"❌ {info}")
             
-            # 幽灵按钮
+            # 幽灵按钮重构
             st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-            if st.button("Guest Mode (Read Only)", use_container_width=True, type="secondary"):
+            if st.button("访客模式 (仅预览)", use_container_width=True, type="secondary"):
                 st.session_state.logged_in = True
                 st.session_state.user = "guest_user"; st.session_state.role = "guest"; st.rerun()
 
         with tab_register:
             with st.form("reg_form"):
-                nu = st.text_input("New Username", placeholder="Create your ID", label_visibility="visible")
-                np = st.text_input("New Password", type="password", placeholder="Set secure password", label_visibility="visible")
+                nu = st.text_input("新用户名", placeholder="设置您的登录 ID", label_visibility="visible")
+                np = st.text_input("新密码", type="password", placeholder="设置安全密码", label_visibility="visible")
                 st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
-                if st.form_submit_button("Initialize Account", use_container_width=True, type="primary"):
+                if st.form_submit_button("初始化账号", use_container_width=True, type="primary"):
                     if nu and np:
                         success, msg = register_user(nu, np)
                         if success:
                             from src.auth.audit_logger import AuditLogger
                             from src.common.utils import get_client_ip
                             AuditLogger.log(nu, "REGISTER", "注册成功", action_type="AUTH", ip=get_client_ip())
-                            st.success("✅ Success! Please Login")
+                            st.success("✅ 注册成功！请切换至登录页")
                         else: st.error(f"❌ {msg}")
         
         st.markdown('</div>', unsafe_allow_html=True) 
 
-    # --- 底部版权 ---
+    # --- [v7.9] 全局状态页脚：全屏居中 (固定于底部) ---
     st.markdown(f"""
-    <div style="position: fixed; bottom: 1.5rem; left: 0; width: 100%; text-align: center; color: rgba(255,255,255,0.3); font-size: 0.7rem; font-family: monospace; pointer-events: none;">
-        RAG PRO MAX ENTERPRISE EDITION v6.6.0 &copy; 2026 | ALL SYSTEMS OPERATIONAL
+    <div style="position: fixed; bottom: 2rem; left: 0; width: 100%; color: #475569; font-size: 0.75rem; font-family: monospace; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px; display: flex; justify-content: center; gap: 60px; align-items: center; z-index: 100;">
+        <span>系统状态: <span style="color:#10b981">● 就绪</span></span>
+        <span>硬件加速: <span style="color:#60a5fa">苹果芯片加速</span></span>
+        <span>版本 v6.6.0</span>
     </div>
     """, unsafe_allow_html=True)

@@ -2464,7 +2464,7 @@ with st.sidebar:
             # --- [v7.0] 极光战略指挥中心 - 首页重构 ---
             st.markdown(f"""
             <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 2.5rem; border-radius: 16px; margin-bottom: 2rem; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.3);">
-                <h1 style="color: #ffffff; margin-bottom: 0.5rem; letter-spacing: -1px;">🚀 RAG Pro Max <span style="font-size: 1.2rem; color: #60a5fa; font-weight: 600; vertical-align: middle; margin-left: 10px;">Enterprise v6.5.1</span></h1>
+                <h1 style="color: #ffffff; margin-bottom: 0.5rem; letter-spacing: -1px;">🚀 RAG Pro Max <span style="font-size: 1.2rem; color: #60a5fa; font-weight: 600; vertical-align: middle; margin-left: 10px;">Enterprise v6.6.0</span></h1>
                 <p style="color: #94a3b8; font-size: 1.15rem; line-height: 1.6; max-width: 800px;">
                     <b>下一代私有化智能认知中台</b>。深度融合了多模态语义解析、结构化 SQL 推演与专家级可视化引擎，
                     致力于将碎片化的非结构化文档转化为具备决策价值的<b>数字资产</b>。
@@ -2486,11 +2486,11 @@ with st.sidebar:
             with dash_col1:
                 st.metric("核心资产库", kb_count, help="当前管理的物理知识库数量")
             with dash_col2:
-                st.metric("认知引擎状态", "Metal/MPS" if platform.system() == "Darwin" else "CUDA/Ready")
+                st.metric("认知引擎状态", "Metal 硬件加速" if platform.system() == "Darwin" else "CUDA 并行就绪")
             with dash_col3:
-                st.metric("数据分析基因", "Active", delta="v6.5.1")
+                st.metric("数据分析基因", "全量开启", delta="v6.6.0")
             with dash_col4:
-                st.metric("日志合规性", "Level 666", help="所有系统日志均已实现权限自愈")
+                st.metric("审计日志合规", "极致安全", help="所有系统日志均已实现权限自愈")
 
             st.markdown("---")
 
@@ -2502,27 +2502,27 @@ with st.sidebar:
                 with st.container(border=True):
                     st.markdown("##### 📄 全模态解析")
                     st.caption("不仅仅是文本。支持 PDF 表格还原、Excel 穿透及高精度图片 OCR。")
-                    st.markdown("`Multi-Modal` `OCR` `Excel`")
+                    st.markdown("`多模态` `文字识别` `表格`")
             
             with cap_col2:
                 with st.container(border=True):
                     st.markdown("##### 📊 极光战略工作坊")
                     st.caption("独有的 Text-to-SQL 引擎，支持业务语义建模与交互式可视化分析。")
-                    st.markdown("`Business BI` `SQL` `Chart`")
+                    st.markdown("`业务报表` `查询` `图表`")
 
             with cap_col3:
                 with st.container(border=True):
                     st.markdown("##### 🔍 极致全景研究")
                     st.caption("融合联网搜索与专家会审模式，提供深度、批判性的多维分析报告。")
-                    st.markdown("`Research` `DeepThink`")
+                    st.markdown("`深度研究` `联网搜索`")
             
             with cap_col4:
                 with st.container(border=True):
                     st.markdown("##### 🏗️ 资产全量镜像")
                     st.caption("支持对话、图表、原始文件及数据库的一键全量导出，确保数据主权。")
-                    st.markdown("`Export` `Mirroring`")
+                    st.markdown("`数据镜像` `备份` `导出`")
 
-                    st.markdown("`Local First` `RBAC` `Encrypted`")
+                    st.markdown("`本地部署` `RBAC` `加密`")
 
             st.markdown("---")
 
@@ -2552,11 +2552,11 @@ with st.sidebar:
                 
                 status_html = f"""
                 <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 10px; border: 1px dashed rgba(255,255,255,0.2);">
-                    <div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">System Real-time HUD</div>
+                    <div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">系统实时运行指标 (HUD)</div>
                     <div style="display: flex; gap: 15px; margin-top: 8px;">
-                        <div><span style="color: #60a5fa; font-weight: bold;">CPU</span> <span style="color: white;">{cpu_load}%</span></div>
-                        <div><span style="color: #10b981; font-weight: bold;">MEM</span> <span style="color: white;">{mem_load}%</span></div>
-                        <div><span style="color: #f59e0b; font-weight: bold;">GPU</span> <span style="color: white;">ON</span></div>
+                        <div><span style="color: #60a5fa; font-weight: bold;">处理器</span> <span style="color: white;">{cpu_load}%</span></div>
+                        <div><span style="color: #10b981; font-weight: bold;">内存</span> <span style="color: white;">{mem_load}%</span></div>
+                        <div><span style="color: #f59e0b; font-weight: bold;">加速卡</span> <span style="color: white;">已开启</span></div>
                     </div>
                 </div>
                 """

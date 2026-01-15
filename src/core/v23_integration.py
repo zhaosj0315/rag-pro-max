@@ -45,20 +45,25 @@ class V23Integration:
         recommendations = self.scheduler.get_recommendations()
         current_load = recommendations['current_load']
         
+        # 负载等级汉化 [v6.6.1]
+        level_map = {"low": "轻量", "medium": "中等", "high": "高负荷", "critical": "极高"}
+        cpu_lv = level_map.get(current_load['cpu_level'].lower(), current_load['cpu_level'])
+        mem_lv = level_map.get(current_load['memory_level'].lower(), current_load['memory_level'])
+        
         # 系统状态指示器
         cpu_color = "🟢" if current_load['cpu_percent'] < 50 else "🟡" if current_load['cpu_percent'] < 80 else "🔴"
         memory_color = "🟢" if current_load['memory_percent'] < 60 else "🟡" if current_load['memory_percent'] < 85 else "🔴"
         
         st.sidebar.metric(
-            f"{cpu_color} CPU", 
+            f"{cpu_color} 处理器 (CPU)", 
             f"{current_load['cpu_percent']:.1f}%",
-            delta=f"负载: {current_load['cpu_level']}"
+            delta=f"当前负载: {cpu_lv}"
         )
         
         st.sidebar.metric(
-            f"{memory_color} 内存", 
+            f"{memory_color} 内存 (MEM)", 
             f"{current_load['memory_percent']:.1f}%",
-            delta=f"负载: {current_load['memory_level']}"
+            delta=f"当前负载: {mem_lv}"
         )
         
         # 智能建议
@@ -128,7 +133,10 @@ class V23Integration:
             st.metric("IO工作线程", optimal_config['io_workers'])
         
         with col3:
-            st.metric("负载等级", optimal_config['load_level'].upper())
+            # 负载等级汉化 [v6.6.1]
+            level_map = {"low": "轻量", "medium": "中等", "high": "高负荷", "critical": "极高"}
+            display_level = level_map.get(optimal_config['load_level'].lower(), optimal_config['load_level'].upper())
+            st.metric("实时负载等级", display_level)
         
         # 调度原因
         st.info(f"📋 调度原因: {optimal_config['reasoning']}")

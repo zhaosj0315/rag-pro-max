@@ -157,7 +157,9 @@ def render_admin_management():
             st.divider()
             for uname, info in users.items():
                 u_days = settings.get(uname, g_days)
-                with st.expander(f"{'🟢' if info.get('is_active', True) else '🔴'} {uname} | 角色: {info.get('role')}"):
+                role_id = info.get('role', 'standard_user')
+                role_name = roles_config.get(role_id, {}).get('name', role_id)
+                with st.expander(f"{'🟢' if info.get('is_active', True) else '🔴'} {uname} | 角色: {role_name}"):
                     c1, c2, c3 = st.columns([2, 2, 1])
                     with c1:
                         r_list = list(roles_config.keys())
@@ -205,10 +207,13 @@ def render_admin_management():
             # 使用 session_state 维持选中状态 (支持跨筛选保留)
             is_selected = st.session_state.get(f"asset_sel_{kb}", False)
             
+            raw_owner = manifest.get('owner', 'admin')
+            display_owner = "系统管理员" if raw_owner == "admin" else raw_owner
+            
             asset_data.append({
                 "☑️ 选择": is_selected,
                 "知识库名称": kb, 
-                "所有人": manifest.get('owner', 'admin'), 
+                "所有人": display_owner, 
                 "文件数": file_count, 
                 "格式化大小": format_size(total_size), 
                 "raw_size": total_size
@@ -423,14 +428,25 @@ def render_admin_management():
             
             # 3. 企业级 HTML 流水表 [v6.4.3] 修复缩进导致的源码显露问题
             type_icons = {
-                "AUTH": "🔐", "KB_MGMT": "📂", "DATA_PROCESS": "🧠", 
-                "ADMIN": "🛠️", "SECURITY": "🛡️", "GENERIC": "📝"
+                "AUTH": "认证", "KB_MGMT": "库管理", "DATA_PROCESS": "数据处理", 
+                "ADMIN": "系统管理", "SECURITY": "安全审计", "GENERIC": "通用动作"
             }
             status_colors = {
-                "success": ("#f0fdf4", "#166534", "✅"), 
-                "failed": ("#fef2f2", "#991b1b", "❌"),
-                "warning": ("#fffbeb", "#92400e", "⚠️"),
-                "intercepted": ("#faf5ff", "#6b21a8", "🚫")
+                "success": ("#f0fdf4", "#166534", "成功"), 
+                "failed": ("#fef2f2", "#991b1b", "失败"),
+                "warning": ("#fffbeb", "#92400e", "警告"),
+                "intercepted": ("#faf5ff", "#6b21a8", "拦截")
+            }
+            # 动作名称汉化映射 [v6.6.1]
+            action_map = {
+                "LOGIN": "账户登录", "AUTO_LOGIN": "自动登录", "LOGOUT": "注销退出",
+                "REGISTER": "账号注册", "DELETE_KB": "物理删除库", "CREATE_KB": "创建知识库",
+                "RENAME_KB": "重命名库", "REBUILD_INDEX": "重建索引", "UPLOAD_FILE": "上传文件",
+                "BATCH_AUTH": "批量授权", "BATCH_LOCK": "批量封禁", "USER_UPDATE": "更新用户属性",
+                "SESSION_REVOKE": "注销用户会话", "CONFIG_CHANGE": "全局配置变更",
+                "KB_PUBLIC_BATCH": "批量公开资产", "KB_DIST_BATCH": "批量分发资产",
+                "KB_PRIV_BATCH": "批量设为私有", "BATCH_TRANSFER": "批量所有权移交",
+                "BATCH_DELETE": "批量物理删除", "DATA_ANALYSIS_EXEC": "执行数据推演"
             }
 
             # 关键修复：HTML 字符串行首绝对不能有空格，物理对齐到最左侧
@@ -462,25 +478,30 @@ def render_admin_management():
             for _, row in f_logs.head(200).iterrows():
                 ts = row['timestamp'].strftime('%m-%d %H:%M:%S')
                 a_type = row.get('action_type', 'GENERIC')
-                icon = type_icons.get(a_type, "📝")
+                type_label = type_icons.get(a_type, "通用")
+                
+                # 执行者汉化
+                raw_user = row['user']
+                display_user = "系统管理员" if raw_user == "admin" else raw_user
+                
+                # 动作名称汉化
+                raw_action = row.get('action', 'Unknown')
+                action_label = action_map.get(raw_action, raw_action)
                 
                 s_val = row.get('status', 'success')
-                bg, fg, s_icon = status_colors.get(s_val, ("#f1f5f9", "#475569", "⚪"))
+                bg, fg, s_label = status_colors.get(s_val, ("#f1f5f9", "#475569", "未知"))
                 
                 details_raw = str(row['details']).replace('"', '&quot;')
                 
                 # 每一行都必须紧贴左侧
                 table_html += f"<tr>"
                 table_html += f"<td style='color: #64748b'>{ts}</td>"
-                table_html += f"<td style='font-weight: 700;'>{row['user']}</td>"
-                table_html += f"<td><span class='badge-type'>{icon} {a_type}</span><br><small style='color: #94a3b8;'>{row['action']}</small></td>"
+                table_html += f"<td style='font-weight: 700;'>{display_user}</td>"
+                table_html += f"<td><span class='badge-type'>{type_label}</span><br><small style='color: #94a3b8;'>{action_label}</small></td>"
                 table_html += f"<td class='details-cell' title='{details_raw}'>{details_raw}</td>"
-                table_html += f"<td><span class='badge-status' style='background: {bg}; color: {fg};'>{s_icon} {s_val.upper()}</span></td>"
+                table_html += f"<td><span class='badge-status' style='background: {bg}; color: {fg};'>{s_label}</span></td>"
                 table_html += f"<td class='ip-text'>{row.get('ip', '...')}</td>"
                 table_html += f"</tr>"
-            
-            table_html += "</tbody></table>"
-            st.markdown(table_html, unsafe_allow_html=True)
             
             table_html += "</tbody></table>"
             st.markdown(table_html, unsafe_allow_html=True)
