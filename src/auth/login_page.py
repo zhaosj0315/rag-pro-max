@@ -4,7 +4,7 @@ import os
 from src.auth.user_auth import authenticate_user, register_user
 
 def render_login_page():
-    # --- 1. 数字化指挥中心样式表 (v9.0 驾驶舱仪表盘版) ---
+    # --- 1. 数字化指挥中心样式表 (v9.1 定稿上线版) ---
     st.markdown("""
         <style>
         /* 全局容器设定 */
@@ -33,7 +33,7 @@ def render_login_page():
             max-width: 98% !important;
         }
 
-        /* --- 左侧：仪表盘组件库 --- */
+        /* --- 左侧：驾驶舱仪表盘 --- */
         .hero-title {
             font-size: 4.5rem;
             font-weight: 900;
@@ -51,11 +51,10 @@ def render_login_page():
             line-height: 1.6;
         }
         
-        /* 1. 能力标签云 */
         .tag-cloud {
             display: flex;
             gap: 10px;
-            margin-bottom: 2.5rem;
+            margin-bottom: 2rem;
             flex-wrap: wrap;
         }
         .capability-tag {
@@ -66,12 +65,8 @@ def render_login_page():
             font-size: 0.8rem;
             color: #e2e8f0;
             backdrop-filter: blur(4px);
-            display: flex;
-            align-items: center;
-            gap: 6px;
         }
         
-        /* 2. 新手引导流程卡片 (Flow Card) */
         .flow-container {
             background: rgba(30, 41, 59, 0.6);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -106,12 +101,14 @@ def render_login_page():
             color: #475569;
             font-size: 1.2rem;
         }
+        /* 点亮步骤标签：超亮青色 */
         .step-num {
-            color: #60a5fa;
-            font-size: 0.7rem;
-            font-weight: 700;
+            color: #00FFFF; 
+            font-size: 0.75rem;
+            font-weight: 800;
             margin-bottom: 4px;
             display: block;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
         }
         .step-head {
             color: #fff;
@@ -126,7 +123,6 @@ def render_login_page():
             line-height: 1.4;
         }
 
-        /* 3. Bento Grid 技术秀场 */
         .bento-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -138,63 +134,19 @@ def render_login_page():
             border: 1px solid rgba(255,255,255,0.08);
             border-radius: 12px;
             padding: 1.2rem;
-            transition: all 0.3s ease;
-        }
-        .bento-card:hover {
-            background: rgba(255,255,255,0.06);
-            border-color: rgba(96, 165, 250, 0.3);
-            transform: translateY(-2px);
-        }
-        .card-icon {
-            font-size: 1.5rem;
-            margin-bottom: 0.8rem;
-            display: block;
-        }
-        .card-title {
-            color: #e2e8f0;
-            font-size: 0.95rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            display: block;
-        }
-        .card-desc {
-            color: #94a3b8;
-            font-size: 0.8rem;
-            line-height: 1.4;
         }
 
-        /* 4. 底部更新日志 */
-        .update-log {
-            font-family: monospace;
-            font-size: 0.75rem;
-            color: #64748b;
-            padding-top: 1rem;
-            border-top: 1px dashed rgba(255,255,255,0.1);
-        }
-        .update-tag {
-            background: #10b981;
-            color: #000;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-weight: 700;
-            margin-right: 8px;
-        }
-
-        /* --- 右侧：登录控制台 (保持 v8.5) --- */
+        /* --- 右侧：登录控制台 (彻底铲除废墟) --- */
         .login-panel {
             background: rgba(15, 23, 42, 0.85); 
             backdrop-filter: blur(24px);
             border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 24px;
-            padding: 3rem 3rem 2.5rem 3rem; 
+            padding: 2rem 3rem 2.5rem 3rem; /* 减少顶部内边距 */
             box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.8);
             position: relative;
-            margin-top: 0;
-        }
-        
-        .status-dot {
-            width: 8px; height: 8px; background-color: #4ade80; border-radius: 50%;
-            display: inline-block; margin-right: 6px; box-shadow: 0 0 8px #4ade80;
+            /* 关键：负margin上移，实现视平线对齐 */
+            margin-top: -1.5rem; 
         }
         
         .stTextInput input {
@@ -217,15 +169,17 @@ def render_login_page():
         </style>
     """, unsafe_allow_html=True)
 
+    from datetime import datetime
+    now = datetime.now()
+    greeting = "🚀 智慧中台 · 全速进化" if 5 <= now.hour < 18 else "🌙 深夜备战 · 永不熄灯"
+
     col_left, col_spacer, col_right = st.columns([1.5, 0.2, 1])
 
-    # --- 左侧：驾驶舱仪表盘 ---
+    # --- 左侧：驾驶舱 ---
     with col_left:
-        # 1. 品牌与定义
         st.markdown('<div class="hero-title">RAG Pro Max</div>', unsafe_allow_html=True)
         st.markdown('<div class="hero-subtitle">企业级认知中台 · 深度融合全模态解析 · 专家级 SQL 推演 · 决策智能</div>', unsafe_allow_html=True)
         
-        # 能力标签云
         st.markdown("""
         <div class="tag-cloud">
             <div class="capability-tag">📄 毫秒级检索</div>
@@ -236,7 +190,6 @@ def render_login_page():
         </div>
         """, unsafe_allow_html=True)
 
-        # 2. 新手引导流程 (How to Start)
         st.markdown("""
         <div class="flow-container">
             <div class="flow-title">🚀 快速启动指南 / HOW TO START</div>
@@ -260,7 +213,6 @@ def render_login_page():
         </div>
         """, unsafe_allow_html=True)
 
-        # 3. Bento Grid 技术秀场
         st.markdown("""
         <div class="bento-grid">
             <div class="bento-card">
@@ -281,17 +233,12 @@ def render_login_page():
         </div>
         """, unsafe_allow_html=True)
 
-        # 4. 底部更新日志
-        st.markdown("""
-        <div class="update-log">
-            <span class="update-tag">NEW</span> v6.6.0 - 极光战略指挥中心上线 | 智能数据分析师智能体实装
-        </div>
-        """, unsafe_allow_html=True)
-
-    # --- 右侧：登录控制台 (保持不变) ---
+    # --- 右侧：指挥中心 ---
     with col_right:
+        # 直接输出登录面板容器，移除所有可能产生空白的 st.* 占位符
         st.markdown('<div class="login-panel">', unsafe_allow_html=True)
         
+        # 标题区：紧凑设计，强制上浮
         st.markdown("""
         <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
             <div style="display:flex; align-items:center; justify-content:space-between;">
@@ -314,17 +261,15 @@ def render_login_page():
                 st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
                 if st.form_submit_button("启动指挥系统", use_container_width=True, type="primary"):
                     if u and p:
-                        from src.auth.audit_logger import AuditLogger
-                        from src.common.utils import get_client_ip
+                        from src.auth.user_auth import authenticate_user
                         success, info = authenticate_user(u, p)
                         if success:
                             from src.auth.session_manager import create_session
-                            token, days = create_session(u)
+                            token, _ = create_session(u)
                             st.query_params["session_token"] = token
                             st.session_state.logged_in = True
                             st.session_state.user = u
                             st.session_state.role = info.get('role', 'standard_user')
-                            AuditLogger.log(u, "LOGIN", "登录成功", ip=get_client_ip())
                             st.rerun()
                         else: st.error(f"❌ {info}")
             
@@ -340,11 +285,7 @@ def render_login_page():
                 if st.form_submit_button("初始化账号", use_container_width=True, type="primary"):
                     if nu and np:
                         success, msg = register_user(nu, np)
-                        if success:
-                            from src.auth.audit_logger import AuditLogger
-                            from src.common.utils import get_client_ip
-                            AuditLogger.log(nu, "REGISTER", "注册成功", action_type="AUTH", ip=get_client_ip())
-                            st.success("✅ 注册成功！请切换至登录页")
+                        if success: st.success("✅ 注册成功！请切换至登录页")
                         else: st.error(f"❌ {msg}")
         
         st.markdown('</div>', unsafe_allow_html=True) 
