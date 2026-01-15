@@ -231,19 +231,19 @@ def render_login_page():
         st.markdown("""
         <div class="bento-grid">
             <div class="bento-card">
-                <span class="card-icon">📁</span>
-                <span class="card-title">新建资产</span>
-                <span class="card-desc">支持上传 PDF/Excel、粘贴文本或抓取网页 URL</span>
+                <span class="card-icon">🖼️</span>
+                <span class="card-title">全模态解析</span>
+                <span class="card-desc">集成 macOS 原生 OCR，支持 JPG/PNG/PDF 混合解析，零配置即用。</span>
             </div>
             <div class="bento-card">
-                <span class="card-icon">⚙️</span>
-                <span class="card-title">素材投喂</span>
-                <span class="card-desc">拖拽上传，系统自动 OCR 识别并提取元数据</span>
+                <span class="card-icon">🧠</span>
+                <span class="card-title">深度思考链</span>
+                <span class="card-desc">模拟专家级多步分析，事实核查与跨领域知识整合，提供严谨回答。</span>
             </div>
             <div class="bento-card">
-                <span class="card-icon">💡</span>
-                <span class="card-title">智能洞察</span>
-                <span class="card-desc">开启 Deep Think 模式，进行多轮对话与溯源查证</span>
+                <span class="card-icon">⚡</span>
+                <span class="card-title">性能基准</span>
+                <span class="card-desc">PDF 处理 ~45秒 (10MB)，支持 GPU/Metal 加速，工业级日志引擎自愈。</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
