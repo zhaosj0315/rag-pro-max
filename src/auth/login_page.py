@@ -4,7 +4,7 @@ import os
 from src.auth.user_auth import authenticate_user, register_user
 
 def render_login_page():
-    # --- 1. 数字化指挥中心样式表 (v9.1 定稿上线版) ---
+    # --- 1. 数字化指挥中心样式表 (v9.2 最终对齐高亮版) ---
     st.markdown("""
         <style>
         /* 全局容器设定 */
@@ -47,14 +47,14 @@ def render_login_page():
             font-size: 1.2rem;
             color: #cbd5e1;
             font-weight: 400;
-            margin-bottom: 1.5rem;
+            margin-bottom: 2rem;
             line-height: 1.6;
         }
         
         .tag-cloud {
             display: flex;
             gap: 10px;
-            margin-bottom: 2rem;
+            margin-bottom: 2.5rem;
             flex-wrap: wrap;
         }
         .capability-tag {
@@ -101,7 +101,6 @@ def render_login_page():
             color: #475569;
             font-size: 1.2rem;
         }
-        /* 点亮步骤标签：超亮青色 */
         .step-num {
             color: #00FFFF; 
             font-size: 0.75rem;
@@ -135,18 +134,31 @@ def render_login_page():
             border-radius: 12px;
             padding: 1.2rem;
         }
+        .card-icon { font-size: 1.5rem; margin-bottom: 0.8rem; display: block; }
+        .card-title { color: #fff; font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; display: block; }
+        /* 修复：描述文字提亮，拒绝隐身 */
+        .card-desc {
+            color: #e5e7eb !important; 
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
 
-        /* --- 右侧：登录控制台 (彻底铲除废墟) --- */
+        /* --- 右侧：登录控制台 (强制上提，消除间隙) --- */
         .login-panel {
             background: rgba(15, 23, 42, 0.85); 
             backdrop-filter: blur(24px);
             border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 24px;
-            padding: 2rem 3rem 2.5rem 3rem; /* 减少顶部内边距 */
+            padding: 2.5rem 3rem 3rem 3rem;
             box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.8);
             position: relative;
-            /* 关键：负margin上移，实现视平线对齐 */
-            margin-top: -1.5rem; 
+            /* 极限上提，实现视平线绝对对齐 */
+            margin-top: -4rem !important; 
+        }
+        
+        .status-dot {
+            width: 8px; height: 8px; background-color: #4ade80; border-radius: 50%;
+            display: inline-block; margin-right: 6px; box-shadow: 0 0 8px #4ade80;
         }
         
         .stTextInput input {
@@ -178,6 +190,7 @@ def render_login_page():
     # --- 左侧：驾驶舱 ---
     with col_left:
         st.markdown('<div class="hero-title">RAG Pro Max</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="color:#60a5fa; font-weight:700; margin-bottom:1rem; font-size:1.1rem;">{greeting}</div>', unsafe_allow_html=True)
         st.markdown('<div class="hero-subtitle">企业级认知中台 · 深度融合全模态解析 · 专家级 SQL 推演 · 决策智能</div>', unsafe_allow_html=True)
         
         st.markdown("""
@@ -235,22 +248,21 @@ def render_login_page():
 
     # --- 右侧：指挥中心 ---
     with col_right:
-        # 直接输出登录面板容器，移除所有可能产生空白的 st.* 占位符
-        st.markdown('<div class="login-panel">', unsafe_allow_html=True)
-        
-        # 标题区：紧凑设计，强制上浮
-        st.markdown("""
-        <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
-            <div style="display:flex; align-items:center; justify-content:space-between;">
-                <h1 style='color:white; margin:0; font-size:2rem; font-weight:800; letter-spacing:0.5px;'>指挥中心</h1>
-                <div style="display:flex; align-items:center; background:rgba(74,222,128,0.1); padding:4px 10px; border-radius:20px; border:1px solid rgba(74,222,128,0.3);">
-                    <div class="status-dot"></div>
-                    <span style="color:#4ade80; font-size:0.7rem; font-weight:700; letter-spacing:0.5px;">在线</span>
+        # 毁灭性合并：将容器开启、标题区、状态指示全部合在一个 markdown 中，铲除所有“占位废墟”
+        panel_header_html = """
+        <div class="login-panel">
+            <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <h1 style='color:white; margin:0; font-size:2rem; font-weight:800; letter-spacing:0.5px;'>指挥中心</h1>
+                    <div style="display:flex; align-items:center; background:rgba(74,222,128,0.1); padding:4px 10px; border-radius:20px; border:1px solid rgba(74,222,128,0.3);">
+                        <div class="status-dot"></div>
+                        <span style="color:#4ade80; font-size:0.7rem; font-weight:700; letter-spacing:0.5px;">在线</span>
+                    </div>
                 </div>
+                <div style="color:#94a3b8; font-size:0.85rem; letter-spacing:1px; margin-top:6px; font-weight:500;">SECURE ACCESS TERMINAL v6.6.0</div>
             </div>
-            <div style="color:#94a3b8; font-size:0.85rem; letter-spacing:1px; margin-top:6px; font-weight:500;">SECURE ACCESS TERMINAL v6.6.0</div>
-        </div>
-        """, unsafe_allow_html=True)
+        """
+        st.markdown(panel_header_html, unsafe_allow_html=True)
         
         tab_login, tab_register = st.tabs(["账号登录", "注册账号"])
         
@@ -280,7 +292,7 @@ def render_login_page():
         with tab_register:
             with st.form("reg_form"):
                 nu = st.text_input("新用户名", placeholder="设置您的登录 ID", label_visibility="visible")
-                np = st.text_input("新密码", type="password", placeholder="设置安全密码", label_visibility="visible")
+                np = st.text_input("New Password", type="password", placeholder="设置安全密码", label_visibility="visible")
                 st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
                 if st.form_submit_button("初始化账号", use_container_width=True, type="primary"):
                     if nu and np:
@@ -288,7 +300,7 @@ def render_login_page():
                         if success: st.success("✅ 注册成功！请切换至登录页")
                         else: st.error(f"❌ {msg}")
         
-        st.markdown('</div>', unsafe_allow_html=True) 
+        st.markdown('</div>', unsafe_allow_html=True) # 闭合 login-panel
 
     # --- 底部版权 ---
     st.markdown(f"""
