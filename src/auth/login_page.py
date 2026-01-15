@@ -67,20 +67,21 @@ def render_login_page():
             font-size: 0.8rem;
         }
         .block-container {
-            padding-top: 5rem !important;
+            padding-top: 3rem !important; /* 上移，从容不迫 */
             padding-bottom: 0rem !important;
-            max-width: 95% !important; /* 解除宽度限制，利用大屏 */
+            max-width: 95% !important;
             padding-left: 5rem !important;
             padding-right: 5rem !important;
         }
         /* 登录框样式优化 */
         [data-testid="stVerticalBlock"] > div:has(div[style*="border"]) {
-            padding: 2.5rem !important; /* 内部空间更舒展 */
+            padding: 2.5rem !important;
             border-radius: 24px !important;
             background: rgba(15, 23, 42, 0.6) !important;
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+            margin-top: 1rem; /* 保持与左侧视觉齐平 */
         }
         .stTabs [data-baseweb="tab-list"] {
             gap: 8px;
@@ -98,13 +99,13 @@ def render_login_page():
     now = datetime.now()
     greeting = "🚀 智慧中台 · 全速进化" if 5 <= now.hour < 18 else "🌙 深夜备战 · 永不熄灯"
 
-    col_brand, col_space, col_auth = st.columns([1.2, 0.2, 1]) # 增加中间留白
+    col_brand, col_space, col_auth = st.columns([1.2, 0.2, 1]) 
 
     with col_brand:
         st.markdown(f"<h1 class='brand-header'>RAG Pro Max</h1>", unsafe_allow_html=True)
-        st.markdown(f"<p style='color: #60a5fa; font-weight: 600; margin-bottom: 2rem; font-size:1rem; display:flex; align-items:center;'><span style='margin-right:8px'></span>{greeting}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color: #60a5fa; font-weight: 600; margin-bottom: 1.5rem; font-size:1rem; display:flex; align-items:center;'><span style='margin-right:8px'></span>{greeting}</p>", unsafe_allow_html=True)
         
-        # --- [v7.8] 卡片式指引：更有质感 ---
+        # --- [v7.8] 卡片式指引 ---
         steps = [
             ("📁 投喂素材", "左侧工具栏上传 PDF/CSV 或抓取网页"),
             ("⚙️ 模式选径", "切换标准对话或数据分析，精准匹配需求"),
@@ -123,9 +124,9 @@ def render_login_page():
             </div>
             """, unsafe_allow_html=True)
 
-        # --- [v7.8] 核心能力速览 (双栏卡片回归) ---
+        # --- [v7.8] 核心能力速览 (微调间距) ---
         st.markdown("""
-        <div style='display: flex; gap: 12px; margin-top: 1.5rem;'>
+        <div style='display: flex; gap: 12px; margin-top: 1rem;'>
             <div style='flex: 1; background: rgba(16,185,129,0.05); border: 1px solid rgba(16,185,129,0.2); padding: 10px; border-radius: 10px; text-align: center;'>
                 <div style='color: #10b981; font-weight: bold; font-size: 0.9rem; margin-bottom: 2px;'>📄 文档检索</div>
                 <div style='color: #64748b; font-size: 0.7rem;'>海量知识 毫秒召回</div>
@@ -138,7 +139,7 @@ def render_login_page():
         """, unsafe_allow_html=True)
 
         st.markdown(f"""
-        <div style="margin-top: 2rem; color: #475569; font-size: 0.75rem; font-family: monospace; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="margin-top: 1.5rem; color: #475569; font-size: 0.75rem; font-family: monospace; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px; display: flex; justify-content: space-between; align-items: center;">
             <span>STATUS: <span style="color:#10b981">● READY</span></span>
             <span>ACCELERATION: <span style="color:#60a5fa">METAL</span></span>
             <span>v6.6.0</span>
