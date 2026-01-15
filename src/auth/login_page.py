@@ -15,21 +15,21 @@ def render_login_page():
             background: radial-gradient(circle at 50% 50%, #1e1b4b 0%, #020617 100%) !important;
         }
         .brand-header {
-            font-size: 3.2rem;
+            font-size: 2.8rem; /* 略微收敛字号以节省纵向空间 */
             font-weight: 900;
             background: linear-gradient(135deg, #60a5fa 0%, #f472b6 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            margin-top: -1.5rem; 
-            margin-bottom: 0.5rem;
+            margin-top: -0.5rem; 
+            margin-bottom: 0.2rem;
             letter-spacing: -1px;
         }
         .feature-card {
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid rgba(255, 255, 255, 0.05);
             border-radius: 12px;
-            padding: 12px 16px;
-            margin-bottom: 10px;
+            padding: 10px 14px; /* 减少内边距 */
+            margin-bottom: 8px; /* 减少卡片间距 */
             display: flex;
             align-items: center;
             transition: all 0.3s ease;
@@ -40,11 +40,11 @@ def render_login_page():
             transform: translateX(5px);
         }
         .feature-icon {
-            font-size: 1.5rem;
-            margin-right: 12px;
+            font-size: 1.3rem;
+            margin-right: 10px;
             background: rgba(96, 165, 250, 0.1);
-            width: 40px;
-            height: 40px;
+            width: 36px; /* 缩小图标 */
+            height: 36px;
             border-radius: 8px;
             display: flex;
             align-items: center;
@@ -52,16 +52,16 @@ def render_login_page():
         }
         .feature-content b {
             color: #e2e8f0;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             display: block;
-            margin-bottom: 2px;
+            margin-bottom: 1px;
         }
         .feature-content span {
             color: #64748b;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
         }
         .block-container {
-            padding-top: 2rem !important;
+            padding-top: 1rem !important; /* 极限上移 */
             padding-bottom: 0rem !important;
             max-width: 95% !important;
             padding-left: 5rem !important;
@@ -75,7 +75,7 @@ def render_login_page():
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
-            margin-top: 1rem;
+            margin-top: 0.5rem;
         }
         .stTabs [data-baseweb="tab-list"] {
             gap: 8px;
@@ -175,7 +175,7 @@ def render_login_page():
 
     # --- [v7.9] 全局状态页脚：全屏居中 (脱离列限制) ---
     st.markdown(f"""
-    <div style="margin-top: 2rem; color: #475569; font-size: 0.75rem; font-family: monospace; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px; display: flex; justify-content: center; gap: 60px; align-items: center; width: 100%;">
+    <div style="margin-top: 1rem; color: #475569; font-size: 0.75rem; font-family: monospace; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px; display: flex; justify-content: center; gap: 60px; align-items: center; width: 100%;">
         <span>STATUS: <span style="color:#10b981">● READY</span></span>
         <span>ACCELERATION: <span style="color:#60a5fa">METAL</span></span>
         <span>v6.6.0</span>
