@@ -1,19 +1,20 @@
 {
-  "version": "6.2.2",
-  "release_date": "2026-01-14",
-  "build_number": "20260114.02",
+  "version": "6.6.0",
+  "release_date": "2026-01-15",
+  "build_number": "20260115.01",
   "status": "stable",
   "major_features": [
-    "🖼️ Full Dimension Mirroring: 1:1 export of chat history with embedded PNGs & interactive HTML",
-    "🌍 Bilingual Business Insights: Auto-generated CN/EN findings for every visualization",
-    "🛡️ Mode Isolation v6: Strict logic separation between Data Analysis and standard RAG",
-    "🚀 Zero-Indentation Stability: Rebuilt export pipeline with production-grade syntax hardening"
+    "🚀 Command Center UI: v7.9 immersive login dashboard with real-time status HUD",
+    "🧠 Data Analyst Agent: Context-aware SQL generation with Drill-Down capabilities",
+    "💾 Analysis Memory: Self-learning SQL template engine for improving accuracy over time",
+    "🛡️ Double-Render Fix: Strict UI isolation preventing duplicate report generation",
+    "⚡ Stream Optimization: Delta-based text streaming eliminating duplicate characters"
   ],
   "compatibility": {
-    "python": ">=3.9",
-    "platforms": ["macOS", "Linux", "Windows"],
-    "dependencies_updated": "2026-01-13"
+    "python": ">=3.10",
+    "platforms": ["macOS (Metal)", "Linux (CUDA)", "Windows"],
+    "dependencies_updated": "2026-01-15"
   },
   "changelog_url": "CHANGELOG.md",
-  "documentation_updated": "2026-01-13"
+  "documentation_updated": "2026-01-15"
 }

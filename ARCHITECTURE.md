@@ -1,8 +1,25 @@
-# RAG Pro Max v6.2.2 企业级系统架构文档
+# RAG Pro Max v6.6.0 企业级系统架构文档
 
-**版本**: v6.2.2 (Mirroring & Global Insights Edition)  
-**更新日期**: 2026-01-14  
-**核心特性**: 全维度对话镜像、中英双语业务发现、Retina 级图表导出、多模式严格隔离
+**版本**: v6.6.0 (Command Center & Analyst Intelligence)  
+**更新日期**: 2026-01-15  
+**核心特性**: 极光战略指挥中心 UI、智能下钻分析、分析记忆库、全维度镜像导出
+
+---
+
+## 🧠 Data Analyst Agent 2.0 架构 (智能体进化)
+
+### 1. 记忆与上下文引擎 (Memory & Context Engine)
+*   **Context Injection Pipeline**: 
+    *   **Capture**: Stage N 执行后，将 row_count > 0 的有效数据摘要（Result Snippet）存入 `full_analysis_context`。
+    *   **Injection**: 生成 Stage N+1 SQL 时，强制将该 Context 注入 System Prompt，实现“数据感知”与“下钻分析”。
+*   **Analysis Memory Module**:
+    *   **Storage**: 本地维护 `business_sql_memory.json`，存储 `<Query, Goal, SQL>` 三元组。
+    *   **Recall**: 每次生成前，基于 Task Title 进行模糊检索，命中高分模板后作为 Few-Shot Example 注入，大幅提升复杂查询成功率。
+
+### 2. UI 互斥渲染机制 (Double-Render Protection)
+为解决“流式生成 + 历史回显”导致的双重渲染问题，v6.6.0 引入了**状态互斥层**：
+*   **Field Isolation**: 消息对象中新增 `report_text` 字段专用于存储分析报告，普通文本存入 `content`。
+*   **Exclusive Rendering**: 渲染循环 (`render_messages`) 中引入排他逻辑——若检测到 `is_data_report=True`，则强制屏蔽标准 Markdown 渲染，仅通过 `render_smart_visualization` 组件展示，确保 UI 的绝对唯一性。
 
 ---
 

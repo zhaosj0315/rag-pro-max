@@ -12,12 +12,28 @@
 
 # RAG Pro Max - Intelligent Document Q&A System
 
-**Version**: v5.5.8  
-![Version](https://img.shields.io/badge/version-v5.5.8-brightgreen)
+**Version**: v6.6.0  
+![Version](https://img.shields.io/badge/version-v6.6.0-brightgreen)
 ![Status](https://img.shields.io/badge/status-Stable-blue)
-![Last Update](https://img.shields.io/badge/last%20update-2026--01--12-orange)
+![Last Update](https://img.shields.io/badge/last%20update-2026--01--15-orange)
 
-## 🚀 RAG Pro Max v5.5.8
+## 🚀 RAG Pro Max v6.6.0
+### 🚀 Strategic Command Center (v6.6.0)
+- **Immersive Login Screen**: Completely redesigned with a 95% full-width layout, removing traditional borders for a high-impact visual experience.
+- **Global Status HUD**: Integrated fixed-bottom system status bar (READY / METAL / Version), displaying real-time acceleration status.
+- **Premium UI Components**: Introduced Glassmorphism feature cards and quick-access shortcuts for a professional look and feel.
+
+### 🧠 Data Analyst Agent (v6.6.0)
+- **Context Injection**: Enables cross-stage analysis memory. Stage 2 can now perceive findings from Stage 1 (e.g., anomalous IDs) to generate drill-down SQL automatically.
+- **Analysis Memory**: The system automatically records successful SQL templates. It recalls historical experience via Few-Shot learning for similar queries, getting smarter over time.
+- **Explainable SQL**: Forces AI to use **CTEs (Common Table Expressions)** and **Plain-Language Comments**, transforming complex SQL logic into linear processes readable by business users.
+
+### 🛡️ Core Stability Fixes (v6.6.0)
+- **Duplicate Response Fix**: 
+    - **Character-Level**: Fixed "stuttering" duplicate text in streaming output (Delta Calculation logic).
+    - **UI-Level**: Fixed the issue where analysis reports were rendered twice in the chat stream (Field Isolation & Mutually Exclusive Display).
+- **State Sync Repair**: Resolved text rollback anomalies in mixed streaming modes.
+
 ### 📦 Data Sovereignty & Full Export (v5.5.8 Update)
 - **Ultimate Asset Package**: One-click export of 01-06 structure, including raw documents, chat history (MD), strategic models, and vector snapshots.
 - **Cross-Directory Salvage**: Automated retrieval of search results from temporary folders to ensure complete data portability.

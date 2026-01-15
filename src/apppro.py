@@ -44,7 +44,7 @@ warnings.filterwarnings("ignore", category=UserWarning, message=".*UnsupportedFi
 warnings.filterwarnings("ignore", message=".*validate_default.*")
 
 # 环境变量设置 - 减少启动警告
-__version__ = "4.5.2"
+__version__ = "6.6.0"
 os.environ['DISABLE_MODEL_SOURCE_CHECK'] = 'True'
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
