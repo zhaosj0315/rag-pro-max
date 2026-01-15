@@ -176,9 +176,9 @@ def render_login_page():
                             st.success("✅ 注册成功！")
                         else: st.error(f"❌ {msg}")
 
-    # --- [v7.9] 全局状态页脚：全屏居中 (脱离列限制) ---
+    # --- [v7.9] 全局状态页脚：全屏居中 (固定于底部) ---
     st.markdown(f"""
-    <div style="margin-top: 1rem; color: #475569; font-size: 0.75rem; font-family: monospace; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px; display: flex; justify-content: center; gap: 60px; align-items: center; width: 100%;">
+    <div style="position: fixed; bottom: 2rem; left: 0; width: 100%; color: #475569; font-size: 0.75rem; font-family: monospace; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px; display: flex; justify-content: center; gap: 60px; align-items: center; z-index: 100;">
         <span>STATUS: <span style="color:#10b981">● READY</span></span>
         <span>ACCELERATION: <span style="color:#60a5fa">METAL</span></span>
         <span>v6.6.0</span>
