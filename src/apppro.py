@@ -6769,3 +6769,10 @@ if st.session_state.get('is_processing') and final_prompt:
                     cleanup_memory()
                     st.session_state.is_processing = False
                     st.stop()
+# [UI Component] 注入全局悬浮滚动按钮 (回到顶部/底部)
+try:
+    from src.ui.scroll_buttons import inject_scroll_buttons
+    inject_scroll_buttons()
+except ImportError:
+    pass
+
