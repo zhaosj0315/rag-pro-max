@@ -486,10 +486,29 @@ class DataAnalystEngine:
                 messages = [ChatMessage(role=MessageRole.USER, content=summary_prompt)]
                 try:
                     response_gen = model_client.stream_chat(messages)
+                    last_text = ""
                     for chunk in response_gen:
-                        if hasattr(chunk, 'delta') and chunk.delta: yield chunk.delta
-                        elif hasattr(chunk, 'message') and hasattr(chunk.message, 'content'): yield chunk.message.content
-                        else: yield str(chunk)
+                        if hasattr(chunk, 'delta') and chunk.delta:
+                            yield chunk.delta
+                            # update last_text if needed, though delta path usually doesn't need it for tracking 
+                            # unless we mix delta and content usage. 
+                            # Safe approach: if we use delta, we assume it's correct.
+                        elif hasattr(chunk, 'message') and hasattr(chunk.message, 'content'):
+                            # [v6.3.7] Fix for non-delta streaming (e.g. some OpenAI compatible APIs)
+                            # Calculate delta from accumulated content
+                            current_text = chunk.message.content
+                            if current_text.startswith(last_text):
+                                delta = current_text[len(last_text):]
+                                if delta:
+                                    yield delta
+                                    last_text = current_text
+                            else:
+                                # Fallback if sequence mismatch: just yield full (might duplicate but safer than losing)
+                                # Or better: reset tracking
+                                yield current_text
+                                last_text = current_text
+                        else:
+                            yield str(chunk)
                 except: yield "战略推演报告生成异常"
             else:
                 res = model_client.complete(summary_prompt).text
