@@ -156,7 +156,7 @@ def render_login_page():
     col_left, col_spacer, col_right = st.columns([1.4, 0.3, 1])
 
     with col_left:
-        # 移除顶部占位符 div，直接渲染标题
+        # 品牌
         st.markdown('<div class="hero-title">RAG Pro Max</div>', unsafe_allow_html=True)
         st.markdown(f'<div style="color:#60a5fa; font-weight:700; margin-bottom:1rem; font-size:1.1rem;">{greeting}</div>', unsafe_allow_html=True)
         st.markdown('<div class="hero-subtitle">企业级认知中台。深度融合全模态解析、专家级 SQL 推演与即时决策智能，重塑数据价值。</div>', unsafe_allow_html=True)
@@ -179,11 +179,10 @@ def render_login_page():
         """, unsafe_allow_html=True)
 
     with col_right:
-        # 移除了所有顶部占位符 div，让面板自然上浮
+        # 直接输出登录面板容器，移除所有干扰项，添加负 margin 强制上移对齐
+        st.markdown('<div class="login-panel" style="margin-top: -0.5rem;">', unsafe_allow_html=True)
         
-        st.markdown('<div class="login-panel">', unsafe_allow_html=True)
-        
-        # 标题区：紧凑设计
+        # 1. 标题区：紧凑对齐，移除所有多余外壳
         st.markdown("""
         <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
             <div style="display:flex; align-items:center; justify-content:space-between;">
@@ -200,12 +199,11 @@ def render_login_page():
         tab_login, tab_register = st.tabs(["Access Login", "Create Account"])
         
         with tab_login:
+            # 彻底移除头像组件，保持纯净表单
             with st.form("login_form"):
                 u = st.text_input("Username", placeholder="Enter your ID", label_visibility="visible")
                 p = st.text_input("Password", type="password", placeholder="Enter your password", label_visibility="visible")
-                
                 st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
-                
                 if st.form_submit_button("Launch Command System", use_container_width=True, type="primary"):
                     if u and p:
                         from src.auth.audit_logger import AuditLogger
@@ -223,7 +221,7 @@ def render_login_page():
                         else:
                             st.error(f"❌ {info}")
             
-            # 幽灵按钮重构
+            # 幽灵按钮
             st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
             if st.button("Guest Mode (Read Only)", use_container_width=True, type="secondary"):
                 st.session_state.logged_in = True
