@@ -67,13 +67,15 @@ def render_login_page():
             font-size: 0.8rem;
         }
         .block-container {
-            padding-top: 4rem !important; /* 顶部留白增加，更从容 */
+            padding-top: 5rem !important;
             padding-bottom: 0rem !important;
-            max-width: 1200px !important;
+            max-width: 95% !important; /* 解除宽度限制，利用大屏 */
+            padding-left: 5rem !important;
+            padding-right: 5rem !important;
         }
         /* 登录框样式优化 */
         [data-testid="stVerticalBlock"] > div:has(div[style*="border"]) {
-            padding: 2rem !important;
+            padding: 2.5rem !important; /* 内部空间更舒展 */
             border-radius: 24px !important;
             background: rgba(15, 23, 42, 0.6) !important;
             backdrop-filter: blur(20px);
