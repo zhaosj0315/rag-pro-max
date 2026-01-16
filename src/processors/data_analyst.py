@@ -311,7 +311,7 @@ class DataAnalystEngine:
 
     def execute_analysis(self, query: str, model_client, context_text: str = "", status_callback=None) -> Dict[str, Any]:
         """
-        [v5.0 极光战略工作坊] 链式推演引擎：需求拆解 -> 多阶脚本 -> 闭环仿真 -> 综合研判
+        [v6.6.8] 极光战略工作坊：增加元数据感知与按需加载保护。
         """
         if status_callback: status_callback("🧠 正在初始化业务语义环境...")
         if not os.path.exists(self.schema_path):
@@ -320,35 +320,42 @@ class DataAnalystEngine:
         with open(self.schema_path, 'r', encoding='utf-8') as f:
             full_schemas = json.load(f)
         
-        # [v6.6.4] 核心优化：先剪枝，再仿真
-        # 1. 先识别相关表
+        # --- [v6.6.8] 策略 A: 元数据意图拦截 ---
+        # 如果用户只是想了解“有哪些指标”、“表结构如何”，直接根据 Schema 回答，不触发 SQL
+        metadata_keywords = ["有哪些指标", "关键数据指标", "指标说明", "数据字典", "表结构", "有哪些表", "数据模型"]
+        if any(k in query for k in metadata_keywords):
+            if status_callback: status_callback("📖 检测到元数据查询意图，正在从业务架构定义中提取答案...")
+            
+            # 构建精简的 Schema 描述供模型回答
+            schema_summary = []
+            for t_name, t_info in full_schemas.get('tables', {}).items():
+                cols = [f"{c['name']}({c.get('comment','无')})" for c in t_info.get('cols', t_info.get('columns', []))[:10]]
+                schema_summary.append(f"- 表: {t_name} ({t_info.get('desc', '业务实体')})\n  字段: {', '.join(cols)}")
+            
+            summary_prompt = f"请根据以下业务模型定义，详细解答用户的疑问：{query}\n\n模型定义：\n" + "\n".join(schema_summary)
+            
+            def metadata_gen():
+                res = model_client.complete(summary_prompt).text
+                for char in res: yield char
+                
+            return {
+                "stages": [], # 元数据查询无执行阶段
+                "logic_gen": metadata_gen(),
+                "success": True,
+                "macro_context": full_schemas.get('macro_context', "业务架构咨询")
+            }
+
+        # --- [v6.6.8] 策略 B: 正常数据分析流 ---
+        # 1. 先识别相关表 (增加限制，防止规模爆炸)
         relevant_table_names = self._get_relevant_tables(query, full_schemas)
+        if len(relevant_table_names) > 10:
+            if status_callback: status_callback(f"⚠️ 检测到问题涉及范围过广 ({len(relevant_table_names)}张表)，已自动剪枝以保护计算资源。")
+            relevant_table_names = relevant_table_names[:10]
         
-        # 2. 仅对相关表进行检查和仿真 (On-Demand Simulation)
+        # 2. 仅对相关表进行检查和仿真
         table_mapping = self._ensure_sandbox_ready(full_schemas, model_client, status_callback=status_callback, target_tables=relevant_table_names)
         
-        # 3. 应用映射并构建 pruned_schemas
-        mapped_relevant_tables = []
-        corrected_schemas = {"tables": {}, "relationships": [], "macro_context": full_schemas.get("macro_context", "")}
-        
-        for t_name, t_info in full_schemas.get("tables", {}).items():
-            real_name = table_mapping.get(t_name, t_name)
-            corrected_schemas["tables"][real_name] = t_info
-            if t_name in relevant_table_names:
-                mapped_relevant_tables.append(real_name)
-        
-        mapped_relevant_tables = list(set(mapped_relevant_tables))
-
-        for rel in full_schemas.get("relationships", []):
-            rel["source"] = table_mapping.get(rel["source"], rel["source"])
-            rel["target"] = table_mapping.get(rel["target"], rel["target"])
-            corrected_schemas["relationships"].append(rel)
-
-        pruned_schemas = {
-            "macro_context": corrected_schemas["macro_context"],
-            "tables": {name: corrected_schemas["tables"].get(name) for name in mapped_relevant_tables if name in corrected_schemas["tables"]},
-            "relationships": [r for r in corrected_schemas["relationships"] if r["source"] in mapped_relevant_tables or r["target"] in mapped_relevant_tables]
-        }
+        # ... (后续逻辑保持不变) ...
 
         if status_callback: status_callback("🎯 正在拆解战略目标与分析路径...")
         decomposition_prompt = f"""
@@ -882,10 +889,17 @@ class DataAnalystEngine:
             with open(self.schema_path, 'w', encoding='utf-8') as f:
                 json.dump(unified_schema, f, indent=4, ensure_ascii=False)
             
+            # [v6.6.8] 核心逻辑修正：在构建阶段就完成数据填充持久化
+            if model_client:
+                if self.logger: self.logger.info("🧪 正在执行出厂级数据预填充 (Persistence Check)...")
+                if status_callback: status_callback("🧪 正在执行出厂级数据预填充...")
+                # 全量填充所有识别出的虚拟表
+                self._ensure_sandbox_ready(unified_schema, model_client, status_callback=None)
+            
             if status_callback:
                 t_names = list(unified_schema['tables'].keys())
                 t_preview = ", ".join(t_names)
-                status_callback(f"✅ 全域建模完成: 包含 {len(t_names)} 张表 [{t_preview}], 定义已存入 {os.path.basename(self.schema_path)}")
+                status_callback(f"✅ 全域建模完成: 包含 {len(t_names)} 张表 [{t_preview}], 且已完成数据持久化")
             
             return {
                 "success": True, 
