@@ -1,20 +1,7 @@
 {
-  "version": "6.6.0",
-  "release_date": "2026-01-15",
-  "build_number": "20260115.01",
-  "status": "stable",
-  "major_features": [
-    "🚀 Command Center UI: v7.9 immersive login dashboard with real-time status HUD",
-    "🧠 Data Analyst Agent: Context-aware SQL generation with Drill-Down capabilities",
-    "💾 Analysis Memory: Self-learning SQL template engine for improving accuracy over time",
-    "🛡️ Double-Render Fix: Strict UI isolation preventing duplicate report generation",
-    "⚡ Stream Optimization: Delta-based text streaming eliminating duplicate characters"
-  ],
-  "compatibility": {
-    "python": ">=3.10",
-    "platforms": ["macOS (Metal)", "Linux (CUDA)", "Windows"],
-    "dependencies_updated": "2026-01-15"
-  },
-  "changelog_url": "CHANGELOG.md",
-  "documentation_updated": "2026-01-15"
+  "version": "6.6.5",
+  "name": "RAG Pro Max",
+  "edition": "Repair & Enhancement Edition",
+  "release_date": "2026-01-16",
+  "status": "Production-Stable"
 }
