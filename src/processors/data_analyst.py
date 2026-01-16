@@ -145,7 +145,11 @@ class DataAnalystEngine:
                             t_context[t]["sample"] = r['data'][0]
                     except: pass
 
-                sql_prompt = f"编写分析 SQL 任务: {meta.get('transformation')}\n模型: {json.dumps(t_context, ensure_ascii=False)}\n前序发现: {analysis_context}\n返回标准 JSON: {{"sqlite": "...", "standard": "...", "dataworks": "..."}}"
+                sql_prompt = f"""编写分析 SQL 任务: {meta.get('transformation')}
+模型: {json.dumps(t_context, ensure_ascii=False)}
+前序发现: {analysis_context}
+返回标准 JSON: {{"sqlite": "...", "standard": "...", "dataworks": "..."}}
+"""
                 sqls = {"sqlite": ""}
                 try:
                     sqls = self._extract_json(model_client.complete(sql_prompt).text) or {"sqlite": ""}
