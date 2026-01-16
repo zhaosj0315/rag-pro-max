@@ -2959,33 +2959,29 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
             status_container.write(msg)
             logger.info(f"👉 {msg}")
         
-        if data_files:
-             # [v5.7.0] 核心修复：始终处理数据文件以确保数据一致性
-             status_container.write(f"📊 检测到 {len(data_files)} 个业务源文件，正在执行物理归档与战略建模...")
-             logger.info(f"📊 [Strategic Workshop] 检测到 {len(data_files)} 个业务源文件，启动战略建模...")
-             res = da_engine.process_files(data_files, llm, status_callback=kb_status_callback)
-             if res['success']:
-                 status_container.success(f"✅ 战略大脑初始化完成 (已归档并导入 {len(res['tables'])} 张表)")
-                 logger.success(f"✅ [Strategic Workshop] 战略大脑初始化完成 (已导入 {len(res['tables'])} 张表)")
-
-        # Schema 建模 (使用之前读取的 docs)
+        # [v6.6.9] 极光战略大脑：全量一站式建模 (物理导入 + 语义提取 + 数据预填充)
+        all_files_for_analyst = []
+        if data_files: all_files_for_analyst.extend(data_files)
+        # 将语义文档也加入建模列表，由引擎内部统一处理，避免重复请求大模型
         if docs:
-            # [v6.3.0] 强制刷新业务模型：确保每次更新都能根据最新材料重新建模，防止表结构“粘滞”
-            status_container.write("🧠 正在提取最新业务元模型...")
-            logger.info("🧠 [Strategic Workshop] 正在从当前源材料中重构业务模型与逻辑通路...")
-            
-            # 不再判断文件是否存在，而是直接执行提取以覆盖旧模型
-            schemas = da_engine.extract_schema_from_docs(docs, llm, status_callback=kb_status_callback)
-            
-            # 业务蓝图推演
-            status_container.write("🌐 正在构建最新业务全景图与关联路径...")
-            blueprint = da_engine.infer_business_blueprint(schemas, llm)
-            scenario = blueprint.get('business_scenario', '未知业务')
-            status_container.info(f"📍 识别业务场景: {scenario}")
-            logger.info(f"📍 [Strategic Workshop] 业务蓝图更新完成: {scenario}")
+            for d in docs:
+                if hasattr(d, 'metadata') and d.metadata.get('file_path'):
+                    all_files_for_analyst.append(d.metadata['file_path'])
         
-        status_container.write("✅ 业务语义建模已更新")
-        logger.success("✨ [Strategic Workshop] 全域业务语义建模就绪")
+        if all_files_for_analyst:
+             status_container.write(f"📊 正在对 {len(all_files_for_analyst)} 个源材料执行全域业务语义建模...")
+             logger.info(f"📊 [Strategic Workshop] 启动全域建模流程: {len(all_files_for_analyst)} 个文件")
+             
+             # process_files 内部现在已经包含了: 
+             # 1. 物理表导入 2. 语义模型提取 3. 出厂级数据预填充 (Persistence Check)
+             res = da_engine.process_files(all_files_for_analyst, llm, status_callback=kb_status_callback)
+             
+             if res['success']:
+                 status_container.success(f"✅ 战略大脑初始化完成 (共计 {len(res['tables'])} 张业务表已固化)")
+                 logger.success(f"✅ [Strategic Workshop] 全域大脑固化完成")
+        
+        status_container.write("✅ 业务语义建模已就绪")
+        logger.success("✨ [Strategic Workshop] 数据分析环境已完成物理闭环")
     
     # --- 补丁: 写入所有权信息与模型对齐 ---
     try:
