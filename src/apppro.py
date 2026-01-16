@@ -5118,13 +5118,19 @@ for msg_idx, msg in enumerate(state.get_messages()):
                             if stage_h.get("source_samples"):
                                 st.markdown("**1. 查询前：业务表采样 (Before)**")
                                 s_tabs = st.tabs(list(stage_h["source_samples"].keys()))
-                                                                                for idx, t_name in enumerate(stage_h["source_samples"]):
-                                                                                    with s_tabs[idx]:
-                                                                                        import pandas as pd
-                                                                                        # [v6.7.6] 最终容错：确保传入 pd.DataFrame 的是列表格式
-                                                                                        raw_sample = stage_h["source_samples"][t_name]
-                                                                                        if isinstance(raw_sample, dict): raw_sample = [raw_sample]
-                                                                                        st.dataframe(pd.DataFrame(raw_sample), use_container_width=True)
+                                for idx, t_name in enumerate(stage_h["source_samples"]):
+                                    with s_tabs[idx]:
+                                        import pandas as pd
+                                        raw_data = stage_h["source_samples"][t_name]
+                                        # [v6.7.7] 终极容错渲染
+                                        try:
+                                            if isinstance(raw_data, dict):
+                                                df_render = pd.DataFrame([raw_data]) # 强制包装为列表
+                                            else:
+                                                df_render = pd.DataFrame(raw_data)
+                                            st.dataframe(df_render, use_container_width=True)
+                                        except:
+                                            st.warning(f"表 {t_name} 暂无数据预览")
                             # B. 加工中：逻辑脚本 (Restored 3 Tabs)
                             st.markdown("**2. 执行中：工程逻辑 (The Logic)**")
                             sqls = stage_h.get("sqls", {})
