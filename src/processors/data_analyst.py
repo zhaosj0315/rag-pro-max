@@ -42,18 +42,16 @@ class DataAnalystEngine:
         return list(set(relevant))[:8] if relevant else list(all_tables.keys())[:3]
 
     def _get_column_value_samples(self, table_name: str, conn: sqlite3.Connection) -> str:
-        """[v6.8.8] 核心增强：探测字段真实取值，防止过滤条件写错"""
         try:
             cursor = conn.cursor()
             cursor.execute(f"PRAGMA table_info({table_name})")
             cols = [row[1] for row in cursor.fetchall()]
             samples = []
-            # 仅对状态、类型、地区等可能用于过滤的字段进行采样
             for col in cols:
                 if any(k in col.lower() for k in ['status', 'type', 'category', 'region', 'gender', 'state', '状态', '类型', '渠道']):
                     cursor.execute(f"SELECT DISTINCT {col} FROM {table_name} LIMIT 5")
-                    vals = [str(row[0]) for row in cursor.fetchall() if row[0] is not None] # 移除 None 值
-                    if vals: samples.append(f"字段 '{col}' 真实取值示例: {vals}")
+                    vals = [str(row[0]) for row in cursor.fetchall() if row[0] is not None]
+                    if vals: samples.append(f"字段 '{col}' 取值范围: {vals}")
             return "\n".join(samples)
         except: return ""
 
@@ -100,7 +98,7 @@ class DataAnalystEngine:
                 info = schemas['tables'].get(t, {})
                 cols = info.get('cols', info.get('columns', []))
                 cols_str = ", ".join([f"{c['name']} ({c.get('comment','')})" for c in cols])
-                prompt = f"为业务表 {t} 生成 20 条逻辑闭环的 SQL INSERT 语句。\n字段：{cols_str}\n背景：{schemas.get('macro_context')}\n要求：仅输出 SQL 代码。"
+                prompt = f"为表 {t} 生成 20 条逻辑闭环的 SQL INSERT 语句。\n字段：{cols_str}\n背景：{schemas.get('macro_context')}\n要求：仅输出 SQL 代码。"
                 try:
                     res = model_client.complete(prompt).text
                     cursor.execute(f"CREATE TABLE IF NOT EXISTS {t} ({', '.join([f'{c['name']} TEXT' for c in cols])})")
@@ -122,32 +120,46 @@ class DataAnalystEngine:
         return None
 
     def execute_analysis(self, query: str, model_client, context_text: str = "", status_callback=None) -> Dict[str, Any]:
+        if self.logger: self.logger.separator("Strategic Workshop: Deep Dive")
+        if self.logger: self.logger.info(f"🤔 [需求理解] 用户问题: {query}")
+        
         if not os.path.exists(self.schema_path): return {"success": False, "logic": "架构缺失"}
         with open(self.schema_path, 'r', encoding='utf-8') as f: full_schemas = json.load(f)
         
-        session_conn = sqlite3.connect(self.db_path, timeout=60)
-        
-        try:
-            if any(k in query for k in ["指标", "结构", "字典", "有哪些表"]):
-                prompt = f"基于以下模型回答: {query}\n{json.dumps(full_schemas, ensure_ascii=False)[:4000]}"
-                def gen():
-                    for char in model_client.complete(prompt).text: yield char
-                return {"stages": [], "logic_gen": gen(), "success": True, "macro_context": "架构咨询"}
+        # 1. 元数据直查
+        if any(k in query for k in ["指标", "结构", "字典", "有哪些表"]):
+            if self.logger: self.logger.info("🔍 [决策路径] 判定为元数据查询，直接提取模型定义")
+            prompt = f"基于以下模型回答: {query}\n{json.dumps(full_schemas, ensure_ascii=False)[:4000]}"
+            def gen():
+                for char in model_client.complete(prompt).text: yield char
+            return {"stages": [], "logic_gen": gen(), "success": True, "macro_context": "架构咨询"}
 
-            rel_tables = self._get_relevant_tables(query, full_schemas)
+        # 2. 相关性裁剪与对齐
+        rel_tables = self._get_relevant_tables(query, full_schemas)
+        if self.logger: self.logger.info(f"📁 [实体识别] 锁定相关业务表: {rel_tables}")
+        
+        session_conn = sqlite3.connect(self.db_path, timeout=60)
+        try:
             mapping = self._ensure_sandbox_ready(full_schemas, model_client, status_callback, rel_tables, conn=session_conn)
             sub_schema = {mapping.get(t, t): full_schemas['tables'][t] for t in rel_tables if t in full_schemas['tables']}
             
+            # 3. 任务拆解
+            if self.logger: self.logger.info("🎯 [逻辑建模] 正在拆解分析路径与战略目标...")
             prompt = f"需求 {query} 拆解为 2-3 个 SQL 阶段。JSON 数组: [{{stage_id, title, transformation, goal}}]\n模型: {json.dumps(sub_schema, ensure_ascii=False)}"
             try:
                 res = model_client.complete(prompt).text
                 stages_meta = json.loads(re.search(r'(\[.*\])', res, re.DOTALL).group(1))
-            except: stages_meta = [{"stage_id": 1, "title": "数据分析", "transformation": "执行分析"}]
+                if self.logger:
+                    for s in stages_meta: self.logger.info(f"   📍 规划阶段 {s['stage_id']}: {s['title']} | 目标: {s['goal']}")
+            except: 
+                stages_meta = [{"stage_id": 1, "title": "数据分析", "transformation": "执行分析"}]
 
             final_data = []
             analysis_context = ""
             for i, meta in enumerate(stages_meta):
-                if status_callback: status_callback(f"⚙️ [Stage {i+1}] 正在精准识别表与字段取值...")
+                if self.logger: self.logger.separator(f"Execution: Stage {i+1}")
+                if self.logger: self.logger.info(f"📝 [阶段任务] {meta.get('title')}")
+                if status_callback: status_callback(f"⚙️ [Stage {i+1}] 构建 SQL 逻辑...")
                 
                 t_context = {}
                 for t in sub_schema:
@@ -155,10 +167,15 @@ class DataAnalystEngine:
                     cols = info.get('cols', info.get('columns', []))
                     keep = ['status', 'state', 'date', 'time', 'amount', 'price', 'total', 'id', 'name', '合规', '成本', '延迟']
                     filtered = [c for c in cols if any(k in c['name'].lower() or k in str(c.get('comment','')).lower() for k in keep)]
+                    
+                    # [v6.8.8] 真实值探测
+                    val_samples = self._get_column_value_samples(t, session_conn)
+                    if self.logger and val_samples: self.logger.info(f"📊 [数据指纹] 表 '{t}' 特征值: {val_samples.replace('\n', ' | ')}")
+                    
                     t_context[t] = {
                         "desc": info.get("desc"), 
                         "cols": filtered if filtered else cols[:10],
-                        "value_samples": self._get_column_value_samples(t, session_conn) # [v6.8.8] 注入真实值样例
+                        "value_samples": val_samples
                     }
                     try:
                         r = self.execute_sql(f"SELECT * FROM {t} LIMIT 1", conn=session_conn)
@@ -168,17 +185,15 @@ class DataAnalystEngine:
 
                 sql_prompt = f"""编写分析 SQL 任务: {meta.get('transformation')}
 模型与真实值样例: {json.dumps(t_context, ensure_ascii=False)}
-
 前序发现: {analysis_context}
-
-【强制指令】:
-1. **严格参考 value_samples**：过滤条件中的值（如 status）必须与样例完全一致。
-2. **SQLite 兼容**：严禁使用 DATE_SUB, NOW() 等函数，改用 date('now'), strftime()。
-3. **返回标准 JSON**: {{"sqlite": "...", "standard": "...", "dataworks": "..."}}
+返回标准 JSON: {{"sqlite": "...", "standard": "...", "dataworks": "..."}}
 """
                 sqls = {"sqlite": ""}
                 try:
                     sqls = self._extract_json(model_client.complete(sql_prompt).text) or {"sqlite": ""}
+                    if self.logger and sqls.get('sqlite'):
+                        self.logger.info("📜 [生成的 SQL 逻辑]:")
+                        print(f"\033[36m{sqls['sqlite']}\033[0m")
                 except: pass
 
                 if status_callback: status_callback(f"🧪 [Stage {i+1}] 执行验证中...")
@@ -189,21 +204,22 @@ class DataAnalystEngine:
                     exec_res = self.execute_sql(sqls["sqlite"], model_client, conn=session_conn)
                     if exec_res["success"]:
                         if exec_res['data']:
-                            if status_callback: status_callback(f"✅ 命中 {len(exec_res['data'])} 行数据")
+                            row_count = len(exec_res['data'])
+                            if self.logger: self.logger.success(f"✅ [查询结果] 成功命中 {row_count} 行记录")
+                            if status_callback: status_callback(f"✅ 命中 {row_count} 行数据")
                             analysis_context += f"阶段{i+1}: {json.dumps(exec_res['data'][:1], ensure_ascii=False)}\n"
                             empty_reason = ""
                         else:
-                            # 自动采样回显逻辑
-                            sql_upper = sqls["sqlite"].upper()
-                            m_table = re.search(r'CREATE\s+(?:TEMPORARY\s+)?TABLE\s+([a-zA-Z0-9_]+)', sql_upper, re.I)
+                            m_table = re.search(r'CREATE\s+(?:TEMPORARY\s+)?TABLE\s+([a-zA-Z0-9_]+)', sqls["sqlite"].upper(), re.I)
                             if m_table:
                                 t_name = m_table.group(1)
                                 verify_res = self.execute_sql(f"SELECT * FROM {t_name} LIMIT 5", conn=session_conn)
                                 if verify_res["success"] and verify_res["data"]:
                                     exec_res["data"] = verify_res["data"]
-                                    if status_callback: status_callback(f"✅ 数据加工完成，表 {t_name} 已就绪")
+                                    if self.logger: self.logger.success(f"🏗️ [工程加工] 表 '{t_name}' 已构建完成并提取采样数据")
                                     empty_reason = ""
                             else:
+                                if self.logger: self.logger.warning("⚠️ [查询结果] SQL 执行成功，但返回结果集为空")
                                 empty_reason = "⚠️ 查询执行成功，但未找到匹配记录 (请检查时间范围或状态值)"
                 
                 final_data.append({
@@ -212,6 +228,8 @@ class DataAnalystEngine:
                     "source_samples": {t: t_context[t].get('sample', {}) for t in t_context}
                 })
 
+            if self.logger: self.logger.separator("Final Synthesis")
+            if self.logger: self.logger.info("🧠 [报告撰写] 正在基于全量推演数据合成战略洞察...")
             def report_gen():
                 p = f"撰写战略报告。需求: {query}\n结论: {analysis_context}\n要求: SCQA 架构，结论先行。"
                 if hasattr(model_client, 'stream_chat'):
@@ -243,7 +261,8 @@ class DataAnalystEngine:
                 try:
                     cursor.execute(stmt)
                     clean_stmt = re.sub(r'^(\s*(--.*|/\*.*?\*/)\s*)+', '', stmt, flags=re.MULTILINE).strip()
-                    if any(clean_stmt.upper().startswith(s) for s in QUERY_STARTERS): rows = cursor.fetchall()
+                    if any(clean_stmt.upper().startswith(s) for s in QUERY_STARTERS):
+                        rows = cursor.fetchall()
                 except Exception as e:
                     if model_client:
                         fix = model_client.complete(f"修正 SQL: {e}\nSQL: {stmt}").text
