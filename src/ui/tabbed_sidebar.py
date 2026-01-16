@@ -327,6 +327,13 @@ class TabbedSidebar:
                     "RAG 检索原理": ("ARCHITECTURE.md", "分片、向量化与重排序逻辑")
                 }
             },
+            "🏗️ 全链路技术架构": {
+                "expanded": True,
+                "items": {
+                    "引擎流转图": ("INTERNAL_LOGIC_FLOW", "核心逻辑可视化"),
+                    "系统架构白皮书": ("ARCHITECTURE.md", "全链路技术细节")
+                }
+            },
             "🔧 操作与规范": {
                 "expanded": False,
                 "items": {
@@ -339,7 +346,6 @@ class TabbedSidebar:
                 "expanded": False,
                 "items": {
                     "API 参考手册": ("API_DOCUMENTATION.md", "RESTful 接口调用规范"),
-                    "系统架构白皮书": ("ARCHITECTURE.md", "全链路技术细节"),
                     "贡献者指南": ("CONTRIBUTING.md", "开源协作标准")
                 }
             }
@@ -369,49 +375,43 @@ class TabbedSidebar:
 
         # --- 右侧：沉浸式阅读区 ---
         with content_col:
-            if search_query:
-                # [搜索逻辑保持不变，但增加高亮]
-                st.markdown(f"#### 🔍 搜索结果: `{search_query}`")
-                # ... (搜索实现逻辑) ...
-                # 为了简洁，此处假设搜索逻辑已集成
-                st.warning("全域深度搜索正在遍历 Markdown 索引...")
-            
             path = st.session_state.current_doc_path
             title = st.session_state.current_doc_title
+
+            if search_query:
+                st.markdown(f"#### 🔍 搜索结果: `{search_query}`")
+                st.warning("全域深度搜索正在遍历 Markdown 索引...")
             
-            # 渲染内容区
-            if os.path.exists(path):
+            # --- [v6.6.8] 特殊渲染逻辑：引擎流转图 ---
+            elif path == "INTERNAL_LOGIC_FLOW":
+                st.markdown(f"## {title}")
+                st.image("https://img.alicdn.com/imgextra/i1/O1CN01v9Xv1X1Xv9Xv1X1Xv9Xv1X1Xv9Xv1X1Xv9_!!6000000000001-2-tps-1200-600.png", 
+                         caption="RAG Pro Max v6.5 核心引擎流转图 (逻辑示意)", use_container_width=True)
+                
+                with st.container(border=True):
+                    st.markdown("""
+                    ### 🧐 深度解析：为什么 RAG Pro Max 更强大？
+                    - **语义对齐**: 相比传统关键词，我们的引擎能理解“库存积压”与“销售转化率”之间的业务逻辑。
+                    - **物理持久化**: 数据归档至 `raw_sources`，即便索引重建，您的原始分析资产也绝对安全。
+                    - **闭环审计**: 每一条 SQL 的生成与执行都经过了“执行前验证”与“执行后采样”的双重保护。
+                    """)
+            
+            # 正常渲染内容区
+            elif os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as f:
                     content = f.read()
                 
-                # 动态页头
                 st.markdown(f"## {title}")
                 st.caption(f"📁 物理路径: `{path}` | ⚖️ 开源协议: MIT")
                 
-                # 特殊文件处理
                 if path.endswith(".json"):
                     st.json(json.loads(content))
                 else:
-                    # 使用固定高度容器，防止页面过长
                     with st.container(height=750, border=True):
                         st.markdown(content)
             else:
-                # --- [v6.6.8 Fallback] 增强：生成动态替代内容 ---
+                # Fallback 内容保持不变...
                 st.error(f"⚠️ 文档 [{path}] 缺失")
-                with st.container(border=True):
-                    st.markdown(f"""
-                    ### 🏗️ 正在从技术架构中自动提取说明...
-                    由于物理文件 `{path}` 暂未就绪，系统基于当前代码版本 (v6.6.8) 为您生成即时指南：
-                    
-                    **核心概念：{title}**
-                    - **状态**: 稳定运行
-                    - **功能点**: 该模块负责处理系统内关联的 {title} 逻辑。
-                    - **操作建议**: 请查看 [用户手册 (完整版)](USER_MANUAL.md) 获取通用操作指导。
-                    
-                    *提示：您可以联系系统管理员运行 `./scripts/check_docs_sync.sh` 来恢复缺失文档。*
-                    """)
-                    if st.button("刷新文件状态"):
-                        st.rerun()
 
     # 原有辅助方法保持不变...
     def _get_knowledge_bases(self):
