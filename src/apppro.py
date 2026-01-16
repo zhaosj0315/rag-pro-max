@@ -181,6 +181,22 @@ from src.ui.progress_monitor import progress_monitor
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings, StorageContext, load_index_from_storage
 from llama_index.core.memory import ChatMemoryBuffer
 
+def display_user_message_with_attachments(prompt, original_query=None):
+    """显示用户消息，包含附件信息"""
+    with st.chat_message("user", avatar="🧑💻"):
+        # 检查是否有附件信息
+        if 'last_query_attachments' in st.session_state and original_query and original_query in st.session_state.last_query_attachments:
+            attachments = st.session_state.last_query_attachments[original_query]
+            if attachments.get('image_text') or attachments.get('file_content'):
+                st.caption("📎 附件:")
+                if attachments.get('image_text'):
+                    with st.expander("📷 图片内容", expanded=False):
+                        st.text(attachments['image_text'][:300] + ("..." if len(attachments['image_text']) > 300 else ""))
+                if attachments.get('file_content'):
+                    with st.expander("📄 文件内容", expanded=False):
+                        st.text(attachments['file_content'][:300] + ("..." if len(attachments['file_content']) > 300 else ""))
+        st.markdown(prompt)
+
 def enhanced_web_search(final_prompt, logger):
     """增强的联网搜索功能"""
     import time
@@ -5787,6 +5803,125 @@ if st.session_state.get('last_web_search_results'):
             if i < len(search_data['results'][:8]):
                 st.divider()
 
+# 📎 附件上传区（输入框上方）- 临时辅助提问
+if 'temp_attachments' not in st.session_state:
+    st.session_state.temp_attachments = {'image_text': None, 'file_content': None, 'file_names': []}
+
+with st.container():
+    col1, col2, col3 = st.columns([1, 1, 8])
+    
+    with col1:
+        uploaded_image = st.file_uploader(
+            "📷 图片", 
+            type=['jpg', 'jpeg', 'png', 'bmp', 'tiff'],
+            key="temp_image_attach",
+            label_visibility="collapsed",
+            help="上传图片，OCR识别后辅助提问"
+        )
+    
+    with col2:
+        uploaded_file = st.file_uploader(
+            "📄 文件",
+            type=['pdf', 'docx', 'txt', 'md'],
+            key="temp_file_attach",
+            label_visibility="collapsed",
+            help="上传文件，提取内容后辅助提问"
+        )
+    
+    # 处理图片 OCR
+    if uploaded_image and uploaded_image.name not in st.session_state.temp_attachments['file_names']:
+        with st.spinner("🔍 识别图片文字..."):
+            try:
+                import tempfile
+                import subprocess
+                with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_image.name.split('.')[-1]}") as tmp:
+                    tmp.write(uploaded_image.read())
+                    tmp_path = tmp.name
+                
+                # macOS 原生 OCR
+                result = subprocess.run(
+                    ['osascript', '-e', f'''
+                    use framework "Vision"
+                    use framework "AppKit"
+                    set imagePath to "{tmp_path}"
+                    set imageURL to current application's |NSURL|'s fileURLWithPath:imagePath
+                    set requestHandler to current application's VNImageRequestHandler's alloc()'s initWithURL:imageURL options:(missing value)
+                    set ocrRequest to current application's VNRecognizeTextRequest's alloc()'s init()
+                    ocrRequest's setRecognitionLevel:(current application's VNRequestTextRecognitionLevelAccurate)
+                    ocrRequest's setRecognitionLanguages:({"zh-Hans", "en-US"})
+                    requestHandler's performRequests:{{ocrRequest}} |error|:(missing value)
+                    set observations to ocrRequest's results()
+                    set textResult to ""
+                    repeat with observation in observations
+                        set textResult to textResult & (observation's topCandidates:(1))'s firstObject()'s |string|() & linefeed
+                    end repeat
+                    return textResult
+                    '''],
+                    capture_output=True, text=True, timeout=30
+                )
+                
+                os.unlink(tmp_path)
+                recognized_text = result.stdout.strip()
+                
+                if recognized_text:
+                    st.session_state.temp_attachments['image_text'] = recognized_text
+                    st.session_state.temp_attachments['file_names'].append(uploaded_image.name)
+                    st.success(f"✅ 已识别图片文字（{len(recognized_text)} 字符）")
+                else:
+                    st.warning("⚠️ 未识别到文字")
+            except Exception as e:
+                st.error(f"❌ OCR 失败: {str(e)}")
+    
+    # 处理文件内容提取
+    if uploaded_file and uploaded_file.name not in st.session_state.temp_attachments['file_names']:
+        with st.spinner("📄 提取文件内容..."):
+            try:
+                file_content = ""
+                file_type = uploaded_file.name.split('.')[-1].lower()
+                
+                if file_type == 'txt' or file_type == 'md':
+                    file_content = uploaded_file.read().decode('utf-8', errors='ignore')
+                elif file_type == 'pdf':
+                    import PyMuPDF as fitz
+                    import tempfile
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+                        tmp.write(uploaded_file.read())
+                        tmp_path = tmp.name
+                    doc = fitz.open(tmp_path)
+                    file_content = "\n".join([page.get_text() for page in doc])
+                    doc.close()
+                    os.unlink(tmp_path)
+                elif file_type == 'docx':
+                    from docx import Document
+                    import tempfile
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp:
+                        tmp.write(uploaded_file.read())
+                        tmp_path = tmp.name
+                    doc = Document(tmp_path)
+                    file_content = "\n".join([p.text for p in doc.paragraphs])
+                    os.unlink(tmp_path)
+                
+                if file_content:
+                    # 限制长度，避免超出 token
+                    if len(file_content) > 3000:
+                        file_content = file_content[:3000] + "\n...(内容过长，已截断)"
+                    
+                    st.session_state.temp_attachments['file_content'] = file_content
+                    st.session_state.temp_attachments['file_names'].append(uploaded_file.name)
+                    st.success(f"✅ 已提取文件内容（{len(file_content)} 字符）")
+                else:
+                    st.warning("⚠️ 未提取到内容")
+            except Exception as e:
+                st.error(f"❌ 文件提取失败: {str(e)}")
+    
+    # 显示已添加的附件
+    if st.session_state.temp_attachments['image_text'] or st.session_state.temp_attachments['file_content']:
+        with col3:
+            st.caption("📎 附件已添加，将作为上下文辅助提问")
+            if st.button("🗑️ 清空附件", key="clear_attachments"):
+                st.session_state.temp_attachments = {'image_text': None, 'file_content': None, 'file_names': []}
+                st.rerun()
+
 # 保持输入框形态一致，避免布局跳动
 if st.session_state.get('is_processing'):
     st.chat_input("正在生成回答中...", disabled=True)
@@ -5803,20 +5938,51 @@ else:
     
     # 如果有新输入，加入队列
     if user_input:
+        # 📎 查询增强：组合附件内容
+        final_query = user_input
+        attachments_info = []
+        
+        if st.session_state.temp_attachments['image_text']:
+            final_query = f"[图片识别内容]\n{st.session_state.temp_attachments['image_text']}\n\n[我的问题]\n{user_input}"
+            attachments_info.append("📷 图片")
+        
+        if st.session_state.temp_attachments['file_content']:
+            if st.session_state.temp_attachments['image_text']:
+                final_query = f"[图片识别内容]\n{st.session_state.temp_attachments['image_text']}\n\n[参考文件内容]\n{st.session_state.temp_attachments['file_content']}\n\n[我的问题]\n{user_input}"
+            else:
+                final_query = f"[参考文件内容]\n{st.session_state.temp_attachments['file_content']}\n\n[我的问题]\n{user_input}"
+            attachments_info.append("📄 文件")
+        
+        # 保存附件信息到消息历史（用于显示）
+        if attachments_info:
+            if 'last_query_attachments' not in st.session_state:
+                st.session_state.last_query_attachments = {}
+            st.session_state.last_query_attachments[user_input] = {
+                'image_text': st.session_state.temp_attachments['image_text'],
+                'file_content': st.session_state.temp_attachments['file_content'],
+                'file_names': st.session_state.temp_attachments['file_names'].copy()
+            }
+        
         if active_kb_name == "multi_kb_mode":
             # 多知识库模式 - 直接处理查询
             selected_kbs = st.session_state.get('selected_kbs', [])
             if not selected_kbs:
                 st.error("请先选择知识库")
             else:
-                st.session_state.question_queue.append(user_input)
+                st.session_state.question_queue.append(final_query)
+                # 清理附件
+                st.session_state.temp_attachments = {'image_text': None, 'file_content': None, 'file_names': []}
         elif active_kb_name == "pure_chat":
             # 纯对话模式 - 直接处理，无需知识库
-            st.session_state.question_queue.append(user_input)
+            st.session_state.question_queue.append(final_query)
+            # 清理附件
+            st.session_state.temp_attachments = {'image_text': None, 'file_content': None, 'file_names': []}
         elif not st.session_state.chat_engine:
             st.error("请先点击左侧【🚀 执行处理】启动系统")
         else:
-            st.session_state.question_queue.append(user_input)
+            st.session_state.question_queue.append(final_query)
+            # 清理附件
+            st.session_state.temp_attachments = {'image_text': None, 'file_content': None, 'file_names': []}
 
 # 处理 prompt_trigger（追问按钮）
 if st.session_state.prompt_trigger:
@@ -6305,7 +6471,7 @@ if st.session_state.get('is_processing') and final_prompt:
         if active_kb_name: HistoryManager.save_session(active_kb_name, state.get_messages(), st.session_state.get('current_session_id'))
 
         # UI 仅显示原始问题或带引用的简洁版
-        with st.chat_message("user", avatar="🧑‍💻"): st.markdown(user_display_prompt)
+        display_user_message_with_attachments(user_display_prompt, st.session_state.get('current_active_query'))
         
         with st.chat_message("assistant", avatar="🤖"):
             msg_placeholder = st.empty()
