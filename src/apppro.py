@@ -2451,53 +2451,14 @@ with st.sidebar:
             perf_monitor.render_panel()
     
     with tab_help:
-        st.markdown("### 📖 RAG Pro Max 智能门户")
-        
-        # 1. 搜索栏
-        help_search = st.text_input("🔍 搜索功能、配置或疑难解答...", placeholder="例如：GPU 加速、API、部署...", key="help_search_input")
-        
-        if help_search:
-            # 简单的关键词检索逻辑
-            from src.utils.doc_search import search_docs
-            results = search_docs(help_search)
-            if results:
-                st.markdown(f"**找到 {len(results)} 条相关结果:**")
-                for res in results:
-                    with st.expander(f"📄 {res['title']}", expanded=True):
-                        st.markdown(res['preview'])
-                        if st.button(f"查看完整文档: {res['file']}", key=f"view_full_{res['file']}"):
-                            st.session_state.full_doc_to_show = res['file']
-                st.divider()
-            else:
-                st.warning("未找到匹配内容，请尝试更简单的关键词。")
-
-        # 2. 动态导航与快速入口
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            if st.button("🚀 快速上手", use_container_width=True):
-                st.session_state.help_active_tab = "onboarding"
-        with col2:
-            if st.button("🔌 API 文档", use_container_width=True):
-                st.session_state.help_active_tab = "api"
-        with col3:
-            if st.button("❓ 常见问题", use_container_width=True):
-                st.session_state.help_active_tab = "faq"
-
-        # 3. 核心内容区
-        active_tab = st.session_state.get('help_active_tab', 'onboarding')
-        
-        if active_tab == "onboarding":
-            # --- [v7.0] 极光战略指挥中心 - 首页重构 ---
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 2.5rem; border-radius: 16px; margin-bottom: 2rem; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.3);">
-                <h1 style="color: #ffffff; margin-bottom: 0.5rem; letter-spacing: -1px;">🚀 RAG Pro Max <span style="font-size: 1.2rem; color: #60a5fa; font-weight: 600; vertical-align: middle; margin-left: 10px;">Enterprise v6.6.0</span></h1>
-                <p style="color: #94a3b8; font-size: 1.15rem; line-height: 1.6; max-width: 800px;">
-                    <b>下一代私有化智能认知中台</b>。深度融合了多模态语义解析、结构化 SQL 推演与专家级可视化引擎，
-                    致力于将碎片化的非结构化文档转化为具备决策价值的<b>数字资产</b>。
-                </p>
-                <div style="display: flex; gap: 20px; margin-top: 1.5rem;">
-                    <div style="background: rgba(96, 165, 250, 0.1); padding: 8px 16px; border-radius: 20px; color: #60a5fa; font-size: 0.85rem; border: 1px solid rgba(96, 165, 250, 0.3);">🛡️ 物理级隐私堡垒</div>
-                    <div style="background: rgba(16, 185, 129, 0.1); padding: 8px 16px; border-radius: 20px; color: #10b981; font-size: 0.85rem; border: 1px solid rgba(16, 185, 129, 0.3);">⚡ 毫秒级知识召回</div>
+        # [v6.6.8] 核心逻辑挂载：调用统一侧边栏组件的帮助渲染器
+        try:
+            from src.ui.tabbed_sidebar import TabbedSidebar
+            sidebar_helper = TabbedSidebar()
+            sidebar_helper._render_help_tab()
+        except Exception as e:
+            st.error(f"帮助中心加载失败: {e}")
+            st.info("💡 提示：系统正在进行架构升级，请尝试刷新页面。")
                     <div style="background: rgba(167, 139, 250, 0.1); padding: 8px 16px; border-radius: 20px; color: #a78bfa; font-size: 0.85rem; border: 1px solid rgba(167, 139, 250, 0.3);">🧠 战略级 SQL 推演</div>
                 </div>
             </div>
