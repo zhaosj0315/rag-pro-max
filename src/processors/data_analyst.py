@@ -126,40 +126,25 @@ class DataAnalystEngine:
         if not os.path.exists(self.schema_path): return {"success": False, "logic": "架构缺失"}
         with open(self.schema_path, 'r', encoding='utf-8') as f: full_schemas = json.load(f)
         
-        # 1. 元数据直查
-        if any(k in query for k in ["指标", "结构", "字典", "有哪些表"]):
-            if self.logger: self.logger.info("🔍 [决策路径] 判定为元数据查询，直接提取模型定义")
-            prompt = f"基于以下模型回答: {query}\n{json.dumps(full_schemas, ensure_ascii=False)[:4000]}"
-            def gen():
-                for char in model_client.complete(prompt).text: yield char
-            return {"stages": [], "logic_gen": gen(), "success": True, "macro_context": "架构咨询"}
-
-        # 2. 相关性裁剪与对齐
-        rel_tables = self._get_relevant_tables(query, full_schemas)
-        if self.logger: self.logger.info(f"📁 [实体识别] 锁定相关业务表: {rel_tables}")
-        
         session_conn = sqlite3.connect(self.db_path, timeout=60)
         try:
+            rel_tables = self._get_relevant_tables(query, full_schemas)
             mapping = self._ensure_sandbox_ready(full_schemas, model_client, status_callback, rel_tables, conn=session_conn)
             sub_schema = {mapping.get(t, t): full_schemas['tables'][t] for t in rel_tables if t in full_schemas['tables']}
             
-            # 3. 任务拆解
-            if self.logger: self.logger.info("🎯 [逻辑建模] 正在拆解分析路径与战略目标...")
-            prompt = f"需求 {query} 拆解为 2-3 个 SQL 阶段。JSON 数组: [{{stage_id, title, transformation, goal}}]\n模型: {json.dumps(sub_schema, ensure_ascii=False)}"
+            if self.logger: self.logger.info("🎯 [逻辑建模] 正在拆解分析路径...")
+            prompt = f"将需求 {query} 拆解为 2-3 个 SQL 阶段。JSON 数组: [{{stage_id, title, transformation, goal}}]\n模型: {json.dumps(sub_schema, ensure_ascii=False)}"
             try:
                 res = model_client.complete(prompt).text
                 stages_meta = json.loads(re.search(r'(\[.*\])', res, re.DOTALL).group(1))
-                if self.logger:
-                    for s in stages_meta: self.logger.info(f"   📍 规划阶段 {s['stage_id']}: {s['title']} | 目标: {s['goal']}")
             except: 
-                stages_meta = [{"stage_id": 1, "title": "数据分析", "transformation": "执行分析"}]
+                stages_meta = [{"stage_id": 1, "title": "全链路数据探索", "transformation": "执行深度聚合分析"}]
 
             final_data = []
             analysis_context = ""
             for i, meta in enumerate(stages_meta):
                 if self.logger: self.logger.separator(f"Execution: Stage {i+1}")
-                if self.logger: self.logger.info(f"📝 [阶段任务] {meta.get('title')}")
-                if status_callback: status_callback(f"⚙️ [Stage {i+1}] 构建 SQL 逻辑...")
+                if status_callback: status_callback(f"⚙️ [Stage {i+1}] 正在精准对齐数据...")
                 
                 t_context = {}
                 for t in sub_schema:
@@ -167,11 +152,7 @@ class DataAnalystEngine:
                     cols = info.get('cols', info.get('columns', []))
                     keep = ['status', 'state', 'date', 'time', 'amount', 'price', 'total', 'id', 'name', '合规', '成本', '延迟']
                     filtered = [c for c in cols if any(k in c['name'].lower() or k in str(c.get('comment','')).lower() for k in keep)]
-                    
-                    # [v6.8.8] 真实值探测
                     val_samples = self._get_column_value_samples(t, session_conn)
-                    if self.logger and val_samples: self.logger.info(f"📊 [数据指纹] 表 '{t}' 特征值: {val_samples.replace('\n', ' | ')}")
-                    
                     t_context[t] = {
                         "desc": info.get("desc"), 
                         "cols": filtered if filtered else cols[:10],
@@ -179,24 +160,25 @@ class DataAnalystEngine:
                     }
                     try:
                         r = self.execute_sql(f"SELECT * FROM {t} LIMIT 1", conn=session_conn)
-                        if r["success"] and r["data"]:
-                            t_context[t]["sample"] = r['data'][0]
+                        if r["success"] and r["data"]: t_context[t]["sample"] = r['data'][0]
                     except: pass
 
-                sql_prompt = f"""编写分析 SQL 任务: {meta.get('transformation')}
+                sql_prompt = f"""针对任务 "{meta.get('transformation')}" 编写 SQLite SQL。
 模型与真实值样例: {json.dumps(t_context, ensure_ascii=False)}
-前序发现: {analysis_context}
-返回标准 JSON: {{"sqlite": "...", "standard": "...", "dataworks": "..."}}
+前序发现与数据摘要: {analysis_context}
+
+【核心指令】:
+1. **跨阶段持久化**：如果本阶段产出的结果需要供后续阶段使用，必须使用 `CREATE TEMPORARY TABLE 表名 AS SELECT...`。**严禁仅使用 WITH 语法进行跨阶段通信**。
+2. **严丝合缝**：WHERE 过滤条件的值必须参考 value_samples。
+3. **返回标准 JSON**: {{"sqlite": "...", "standard": "...", "dataworks": "..."}}
 """
                 sqls = {"sqlite": ""}
                 try:
                     sqls = self._extract_json(model_client.complete(sql_prompt).text) or {"sqlite": ""}
-                    if self.logger and sqls.get('sqlite'):
-                        self.logger.info("📜 [生成的 SQL 逻辑]:")
-                        print(f"\033[36m{sqls['sqlite']}\033[0m")
+                    if self.logger: self.logger.info(f"📜 [SQL] {sqls.get('sqlite')}")
                 except: pass
 
-                if status_callback: status_callback(f"🧪 [Stage {i+1}] 执行验证中...")
+                if status_callback: status_callback(f"🧪 [Stage {i+1}] 执行逻辑验证...")
                 exec_res = {"success": False, "data": []}
                 empty_reason = "该阶段执行了逻辑加工，未产生回显数据"
                 
@@ -204,23 +186,25 @@ class DataAnalystEngine:
                     exec_res = self.execute_sql(sqls["sqlite"], model_client, conn=session_conn)
                     if exec_res["success"]:
                         if exec_res['data']:
-                            row_count = len(exec_res['data'])
-                            if self.logger: self.logger.success(f"✅ [查询结果] 成功命中 {row_count} 行记录")
-                            if status_callback: status_callback(f"✅ 命中 {row_count} 行数据")
-                            analysis_context += f"阶段{i+1}: {json.dumps(exec_res['data'][:1], ensure_ascii=False)}\n"
+                            r_count = len(exec_res['data'])
+                            if self.logger: self.logger.success(f"✅ [Execution] 命中 {r_count} 行数据")
+                            if status_callback: status_callback(f"✅ 命中 {r_count} 行数据")
+                            analysis_context += f"阶段{i+1}核心发现: {json.dumps(exec_res['data'][:5], ensure_ascii=False)}\n"
                             empty_reason = ""
                         else:
-                            m_table = re.search(r'CREATE\s+(?:TEMPORARY\s+)?TABLE\s+([a-zA-Z0-9_]+)', sqls["sqlite"].upper(), re.I)
+                            # 采样自愈
+                            sql_upper = sqls["sqlite"].upper()
+                            m_table = re.search(r'CREATE\s+(?:TEMPORARY\s+)?TABLE\s+([a-zA-Z0-9_]+)', sql_upper, re.I)
                             if m_table:
                                 t_name = m_table.group(1)
-                                verify_res = self.execute_sql(f"SELECT * FROM {t_name} LIMIT 5", conn=session_conn)
-                                if verify_res["success"] and verify_res["data"]:
-                                    exec_res["data"] = verify_res["data"]
-                                    if self.logger: self.logger.success(f"🏗️ [工程加工] 表 '{t_name}' 已构建完成并提取采样数据")
+                                v_res = self.execute_sql(f"SELECT * FROM {t_name} LIMIT 10", conn=session_conn)
+                                if v_res["success"] and v_res["data"]:
+                                    exec_res["data"] = v_res["data"]
                                     empty_reason = ""
+                                else:
+                                    empty_reason = f"🏗️ 临时表 '{t_name}' 已创建，但内部无符合条件的数据"
                             else:
-                                if self.logger: self.logger.warning("⚠️ [查询结果] SQL 执行成功，但返回结果集为空")
-                                empty_reason = "⚠️ 查询执行成功，但未找到匹配记录 (请检查时间范围或状态值)"
+                                empty_reason = "⚠️ 查询执行成功，但未找到匹配记录"
                 
                 final_data.append({
                     "meta": meta, "sqls": sqls, "data": exec_res["data"], 
@@ -228,16 +212,15 @@ class DataAnalystEngine:
                     "source_samples": {t: t_context[t].get('sample', {}) for t in t_context}
                 })
 
-            if self.logger: self.logger.separator("Final Synthesis")
-            if self.logger: self.logger.info("🧠 [报告撰写] 正在基于全量推演数据合成战略洞察...")
+            if self.logger: self.logger.info("🧠 [Synthesis] 正在合成全链路分析报告...")
             def report_gen():
-                p = f"撰写战略报告。需求: {query}\n结论: {analysis_context}\n要求: SCQA 架构，结论先行。"
+                p = f"撰写战略报告。需求: {query}\n过程摘要: {analysis_context}\n要求: SCQA 架构，结论先行。"
                 if hasattr(model_client, 'stream_chat'):
                     from llama_index.core.base.llms.types import ChatMessage, MessageRole
                     try:
                         for chunk in model_client.stream_chat([ChatMessage(role=MessageRole.USER, content=p)]):
                             yield chunk.delta if hasattr(chunk, 'delta') else str(chunk)
-                    except: yield "生成异常"
+                    except: yield "生成中断"
                 else: yield model_client.complete(p).text
 
             return {"stages": final_data, "logic_gen": report_gen(), "success": True, "macro_context": full_schemas.get('macro_context','')}
@@ -301,7 +284,7 @@ class DataAnalystEngine:
             if semantic_docs and model_client:
                 docs = "".join([open(p, 'r', errors='ignore').read()[:5000] for p in semantic_docs])
                 try:
-                    res = model_client.complete(f"构建模型。返回 JSON").text
+                    res = model_client.complete(f"根据物理表 {json.dumps(physical_tables)} 和业务材料 {docs} 构建全局模型。返回标准 JSON。" ).text
                     match = re.search(r'(\{.*\})', res, re.DOTALL)
                     if match:
                         semantic = json.loads(match.group(1))
@@ -312,7 +295,7 @@ class DataAnalystEngine:
                 except: pass
             with open(self.schema_path, 'w', encoding='utf-8') as f: json.dump(unified_schema, f, indent=4, ensure_ascii=False)
             if model_client:
-                if status_callback: status_callback("🧪 预填充仿真数据...")
+                if status_callback: status_callback("🧪 正在固化仿真数据底座...")
                 self._ensure_sandbox_ready(unified_schema, model_client, status_callback=None)
             if status_callback: status_callback(f"✅ 战略大脑初始化完成")
             return {"success": True, "tables": list(unified_schema['tables'].keys())}
