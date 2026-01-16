@@ -846,7 +846,7 @@ class DataAnalystEngine:
                 prompt = f"""
 你是一名资深架构师。请结合以下【物理表结构】与【业务材料内容】，构建统一的业务模型。
 【物理表结构】：{json.dumps(physical_tables, ensure_ascii=False)}
-【业务材料】：{""..join(docs_content)}
+【业务材料】：{"".join(docs_content)}
 
 要求输出标准 JSON：
 1. "macro_context": "基于文档推断的宏观背景与 KPI 定义"
