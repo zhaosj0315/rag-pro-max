@@ -5149,19 +5149,27 @@ for msg_idx, msg in enumerate(state.get_messages()):
                             # C. 查询后：结果产出
                             st.markdown("**3. 查询后：汇聚结果表 (After)**")
                             import pandas as pd
-                            df_h = pd.DataFrame(stage_h["data"])
-                            
-                            if not df_h.empty:
-                                # 使用全功能可视化画板 [v5.8.8]
-                                render_smart_visualization(
-                                    df=df_h, 
-                                    query=m_h['title'], 
-                                    msg_idx=msg_idx, 
-                                    stage_id=m_h['stage_id'], 
-                                    recommendation=stage_h.get("recommendation")
-                                )
+                            # [v6.8.1] 强制容错渲染与可见性保障
+                            raw_result_data = stage_h.get("data", [])
+                            if raw_result_data:
+                                try:
+                                    df_h = pd.DataFrame(raw_result_data)
+                                    if not df_h.empty:
+                                        # 使用全功能可视化画板
+                                        render_smart_visualization(
+                                            df=df_h, 
+                                            query=m_h['title'], 
+                                            msg_idx=msg_idx, 
+                                            stage_id=m_h['stage_id'], 
+                                            recommendation=stage_h.get("recommendation")
+                                        )
+                                    else:
+                                        st.warning("⚠️ 查询执行成功，但结果集为空 (0 rows)")
+                                except Exception as e:
+                                    st.error(f"表格渲染异常: {e}")
+                                    st.write(raw_result_data) # 终极兜底：直接打印原始数据
                             else:
-                                st.info("该阶段未产出数据结果")
+                                st.info("该阶段仅执行了逻辑加工，未产生行级数据结果")
                             if stage_h.get("is_simulated"):
                                 st.info("✨ 此阶段基于业务模型仿真推演")
 
