@@ -355,7 +355,28 @@ class DataAnalystEngine:
         # 2. 仅对相关表进行检查和仿真
         table_mapping = self._ensure_sandbox_ready(full_schemas, model_client, status_callback=status_callback, target_tables=relevant_table_names)
         
-        # ... (后续逻辑保持不变) ...
+        # 3. [v6.6.8] 应用映射并构建 pruned_schemas
+        mapped_relevant_tables = []
+        corrected_schemas = {"tables": {}, "relationships": [], "macro_context": full_schemas.get("macro_context", "")}
+        
+        for t_name, t_info in full_schemas.get("tables", {}).items():
+            real_name = table_mapping.get(t_name, t_name)
+            corrected_schemas["tables"][real_name] = t_info
+            if t_name in relevant_table_names:
+                mapped_relevant_tables.append(real_name)
+        
+        mapped_relevant_tables = list(set(mapped_relevant_tables))
+
+        for rel in full_schemas.get("relationships", []):
+            rel["source"] = table_mapping.get(rel["source"], rel["source"])
+            rel["target"] = table_mapping.get(rel["target"], rel["target"])
+            corrected_schemas["relationships"].append(rel)
+
+        pruned_schemas = {
+            "macro_context": corrected_schemas["macro_context"],
+            "tables": {name: corrected_schemas["tables"][name] for name in mapped_relevant_tables if name in corrected_schemas["tables"]},
+            "relationships": [r for r in corrected_schemas["relationships"] if r["source"] in mapped_relevant_tables or r["target"] in mapped_relevant_tables]
+        }
 
         if status_callback: status_callback("🎯 正在拆解战略目标与分析路径...")
         decomposition_prompt = f"""
