@@ -366,10 +366,10 @@ def render_admin_management():
                     AuditLogger.log(st.session_state.get('user'), "ROLE_UPDATE", f"更新角色 {selected_role_id} 权限", ip=get_client_ip())
                     st.success("已保存"); st.rerun()
 
-    # --- Tab 5: 审计记录 (企业级监控面板) ---
+    # --- Tab 5: 审计记录 (企业级监控面板 v6.6.6) ---
     with tab_audit:
-        st.caption("系统全行为追踪：从管理指令到 AI 推演的深度审计流水")
-        raw_logs = AuditLogger.get_logs()
+        st.caption("全量行为链路追踪：实时监控系统合规性、资源流向与风控状态")
+        raw_logs = AuditLogger.get_logs(limit=2000)
         if not raw_logs:
             st.info("暂无审计记录")
         else:
@@ -377,31 +377,46 @@ def render_admin_management():
             df_logs['timestamp'] = pd.to_datetime(df_logs['timestamp'])
             df_logs = df_logs.sort_values('timestamp', ascending=False)
             
-            # 1. 筛选矩阵 (多维增强)
+            # 1. 行为风控引擎 (Risk Engine)
+            with st.container(border=True):
+                st.markdown("🛡️ **实时行为风控大盘**")
+                rc1, rc2, rc3 = st.columns(3)
+                
+                # A. 暴力破解检测
+                failed_logins = df_logs[(df_logs['action'] == 'LOGIN_FAILED') & (df_logs['timestamp'] > (datetime.now() - pd.Timedelta(hours=1)))]
+                if len(failed_logins) > 5:
+                    rc1.error(f"🚨 暴力破解风险: 过去1小时有 {len(failed_logins)} 次失败登录")
+                else:
+                    rc1.success("✅ 认证状态稳定")
+                
+                # B. 大规模删除检测
+                mass_deletes = df_logs[(df_logs['action_type'] == 'KB_MGMT') & (df_logs['action'].str.contains('DELETE'))]
+                if len(mass_deletes) > 10:
+                    rc2.warning(f"⚠️ 资产流失风险: 检测到大规模物理删除行为")
+                else:
+                    rc2.success("✅ 资产结构安全")
+                
+                # C. 敏感爬取检测
+                crawl_ops = df_logs[df_logs['action_type'] == 'CRAWL']
+                if len(crawl_ops) > 20:
+                    rc3.info(f"📊 活跃抓取: 当前有 {len(crawl_ops)} 项爬虫任务在流水中")
+                else:
+                    rc3.success("✅ 抓取频率正常")
+
+            # 2. 筛选矩阵
             with st.container(border=True):
                 c1, c2, c3, c4 = st.columns([1.2, 1, 1, 1.8])
-                # 时间范围
                 min_date = df_logs['timestamp'].min().date()
                 max_date = df_logs['timestamp'].max().date()
-                sel_range = c1.date_input("🕒 观察窗口", value=(min_date, max_date), key="aud_range_v2")
+                sel_range = c1.date_input("🕒 观察窗口", value=(min_date, max_date), key="aud_range_v3")
                 
-                # 分类筛选 [v6.4.1] 修复旧日志无分类导致的 TypeError
-                if 'action_type' in df_logs:
-                    df_logs['action_type'] = df_logs['action_type'].fillna('GENERIC').astype(str)
-                    all_types = sorted([t for t in df_logs['action_type'].unique() if t])
-                else:
-                    all_types = []
-                sel_t = c2.multiselect("📂 动作分类", all_types, key="aud_type_f")
+                all_types = sorted(df_logs['action_type'].unique()) if 'action_type' in df_logs else []
+                sel_t = c2.multiselect("📂 动作分类", all_types, key="aud_type_f3")
                 
-                # 状态筛选 [v6.4.1] 增加鲁棒性
-                df_logs['status'] = df_logs['status'].fillna('success').astype(str)
-                all_status = sorted([s for s in df_logs['status'].unique() if s])
-                sel_s = c3.multiselect("🚦 结果状态", all_status, key="aud_status_f")
-                
-                # [v6.4.2] 补齐丢失的搜索框逻辑
-                search_det = c4.text_input("🔍 详情穿透", placeholder="搜索用户、IP或动作详情...", key="audit_search_v2")
+                all_status = sorted(df_logs['status'].unique()) if 'status' in df_logs else []
+                sel_s = c3.multiselect("🚦 结果状态", all_status, key="aud_status_f3")
+                search_det = c4.text_input("🔍 详情穿透", placeholder="搜索用户、IP或变更详情...", key="audit_search_v3")
 
-            # 过滤逻辑
             f_logs = df_logs.copy()
             if len(sel_range) == 2:
                 f_logs = f_logs[(f_logs['timestamp'].dt.date >= sel_range[0]) & (f_logs['timestamp'].dt.date <= sel_range[1])]
@@ -411,25 +426,20 @@ def render_admin_management():
                 mask = f_logs.apply(lambda row: search_det.lower() in str(row.values).lower(), axis=1)
                 f_logs = f_logs[mask]
 
-            # 2. 动态监控看板
+            # 3. 统计
             k1, k2, k3, k4 = st.columns(4)
-            k1.metric("匹配记录数", len(f_logs))
-            
-            failed_count = len(f_logs[f_logs['status'].isin(['failed', 'intercepted', 'warning'])])
-            k2.metric("异常/拦截告警", failed_count, delta=f"{failed_count}" if failed_count > 0 else "0", delta_color="inverse")
-            
-            active_users = f_logs['user'].nunique()
-            k3.metric("活跃执行者", active_users)
+            k1.metric("匹配流水", len(f_logs))
+            k2.metric("异常告警", len(f_logs[f_logs['status']!='success']))
+            k3.metric("唯一主体", f_logs['user'].nunique())
             
             csv = f_logs.to_csv(index=False).encode('utf-8-sig')
-            k4.download_button("📥 导出审计报表", data=csv, file_name=f"audit_report_{datetime.now().strftime('%Y%m%d')}.csv", use_container_width=True)
+            k4.download_button("📥 导出全量审计报表", data=csv, file_name=f"audit_v666_{datetime.now().strftime('%Y%m%d')}.csv", use_container_width=True)
 
-            st.write("")
-            
-            # 3. 企业级 HTML 流水表 [v6.4.3] 修复缩进导致的源码显露问题
+            # 4. 企业级 HTML 流水表 (支持 Diff 展示)
             type_icons = {
                 "AUTH": "认证", "KB_MGMT": "库管理", "DATA_PROCESS": "数据处理", 
-                "ADMIN": "系统管理", "SECURITY": "安全审计", "GENERIC": "通用动作"
+                "ADMIN": "系统管理", "SECURITY": "安全审计", "GENERIC": "通用动作",
+                "CRAWL": "网页抓取", "PREVIEW": "文件预览"
             }
             status_colors = {
                 "success": ("#f0fdf4", "#166534", "成功"), 
@@ -437,37 +447,28 @@ def render_admin_management():
                 "warning": ("#fffbeb", "#92400e", "警告"),
                 "intercepted": ("#faf5ff", "#6b21a8", "拦截")
             }
-            # 动作名称汉化映射 [v6.6.1]
             action_map = {
-                "LOGIN": "账户登录", "AUTO_LOGIN": "自动登录", "LOGOUT": "注销退出",
-                "REGISTER": "账号注册", "DELETE_KB": "物理删除库", "CREATE_KB": "创建知识库",
-                "RENAME_KB": "重命名库", "REBUILD_INDEX": "重建索引", "UPLOAD_FILE": "上传文件",
-                "BATCH_AUTH": "批量授权", "BATCH_LOCK": "批量封禁", "USER_UPDATE": "更新用户属性",
-                "SESSION_REVOKE": "注销用户会话", "CONFIG_CHANGE": "全局配置变更",
-                "KB_PUBLIC_BATCH": "批量公开资产", "KB_DIST_BATCH": "批量分发资产",
-                "KB_PRIV_BATCH": "批量设为私有", "BATCH_TRANSFER": "批量所有权移交",
-                "BATCH_DELETE": "批量物理删除", "DATA_ANALYSIS_EXEC": "执行数据推演"
+                "LOGIN": "账户登录", "LOGOUT": "注销退出", "DOC_DETAIL_VIEW": "查看详情",
+                "DOC_NATIVE_PREVIEW": "系统预览", "CRAWL_START": "启动抓取", "CONFIG_UPDATE": "修改配置",
+                "BATCH_AUTH": "批量授权", "DATA_ANALYSIS_EXEC": "执行推演"
             }
 
-            # 关键修复：HTML 字符串行首绝对不能有空格，物理对齐到最左侧
             table_html = """
 <style>
-.audit-table { width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 12px; color: #1e293b; }
+.audit-table { width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 12px; }
 .audit-table th { background: #f8fafc; color: #64748b; padding: 12px 10px; text-align: left; border-bottom: 2px solid #e2e8f0; }
 .audit-table td { padding: 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
-.badge-type { padding: 2px 6px; border-radius: 4px; background: #f1f5f9; color: #475569; font-weight: 600; font-size: 10px; display: inline-block; }
-.badge-status { padding: 2px 10px; border-radius: 20px; font-weight: 600; font-size: 11px; text-transform: uppercase; }
-.details-cell { max-width: 350px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #475569; }
-.audit-table tr:hover { background: #f8fafc; }
-.ip-text { font-family: monospace; color: #94a3b8; font-size: 11px; }
+.badge-type { padding: 2px 6px; border-radius: 4px; background: #f1f5f9; color: #475569; font-weight: 600; font-size: 10px; }
+.badge-status { padding: 2px 10px; border-radius: 20px; font-weight: 600; font-size: 11px; }
+.diff-tag { color: #2563eb; background: #eff6ff; padding: 1px 4px; border-radius: 3px; font-family: monospace; font-size: 10px; border: 1px solid #dbeafe; }
 </style>
 <table class='audit-table'>
 <thead>
 <tr>
-<th style='width: 15%'>🕒 发生时间</th>
-<th style='width: 10%'>👤 执行者</th>
-<th style='width: 15%'>分类 / 动作</th>
-<th style='width: 40%'>📝 业务执行详情</th>
+<th style='width: 15%'>🕒 时间</th>
+<th style='width: 10%'>👤 用户</th>
+<th style='width: 15%'>分类/动作</th>
+<th style='width: 40%'>📝 执行摘要与变更记录</th>
 <th style='width: 10%'>🚦 状态</th>
 <th style='width: 10%'>🌐 IP</th>
 </tr>
@@ -478,29 +479,26 @@ def render_admin_management():
             for _, row in f_logs.head(200).iterrows():
                 ts = row['timestamp'].strftime('%m-%d %H:%M:%S')
                 a_type = row.get('action_type', 'GENERIC')
-                type_label = type_icons.get(a_type, "通用")
+                type_label = type_icons.get(a_type, a_type)
+                action_label = action_map.get(row.get('action'), row.get('action'))
                 
-                # 执行者汉化
-                raw_user = row['user']
-                display_user = "系统管理员" if raw_user == "admin" else raw_user
-                
-                # 动作名称汉化
-                raw_action = row.get('action', 'Unknown')
-                action_label = action_map.get(raw_action, raw_action)
+                # 处理变更对比 (Diff)
+                diff_html = ""
+                diff_data = row.get('diff')
+                if diff_data and isinstance(diff_data, dict):
+                    diff_html = f"<br><span class='diff-tag'>Δ {diff_data.get('item','变更')}: {diff_data.get('new_value','...')}</span>"
                 
                 s_val = row.get('status', 'success')
                 bg, fg, s_label = status_colors.get(s_val, ("#f1f5f9", "#475569", "未知"))
+                details_raw = str(row['details'])
                 
-                details_raw = str(row['details']).replace('"', '&quot;')
-                
-                # 每一行都必须紧贴左侧
                 table_html += f"<tr>"
                 table_html += f"<td style='color: #64748b'>{ts}</td>"
-                table_html += f"<td style='font-weight: 700;'>{display_user}</td>"
-                table_html += f"<td><span class='badge-type'>{type_label}</span><br><small style='color: #94a3b8;'>{action_label}</small></td>"
-                table_html += f"<td class='details-cell' title='{details_raw}'>{details_raw}</td>"
+                table_html += f"<td style='font-weight: 700;'>{row['user']}</td>"
+                table_html += f"<td><span class='badge-type'>{type_label}</span><br><small>{action_label}</small></td>"
+                table_html += f"<td>{details_raw}{diff_html}</td>"
                 table_html += f"<td><span class='badge-status' style='background: {bg}; color: {fg};'>{s_label}</span></td>"
-                table_html += f"<td class='ip-text'>{row.get('ip', '...')}</td>"
+                table_html += f"<td style='color: #94a3b8; font-family: monospace;'>{row.get('ip', '...')}</td>"
                 table_html += f"</tr>"
             
             table_html += "</tbody></table>"

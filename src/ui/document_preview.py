@@ -43,12 +43,15 @@ def show_kb_documents(kb_name: str) -> None:
             
             # 详情按钮 (图标)
             if col_view.button("📝", key=f"view_{doc.name}", help="查看详情", use_container_width=True):
+                from src.auth.audit_logger import AuditLogger
+                AuditLogger.log(st.session_state.get('user'), "DOC_DETAIL_VIEW", f"查看文档详情: {doc.name} (KB: {kb_name})", action_type="PREVIEW")
                 st.session_state['show_doc_detail'] = doc
                 st.session_state['show_doc_kb'] = kb_name
             
             # 原生预览按钮 (图标)
             if col_native.button("👁️", key=f"native_{doc.name}", help="macOS 原生预览", use_container_width=True):
                 from src.utils.app_utils import open_file_native
+                from src.auth.audit_logger import AuditLogger
                 # 重新验证路径，防止相对路径失效
                 import os
                 import glob
@@ -72,6 +75,7 @@ def show_kb_documents(kb_name: str) -> None:
                         break
                 
                 if final_path and open_file_native(final_path):
+                    AuditLogger.log(st.session_state.get('user'), "DOC_NATIVE_PREVIEW", f"调用macOS原生预览: {doc.name} (KB: {kb_name})", action_type="PREVIEW")
                     st.toast(f"🚀 正在调用系统预览: {doc.name}")
                 else:
                     st.error(f"无法定位文件: {doc.name}")

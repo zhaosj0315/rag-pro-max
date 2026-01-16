@@ -63,6 +63,20 @@ class ConfigService:
         """设置配置值（支持点号分隔的嵌套键）"""
         from src.common.config import set_config_value
         config = self.get_config(config_name)
+        
+        # [Audit] 记录配置变更
+        try:
+            from src.auth.audit_logger import AuditLogger
+            import streamlit as st
+            AuditLogger.log(
+                st.session_state.get('user', 'system'), 
+                "CONFIG_UPDATE", 
+                f"修改配置项 {key} (文件: {config_name})", 
+                action_type="ADMIN",
+                diff={"item": key, "new_value": str(value)}
+            )
+        except: pass
+        
         updated_config = set_config_value(key, value, config)
         return self.set_config(updated_config, config_name)
     

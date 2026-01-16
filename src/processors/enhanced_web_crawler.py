@@ -36,6 +36,9 @@ class EnhancedWebCrawler:
         
         # 使用新的异步爬虫
         async with AsyncWebCrawler(max_concurrent=max_concurrent, ignore_robots=ignore_robots) as crawler:
+            from src.auth.audit_logger import AuditLogger
+            import streamlit as st
+            AuditLogger.log(st.session_state.get('user'), "CRAWL_START", f"启动爬虫任务: {start_url} (并发: {max_concurrent})", action_type="CRAWL")
             
             # 使用指定的输出目录或创建临时目录
             if output_dir:
