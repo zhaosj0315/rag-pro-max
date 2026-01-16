@@ -58,8 +58,8 @@ class DataAnalystEngine:
         prompt = f"""
 你是一名资深首席架构师。请从以下文档中【严谨提取】业务模型与宏观背景。
 
-【重要约束】：
-1. **严禁凭空想象**：不要生成文档中未提及的表结构。严禁默认输出“产品(Products)”、“订单(Orders)”等通用电商表，除非文档中明确出现了这些业务实体。
+【重要约束】:
+1. **严禁凭空想象**：不要生成文档中未提及的表结构。代理表生成
 2. **物理表对齐**：如果文档中包含物理表字段定义，请以物理表名为准。
 3. **识别业务领域**：基于文档真实内容推断 KPI 目标。
 
@@ -181,7 +181,7 @@ class DataAnalystEngine:
         if status_callback and len(physical_tables_raw) > 0 and not target_tables:
             display_tables = [t for t in physical_tables_raw if t.lower() not in ('dual', 'sqlite_sequence')]
             if display_tables:
-                status_callback(f"📂 物理库实存表 ({len(display_tables)}张): {', '.join(display_tables[:5])}...")
+                status_callback(f"📂 物理库实存表 ({len(display_tables)}张): {', '.join(display_tables[:5])}..." )
 
         # [Helper] 模糊匹配逻辑
         def find_physical_match(target_name):
@@ -220,7 +220,6 @@ class DataAnalystEngine:
                     # 表存在且有数据 -> 完美复用
                     if physical_match != t_name_str:
                         table_mapping[t_name_str] = physical_match
-                        # if self.logger: self.logger.info(f"🔗 表名自动对齐: {t_name_str} -> {physical_match}")
                     tables_ready.append(physical_match)
                     if self.logger: self.logger.info(f"💾 复用现有数据: {physical_match} ({row_count} 行)")
                 else:
@@ -321,32 +320,21 @@ class DataAnalystEngine:
             full_schemas = json.load(f)
         
         # --- [v6.6.8] 策略 A: 元数据意图拦截 ---
-        # 如果用户只是想了解“有哪些指标”、“表结构如何”，直接根据 Schema 回答，不触发 SQL
         metadata_keywords = ["有哪些指标", "关键数据指标", "指标说明", "数据字典", "表结构", "有哪些表", "数据模型"]
         if any(k in query for k in metadata_keywords):
             if status_callback: status_callback("📖 检测到元数据查询意图，正在从业务架构定义中提取答案...")
-            
-            # 构建精简的 Schema 描述供模型回答
             schema_summary = []
             for t_name, t_info in full_schemas.get('tables', {}).items():
                 cols = [f"{c['name']}({c.get('comment','无')})" for c in t_info.get('cols', t_info.get('columns', []))[:10]]
                 schema_summary.append(f"- 表: {t_name} ({t_info.get('desc', '业务实体')})\n  字段: {', '.join(cols)}")
-            
             summary_prompt = f"请根据以下业务模型定义，详细解答用户的疑问：{query}\n\n模型定义：\n" + "\n".join(schema_summary)
-            
             def metadata_gen():
                 res = model_client.complete(summary_prompt).text
                 for char in res: yield char
-                
-            return {
-                "stages": [], # 元数据查询无执行阶段
-                "logic_gen": metadata_gen(),
-                "success": True,
-                "macro_context": full_schemas.get('macro_context', "业务架构咨询")
-            }
+            return {"stages": [], "logic_gen": metadata_gen(), "success": True, "macro_context": full_schemas.get('macro_context', "业务架构咨询")}
 
         # --- [v6.6.8] 策略 B: 正常数据分析流 ---
-        # 1. 先识别相关表 (增加限制，防止规模爆炸)
+        # 1. 先识别相关表
         relevant_table_names = self._get_relevant_tables(query, full_schemas)
         if len(relevant_table_names) > 10:
             if status_callback: status_callback(f"⚠️ 检测到问题涉及范围过广 ({len(relevant_table_names)}张表)，已自动剪枝以保护计算资源。")
@@ -355,7 +343,7 @@ class DataAnalystEngine:
         # 2. 仅对相关表进行检查和仿真
         table_mapping = self._ensure_sandbox_ready(full_schemas, model_client, status_callback=status_callback, target_tables=relevant_table_names)
         
-        # 3. [v6.6.8] 应用映射并构建 pruned_schemas
+        # 3. 应用映射并构建 pruned_schemas
         mapped_relevant_tables = []
         corrected_schemas = {"tables": {}, "relationships": [], "macro_context": full_schemas.get("macro_context", "")}
         
@@ -372,9 +360,10 @@ class DataAnalystEngine:
             rel["target"] = table_mapping.get(rel["target"], rel["target"])
             corrected_schemas["relationships"].append(rel)
 
+        # 确保 pruned_schemas 始终被定义
         pruned_schemas = {
             "macro_context": corrected_schemas["macro_context"],
-            "tables": {name: corrected_schemas["tables"][name] for name in mapped_relevant_tables if name in corrected_schemas["tables"]},
+            "tables": {name: corrected_schemas["tables"].get(name) for name in mapped_relevant_tables if name in corrected_schemas["tables"]},
             "relationships": [r for r in corrected_schemas["relationships"] if r["source"] in mapped_relevant_tables or r["target"] in mapped_relevant_tables]
         }
 
@@ -384,7 +373,7 @@ class DataAnalystEngine:
 需求：{query}
 业务模型：{json.dumps(pruned_schemas, ensure_ascii=False)}
 
-【关键策略】：
+【关键策略】:
 1. **数据依赖 (Drill Down)**：如果需求涉及深入分析（如“找出异常并分析原因”），请确保 Stage 2 的逻辑能利用 Stage 1 的产出（例如：Stage 1 找出 ID，Stage 2 使用 WHERE id IN (...)）。
 2. **逻辑递进**：
    - Stage 1: 现象摸排/范围圈定 (Broad Scan)
@@ -420,14 +409,11 @@ class DataAnalystEngine:
             analysis_path = meta.get('transformation', meta.get('title', '业务逻辑推演'))
             
             sample_context = ""
-            for t_name in relevant_table_names:
-                # [Fix] use mapped name
-                real_t_name = table_mapping.get(t_name, t_name)
-                # re-verify existence to be safe
+            for t_name in mapped_relevant_tables:
                 try:
-                    s_res = self.execute_sql(f"SELECT * FROM {real_t_name} LIMIT 2")
+                    s_res = self.execute_sql(f"SELECT * FROM {t_name} LIMIT 2")
                     if s_res["success"] and s_res["data"]:
-                        sample_context += f"- 表 '{real_t_name}' 数据样例: {json.dumps(s_res['data'], ensure_ascii=False)}\n"
+                        sample_context += f"- 表 '{t_name}' 数据样例: {json.dumps(s_res['data'], ensure_ascii=False)}\n"
                 except: pass
 
             prior_context_str = ""
@@ -442,9 +428,7 @@ class DataAnalystEngine:
                 for m in memories:
                     if any(k in m['query'] or k in m['goal'] for k in list(keywords)):
                         relevant_mems.append(f"- 历史参考SQL ({m['goal']}): {m['sql']}")
-                
-                if relevant_mems:
-                    memory_context_str = "\n【历史成功案例 (Few-Shot)】:\n" + "\n".join(relevant_mems[-2:]) 
+                if relevant_mems: memory_context_str = "\n【历史成功案例 (Few-Shot)】:\n" + "\n".join(relevant_mems[-2:]) 
             except: pass
 
             sql_prompt = f"""
@@ -459,37 +443,17 @@ class DataAnalystEngine:
 要求：
 1. **严格限制字段与表名**：
    - **绝对禁止**使用模型中不存在的表名。
-   - **严禁凭空想象字段名**：必须且仅能使用下述【模型】和【数据样例】中明确出现的列名。
-   - 字段名若包含特殊字符请使用双引号包裹。
-
-2. **强制使用模块化编程 (CTE)**：
-   - **严禁写超过 15 行的嵌套子查询**。必须使用 `WITH ... AS (...)` 将逻辑拆解为多个独立、命名的步骤。
-   - **命名规范**：CTE 名称必须反映业务含义（如 `active_users`, `monthly_revenue`），禁止使用 `t1`, `temp`。
-
-3. **面向小白的详细注释**：
-   - **在每个 CTE 代码块之前**，必须加一段中文注释，解释“这一步是为了算什么”。
-   - 解释复杂的计算公式背后的业务含义。
-
-4. **严谨的 SQL 语法 (SQLite 兼容)**：
-   - **绝对禁止在 WHERE 子句中使用聚合函数** (如 AVG, SUM)。必须将其移至 HAVING 子句中。
-   - **严禁使用 QUALIFY** 关键字。
-   - **严禁使用 ? 占位符** (所有变量必须在 SQL 中直接展开为字面量)。
-
-5. 返回一个 JSON 对象，包含三个字段：
-   - "dataworks": "生产环境 SQL (MaxCompute语法)，必须包含 ${{bizdate}} 变量"
-   - "standard": "标准 ANSI SQL (用于通用数据库验证)"
-   - "sqlite": "本地验证 SQL (用于当前环境执行)"
-
-仅返回 JSON，不要有其他解释。
+   - **严禁凭空想象字段名**。
+2. **强制使用模块化编程 (CTE)**。
+3. **面向小白的详细注释**。
+4. **严谨的 SQL 语法 (SQLite 兼容)**。
+5. 返回 JSON 对象: "dataworks", "standard", "sqlite"。
 """
-            
             sqls = {"dataworks": "", "standard": "", "sqlite": ""}
             try:
                 sql_res = model_client.complete(sql_prompt).text
-                import re
                 json_match = re.search(r'(\{.*\})', sql_res, re.DOTALL)
-                if json_match:
-                    sqls = json.loads(json_match.group(1))
+                if json_match: sqls = json.loads(json_match.group(1))
                 if status_callback: status_callback(f"✅ SQL生成完毕 (覆盖 {len(sqls)} 种方言)")
             except: 
                 if status_callback: status_callback("⚠️ SQL生成异常，将使用空模板")
@@ -497,7 +461,6 @@ class DataAnalystEngine:
             if status_callback: status_callback(f"🧪 [Stage {meta['stage_id']}] 正在执行逻辑验证...")
             execution_res = {"success": False, "data": []}
             is_simulated = False
-            source_samples = {}
             
             conn_check = sqlite3.connect(self.db_path)
             cursor_check = conn_check.cursor()
@@ -508,11 +471,9 @@ class DataAnalystEngine:
             if sqls.get("sqlite"):
                 execution_res = self.execute_sql(sqls["sqlite"], model_client=model_client)
                 row_count = len(execution_res.get("data", []))
-                
                 if execution_res["success"]:
                     if status_callback: status_callback(f"⚡ [Stage {meta['stage_id']}] SQL执行成功, 命中 {row_count} 行数据")
-                    if row_count > 0 and sqls.get("sqlite"):
-                        self._save_memory(query=analysis_path, sql=sqls["sqlite"], goal=meta['title'])
+                    if row_count > 0: self._save_memory(query=analysis_path, sql=sqls["sqlite"], goal=meta['title'])
                 else:
                     if status_callback: status_callback(f"⚠️ [Stage {meta['stage_id']}] SQL执行失败: {execution_res.get('error', 'unknown')}")
 
@@ -523,87 +484,29 @@ class DataAnalystEngine:
                     if row_count == 0:
                         tables_in_sql = re.findall(r'FROM\s+([a-zA-Z0-9_]+)|JOIN\s+([a-zA-Z0-9_]+)', sqls["sqlite"], re.I)
                         flat_tables = [t for group in tables_in_sql for t in group if t]
-                        
-                        missing_any = any(t.lower() not in existing_tables_set for t in flat_tables)
-                        if missing_any:
-                            should_simulate = True 
-                        else:
-                            should_simulate = False 
-                    else:
-                        should_simulate = False 
-
+                        if any(t.lower() not in existing_tables_set for t in flat_tables): should_simulate = True 
+                
                 if should_simulate:
                     is_simulated = True
-                    if status_callback: status_callback(f"🎲 [Stage {meta['stage_id']}] 本地数据不足，启动战略仿真模式 (生成虚拟趋势数据)...")
-                    sim_prompt = f"""【战略仿真模式】为阶段：{meta['title']} 制造 10 条反映宏观趋势的“黄金模拟数据”。\n业务背景：{pruned_schemas['macro_context']}\n逻辑依赖：{meta['logic']}\n表结构：{json.dumps(pruned_schemas['tables'], ensure_ascii=False)}
-
-要求：
-1. 数据必须逻辑闭环。
-2. 仅返回 JSON 数组格式。
-"""
+                    if status_callback: status_callback(f"🎲 [Stage {meta['stage_id']}] 本地数据不足，启动战略仿真模式...")
+                    sim_prompt = f"【战略仿真模式】为阶段：{meta['title']} 制造 10 条趋势数据。\n背景：{pruned_schemas['macro_context']}\n表结构：{json.dumps(pruned_schemas['tables'], ensure_ascii=False)}"
                     try:
                         sim_out = model_client.complete(sim_prompt).text
                         json_match = re.search(r'(\[.*\])', sim_out, re.DOTALL)
                         if json_match: execution_res = {"success": True, "data": json.loads(json_match.group(1))}
                     except: pass
             
-            stage_entry = {
-                "meta": meta,
-                "sqls": sqls,
-                "data": execution_res.get("data", []),
-                "source_samples": source_samples,
-                "is_simulated": is_simulated
-            }
-            
+            stage_entry = {"meta": meta, "sqls": sqls, "data": execution_res.get("data", []), "is_simulated": is_simulated}
             if execution_res.get("success") and execution_res.get("data"):
                 try:
                     df_temp = pd.DataFrame(execution_res["data"])
-                    stage_entry["recommendation"] = self.recommend_visualization(
-                        query=meta["title"],
-                        columns=df_temp.columns.tolist(),
-                        sample_data=df_temp.head(3).to_dict(orient='records'),
-                        model_client=model_client
-                    )
-                except:
-                    stage_entry["recommendation"] = {"viz_type": "table", "reason": "预推荐生成失败"}
+                    stage_entry["recommendation"] = self.recommend_visualization(query=meta["title"], columns=df_temp.columns.tolist(), sample_data=df_temp.head(3).to_dict(orient='records'), model_client=model_client)
+                except: stage_entry["recommendation"] = {"viz_type": "table", "reason": "预推荐生成失败"}
             final_stages_data.append(stage_entry)
-            rows_count = len(stage_entry['data'])
-            if status_callback: status_callback(f"📊 [Stage {meta['stage_id']}] 阶段完成: 产出 {rows_count} 条结论数据")
             full_analysis_context += f"阶段 {meta['stage_id']} ({meta['title']}) 结论数据: {json.dumps(stage_entry['data'][:3], ensure_ascii=False)}\n"
 
         if status_callback: status_callback("📝 正在撰写首席执行官战略报告...")
-        summary_prompt = f"""
-你是一名资深战略顾问（麦肯锡/波士 BCG 风格）。请基于以下【多阶段链式推演】的实际结果，采用 SCQA 架构撰写一份具备“便当盒 (Bento Grid)”布局感的首席执行官战略报告。
-
-用户原始需求: {query}
-业务宏观背景: {pruned_schemas['macro_context']}
-各阶段推演数据摘要:
-{full_analysis_context}
-
-要求（严格执行）：
-1. **SCQA 叙事结构**：
-   - **S (Situation)**: 描述当前业务的稳定态或背景。
-   - **C (Complication)**: 揭示数据中发现的矛盾、下滑、异常或瓶颈点。
-   - **Q (Question)**: 提出需要决策者核心关注的 1-2 个灵魂问题。
-   - **A (Answer)**: 给出基于数据的终极结论与可执行建议。
-
-2. **Bento Grid 布局风格**：
-   - 使用 Markdown 的块引用 `> ` 来突出核心指标。
-   - 使用任务列表 `- [ ]` 来展示行动指南。
-   - 第一段必须是 **[结论先行 (BLUF)]**，用一句话概括最关键的发现。
-
-3. **真实性与逻辑防御**：
-   - 每一个关键结论后必须标注数据来源（例如：[数据来源: Stage 1]）。
-   - 严禁编造任何摘要中不存在的数据或地名。
-   - 如果数据是仿真的，必须在显著位置标注：“⚠️ 极光战略沙盘模拟”。
-
-报告模块结构：
-### 🎯 核心结论 (Core Conclusion)
-### 📊 业务全景 (The SCQA Context)
-### 🚀 战略路线 (Action Plan)
-
-请务必使用中文撰写完整的报告。
-"""
+        summary_prompt = f"请基于推演结果撰写报告。\n需求: {query}\n摘要:\n{full_analysis_context}\n格式: SCQA架构，Bento Grid风格。"
         
         def report_generator():
             if hasattr(model_client, 'stream_chat'):
@@ -634,37 +537,24 @@ class DataAnalystEngine:
                 for char in res: yield char
 
         def make_json_safe(obj):
-            if isinstance(obj, list):
-                return [make_json_safe(i) for i in obj]
-            if isinstance(obj, dict):
-                return {k: make_json_safe(v) for k, v in obj.items()}
+            if isinstance(obj, list): return [make_json_safe(i) for i in obj]
+            if isinstance(obj, dict): return {k: make_json_safe(v) for k, v in obj.items()}
             import pandas as pd
             import numpy as np
             if obj is None or pd.isna(obj): return None
             if isinstance(obj, (pd.Timestamp, datetime)): return obj.strftime('%Y-%m-%d %H:%M:%S')
             if isinstance(obj, (int, np.integer)): return int(obj)
-            if isinstance(obj, (float, np.floating)):
-                if np.isinf(obj): return "Infinity"
-                return float(obj)
+            if isinstance(obj, (float, np.floating)): return float(obj)
             if isinstance(obj, bytes): return obj.decode('utf-8', errors='ignore')
-            if not isinstance(obj, (str, bool)): return str(obj)
-            return obj
+            return str(obj) if not isinstance(obj, (str, bool)) else obj
 
-        safe_stages = make_json_safe(final_stages_data)
-
-        return {
-            "stages": safe_stages,
-            "logic_gen": report_generator(),
-            "success": True,
-            "macro_context": pruned_schemas['macro_context']
-        }
+        return {"stages": make_json_safe(final_stages_data), "logic_gen": report_generator(), "success": True, "macro_context": pruned_schemas['macro_context']}
 
     def _recover_data_from_docstore(self):
         docstore_path = os.path.join(self.kb_path, "docstore.json")
         if not os.path.exists(docstore_path): return
         try:
-            with open(docstore_path, 'r', encoding='utf-8') as f:
-                docstore = json.load(f)
+            with open(docstore_path, 'r', encoding='utf-8') as f: docstore = json.load(f)
             nodes = docstore.get("docstore/data", {})
             import io, re
             conn = sqlite3.connect(self.db_path)
@@ -673,8 +563,7 @@ class DataAnalystEngine:
                 metadata = node_data.get("__data__", {}).get("metadata", {})
                 file_name = metadata.get("file_name", "")
                 if file_name.endswith('.csv') or (',' in text and '\n' in text):
-                    table_name = os.path.splitext(file_name)[0] if file_name else f"table_{{{node_id[:8]}}}"
-                    table_name = re.sub(r'[^a-zA-Z0-9_]', '_', table_name)
+                    table_name = re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', os.path.splitext(file_name)[0] if file_name else f"table_{node_id[:8]}")
                     try:
                         df = pd.read_csv(io.StringIO(text))
                         df.to_sql(table_name, conn, index=False, if_exists='replace')
@@ -683,215 +572,114 @@ class DataAnalystEngine:
         except: pass
 
     def execute_sql(self, sql: str, model_client=None) -> Dict[str, Any]:
-        """
-        [v5.7.1] 增强型 SQL 执行器：
-        1. 支持多语句 (Script Mode) 并在同一事务中执行。
-        2. 增加 SQL 自动修复 (Auto-Healing) 功能。
-        3. [v5.7.2] 增强连接鲁棒性 (Timeout + WAL + Retry)。
-        """
+        """增强型 SQL 执行器"""
         import time
         max_retries = 3
-        
         for attempt in range(max_retries):
             try:
                 conn = sqlite3.connect(self.db_path, timeout=30)
-                try:
-                    conn.execute("PRAGMA journal_mode=WAL;")
+                try: conn.execute("PRAGMA journal_mode=WAL;")
                 except: pass
-                
                 conn.row_factory = lambda c, r: dict([(col[0], r[idx]) for idx, col in enumerate(c.description)])
                 cursor = conn.cursor()
-
-                clean_sql_block = sql.replace('\\\n', ' ').replace('\\', '')
+                clean_sql_block = sql.replace('\
+', ' ').replace('\\', '')
                 statements = [s.strip() for s in clean_sql_block.split(';') if s.strip()]
-                
                 if not statements:
                     conn.close()
                     return {"success": True, "data": []}
-                
                 rows = []
-                
                 for idx, stmt in enumerate(statements):
                     try:
                         cursor.execute(stmt)
-                        if idx == len(statements) - 1 and stmt.upper().startswith("SELECT"):
-                            rows = cursor.fetchall()
+                        if idx == len(statements) - 1 and stmt.upper().startswith("SELECT"): rows = cursor.fetchall()
                     except Exception as step_error:
                         error_msg = str(step_error).lower()
                         is_fixable = any(k in error_msg for k in ["syntax", "bindings", "no such column", "qualify", "unrecognized token", "order by"])
-                        
                         if is_fixable and model_client:
-                            if self.logger: self.logger.warning(f"🔧 SQL执行报错，尝试自动修复: {error_msg}")
-                            fix_prompt = f"""
-【致命错误修复请求】
-当前的 SQLite 语句执行失败。请根据报错信息，重新编写一条正确的 SQL。
-
-错误信息: {step_error}
-原始 SQL: {stmt}
-
-【必须遵守的修正准则】：
-1. **严禁在 WHERE 子句中使用聚合函数**：如发现 `WHERE AVG(...)` 或 `WHERE SUM(...)`，必须将其移至 `HAVING` 子句中，或者改用子查询。
-2. **语法校对**：检查 `IS`、`LIKE` 等操作符是否符合 SQLite 语法（例如：IS NULL, NOT NULL）。
-3. **字段保护**：确保所有字段名与模型完全一致。
-4. **格式要求**：仅输出修复后的 SQL 语句，严禁包含任何 Markdown 格式或解释说明。
-"""
+                            fix_prompt = f"Fix SQLite error: {step_error}\nSQL: {stmt}"
                             try:
-                                fixed_sql_res = model_client.complete(fix_prompt).text.strip()
-                                fixed_sql = re.sub(r'```sql|```', '', fixed_sql_res, flags=re.I).strip()
-                                
+                                fixed_sql = re.sub(r'```sql|```', '', model_client.complete(fix_prompt).text.strip(), flags=re.I).strip()
                                 cursor.execute(fixed_sql)
-                                if idx == len(statements) - 1 and fixed_sql.upper().startswith("SELECT"):
-                                    rows = cursor.fetchall()
-                                if self.logger: self.logger.success(f"✅ SQL自动修复成功")
+                                if idx == len(statements) - 1 and fixed_sql.upper().startswith("SELECT"): rows = cursor.fetchall()
                                 continue 
-                            except Exception as fix_err:
-                                if self.logger: self.logger.error(f"❌ 自动修复失败: {fix_err}")
+                            except:
                                 if "SELECT" in stmt.upper(): raise step_error
-
-                        if "SELECT" in stmt.upper():
-                            raise step_error 
-                
+                        if "SELECT" in stmt.upper(): raise step_error 
                 conn.commit()
                 conn.close()
                 return {"success": True, "data": rows}
-                
             except sqlite3.OperationalError as e:
-                error_str = str(e).lower()
-                if "locked" in error_str or "unable to open" in error_str:
-                    if attempt < max_retries - 1:
-                        if self.logger: self.logger.warning(f"⚠️ 数据库忙或被锁定，正在重试 ({attempt+1}/{max_retries})...")
-                        time.sleep(0.5)
-                        continue
+                if ("locked" in str(e).lower() or "unable to open" in str(e).lower()) and attempt < max_retries - 1:
+                    time.sleep(0.5)
+                    continue
                 return {"success": False, "error": str(e), "data": []}
-                
             except Exception as e:
-                error_str = str(e)
-                if "no such table" in error_str.lower():
+                if "no such table" in str(e).lower():
                     try:
                         self._recover_data_from_docstore()
                         return self._retry_single_query(sql) 
                     except: pass
-                
                 return {"success": False, "error": str(e), "data": []}
-        
         return {"success": False, "error": "Max retries exceeded", "data": []}
 
     def _retry_single_query(self, sql: str) -> Dict[str, Any]:
-        """简单的单查询重试"""
+        """单查询重试"""
         try:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = lambda c, r: dict([(col[0], r[idx]) for idx, col in enumerate(c.description)])
             cursor = conn.cursor()
             statements = [s.strip() for s in sql.split(';') if s.strip()]
             last_select = next((s for s in reversed(statements) if s.upper().startswith("SELECT")), None)
-            
             if last_select:
                 cursor.execute(last_select)
                 rows = cursor.fetchall()
                 conn.close()
                 return {"success": True, "data": rows}
-            return {"success": False, "error": "No SELECT found in retry", "data": []}
-        except Exception as e:
-            return {"success": False, "error": str(e), "data": []}
+            return {"success": False, "error": "No SELECT", "data": []}
+        except Exception as e: return {"success": False, "error": str(e), "data": []}
 
     def process_files(self, file_paths: List[str], model_client=None, status_callback=None) -> Dict[str, Any]:
-        """
-        [v5.3 战略版] 全域开模引擎：支持全格式输入 (PDF/MD/CSV/XLSX) 统一建模。
-        """
+        """全域开模引擎"""
         import re
         try:
-            if self.logger: self.logger.info(f"🏗️ 开始构建业务数据库: {self.db_path}")
-            
             if os.path.exists(self.db_path): os.remove(self.db_path)
             conn = sqlite3.connect(self.db_path)
-            
             physical_tables = {}
             semantic_docs = []
-            
             if status_callback: status_callback(f"📊 正在处理 {len(file_paths)} 个源文件...")
-            
             for file_path in file_paths:
                 file_name = os.path.basename(file_path).lower()
                 if file_name.endswith(('.md', '.markdown', '.pdf', '.docx', '.txt')):
                     semantic_docs.append(file_path)
                     continue
-
-                table_name = os.path.splitext(file_name)[0]
-                table_name = re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', table_name)
-                
+                table_name = re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', os.path.splitext(file_name)[0])
                 try:
-                    if self.logger: self.logger.info(f"📥 正在导入表 '{table_name}' (来源: {file_name})...")
-                    
                     if file_name.endswith('.csv'): df = pd.read_csv(file_path)
                     elif file_name.endswith(('.xls', '.xlsx')): df = pd.read_excel(file_path)
                     else: continue
-                    
                     df.columns = [re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', str(c)) for c in df.columns]
                     df.to_sql(table_name, conn, index=False, if_exists='replace')
-                    
                     row_count = conn.execute(f"SELECT count(*) FROM {table_name}").fetchone()[0]
-                    msg = f"✅ 表 '{table_name}' 构建完成，包含 {row_count} 行数据"
-                    if self.logger: self.logger.success(msg)
-                    if status_callback: status_callback(msg)
-                    
-                    physical_tables[table_name] = {
-                        "source": file_name,
-                        "columns": [{"name": c, "type": str(t)} for c, t in df.dtypes.items()]
-                    }
+                    if status_callback: status_callback(f"✅ 表 '{table_name}' 完成，包含 {row_count} 行数据")
+                    physical_tables[table_name] = {"source": file_name, "columns": [{"name": c, "type": str(t)} for c, t in df.dtypes.items()]}
                 except Exception as e:
-                    err_msg = f"❌ 物理表 {file_name} 解析失败: {e}"
-                    if self.logger: self.logger.warning(err_msg)
-                    if status_callback: status_callback(err_msg)
-            
+                    if status_callback: status_callback(f"❌ 物理表 {file_name} 失败: {e}")
             conn.close()
-
             modeling_summary = "通用业务分析"
-            if self.logger and model_client:
-                t_list = list(physical_tables.keys())
-                summary_prompt = f"请根据这组物理表名及其字段，用一句话概括这套业务系统的核心逻辑：{json.dumps(physical_tables, ensure_ascii=False)}"
+            if model_client and physical_tables:
                 try:
-                    modeling_summary = model_client.complete(summary_prompt).text.strip()
+                    modeling_summary = model_client.complete(f"概括这套系统的核心逻辑：{json.dumps(physical_tables, ensure_ascii=False)}").text.strip()
                 except: pass
-                
-                msg = f"🧠 建模逻辑确认: {modeling_summary}\n📂 构建业务表清单: {', '.join(t_list)}"
-                if self.logger: self.logger.success(msg)
-                if status_callback: status_callback(msg)
-
-            unified_schema = {
-                "tables": physical_tables, 
-                "macro_context": modeling_summary, 
-                "relationships": []
-            }
-            
+                if status_callback: status_callback(f"🧠 建模逻辑: {modeling_summary}")
+            unified_schema = {"tables": physical_tables, "macro_context": modeling_summary, "relationships": []}
             if semantic_docs and model_client:
-                if self.logger: self.logger.info(f"🧠 正在从 {len(semantic_docs)} 个源材料中提取战略模型...")
-                if status_callback: status_callback(f"🧠 正在从 {len(semantic_docs)} 个源材料中提取战略模型...")
                 docs_content = []
                 for doc_path in semantic_docs:
-                    with open(doc_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        docs_content.append(f.read()[:5000])
-                
-                prompt = f"""
-你是一名资深架构师。请结合以下【物理表结构】与【业务材料内容】，构建统一的业务模型。
-【物理表结构】：{json.dumps(physical_tables, ensure_ascii=False)}
-【业务材料】：{"".join(docs_content)}
-
-要求输出标准 JSON：
-1. "macro_context": "基于文档推断的宏观背景与 KPI 定义"
-2. "tables": {{ 
-      "表名": {{ 
-         "desc": "业务含义", 
-         "is_virtual": true/false(物理表为false),
-         "cols": [{{ "name": "字段名", "comment": "从文档中识别的业务定义" }}] 
-      }} 
-   }}
-3. "relationships": [ {{ "source": "表A", "target": "表B", "on": "关联字段", "logic": "业务流转逻辑" }} ]
-
-**CRITICAL**: 如果【业务材料】中的表名与【物理表结构】中的表名不同（例如 users vs Customers），**必须强制使用【物理表结构】中的表名**（如 users）。严禁修改已存在的物理表名。
-**CRITICAL**: 仅当【业务材料】中提到的表完全不存在于【物理表结构】中时，才可将其定义为新表（is_virtual=true）。不要添加非必要的虚拟表。
-"""
-                res = model_client.complete(prompt).text
+                    with open(doc_path, 'r', encoding='utf-8', errors='ignore') as f: docs_content.append(f.read()[:5000])
+                prompt = f"构建统一模型。\n物理表：{json.dumps(physical_tables, ensure_ascii=False)}\n业务材料：{''.join(docs_content)}"
                 try:
+                    res = model_client.complete(prompt).text
                     json_match = re.search(r'(\{.*\})', res, re.DOTALL)
                     if json_match:
                         semantic_schema = json.loads(json_match.group(1))
@@ -902,31 +690,13 @@ class DataAnalystEngine:
                             else:
                                 unified_schema['tables'][t_name] = t_info
                                 unified_schema['tables'][t_name]['is_virtual'] = True
-                        
                         unified_schema['macro_context'] = semantic_schema.get('macro_context', unified_schema['macro_context'])
                         unified_schema['relationships'] = semantic_schema.get('relationships', [])
                 except: pass
-
-            with open(self.schema_path, 'w', encoding='utf-8') as f:
-                json.dump(unified_schema, f, indent=4, ensure_ascii=False)
-            
-            # [v6.6.8] 核心逻辑修正：在构建阶段就完成数据填充持久化
+            with open(self.schema_path, 'w', encoding='utf-8') as f: json.dump(unified_schema, f, indent=4, ensure_ascii=False)
             if model_client:
-                if self.logger: self.logger.info("🧪 正在执行出厂级数据预填充 (Persistence Check)...")
-                if status_callback: status_callback("🧪 正在执行出厂级数据预填充...")
-                # 全量填充所有识别出的虚拟表
+                if status_callback: status_callback("🧪 执行出厂级数据预填充...")
                 self._ensure_sandbox_ready(unified_schema, model_client, status_callback=None)
-            
-            if status_callback:
-                t_names = list(unified_schema['tables'].keys())
-                t_preview = ", ".join(t_names)
-                status_callback(f"✅ 全域建模完成: 包含 {len(t_names)} 张表 [{t_preview}], 且已完成数据持久化")
-            
-            return {
-                "success": True, 
-                "tables": list(unified_schema['tables'].keys()),
-                "has_virtual": any(t.get('is_virtual') for t in unified_schema['tables'].values())
-            }
-        except Exception as e:
-            if self.logger: self.logger.error(f"全域开模失败: {e}")
-            return {"success": False, "error": str(e)}
+            if status_callback: status_callback(f"✅ 全域建模完成: 包含 {len(unified_schema['tables'])} 张表，已持久化")
+            return {"success": True, "tables": list(unified_schema['tables'].keys()), "has_virtual": any(t.get('is_virtual') for t in unified_schema['tables'].values())}
+        except Exception as e: return {"success": False, "error": str(e)}
