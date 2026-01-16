@@ -228,34 +228,37 @@ def render_admin_management():
                 ac1, ac2 = st.columns([2, 1])
                 target_owner = ac1.selectbox("选择接收者", options=list(users.keys()), key="batch_transfer_owner")
                 if ac2.button("👤 批量移交所有权", type="primary", use_container_width=True):
-                    success_count = 0
-                    error_count = 0
-                    for k in selected_kbs:
-                        try:
-                            kp = os.path.join(kb_storage_root, k)
-                            manifest_path = os.path.join(kp, "manifest.json")
-                            if os.path.exists(manifest_path):
-                                # 直接读取并更新
-                                with open(manifest_path, 'r', encoding='utf-8') as f:
-                                    mf = json.load(f)
-                                mf['owner'] = target_owner
-                                # 物理固化写入
-                                with open(manifest_path, 'w', encoding='utf-8') as f:
-                                    json.dump(mf, f, indent=4, ensure_ascii=False)
-                                success_count += 1
-                            else:
+                    with st.spinner(f"正在将资产移交给 {target_owner}..."):
+                        success_count = 0
+                        error_count = 0
+                        for k in selected_kbs:
+                            try:
+                                kp = os.path.join(kb_storage_root, k)
+                                manifest_path = os.path.join(kp, "manifest.json")
+                                if os.path.exists(manifest_path):
+                                    with open(manifest_path, 'r', encoding='utf-8') as f:
+                                        mf = json.load(f)
+                                    mf['owner'] = target_owner
+                                    with open(manifest_path, 'w', encoding='utf-8') as f:
+                                        json.dump(mf, f, indent=4, ensure_ascii=False)
+                                    success_count += 1
+                                else:
+                                    error_count += 1
+                            except Exception as e:
+                                st.error(f"移交 {k} 时出错: {e}")
                                 error_count += 1
-                        except Exception as e:
-                            st.error(f"移交 {k} 时出错: {e}")
-                            error_count += 1
-                    
-                    if success_count > 0:
-                        AuditLogger.log(st.session_state.get('user'), "BATCH_TRANSFER", f"成功将 {success_count} 个资产移交给 {target_owner}", ip=get_client_ip())
-                        st.toast(f"✅ 成功移交 {success_count} 个资产", icon="👤")
-                    if error_count > 0:
-                        st.error(f"❌ {error_count} 个资产移交失败，请检查文件权限")
-                    time.sleep(0.5)
-                    st.rerun()
+                        
+                        if success_count > 0:
+                            AuditLogger.log(st.session_state.get('user'), "BATCH_TRANSFER", f"成功将 {success_count} 个资产移交给 {target_owner}", ip=get_client_ip())
+                            st.success(f"✅ 成功移交 {success_count} 个知识库资产！")
+                            st.toast(f"移交成功: {target_owner}", icon="👤")
+                            
+                        if error_count > 0:
+                            st.error(f"❌ {error_count} 个资产移交失败")
+                        
+                        # [v6.8.2] 留出时间让用户看清提示
+                        time.sleep(1.5)
+                        st.rerun()
                 
                 if st.button("🗑️ 物理删除选中资产", type="secondary", use_container_width=True):
                     import shutil
