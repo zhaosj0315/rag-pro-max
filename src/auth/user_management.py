@@ -239,15 +239,16 @@ def render_admin_management():
                                     with open(manifest_path, 'r', encoding='utf-8') as f:
                                         mf = json.load(f)
                                     mf['owner'] = target_owner
-                                                                    with open(manifest_path, 'w', encoding='utf-8') as f:
-                                                                        json.dump(mf, f, indent=4, ensure_ascii=False)
-                                                                    
-                                                                    # [v6.8.3] 同步输出到终端
-                                                                    from src.app_logging.log_manager import LogManager
-                                                                    terminal_logger = LogManager()
-                                                                    terminal_logger.success(f"👤 [Asset Transfer] 知识库 '{k}' 已成功移交给用户 '{target_owner}'")
-                                                                    
-                                                                    success_count += 1                                else:
+                                    with open(manifest_path, 'w', encoding='utf-8') as f:
+                                        json.dump(mf, f, indent=4, ensure_ascii=False)
+                                    
+                                    # [v6.8.3] 同步输出到终端
+                                    from src.app_logging.log_manager import LogManager
+                                    terminal_logger = LogManager()
+                                    terminal_logger.success(f"👤 [Asset Transfer] 知识库 '{k}' 已成功移交给用户 '{target_owner}'")
+                                    
+                                    success_count += 1
+                                else:
                                     error_count += 1
                             except Exception as e:
                                 st.error(f"移交 {k} 时出错: {e}")

@@ -987,6 +987,7 @@ if not st.session_state.get("logged_in"):
 # ==========================================
 # 登录拦截逻辑 (管理为先)
 # ==========================================
+# Force refresh
 from src.auth.login_page import render_login_page
 from src.auth.user_management import render_admin_management
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
@@ -1014,7 +1015,7 @@ with st.sidebar:
     MobileAdapter.render_view_selector()
     
     # 横向标签页布局 (v3.4: 管理为先)
-    # [v6.9.2] 侧边栏架构强制对齐修复
+    # [v6.9.3] 侧边栏架构彻底净化修复
     tab_labels = ["🏠 主页", "🎭 角色", "⚙️ 配置", "📊 监控", "❓ 帮助"]
     is_admin = (st.session_state.get('role') == 'admin')
     if is_admin:
@@ -1022,14 +1023,14 @@ with st.sidebar:
     
     tabs = st.tabs(tab_labels)
     
-    # 使用索引访问 Tab，防止解包崩溃
+    # 分配 Tab 变量 (索引安全)
     tab_main = tabs[0]
     tab_roles = tabs[1]
     tab_config = tabs[2]
     tab_monitor = tabs[3]
     tab_help = tabs[4]
     
-    # 渲染 Admin 专用 Tab
+    # 渲染 Admin 专用 Tab (物理对齐)
     if is_admin and len(tabs) > 5:
         with tabs[5]:
             render_admin_management()
