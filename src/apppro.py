@@ -6270,11 +6270,7 @@ if st.session_state.get('is_processing') and final_prompt:
                             da_status_box.update(label="✅ 战略推演已完成", state="complete", expanded=False)
                             
                             if analysis_res.get("success", False):
-                                st.markdown(f"### 🏗️ 5.2.4 极光战略工作坊 (工程化闭环)")
-                                if analysis_res.get("macro_context"):
-                                    st.info(f"🎯 **核心战略目标**: {analysis_res['macro_context']}")
-                                    
-                                # 1. 核心推演报告 (总领全文)
+                                # 1. 核心推演报告流式预览 (仅用于实时动态效果)
                                 report_placeholder = st.empty()
                                 full_report = ""
                                 logic_stream = analysis_res.get("logic_gen")
@@ -6282,95 +6278,33 @@ if st.session_state.get('is_processing') and final_prompt:
                                     for token in logic_stream:
                                         full_report += token
                                         report_placeholder.markdown(full_report + "▌")
+                                report_placeholder.empty() # 清空占位符，统一走消息中心渲染
                                 
-                                report_placeholder.markdown(full_report)
-                                
-                                # [v6.3.9] 实效性校验：确保至少有报告内容或分析阶段产出
+                                # 2. [v6.7.3] 核心持久化逻辑：将分析成果注入消息流
                                 if not full_report.strip() and not analysis_res.get("stages"):
-                                    st.warning("📍 战略推演已完成，但基于当前数据和逻辑未发现可量化的显著结论。")
-                                    full_report = "### 📋 战略分析摘要\n本次分析未发现显著的模式差异或数据异常，建议调整查询维度后重试。"
+                                    full_report = "### 📋 战略分析摘要\n分析任务已完成，未发现显著异常。"
 
-                                # 2. 循环渲染每个逻辑阶段
-                                for stage in analysis_res.get("stages", []):
-                                    meta = stage["meta"]
-                                    with st.expander(f"📍 Stage {meta['stage_id']}: {meta['title']}", expanded=True):
-                                        st.markdown(f"**分析目标**: {meta['goal']}")
-                                        
-                                        # --- [v5.2] 数据流转全演示 ---
-                                        with st.container(border=True):
-                                            st.markdown("##### 🧬 数据演进演示 (Lineage Demo)")
-                                            
-                                            # A. 查询前：原始数据
-                                            st.markdown("**1. 查询前：业务表采样 (Before)**")
-                                            if stage.get("source_samples"):
-                                                s_tabs = st.tabs(list(stage["source_samples"].keys()))
-                                                for idx, t_name in enumerate(stage["source_samples"]):
-                                                    with s_tabs[idx]:
-                                                        import pandas as pd
-                                                        st.dataframe(pd.DataFrame(stage["source_samples"][t_name]), use_container_width=True)
-                                            
-                                            # B. 加工中：逻辑脚本
-                                            st.markdown("**2. 执行中：工程逻辑 (The Logic)**")
-                                            sqls = stage.get("sqls", {})
-                                            sql_tabs = st.tabs(["🧪 SQLite (本地验证)", "🐘 Standard SQL", "💻 DataWorks (生产)"])
-                                            with sql_tabs[0]:
-                                                st.caption("SQL 语言: SQLite (Local Sim)")
-                                                st.code(sqls.get("sqlite", ""), language="sql")
-                                            with sql_tabs[1]:
-                                                st.caption("SQL 语言: Standard ANSI SQL")
-                                                st.code(sqls.get("standard", ""), language="sql")
-                                            with sql_tabs[2]:
-                                                st.caption("SQL 语言: MaxCompute / DataWorks")
-                                                st.code(sqls.get("dataworks", ""), language="sql")
-                                            
-                                            # C. 查询后：结果产出
-                                            st.markdown("**3. 查询后：汇聚结果表 (After)**")
-                                            import pandas as pd
-                                            df_s = pd.DataFrame(stage["data"])
-                                            if not df_s.empty:
-                                                # 使用全功能可视化画板 [v5.8.8]
-                                                render_smart_visualization(
-                                                    df=df_s, 
-                                                    query=meta['title'], 
-                                                    msg_idx=999, 
-                                                    stage_id=meta['stage_id'], 
-                                                    recommendation=stage.get("recommendation")
-                                                )
-                                            else:
-                                                st.info("该阶段未产出数据结果")
-                                            if stage.get("is_simulated"):
-                                                st.warning("✨ 本阶段结果基于战略业务模型仿真得出")
+                                st.session_state.messages.append({
+                                    "role": "assistant", 
+                                    "content": "", # 留空，防止普通文字渲染器重复输出
+                                    "report_text": full_report,
+                                    "is_data_report": True, 
+                                    "stages": analysis_res.get("stages", []), 
+                                    "macro_context": analysis_res.get("macro_context"),
+                                    "stats": {"time": time.time() - start_time}
+                                })
 
-                                # 3. [v5.2.3 恢复] 生成最新的战略建议追问
+                                # 3. [v5.2.3] 生成追问建议
                                 try:
                                     from src.chat.unified_suggestion_engine import get_unified_suggestion_engine
                                     sug_engine = get_unified_suggestion_engine(active_kb_name)
-                                    # 结合提问与最终报告内容作为生成上下文
-                                    suggestion_context = f"用户提问: {final_prompt}\n战略推演报告: {full_report}"
-                                    new_sugs = sug_engine.generate_suggestions(
-                                        context=suggestion_context,
-                                        source_type='chat',
-                                        query_engine=st.session_state.chat_engine,
-                                        num_questions=3
-                                    )
+                                    new_sugs = sug_engine.generate_suggestions(f"提问: {final_prompt}\n报告: {full_report}", 'chat', st.session_state.chat_engine, 3)
                                     if new_sugs:
                                         st.session_state.suggestions_history = new_sugs[:3]
-                                        st.session_state.current_suggestions = new_sugs[:3]
-                                except Exception as e:
-                                    logger.warning(f"⚠️ 战略追问生成失败: {e}")
+                                        st.session_state.messages[-1]['suggestions'] = new_sugs[:3]
+                                except: pass
 
-                                # 归档并中断
-                                st.session_state.messages.append({
-                                    "role": "assistant", 
-                                    "content": "", # [修复] 内容设为空，防止在历史消息渲染中重复输出
-                                    "report_text": full_report, # 将报告内容存入独立字段
-                                    "is_data_report": True, 
-                                    "stages": analysis_res["stages"], 
-                                    "macro_context": analysis_res.get("macro_context"),
-                                    "suggestions": st.session_state.get('current_suggestions', [])
-                                })
-                                
-                                # [关键修复] 立即保存会话历史 (Data Analysis)
+                                # 4. 固化存储并触发全量重绘
                                 if active_kb_name: 
                                     HistoryManager.save_session(active_kb_name, st.session_state.messages, st.session_state.get('current_session_id'))
                                 
