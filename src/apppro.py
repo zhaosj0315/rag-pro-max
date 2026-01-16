@@ -1013,6 +1013,7 @@ with st.sidebar:
     MobileAdapter.render_view_selector()
     
     # 横向标签页布局 (v3.4: 管理为先)
+    # [v6.9.1] 侧边栏架构稳固化修复
     tab_labels = ["🏠 主页", "🎭 角色", "⚙️ 配置", "📊 监控", "❓ 帮助"]
     if st.session_state.get('role') == 'admin':
         tab_labels.append("👤 用户")
