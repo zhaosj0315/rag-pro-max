@@ -988,6 +988,7 @@ if not st.session_state.get("logged_in"):
 # 登录拦截逻辑 (管理为先)
 # ==========================================
 from src.auth.login_page import render_login_page
+from src.auth.user_management import render_admin_management
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     render_login_page()
     st.stop()
@@ -1013,26 +1014,27 @@ with st.sidebar:
     MobileAdapter.render_view_selector()
     
     # 横向标签页布局 (v3.4: 管理为先)
-    # [v6.9.1] 侧边栏架构稳固化修复
+    # [v6.9.2] 侧边栏架构强制对齐修复
     tab_labels = ["🏠 主页", "🎭 角色", "⚙️ 配置", "📊 监控", "❓ 帮助"]
-    if st.session_state.get('role') == 'admin':
+    is_admin = (st.session_state.get('role') == 'admin')
+    if is_admin:
         tab_labels.append("👤 用户")
     
     tabs = st.tabs(tab_labels)
     
-    # 动态分配 tab 变量
-    if st.session_state.get('role') == 'admin':
-        tab_main, tab_roles, tab_config, tab_monitor, tab_help, tab_user = tabs
-    else:
-        tab_main, tab_roles, tab_config, tab_monitor, tab_help = tabs
+    # 使用索引访问 Tab，防止解包崩溃
+    tab_main = tabs[0]
+    tab_roles = tabs[1]
+    tab_config = tabs[2]
+    tab_monitor = tabs[3]
+    tab_help = tabs[4]
     
-    # 渲染管理 Tab (仅 Admin)
-    if st.session_state.get('role') == 'admin':
-        with tab_user:
-            from src.auth.user_management import render_admin_management
+    # 渲染 Admin 专用 Tab
+    if is_admin and len(tabs) > 5:
+        with tabs[5]:
             render_admin_management()
 
-    # --- 退出登录按钮 (位于侧边栏底部) ---
+    # --- 退出登录按钮 ---
     st.sidebar.markdown("---")
     if st.sidebar.button("🚪 退出当前账号", use_container_width=True):
         st.session_state.logged_in = False
