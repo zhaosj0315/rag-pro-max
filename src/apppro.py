@@ -1036,6 +1036,90 @@ with st.sidebar:
         with tabs[5]:
             render_resource_governance()
 
+    # --- 图片提问功能 ---
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**📸 图片提问**")
+    uploaded_image = st.sidebar.file_uploader(
+        "上传图片，自动识别文字",
+        type=['jpg', 'jpeg', 'png', 'bmp', 'tiff'],
+        help="支持截图、拍照等图片，系统会自动识别文字内容",
+        label_visibility="collapsed",
+        key="image_question_uploader"
+    )
+    
+    if uploaded_image:
+        # 显示图片预览
+        from PIL import Image
+        import io
+        
+        image = Image.open(uploaded_image)
+        st.sidebar.image(image, caption="上传的图片", use_container_width=True)
+        
+        # macOS 原生 OCR 识别
+        if st.sidebar.button("🔍 识别文字并提问", use_container_width=True):
+            with st.sidebar.spinner("正在识别图片文字..."):
+                try:
+                    # 使用 macOS 原生 OCR
+                    import subprocess
+                    import tempfile
+                    
+                    # 保存临时文件
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
+                        image.save(tmp_file.name)
+                        tmp_path = tmp_file.name
+                    
+                    # 调用 macOS 原生 OCR
+                    result = subprocess.run(
+                        ['osascript', '-e', f'''
+                        use framework "Vision"
+                        use framework "AppKit"
+                        
+                        set imagePath to "{tmp_path}"
+                        set imageURL to current application's |NSURL|'s fileURLWithPath:imagePath
+                        set requestHandler to current application's VNImageRequestHandler's alloc()'s initWithURL:imageURL options:(missing value)
+                        set ocrRequest to current application's VNRecognizeTextRequest's alloc()'s init()
+                        ocrRequest's setRecognitionLevel:(current application's VNRequestTextRecognitionLevelAccurate)
+                        ocrRequest's setRecognitionLanguages:({{\"zh-Hans\", \"en-US\"}})
+                        
+                        requestHandler's performRequests:{{ocrRequest}} |error|:(missing value)
+                        
+                        set observations to ocrRequest's results()
+                        set textResult to ""
+                        repeat with observation in observations
+                            set textResult to textResult & (observation's topCandidates:(1))'s firstObject()'s |string|() & linefeed
+                        end repeat
+                        return textResult
+                        '''],
+                        capture_output=True,
+                        text=True,
+                        timeout=30
+                    )
+                    
+                    # 清理临时文件
+                    import os
+                    os.unlink(tmp_path)
+                    
+                    if result.returncode == 0 and result.stdout.strip():
+                        recognized_text = result.stdout.strip()
+                        st.sidebar.success(f"✅ 识别成功！共 {len(recognized_text)} 字")
+                        
+                        # 显示识别的文字
+                        with st.sidebar.expander("📝 识别的文字", expanded=True):
+                            st.text_area("", recognized_text, height=150, label_visibility="collapsed")
+                        
+                        # 将识别的文字加入问题队列
+                        if st.sidebar.button("💬 使用此文字提问", use_container_width=True):
+                            st.session_state.question_queue.append(recognized_text)
+                            st.sidebar.success("✅ 已加入提问队列")
+                            st.rerun()
+                    else:
+                        st.sidebar.error("❌ 识别失败，请确保图片清晰")
+                        
+                except Exception as e:
+                    st.sidebar.error(f"❌ OCR 识别出错: {str(e)}")
+                    # 备用方案提示
+                    st.sidebar.info("💡 提示：请确保使用 macOS 系统")
+
     # --- 退出登录按钮 ---
     st.sidebar.markdown("---")
     if st.sidebar.button("🚪 退出当前账号", use_container_width=True):
