@@ -75,75 +75,88 @@ class DataAnalystEngine:
             tables_to_mock.append(t)
 
         if tables_to_mock and model_client:
-            if status_callback: status_callback(f"🎲 正在初始化 {len(tables_to_mock)} 个业务实体...")
+            if status_callback: status_callback(f"🎲 正在初始化 {len(tables_to_mock)} 个核心业务实体...")
             for t in tables_to_mock:
                 info = schemas['tables'].get(t, {})
                 cols = info.get('cols', info.get('columns', []))
                 cols_str = ", ".join([f"{c['name']} ({c.get('comment','')})" for c in cols])
-                prompt = f"为业务表 {t} 生成 20 条逻辑闭环的 SQL INSERT 语句。\n字段：{cols_str}\n仅输出 SQL，单引号转义。"
+                prompt = f"为业务表 {t} 生成 20 条逻辑闭环的 SQL INSERT 语句。\n字段：{cols_str}\n仅输出 SQL 代码块，不要有解释。"
                 try:
                     res = model_client.complete(prompt).text
                     cursor.execute(f"CREATE TABLE IF NOT EXISTS {t} ({', '.join([f'{c['name']} TEXT' for c in cols])})")
                     for line in res.split(';'):
-                        if 'INSERT' in line.upper(): cursor.execute(line.strip())
+                        clean = line.strip().replace('```sql', '').replace('```', '')
+                        if clean.upper().startswith('INSERT'): cursor.execute(clean)
                 except: pass
         conn.commit()
         conn.close()
         return table_mapping
 
     def _extract_json(self, text: str) -> Optional[Dict]:
-        """[v6.7.2] 强力 JSON 提取器：支持键名归一化与终端调试"""
+        """[v6.7.5] 工业级容错 JSON 提取器"""
         try:
+            # 1. 尝试寻找代码块
+            code_match = re.search(r'```json\s*(\{.*?\})\s*```', text, re.DOTALL)
+            if code_match:
+                return json.loads(code_match.group(1).replace('\\n', ' '))
+            
+            # 2. 尝试全局大括号匹配
             match = re.search(r'(\{.*\})', text, re.DOTALL)
             if match:
                 clean_json = match.group(1).replace('\\n', ' ').replace('\\t', ' ')
                 data = json.loads(clean_json)
                 return {str(k).lower(): v for k, v in data.items()}
         except: pass
+        
+        # 3. 终极暴力清理
         try:
             start, end = text.find('{'), text.rfind('}')
             if start != -1 and end != -1:
                 data = json.loads(text[start:end+1])
                 return {str(k).lower(): v for k, v in data.items()}
         except:
-            if self.logger: self.logger.error(f"❌ JSON 提取失败。原始响应: {text[:300]}...")
+            if self.logger: self.logger.error(f"❌ JSON 解析崩溃。输入: {text[:100]}...")
         return None
 
     def execute_analysis(self, query: str, model_client, context_text: str = "", status_callback=None) -> Dict[str, Any]:
-        if self.logger: self.logger.info(f"🚀 [Strategic Workshop] 开始推演: {query}")
-        if not os.path.exists(self.schema_path): return {"success": False, "logic": "架构缺失"}
+        if self.logger: self.logger.info(f"🚀 [Strategic Workshop] 推演请求: {query}")
+        if not os.path.exists(self.schema_path): return {"success": False, "logic": "架构定义缺失"}
         with open(self.schema_path, 'r', encoding='utf-8') as f: full_schemas = json.load(f)
         
-        if any(k in query for k in ["有哪些指标", "说明", "字典", "结构", "有哪些表"]):
-            prompt = f"基于以下模型回答问题: {query}\n模型: {json.dumps(full_schemas, ensure_ascii=False)[:5000]}"
+        # 1. 元数据拦截
+        if any(k in query for k in ["指标", "结构", "字典", "有哪些表"]):
+            prompt = f"根据以下模型回答: {query}\n{json.dumps(full_schemas, ensure_ascii=False)[:4000]}"
             def gen():
                 for char in model_client.complete(prompt).text: yield char
-            return {"stages": [], "logic_gen": gen(), "success": True, "macro_context": "元数据咨询"}
+            return {"stages": [], "logic_gen": gen(), "success": True, "macro_context": "架构咨询"}
 
+        # 2. 识别相关表
         rel_tables = self._get_relevant_tables(query, full_schemas)
         mapping = self._ensure_sandbox_ready(full_schemas, model_client, status_callback, rel_tables)
         
         sub_schema = {mapping.get(t, t): full_schemas['tables'][t] for t in rel_tables if t in full_schemas['tables']}
-        if self.logger: self.logger.info(f"🔍 [Relevance] 锁定业务实体: {list(sub_schema.keys())}")
+        if self.logger: self.logger.info(f"🔍 [Relevance] 目标实体: {list(sub_schema.keys())}")
 
-        prompt = f"将需求 {query} 拆解为 2-3 个分析阶段。返回标准 JSON 数组: [{{stage_id, title, transformation, goal}}]\n模型: {json.dumps(sub_schema, ensure_ascii=False)}"
+        # 3. 任务拆解
+        prompt = f"你是战略顾问。将 {query} 拆解为 2-3 个 SQL 逻辑阶段。返回 JSON 数组: [{{stage_id, title, transformation, goal}}]\n模型: {json.dumps(sub_schema, ensure_ascii=False)}"
         try:
             res = model_client.complete(prompt).text
-            stages_meta = json.loads(re.search(r'(\[.*\])', res, re.DOTALL).group(1))
+            match = re.search(r'(\[.*\])', res, re.DOTALL)
+            stages_meta = json.loads(match.group(1)) if match else []
         except: 
-            if self.logger: self.logger.warning("⚠️ 任务拆解失败，降级模式")
-            stages_meta = [{"stage_id": 1, "title": "全量数据分析", "transformation": "执行数据透视"}]
+            stages_meta = [{"stage_id": 1, "title": "全链路数据穿透", "transformation": "执行多维聚合分析"}]
 
         final_data = []
         analysis_context = ""
         for i, meta in enumerate(stages_meta):
-            if status_callback: status_callback(f"⚙️ [Stage {i+1}] 构建 SQL 逻辑...")
+            if status_callback: status_callback(f"⚙️ [Stage {i+1}] 构建 SQL 逻辑通路...")
             
+            # 字段白名单与样本
             t_context = {}
             for t in sub_schema:
                 info = sub_schema[t]
                 cols = info.get('cols', info.get('columns', []))
-                keep = ['status', 'state', 'date', 'time', 'amount', 'price', 'total', 'id', 'name', '状态', '日期', '金额']
+                keep = ['status', 'state', 'date', 'time', 'amount', 'price', 'total', 'id', 'name', '合规', '成本', '延迟']
                 filtered = [c for c in cols if any(k in c['name'].lower() or k in str(c.get('comment','')).lower() for k in keep)]
                 t_context[t] = {"desc": info.get("desc"), "cols": filtered if filtered else cols[:10]}
                 try:
@@ -152,37 +165,38 @@ class DataAnalystEngine:
                         t_context[t]["sample"] = r['data'][0]
                 except: pass
 
-            sql_prompt = f"""针对任务 \"{meta.get('transformation')}\" 编写 SQL。
+            sql_prompt = f"针对任务 \"{meta.get('transformation')}\" 编写 SQLite SQL。
 模型: {json.dumps(t_context, ensure_ascii=False)}
-前序发现: {analysis_context}
-输出标准 JSON: {{"sqlite": "...", "standard": "...", "dataworks": "..."}}
-"""
+前序上下文: {analysis_context}
+【严格要求】: 必须返回标准 JSON，不要包含 Markdown 代码块之外的任何文字。
+格式: {{"sqlite": "SELECT...", "standard": "...", "dataworks": "..."}}
+"
             sqls = {"sqlite": ""}
             try:
-                res_text = model_client.complete(sql_prompt).text
-                sqls = self._extract_json(res_text) or {"sqlite": ""}
+                raw_res = model_client.complete(sql_prompt).text
+                sqls = self._extract_json(raw_res) or {"sqlite": ""}
             except: pass
 
-            if status_callback: status_callback(f"🧪 [Stage {i+1}] 执行并验证...")
+            if status_callback: status_callback(f"🧪 [Stage {i+1}] 执行逻辑验证...")
             exec_res = {"success": False, "data": []}
             if sqls.get("sqlite"):
                 exec_res = self.execute_sql(sqls["sqlite"], model_client)
                 if exec_res["success"]:
-                    r_count = len(exec_res['data'])
-                    if self.logger: self.logger.success(f"⚡ [Execution] 阶段 {i+1} 成功，命中 {r_count} 行")
-                    if status_callback: status_callback(f"✅ 命中 {r_count} 行数据")
-                    if r_count > 0: analysis_context += f"阶段{i+1}: {json.dumps(exec_res['data'][:1], ensure_ascii=False)}\n"
+                    if status_callback: status_callback(f"✅ 获取 {len(exec_res['data'])} 行结论数据")
+                    if exec_res['data']: analysis_context += f"阶段{i+1}: {json.dumps(exec_res['data'][:1], ensure_ascii=False)}\n"
             
-            final_data.append({"meta": meta, "sqls": sqls, "data": exec_res["data"]})
+            # [v6.7.5] 增加 source_samples 伪数据支持，防止界面空白
+            samples = {t: t_context[t].get('sample', [t_context[t]['cols'][0]]) for t in t_context}
+            final_data.append({"meta": meta, "sqls": sqls, "data": exec_res["data"], "source_samples": samples})
 
         def report_gen():
-            p = f"撰写战略报告。需求: {query}\n结论: {analysis_context}\n要求: SCQA 架构，结论先行。"
+            p = f"撰写战略报告。需求: {query}\n推演结论: {analysis_context}\n要求: SCQA 架构，结论先行，Bento Grid 视觉风格。"
             if hasattr(model_client, 'stream_chat'):
                 from llama_index.core.base.llms.types import ChatMessage, MessageRole
                 try:
                     for chunk in model_client.stream_chat([ChatMessage(role=MessageRole.USER, content=p)]):
                         yield chunk.delta if hasattr(chunk, 'delta') else str(chunk)
-                except: yield "生成中断"
+                except: yield "生成异常"
             else: yield model_client.complete(p).text
 
         return {"stages": final_data, "logic_gen": report_gen(), "success": True, "macro_context": full_schemas.get('macro_context','')}
@@ -202,9 +216,9 @@ class DataAnalystEngine:
                     if stmt.upper().startswith("SELECT"): rows = cursor.fetchall()
                 except Exception as e:
                     if model_client and stmt.upper().startswith("SELECT"):
-                        fix = model_client.complete(f"修正 SQL 语法错误: {e}\n错误 SQL: {stmt}\n仅输出修正后的一条 SQL").text
-                        fixed_stmt = fix.replace('```sql', '').replace('```', '').strip()
-                        cursor.execute(fixed_stmt)
+                        fix = model_client.complete(f"修正 SQL 语法错误: {e}\nSQL: {stmt}").text
+                        fixed = fix.replace('```sql', '').replace('```', '').strip()
+                        cursor.execute(fixed)
                         rows = cursor.fetchall()
             conn.commit()
             conn.close()
@@ -217,7 +231,7 @@ class DataAnalystEngine:
             conn = sqlite3.connect(self.db_path)
             physical_tables = {}
             semantic_docs = []
-            if status_callback: status_callback(f"📊 解析 {len(file_paths)} 个源材料...")
+            if status_callback: status_callback(f"📊 启动全域战略建模...")
             for path in file_paths:
                 name = os.path.basename(path).lower()
                 if name.endswith(('.md', '.pdf', '.docx', '.txt')):
@@ -227,19 +241,18 @@ class DataAnalystEngine:
                     df = pd.read_csv(path) if name.endswith('.csv') else pd.read_excel(path)
                     df.columns = [re.sub(r'[^a-zA-Z0-9_]', '_', str(c)) for c in df.columns]
                     df.to_sql(t_name, conn, index=False, if_exists='replace')
-                    count = conn.execute(f"SELECT count(*) FROM {t_name}").fetchone()[0]
-                    if status_callback: status_callback(f"✅ 表 '{t_name}' 物理就绪 ({count} 行)")
+                    if self.logger: self.logger.success(f"📥 物理表导入成功: {t_name}")
                     physical_tables[t_name] = {"cols": [{"name": c, "type": str(t)} for c, t in df.dtypes.items()]}
                 except: pass
             conn.close()
-            modeling_summary = "多维业务分析"
+            modeling_summary = "多维业务逻辑分析"
             if model_client and physical_tables:
-                modeling_summary = model_client.complete(f"总结业务逻辑: {json.dumps(physical_tables, ensure_ascii=False)}").text.strip()
+                modeling_summary = model_client.complete(f"总结业务逻辑: {json.dumps(physical_tables)}").text.strip()
             unified_schema = {"tables": physical_tables, "macro_context": modeling_summary}
             if semantic_docs and model_client:
                 docs = "".join([open(p, 'r', errors='ignore').read()[:5000] for p in semantic_docs])
                 try:
-                    res = model_client.complete(f"基于物理表 {json.dumps(physical_tables)} 和文档构建全局模型。返回 JSON").text
+                    res = model_client.complete(f"根据物理表 {json.dumps(physical_tables)} 和业务材料 {docs} 构建全局模型。返回标准 JSON。 ").text
                     match = re.search(r'(\{.*\})', res, re.DOTALL)
                     if match:
                         semantic = json.loads(match.group(1))
@@ -250,8 +263,8 @@ class DataAnalystEngine:
                 except: pass
             with open(self.schema_path, 'w', encoding='utf-8') as f: json.dump(unified_schema, f, indent=4, ensure_ascii=False)
             if model_client:
-                if status_callback: status_callback("🧪 正在固化仿真数据...")
+                if status_callback: status_callback("🧪 正在固化仿真数据底座...")
                 self._ensure_sandbox_ready(unified_schema, model_client, status_callback=None)
-            if status_callback: status_callback(f"✅ 全域建模完成")
+            if status_callback: status_callback(f"✅ 战略大脑初始化完成")
             return {"success": True, "tables": list(unified_schema['tables'].keys())}
         except Exception as e: return {"success": False, "error": str(e)}
