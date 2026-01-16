@@ -420,34 +420,41 @@ class DataAnalystEngine:
             if full_analysis_context:
                 prior_context_str = f"\n【前序阶段分析结论 (关键上下文)】:\n{full_analysis_context}\n\n**重要指令**：如果前序结论中包含特定的 ID、日期或异常值，请务必在 SQL 的 WHERE 子句中使用它们（例如 `WHERE id IN (...)`），以实现深入分析。"
 
-            memory_context_str = ""
-            try:
-                memories = self._load_memory()
-                relevant_mems = []
-                keywords = meta.get('logic', meta['title'])[:10] 
-                for m in memories:
-                    if any(k in m['query'] or k in m['goal'] for k in list(keywords)):
-                        relevant_mems.append(f"- 历史参考SQL ({m['goal']}): {m['sql']}")
-                if relevant_mems: memory_context_str = "\n【历史成功案例 (Few-Shot)】:\n" + "\n".join(relevant_mems[-2:]) 
-            except: pass
+            # [v6.6.9] 字段级精准剪枝 (Column Pruning)
+            # 仅保留与问题及业务语义相关的字段，防止 Token 溢出与幻觉干扰
+            optimized_tables_schema = {}
+            for t_name in mapped_relevant_tables:
+                t_info = corrected_schemas['tables'].get(t_name, {})
+                all_cols = t_info.get('cols', t_info.get('columns', []))
+                # 如果字段不多，保留全部
+                if len(all_cols) <= 15:
+                    optimized_tables_schema[t_name] = t_info
+                else:
+                    # 简单语义过滤：保留名称、金额、日期、ID等核心特征字段
+                    core_keywords = ['id', 'name', 'date', 'time', 'amount', 'price', 'total', 'status', 'type', 'category', 'user', 'order', 'region', '金额', '日期', '状态', '名称']
+                    filtered_cols = [c for c in all_cols if any(k in c['name'].lower() or k in str(c.get('comment','')).lower() for k in core_keywords)]
+                    # 确保至少保留前5个字段
+                    if len(filtered_cols) < 5: filtered_cols = all_cols[:8]
+                    
+                    new_info = t_info.copy()
+                    new_info['cols'] = filtered_cols
+                    new_info['desc'] = t_info.get('desc', '') + " (字段已基于相关性精简)"
+                    optimized_tables_schema[t_name] = new_info
 
             sql_prompt = f"""
-基于分析路径："{analysis_path}"，请编写高度可读、带有详细业务注释的多方言 SQL。
+你是一名数据专家。请基于以下分析路径编写 SQL。
+路径："{analysis_path}"
 业务背景：{pruned_schemas['macro_context']}
-模型：{json.dumps(pruned_schemas['tables'], ensure_ascii=False)}
-数据样例（请参考真实的时间格式、状态值等）：
+模型(已精简)：{json.dumps(optimized_tables_schema, ensure_ascii=False)}
+数据样例：
 {sample_context}
 {prior_context_str}
-{memory_context_str}
 
-要求：
-1. **严格限制字段与表名**：
-   - **绝对禁止**使用模型中不存在的表名。
-   - **严禁凭空想象字段名**。
-2. **强制使用模块化编程 (CTE)**。
-3. **面向小白的详细注释**。
-4. **严谨的 SQL 语法 (SQLite 兼容)**。
-5. 返回 JSON 对象: "dataworks", "standard", "sqlite"。
+【重要指令】：
+1. **精准定位**：仅使用解决当前问题所必需的字段。
+2. **真数优先**：如果表有样例数据，必须严格遵循样例中的格式与值（如：日期格式、状态代码）。
+3. **模块化 (CTE)**：使用 WITH 语句拆解复杂逻辑。
+4. **语法**：必须兼容 SQLite。
 """
             sqls = {"dataworks": "", "standard": "", "sqlite": ""}
             try:
