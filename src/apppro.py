@@ -6257,6 +6257,7 @@ if st.session_state.get('is_processing') and final_prompt:
                             llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
                             
                             logger.info(f"🔮 [Strategic Workshop] 启动链式推演...")
+                            start_time = time.time() # [v6.7.4] 记录开始时间以供统计
                             
                             # [v5.6] 增加实时进度反馈，防止用户认为卡死
                             da_status_box = st.status("🧠 极光战略工作坊正在推演中...", expanded=True)
