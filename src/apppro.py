@@ -5873,7 +5873,21 @@ if st.session_state.prompt_trigger:
 # --- 核心调度逻辑 (v4.5.5 彻底修复死锁) ---
 # 1. 自动从队列消费 (如果当前空闲且队列有任务)
 if not st.session_state.get('is_processing') and st.session_state.question_queue:
-    st.session_state.current_active_query = st.session_state.question_queue.pop(0)
+    query_to_process = st.session_state.question_queue.pop(0)
+    
+    # [Audit] 记录提问行为
+    try:
+        from src.auth.audit_logger import AuditLogger
+        AuditLogger.log(
+            st.session_state.get('user', 'guest'), 
+            "USER_QUERY", 
+            f"在知识库 [{active_kb_name or '默认'}] 提问: {query_to_process[:150]}...", 
+            action_type="CHAT",
+            ip=get_client_ip()
+        )
+    except: pass
+    
+    st.session_state.current_active_query = query_to_process
     st.session_state.is_processing = True
     st.session_state.process_start_time = time.time()
     st.rerun()

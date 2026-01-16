@@ -58,7 +58,7 @@ def render_admin_management():
     st.divider()
     
     tab_dist, tab_users, tab_assets, tab_roles, tab_audit = st.tabs([
-        "⚡ 资源分发", "👤 用户与会话", "🗄️ 资产全览", "🎭 角色定义", "📜 审计记录"
+        "⚡ 资源分发", "👤 用户与会话", "🗄️ 资产全览", "🎭 角色定义", "📜 行为审计"
     ])
     
     # --- Tab 1: 资源分发 ---
@@ -83,7 +83,7 @@ def render_admin_management():
                             for u in sel_users:
                                 users[u]['kb_whitelist'] = list(set(users[u].get('kb_whitelist', [])).union(set(target_kbs)))
                             save_users(users)
-                            AuditLogger.log(st.session_state.get('user'), "BATCH_AUTH", f"批量授权给 {len(sel_users)} 名用户: {', '.join(target_kbs)}", ip=get_client_ip())
+                            AuditLogger.log(st.session_state.get('user'), "BATCH_AUTH", f"批量授权给 {len(sel_users)} 名用户", ip=get_client_ip())
                             st.success("授权完成"); time.sleep(0.5); st.rerun()
                     elif action == "批量封禁账户" and sel_users:
                         if st.button("🔒 执行批量封禁", type="secondary", key="btn_lock_u"):
@@ -126,7 +126,7 @@ def render_admin_management():
                             for u in target_users:
                                 users[u]['kb_whitelist'] = list(set(users[u].get('kb_whitelist',[])).union(set(sel_dist_kbs)))
                             save_users(users)
-                            AuditLogger.log(st.session_state.get('user'), "KB_DIST_BATCH", f"分发了 {len(sel_dist_kbs)} 个库给指定角色/用户", ip=get_client_ip())
+                            AuditLogger.log(st.session_state.get('user'), "KB_DIST_BATCH", f"分发了 {len(sel_dist_kbs)} 个库", ip=get_client_ip())
                             st.rerun()
                         if b3.button("🔒 设为私有", use_container_width=True, key="btn_dist_priv"):
                             sc = load_sharing_config()
@@ -135,13 +135,13 @@ def render_admin_management():
                                 for r in sc.get('role_sharing', {}):
                                     if k in sc['role_sharing'][r]: sc['role_sharing'][r].remove(k)
                             save_sharing_config(sc)
-                            AuditLogger.log(st.session_state.get('user'), "KB_PRIV_BATCH", f"撤销了 {len(sel_dist_kbs)} 个库的分享状态", status="warning", ip=get_client_ip())
+                            AuditLogger.log(st.session_state.get('user'), "KB_PRIV_BATCH", f"撤销分享状态", status="warning", ip=get_client_ip())
                             st.rerun()
 
     # --- Tab 2: 用户与会话 ---
     with tab_users:
         st.caption("账户全生命周期管理：从基本属性到登录会话安全")
-        from src.auth.session_manager import get_user_storage_usage, format_size, get_session_settings, set_session_setting, revoke_user_sessions
+        from src.auth.session_manager import get_session_settings, set_session_setting, revoke_user_sessions
         
         try:
             settings = get_session_settings()
@@ -179,18 +179,16 @@ def render_admin_management():
                         AuditLogger.log(st.session_state.get('user'), "USER_UPDATE", f"更新用户 {uname} 属性", ip=get_client_ip())
                         st.toast("配置已保存"); st.rerun()
                     if sc3.button("🚨 强制下线", key=f"rv_{uname}", use_container_width=True, type="secondary"):
-                        count = revoke_user_sessions(uname)
-                        AuditLogger.log(st.session_state.get('user'), "SESSION_REVOKE", f"注销了用户 {uname} 的所有会话", status="warning", ip=get_client_ip())
+                        revoke_user_sessions(uname)
+                        AuditLogger.log(st.session_state.get('user'), "SESSION_REVOKE", f"注销用户 {uname} 会话", status="warning", ip=get_client_ip())
                         st.rerun()
         except Exception as e: st.error(f"渲染失败: {e}")
 
-    # --- Tab 3: 资产全览 (恢复治理能力) ---
+    # --- Tab 3: 资产全览 ---
     with tab_assets:
         st.caption("全量物理资产审计与治理：监控磁盘占用、所有权移交及深度清理")
         from src.config.manifest_manager import ManifestManager
         kb_storage_root = os.path.join(os.getcwd(), "vector_db_storage")
-        
-        # 1. 数据采集与状态同步
         asset_data = []
         for kb in all_kbs:
             kb_path = os.path.join(kb_storage_root, kb)
@@ -203,130 +201,47 @@ def render_admin_management():
                         total_size += os.path.getsize(os.path.join(root, f))
                         file_count += 1
             except: pass
-            
-            # 使用 session_state 维持选中状态 (支持跨筛选保留)
-            is_selected = st.session_state.get(f"asset_sel_{kb}", False)
-            
-            raw_owner = manifest.get('owner', 'admin')
-            display_owner = "系统管理员" if raw_owner == "admin" else raw_owner
-            
             asset_data.append({
-                "☑️ 选择": is_selected,
+                "☑️ 选择": st.session_state.get(f"asset_sel_{kb}", False),
                 "知识库名称": kb, 
-                "所有人": display_owner, 
+                "所有人": manifest.get('owner', 'admin'), 
                 "文件数": file_count, 
-                "格式化大小": format_size(total_size), 
-                "raw_size": total_size
+                "格式化大小": format_size(total_size)
             })
 
-        # 2. 筛选区域
         with st.container(border=True):
             st.markdown("**🔍 资产筛选**")
             f_col1, f_col2 = st.columns([1, 1.5])
-            with f_col1:
-                search_asset = st.text_input("按名称搜索", placeholder="输入知识库名称...", key="search_asset_input")
-            with f_col2:
-                all_owners = sorted(list(set([d['所有人'] for d in asset_data]))) if asset_data else []
-                filter_owners = st.multiselect("按所有人筛选", options=all_owners, key="filter_asset_owner")
+            search_asset = f_col1.text_input("按名称搜索", placeholder="输入知识库名称...", key="search_asset_input")
+            all_owners = sorted(list(set([d['所有人'] for d in asset_data]))) if asset_data else []
+            filter_owners = f_col2.multiselect("按所有人筛选", options=all_owners, key="filter_asset_owner")
 
-        # 3. 执行筛选
-        filtered_data = []
-        for item in asset_data:
-            if filter_owners and item['所有人'] not in filter_owners:
-                continue
-            if search_asset and search_asset.lower() not in item['知识库名称'].lower():
-                continue
-            filtered_data.append(item)
+        filtered_data = [item for item in asset_data if (not filter_owners or item['所有人'] in filter_owners) and (not search_asset or search_asset.lower() in item['知识库名称'].lower())]
 
-        # 4. 批量操作工具栏
         if filtered_data:
-            st.markdown(f"📊 **共找到 {len(filtered_data)} 个资产**")
-            
-            # 全选/反选逻辑
-            sel_col1, sel_col2, sel_col3 = st.columns([1, 1, 4])
-            with sel_col1:
-                if st.button("✅ 全选列表", use_container_width=True, help="选中下方列表中的所有知识库"):
-                    for item in filtered_data:
-                         st.session_state[f"asset_sel_{item['知识库名称']}"] = True
-                    st.rerun()
-            with sel_col2:
-                if st.button("❌ 取消选择", use_container_width=True):
-                    for item in asset_data: # 清除所有，不仅仅是筛选后的
-                         st.session_state[f"asset_sel_{item['知识库名称']}"] = False
-                    st.rerun()
-            
-            # 更新数据源的选中状态 (确保 DataEditor 显示最新状态)
-            for item in filtered_data:
-                item['☑️ 选择'] = st.session_state.get(f"asset_sel_{item['知识库名称']}", False)
-
-            # 5. 数据表格
             df_assets = pd.DataFrame(filtered_data)
+            edited_df = st.data_editor(df_assets, use_container_width=True, hide_index=True, key="asset_manager_editor_v3")
+            selected_kbs = edited_df[edited_df["☑️ 选择"] == True]["知识库名称"].tolist()
             
-            # 使用 key 确保 data_editor 更新时能回写
-            edited_df = st.data_editor(
-                df_assets[["☑️ 选择", "知识库名称", "所有人", "文件数", "格式化大小"]], 
-                use_container_width=True, 
-                hide_index=True, 
-                key="asset_manager_editor_v2",
-                disabled=["知识库名称", "所有人", "文件数", "格式化大小"]
-            )
-            
-            # 获取选中的项 (合并 session_state 和 手动编辑的结果)
-            # 注意：此处优先信任 edited_df，因为它是用户当前看到的最终状态
-            selected_rows = edited_df[edited_df["☑️ 选择"] == True]
-            selected_kbs = selected_rows["知识库名称"].tolist()
-            
-            # 6. 批量动作区域
             if selected_kbs:
                 st.divider()
-                st.write(f"**⚡ 已选择 {len(selected_kbs)} 项进行操作**")
-                
                 ac1, ac2 = st.columns([2, 1])
-                target_owner = ac1.selectbox("选择接收者", options=list(users.keys()), key="batch_asset_transfer_owner")
-                
+                target_owner = ac1.selectbox("选择接收者", options=list(users.keys()), key="batch_transfer_owner")
                 if ac2.button("👤 批量移交所有权", type="primary", use_container_width=True):
                     for k in selected_kbs:
                         kp = os.path.join(kb_storage_root, k)
                         mf = ManifestManager.load(kp); mf['owner'] = target_owner
-                        with open(os.path.join(kp, "manifest.json"), 'w', encoding='utf-8') as f: json.dump(mf, f, indent=4, ensure_ascii=False)
-                    AuditLogger.log(st.session_state.get('user'), "BATCH_TRANSFER", f"将 {len(selected_kbs)} 个库移交给 {target_owner}", ip=get_client_ip())
-                    st.success("移交成功"); st.rerun()
+                        ManifestManager.save(kp, mf)
+                    AuditLogger.log(st.session_state.get('user'), "BATCH_TRANSFER", f"移交 {len(selected_kbs)} 个资产", ip=get_client_ip())
+                    st.rerun()
                 
-                # 危险操作区
-                with st.expander("🚨 危险操作区域 (物理删除)", expanded=False):
-                    st.warning("⚠️ 注意：物理删除操作不可恢复！将永久删除知识库文件和聊天记录。")
-                    if st.button("🗑️ 物理删除选中资产", use_container_width=True, type="secondary"):
-                         st.session_state.confirm_batch_delete = True
-                    
-                    if st.session_state.get("confirm_batch_delete"):
-                        st.error(f"❌ 确定要永久删除这 {len(selected_kbs)} 个知识库吗？")
-                        col_d1, col_d2 = st.columns(2)
-                        if col_d1.button("🔥 确认删除", type="primary", use_container_width=True):
-                            import shutil
-                            success_count = 0
-                            for k in selected_kbs: 
-                                try:
-                                    shutil.rmtree(os.path.join(kb_storage_root, k))
-                                    if os.path.exists(f"chat_histories/{k}.json"): os.remove(f"chat_histories/{k}.json")
-                                    # 清除选中状态
-                                    st.session_state[f"asset_sel_{k}"] = False
-                                    success_count += 1
-                                except Exception as e:
-                                    st.error(f"删除 {k} 失败: {e}")
-                            
-                            AuditLogger.log(st.session_state.get('user'), "BATCH_DELETE", f"物理删除了 {success_count} 个知识库资产", status="warning", ip=get_client_ip())
-                            del st.session_state.confirm_batch_delete
-                            st.rerun()
-                        
-                        if col_d2.button("取消", use_container_width=True):
-                            del st.session_state.confirm_batch_delete
-                            st.rerun()
-
-        else:
-            if asset_data:
-                st.info("🔍 未找到匹配的资产，请调整筛选条件")
-            else:
-                st.info("暂无物理资产数据")
+                if st.button("🗑️ 物理删除选中资产", type="secondary", use_container_width=True):
+                    import shutil
+                    for k in selected_kbs:
+                        shutil.rmtree(os.path.join(kb_storage_root, k))
+                        if os.path.exists(f"chat_histories/{k}.json"): os.remove(f"chat_histories/{k}.json")
+                    AuditLogger.log(st.session_state.get('user'), "BATCH_DELETE", f"物理删除 {len(selected_kbs)} 个资产", status="warning", ip=get_client_ip())
+                    st.rerun()
 
     # --- Tab 4: 角色定义 ---
     with tab_roles:
@@ -335,7 +250,6 @@ def render_admin_management():
         with role_col1:
             st.markdown("**现有角色**")
             selected_role_id = st.radio("选择角色", list(roles_config.keys()), format_func=lambda x: f"{roles_config[x]['name']} ({x})", label_visibility="collapsed")
-            st.divider()
             with st.expander("➕ 新增角色"):
                 n_rid = st.text_input("角色ID", placeholder="auditor")
                 n_rname = st.text_input("名称", placeholder="审计员")
@@ -357,152 +271,122 @@ def render_admin_management():
                 p_cols = st.columns(2)
                 for i, (p_id, p_name) in enumerate(ALL_PERMISSIONS_MAP.items()):
                     with p_cols[i % 2]:
-                        is_checked = (p_id in curr_perms or "*" in curr_perms)
-                        if st.checkbox(p_name, value=is_checked, key=f"perm_{selected_role_id}_{p_id}", disabled=(selected_role_id=="admin")):
+                        if st.checkbox(p_name, value=(p_id in curr_perms or "*" in curr_perms), key=f"p_{selected_role_id}_{p_id}", disabled=(selected_role_id=="admin")):
                             new_perms.append(p_id)
                 if st.button("💾 保存角色配置", use_container_width=True, type="primary"):
                     roles_config[selected_role_id].update({"description": new_desc, "default_quota_mb": new_def_quota, "permissions": new_perms})
                     with open(ROLE_TEMPLATE_PATH, 'w', encoding='utf-8') as f: json.dump(roles_config, f, indent=4, ensure_ascii=False)
-                    AuditLogger.log(st.session_state.get('user'), "ROLE_UPDATE", f"更新角色 {selected_role_id} 权限", ip=get_client_ip())
-                    st.success("已保存"); st.rerun()
+                    AuditLogger.log(st.session_state.get('user'), "ROLE_UPDATE", f"更新角色 {selected_role_id}", ip=get_client_ip())
+                    st.rerun()
 
-    # --- Tab 5: 审计记录 (企业级监控面板 v6.6.6) ---
+    # --- Tab 5: 行为审计 (企业级监控面板 v6.6.7) ---
     with tab_audit:
-        st.caption("全量行为链路追踪：实时监控系统合规性、资源流向与风控状态")
-        raw_logs = AuditLogger.get_logs(limit=2000)
+        st.caption("全量行为链路追踪：支持高性能分页查询与多维逻辑穿透")
+        
+        # 1. 行为风控看板
+        raw_logs = AuditLogger.get_logs(limit=5000) 
         if not raw_logs:
             st.info("暂无审计记录")
         else:
             df_logs = pd.DataFrame(raw_logs)
             df_logs['timestamp'] = pd.to_datetime(df_logs['timestamp'])
-            df_logs = df_logs.sort_values('timestamp', ascending=False)
             
-            # 1. 行为风控引擎 (Risk Engine)
             with st.container(border=True):
                 st.markdown("🛡️ **实时行为风控大盘**")
                 rc1, rc2, rc3 = st.columns(3)
-                
-                # A. 暴力破解检测
                 failed_logins = df_logs[(df_logs['action'] == 'LOGIN_FAILED') & (df_logs['timestamp'] > (datetime.now() - pd.Timedelta(hours=1)))]
-                if len(failed_logins) > 5:
-                    rc1.error(f"🚨 暴力破解风险: 过去1小时有 {len(failed_logins)} 次失败登录")
-                else:
-                    rc1.success("✅ 认证状态稳定")
+                if len(failed_logins) > 5: rc1.error(f"🚨 暴力破解风险: 过去1小时 {len(failed_logins)} 次失败")
+                else: rc1.success("✅ 认证状态稳定")
                 
-                # B. 大规模删除检测
-                mass_deletes = df_logs[(df_logs['action_type'] == 'KB_MGMT') & (df_logs['action'].str.contains('DELETE'))]
-                if len(mass_deletes) > 10:
-                    rc2.warning(f"⚠️ 资产流失风险: 检测到大规模物理删除行为")
-                else:
-                    rc2.success("✅ 资产结构安全")
+                mass_deletes = df_logs[(df_logs['action_type'] == 'KB_MGMT') & (df_logs['action'].str.contains('DELETE', na=False))]
+                if len(mass_deletes) > 10: rc2.warning(f"⚠️ 资产流失风险: 检测到大规模物理删除")
+                else: rc2.success("✅ 资产结构安全")
                 
-                # C. 敏感爬取检测
-                crawl_ops = df_logs[df_logs['action_type'] == 'CRAWL']
-                if len(crawl_ops) > 20:
-                    rc3.info(f"📊 活跃抓取: 当前有 {len(crawl_ops)} 项爬虫任务在流水中")
-                else:
-                    rc3.success("✅ 抓取频率正常")
+                query_ops = df_logs[df_logs['action_type'] == 'CHAT']
+                rc3.info(f"🗨️ 活跃问答: 当前有 {len(query_ops)} 条问答流水")
 
-            # 2. 筛选矩阵
+            # 2. 高级筛选矩阵
             with st.container(border=True):
-                c1, c2, c3, c4 = st.columns([1.2, 1, 1, 1.8])
+                st.markdown("**🔍 审计穿透过滤器**")
+                c1, c2, c3 = st.columns([1.5, 1, 1])
                 min_date = df_logs['timestamp'].min().date()
                 max_date = df_logs['timestamp'].max().date()
-                sel_range = c1.date_input("🕒 观察窗口", value=(min_date, max_date), key="aud_range_v3")
+                sel_range = c1.date_input("🕒 观察窗口", value=(min_date, max_date), key="aud_range_v4")
+                all_users = sorted(df_logs['user'].unique().tolist())
+                sel_users_f = c2.multiselect("👤 执行用户", all_users, key="aud_user_f4")
+                all_types = sorted(df_logs['action_type'].unique().tolist())
+                sel_t = c3.multiselect("📂 动作分类", all_types, key="aud_type_f4")
                 
-                all_types = sorted(df_logs['action_type'].unique()) if 'action_type' in df_logs else []
-                sel_t = c2.multiselect("📂 动作分类", all_types, key="aud_type_f3")
-                
-                all_status = sorted(df_logs['status'].unique()) if 'status' in df_logs else []
-                sel_s = c3.multiselect("🚦 结果状态", all_status, key="aud_status_f3")
-                search_det = c4.text_input("🔍 详情穿透", placeholder="搜索用户、IP或变更详情...", key="audit_search_v3")
+                c4, c5, c6 = st.columns([1, 1, 1.5])
+                all_status = sorted(df_logs['status'].unique().tolist())
+                sel_s = c4.multiselect("🚦 结果状态", all_status, key="aud_status_f4")
+                all_ips = sorted(df_logs['ip'].unique().tolist())
+                sel_ips = c5.multiselect("🌐 源 IP 过滤", all_ips, key="aud_ip_f4")
+                search_det = c6.text_input("📝 关键字穿透", placeholder="搜索详情、Diff或设备号...", key="audit_search_v4")
 
             f_logs = df_logs.copy()
             if len(sel_range) == 2:
                 f_logs = f_logs[(f_logs['timestamp'].dt.date >= sel_range[0]) & (f_logs['timestamp'].dt.date <= sel_range[1])]
+            if sel_users_f: f_logs = f_logs[f_logs['user'].isin(sel_users_f)]
             if sel_t: f_logs = f_logs[f_logs['action_type'].isin(sel_t)]
             if sel_s: f_logs = f_logs[f_logs['status'].isin(sel_s)]
+            if sel_ips: f_logs = f_logs[f_logs['ip'].isin(sel_ips)]
             if search_det: 
                 mask = f_logs.apply(lambda row: search_det.lower() in str(row.values).lower(), axis=1)
                 f_logs = f_logs[mask]
 
-            # 3. 统计
-            k1, k2, k3, k4 = st.columns(4)
-            k1.metric("匹配流水", len(f_logs))
-            k2.metric("异常告警", len(f_logs[f_logs['status']!='success']))
-            k3.metric("唯一主体", f_logs['user'].nunique())
+            # 3. 分页控制
+            st.divider()
+            p_col1, p_col2, p_col3 = st.columns([2, 3, 2])
+            with p_col1:
+                rows_per_page = st.selectbox("每页显示", [10, 20, 50, 100], index=1, key="aud_page_size")
+            total_rows = len(f_logs)
+            total_pages = max(1, (total_rows + rows_per_page - 1) // rows_per_page)
+            with p_col2:
+                curr_page = st.number_input(f"当前页码 (共 {total_pages} 页)", 1, total_pages, 1, key="aud_curr_page")
+            with p_col3:
+                st.write(""); st.write("")
+                st.markdown(f"显示 { (curr_page-1)*rows_per_page + 1 } - { min(curr_page*rows_per_page, total_rows) } 条")
+
+            start_idx = (curr_page - 1) * rows_per_page
+            display_df = f_logs.iloc[start_idx : start_idx + rows_per_page]
+
+            # 4. 企业级紧凑 HTML 流水表
+            type_icons = {"AUTH": "认证", "KB_MGMT": "库管理", "DATA_PROCESS": "数据处理", "ADMIN": "配置", "SECURITY": "安全", "CRAWL": "爬虫", "PREVIEW": "预览", "CHAT": "对话"}
+            status_colors = {"success": ("#f0fdf4", "#166534", "成功"), "failed": ("#fef2f2", "#991b1b", "失败"), "warning": ("#fffbeb", "#92400e", "警告"), "intercepted": ("#faf5ff", "#6b21a8", "拦截")}
             
-            csv = f_logs.to_csv(index=False).encode('utf-8-sig')
-            k4.download_button("📥 导出全量审计报表", data=csv, file_name=f"audit_v666_{datetime.now().strftime('%Y%m%d')}.csv", use_container_width=True)
-
-            # 4. 企业级 HTML 流水表 (支持 Diff 展示)
-            type_icons = {
-                "AUTH": "认证", "KB_MGMT": "库管理", "DATA_PROCESS": "数据处理", 
-                "ADMIN": "系统管理", "SECURITY": "安全审计", "GENERIC": "通用动作",
-                "CRAWL": "网页抓取", "PREVIEW": "文件预览"
-            }
-            status_colors = {
-                "success": ("#f0fdf4", "#166534", "成功"), 
-                "failed": ("#fef2f2", "#991b1b", "失败"),
-                "warning": ("#fffbeb", "#92400e", "警告"),
-                "intercepted": ("#faf5ff", "#6b21a8", "拦截")
-            }
-            action_map = {
-                "LOGIN": "账户登录", "LOGOUT": "注销退出", "DOC_DETAIL_VIEW": "查看详情",
-                "DOC_NATIVE_PREVIEW": "系统预览", "CRAWL_START": "启动抓取", "CONFIG_UPDATE": "修改配置",
-                "BATCH_AUTH": "批量授权", "DATA_ANALYSIS_EXEC": "执行推演"
-            }
-
             table_html = """
 <style>
-.audit-table { width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 12px; }
-.audit-table th { background: #f8fafc; color: #64748b; padding: 12px 10px; text-align: left; border-bottom: 2px solid #e2e8f0; }
-.audit-table td { padding: 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.audit-table { width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 12px; table-layout: fixed; }
+.audit-table th { background: #f8fafc; color: #64748b; padding: 10px; text-align: left; border-bottom: 2px solid #e2e8f0; }
+.audit-table td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.cell-compact { max-height: 50px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-overflow: ellipsis; }
+.cell-compact:hover { max-height: none; -webkit-line-clamp: unset; background: white; position: relative; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-radius: 4px; padding: 5px; }
 .badge-type { padding: 2px 6px; border-radius: 4px; background: #f1f5f9; color: #475569; font-weight: 600; font-size: 10px; }
-.badge-status { padding: 2px 10px; border-radius: 20px; font-weight: 600; font-size: 11px; }
-.diff-tag { color: #2563eb; background: #eff6ff; padding: 1px 4px; border-radius: 3px; font-family: monospace; font-size: 10px; border: 1px solid #dbeafe; }
+.badge-status { padding: 2px 8px; border-radius: 20px; font-weight: 600; font-size: 10px; }
+.diff-tag { color: #2563eb; background: #eff6ff; padding: 1px 4px; border-radius: 3px; font-family: monospace; font-size: 10px; border: 1px solid #dbeafe; display: inline-block; margin-top: 4px; }
 </style>
 <table class='audit-table'>
-<thead>
-<tr>
-<th style='width: 15%'>🕒 时间</th>
-<th style='width: 10%'>👤 用户</th>
-<th style='width: 15%'>分类/动作</th>
-<th style='width: 40%'>📝 执行摘要与变更记录</th>
-<th style='width: 10%'>🚦 状态</th>
-<th style='width: 10%'>🌐 IP</th>
-</tr>
-</thead>
+<thead><tr><th style='width: 12%'>🕒 时间</th><th style='width: 10%'>👤 用户</th><th style='width: 12%'>分类/动作</th><th style='width: 48%'>📝 执行摘要与变更对比</th><th style='width: 8%'>🚦 状态</th><th style='width: 10%'>🌐 IP</th></tr></thead>
 <tbody>
 """
-            
-            for _, row in f_logs.head(200).iterrows():
+            for _, row in display_df.iterrows():
                 ts = row['timestamp'].strftime('%m-%d %H:%M:%S')
-                a_type = row.get('action_type', 'GENERIC')
-                type_label = type_icons.get(a_type, a_type)
-                action_label = action_map.get(row.get('action'), row.get('action'))
-                
-                # 处理变更对比 (Diff)
-                diff_html = ""
-                diff_data = row.get('diff')
-                if diff_data and isinstance(diff_data, dict):
-                    diff_html = f"<br><span class='diff-tag'>Δ {diff_data.get('item','变更')}: {diff_data.get('new_value','...')}</span>"
-                
-                s_val = row.get('status', 'success')
-                bg, fg, s_label = status_colors.get(s_val, ("#f1f5f9", "#475569", "未知"))
-                details_raw = str(row['details'])
-                
-                table_html += f"<tr>"
-                table_html += f"<td style='color: #64748b'>{ts}</td>"
-                table_html += f"<td style='font-weight: 700;'>{row['user']}</td>"
-                table_html += f"<td><span class='badge-type'>{type_label}</span><br><small>{action_label}</small></td>"
-                table_html += f"<td>{details_raw}{diff_html}</td>"
-                table_html += f"<td><span class='badge-status' style='background: {bg}; color: {fg};'>{s_label}</span></td>"
-                table_html += f"<td style='color: #94a3b8; font-family: monospace;'>{row.get('ip', '...')}</td>"
-                table_html += f"</tr>"
+                t_label = type_icons.get(row.get('action_type'), row.get('action_type', 'GENERIC'))
+                d_html = f"<br><span class='diff-tag'>Δ {row['diff'].get('item')}: {row['diff'].get('new_value')}</span>" if (row.get('diff') and isinstance(row.get('diff'), dict)) else ""
+                bg, fg, s_lab = status_colors.get(row.get('status', 'success'), ("#f1f5f9", "#475569", "未知"))
+                table_html += f"<tr><td>{ts}</td><td style='font-weight:700'>{row['user']}</td><td><span class='badge-type'>{t_label}</span><br><small>{row.get('action')}</small></td><td><div class='cell-compact'>{row['details']}{d_html}</div></td><td><span class='badge-status' style='background:{bg};color:{fg}'>{s_lab}</span></td><td>{row.get('ip', '...')}</td></tr>"
             
             table_html += "</tbody></table>"
             st.markdown(table_html, unsafe_allow_html=True)
+            csv = f_logs.to_csv(index=False).encode('utf-8-sig')
+            st.download_button("📥 导出筛选结果 (CSV)", data=csv, file_name=f"audit_{datetime.now().strftime('%Y%m%d')}.csv", use_container_width=True)
+
+def format_size(size):
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size < 1024: return f"{size:.2f} {unit}"
+        size /= 1024
+    return f"{size:.2f} TB"
 
 def get_client_ip():
     from src.common.utils import get_client_ip
