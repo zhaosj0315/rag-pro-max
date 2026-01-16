@@ -54,6 +54,7 @@ except ImportError:
 # -----------------------------------------------------------
 
 # 极其早地初始化日志，防止任何模块在加载时触发
+# Force reload: 2026-01-16
 from src.app_logging import LogManager
 logger = LogManager()
 
@@ -989,7 +990,7 @@ if not st.session_state.get("logged_in"):
 # ==========================================
 # Force refresh
 from src.auth.login_page import render_login_page
-from src.auth.user_management import render_admin_management
+from src.auth.resource_governance import render_resource_governance
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     render_login_page()
     st.stop()
@@ -1033,7 +1034,7 @@ with st.sidebar:
     # 渲染 Admin 专用 Tab (物理对齐)
     if is_admin and len(tabs) > 5:
         with tabs[5]:
-            render_admin_management()
+            render_resource_governance()
 
     # --- 退出登录按钮 ---
     st.sidebar.markdown("---")
@@ -5122,15 +5123,23 @@ for msg_idx, msg in enumerate(state.get_messages()):
                                     with s_tabs[idx]:
                                         import pandas as pd
                                         raw_data = stage_h["source_samples"][t_name]
-                                        # [v6.7.7] 终极容错渲染
+                                        # [v6.7.8] 改进多行数据显示
                                         try:
-                                            if isinstance(raw_data, dict):
-                                                df_render = pd.DataFrame([raw_data]) # 强制包装为列表
-                                            else:
+                                            if isinstance(raw_data, list) and len(raw_data) > 0:
+                                                # 多行数据，直接显示
                                                 df_render = pd.DataFrame(raw_data)
+                                                st.caption(f"📊 采样 {len(raw_data)} 行数据")
+                                            elif isinstance(raw_data, dict) and raw_data:
+                                                # 单行数据，包装为列表
+                                                df_render = pd.DataFrame([raw_data])
+                                                st.caption(f"📊 采样 1 行数据")
+                                            else:
+                                                # 空数据
+                                                st.info(f"表 {t_name} 暂无数据")
+                                                continue
                                             st.dataframe(df_render, use_container_width=True)
-                                        except:
-                                            st.warning(f"表 {t_name} 暂无数据预览")
+                                        except Exception as e:
+                                            st.warning(f"表 {t_name} 数据预览失败: {str(e)}")
                             # B. 加工中：逻辑脚本 (Restored 3 Tabs)
                             st.markdown("**2. 执行中：工程逻辑 (The Logic)**")
                             sqls = stage_h.get("sqls", {})

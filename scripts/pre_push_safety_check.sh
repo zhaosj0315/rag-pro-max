@@ -1,91 +1,142 @@
 #!/bin/bash
+# GitHub 推送前安全检查脚本
+# 版本: v1.0
+# 基于: NON_ESSENTIAL_PUSH_STANDARD.md
 
-# RAG Pro Max - 推送前安全检查脚本
-# 确保遵守"非必要不推送"原则
+set -e
 
-echo "🔍 RAG Pro Max 推送前安全检查"
-echo "================================"
-
-# 检查是否有违规文件将被推送
-echo "📋 检查待推送文件..."
-STAGED_FILES=$(git diff --cached --name-only)
-
-if [ -z "$STAGED_FILES" ]; then
-    echo "⚠️  没有待推送的文件"
-    exit 1
-fi
-
-echo "待推送文件数量: $(echo "$STAGED_FILES" | wc -l)"
-
-# 检查违规文件
+echo "🔒 GitHub 推送前安全检查"
+echo "=================================="
 echo ""
-echo "🚨 检查违规文件..."
-VIOLATION_FILES=$(echo "$STAGED_FILES" | grep -E "(vector_db_storage|chat_histories|app_logs|temp_uploads|hf_cache|exports|refactor_backups|test_.*_output|PRODUCTION_RELEASE_REPORT|\.pyc$|__pycache__|\.log$|\.db$|\.sqlite|\.pkl|\.pickle|crawler_state.*\.json|\.DS_Store|\.tmp$|\.temp$)" | grep -v "\.gitkeep$")
 
-if [ ! -z "$VIOLATION_FILES" ]; then
-    echo "❌ 发现违规文件，禁止推送:"
-    echo "$VIOLATION_FILES"
-    echo ""
-    echo "🔧 修复建议:"
-    echo "1. 更新 .gitignore 文件"
-    echo "2. 运行: git rm -r --cached 违规文件名"
-    echo "3. 重新提交"
-    exit 1
-fi
+# 颜色定义
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-echo "✅ 没有发现违规文件"
+# 检查计数
+ISSUES=0
 
-# 检查文件大小
-echo ""
-echo "📏 检查文件大小..."
-LARGE_FILES=$(echo "$STAGED_FILES" | xargs ls -la 2>/dev/null | awk '$5 > 1048576 {print $9, $5}')
-
-if [ ! -z "$LARGE_FILES" ]; then
-    echo "⚠️  发现大文件 (>1MB):"
-    echo "$LARGE_FILES"
-    echo "请确认这些文件是否必要推送"
-fi
-
-# 检查 .gitignore 完整性
-echo ""
-echo "🛡️  检查 .gitignore 完整性..."
-REQUIRED_RULES=(
-    "vector_db_storage/"
-    "chat_histories/"
-    "app_logs/"
-    "temp_uploads/"
-    "hf_cache/"
-    "exports/"
-    "crawler_state*.json"
-    ".DS_Store"
-    "__pycache__/"
-    "*.pyc"
+# 1. 检查是否有私有数据目录
+echo "📋 [1/5] 检查私有数据目录..."
+PRIVATE_DIRS=(
+    "vector_db_storage"
+    "chat_histories"
+    "app_logs"
+    "temp_uploads"
+    "hf_cache"
+    "exports"
 )
 
-MISSING_RULES=""
-for rule in "${REQUIRED_RULES[@]}"; do
-    if ! grep -q "$rule" .gitignore; then
-        MISSING_RULES="$MISSING_RULES\n$rule"
+for dir in "${PRIVATE_DIRS[@]}"; do
+    if git ls-files --error-unmatch "$dir" >/dev/null 2>&1; then
+        echo -e "  ${RED}✗${NC} 发现私有目录: $dir"
+        ISSUES=$((ISSUES + 1))
     fi
 done
 
-if [ ! -z "$MISSING_RULES" ]; then
-    echo "⚠️  .gitignore 缺少规则:"
-    echo -e "$MISSING_RULES"
-    echo "建议添加这些规则到 .gitignore"
+if [ $ISSUES -eq 0 ]; then
+    echo -e "  ${GREEN}✓${NC} 无私有数据目录"
 fi
 
-# 最终检查
+# 2. 检查配置文件
 echo ""
-echo "🎯 最终安全评估..."
-TOTAL_FILES=$(echo "$STAGED_FILES" | wc -l)
+echo "📋 [2/5] 检查配置文件..."
+CONFIG_FILES=(
+    "config/sessions.json"
+    "config/users.json"
+    "config/app_config.json"
+    "config/alert_history.json"
+)
 
-if [ $TOTAL_FILES -gt 50 ]; then
-    echo "⚠️  推送文件数量较多 ($TOTAL_FILES 个)，请确认是否合理"
+for file in "${CONFIG_FILES[@]}"; do
+    if git diff --cached --name-only | grep -q "$file"; then
+        echo -e "  ${YELLOW}⚠️${NC}  配置文件将被推送: $file"
+        echo "     建议: 确认是否包含敏感信息"
+    fi
+done
+
+# 3. 检查临时文件
+echo ""
+echo "📋 [3/5] 检查临时文件..."
+TEMP_PATTERNS=(
+    "*.tmp"
+    "*.temp"
+    "*_backup.py"
+    "*_old.py"
+    "crawler_state*.json"
+    "test_*_output"
+)
+
+for pattern in "${TEMP_PATTERNS[@]}"; do
+    if git ls-files --error-unmatch $pattern >/dev/null 2>&1; then
+        echo -e "  ${RED}✗${NC} 发现临时文件: $pattern"
+        ISSUES=$((ISSUES + 1))
+    fi
+done
+
+if [ $ISSUES -eq 0 ]; then
+    echo -e "  ${GREEN}✓${NC} 无临时文件"
 fi
 
+# 4. 检查大文件
 echo ""
-echo "✅ 安全检查完成！"
-echo "📤 可以安全推送到远程仓库"
+echo "📋 [4/5] 检查大文件 (>1MB)..."
+LARGE_FILES=$(find . -type f -size +1M ! -path "./.git/*" ! -path "./vector_db_storage/*" ! -path "./chat_histories/*" ! -path "./temp_uploads/*" ! -path "./hf_cache/*" 2>/dev/null)
+
+if [ -n "$LARGE_FILES" ]; then
+    echo -e "  ${YELLOW}⚠️${NC}  发现大文件:"
+    echo "$LARGE_FILES" | while read file; do
+        SIZE=$(du -h "$file" | cut -f1)
+        echo "     - $file ($SIZE)"
+    done
+else
+    echo -e "  ${GREEN}✓${NC} 无大文件"
+fi
+
+# 5. 检查 .gitignore
 echo ""
-echo "推送命令: git push origin $(git branch --show-current)"
+echo "📋 [5/5] 检查 .gitignore..."
+if [ -f ".gitignore" ]; then
+    # 检查必需的规则
+    REQUIRED_RULES=(
+        "vector_db_storage"
+        "chat_histories"
+        "temp_uploads"
+        "app_logs"
+        "config/sessions.json"
+        "config/users.json"
+    )
+    
+    MISSING=0
+    for rule in "${REQUIRED_RULES[@]}"; do
+        if ! grep -q "$rule" .gitignore; then
+            echo -e "  ${RED}✗${NC} .gitignore 缺少规则: $rule"
+            MISSING=$((MISSING + 1))
+        fi
+    done
+    
+    if [ $MISSING -eq 0 ]; then
+        echo -e "  ${GREEN}✓${NC} .gitignore 规则完整"
+    else
+        ISSUES=$((ISSUES + MISSING))
+    fi
+else
+    echo -e "  ${RED}✗${NC} .gitignore 文件不存在"
+    ISSUES=$((ISSUES + 1))
+fi
+
+# 总结
+echo ""
+echo "=================================="
+if [ $ISSUES -eq 0 ]; then
+    echo -e "${GREEN}✅ 安全检查通过！可以推送${NC}"
+    echo "=================================="
+    exit 0
+else
+    echo -e "${RED}❌ 发现 $ISSUES 个问题，请修复后再推送${NC}"
+    echo "=================================="
+    exit 1
+fi
