@@ -157,23 +157,43 @@ class DataAnalystEngine:
 
                 if status_callback: status_callback(f"🧪 [Stage {i+1}] 执行验证中...")
                 exec_res = {"success": False, "data": []}
+                empty_reason = "该阶段执行了逻辑加工，未产生回显数据"
+                
                 if sqls.get("sqlite"):
                     exec_res = self.execute_sql(sqls["sqlite"], model_client, conn=session_conn)
                     if exec_res["success"]:
                         if exec_res['data']:
-                            if status_callback: status_callback(f"✅ 命中 {len(exec_res['data'])} 行数据")
+                            if status_callback: status_callback(f"✅ 命中 {len(exec_res['data'])} 行结论数据")
                             analysis_context += f"阶段{i+1}: {json.dumps(exec_res['data'][:1], ensure_ascii=False)}\n"
+                            empty_reason = ""
                         else:
-                            # 自愈：如果是 DDL，自动通过采样回显
-                            m_table = re.search(r'CREATE\s+(?:TEMPORARY\s+)?TABLE\s+([a-zA-Z0-9_]+)', sqls["sqlite"], re.I)
+                            # [v6.8.5] 深度自愈与原因识别
+                            sql_upper = sqls["sqlite"].upper()
+                            m_table = re.search(r'CREATE\s+(?:TEMPORARY\s+)?TABLE\s+([a-zA-Z0-9_]+)', sql_upper, re.I)
+                            
                             if m_table:
                                 t_name = m_table.group(1)
                                 verify_res = self.execute_sql(f"SELECT * FROM {t_name} LIMIT 5", conn=session_conn)
                                 if verify_res["success"] and verify_res["data"]:
                                     exec_res["data"] = verify_res["data"]
-                                    if status_callback: status_callback(f"✅ 表 {t_name} 数据已就绪")
+                                    if status_callback: status_callback(f"✅ 数据加工完成，表 {t_name} 已就绪")
+                                    empty_reason = ""
+                                else:
+                                    status_msg = f"🏗️ 步骤执行成功，但生成的结果集/临时表 '{t_name}' 为空"
+                                    if status_callback: status_callback(status_msg)
+                                    empty_reason = status_msg
+                            elif "SELECT" in sql_upper or "WITH" in sql_upper:
+                                status_msg = "⚠️ 查询执行成功，但在当前数据集中未找到匹配记录"
+                                if status_callback: status_callback(status_msg)
+                                empty_reason = status_msg
                 
-                final_data.append({"meta": meta, "sqls": sqls, "data": exec_res["data"], "source_samples": {t: t_context[t].get('sample', {}) for t in t_context}})
+                final_data.append({
+                    "meta": meta, 
+                    "sqls": sqls, 
+                    "data": exec_res["data"], 
+                    "empty_reason": empty_reason, # [v6.8.5] 记录原因供前端显示
+                    "source_samples": {t: t_context[t].get('sample', {}) for t in t_context}
+                })
 
             def report_gen():
                 p = f"撰写战略报告。需求: {query}\n结论: {analysis_context}\n要求: SCQA 架构，结论先行。"

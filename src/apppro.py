@@ -5164,12 +5164,13 @@ for msg_idx, msg in enumerate(state.get_messages()):
                                             recommendation=stage_h.get("recommendation")
                                         )
                                     else:
-                                        st.warning("⚠️ 查询执行成功，但结果集为空 (0 rows)")
+                                        st.warning(stage_h.get("empty_reason", "⚠️ 查询执行成功，但结果集为空 (0 rows)"))
                                 except Exception as e:
                                     st.error(f"表格渲染异常: {e}")
                                     st.write(raw_result_data) # 终极兜底：直接打印原始数据
                             else:
-                                st.info("该阶段仅执行了逻辑加工，未产生行级数据结果")
+                                # [v6.8.5] 显示更具体的后台解释
+                                st.info(stage_h.get("empty_reason", "该阶段仅执行了逻辑加工，未产生回显数据"))
                             if stage_h.get("is_simulated"):
                                 st.info("✨ 此阶段基于业务模型仿真推演")
 
