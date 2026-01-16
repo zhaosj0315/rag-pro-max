@@ -2362,17 +2362,15 @@ with st.sidebar:
                             role = "👤 用户" if msg["role"] == "user" else "🤖 助手"
                             export_content += f"## {role} ({i})\n\n{msg['content']}\n\n"
                     
-            if st.button("🔄 刷新标题", use_container_width=True, help="根据对话内容重新生成标题"):
-                # ... (logic remains same)
-                pass # placeholder for brevity in replace
-            
-            # [Audit] 记录对话导出点击
-            if len(state.get_messages()) > 0:
-                # 注意：Streamlit button/download_button 无法直接捕获下载瞬间
-                # 我们在此处记录“准备导出”行为
-                pass
-
-            st.download_button("📥 导出", export_content, file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d')}.md", mime="text/markdown", use_container_width=True, disabled=len(state.get_messages()) == 0)
+                    if st.button("🔄 刷新标题", use_container_width=True, help="根据对话内容重新生成标题"):
+                        if len(st.session_state.messages) > 0:
+                            first_q = st.session_state.messages[0]['content'][:20]
+                            st.session_state.custom_titles[current_kb_name] = first_q
+                            st.toast("✅ 标题已根据首个问题更新")
+                            st.rerun()
+                    
+                    # [Audit] 记录对话导出点击准备行为
+                    st.download_button("📥 导出", export_content, file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d')}.md", mime="text/markdown", use_container_width=True, disabled=len(state.get_messages()) == 0)
 
                 with op_row1[3]:
                     # 删除权限检查 (颗粒化)
