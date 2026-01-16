@@ -159,6 +159,8 @@ docker-compose up -d
 ```
 
 ### 启动应用
+
+#### 本地启动
 ```bash
 # 推荐方式（含测试）
 ./start.sh
@@ -166,6 +168,32 @@ docker-compose up -d
 # 直接启动
 streamlit run src/apppro.py
 ```
+
+#### 🌐 公网访问（免费）
+一键启动并获得公网地址，无需注册，完全免费：
+
+```bash
+# 方式1: 最简单（推荐）
+./scripts/public.sh
+
+# 方式2: 稳定SSH隧道
+./scripts/start-ssh-stable2.sh
+```
+
+启动后会显示：
+```
+🎉 隧道已建立！
+🌐 公网地址: https://rag-pro-max.serveousercontent.com
+🏠 本地地址: http://localhost:8501
+```
+
+**特点**：
+- ✅ 完全免费，无需注册
+- ✅ 自动 HTTPS，安全访问
+- ✅ 支持多人同时访问
+- ✅ 全球任何地方可访问
+
+详见：[免费公网访问指南](FREE_PUBLIC_ACCESS.md)
 
 ---
 
