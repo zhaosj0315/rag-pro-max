@@ -162,7 +162,7 @@ class DataAnalystEngine:
                 try:
                     r = self.execute_sql(f"SELECT * FROM {t} LIMIT 1")
                     if r["success"] and r["data"]:
-                        t_context[t]["sample"] = r['data'][0]
+                        t_context[t]["sample"] = [r['data'][0]] # [v6.7.6] 强制列表包装，防止 Pandas 报错
                 except: pass
 
             sql_prompt = f"""针对任务 "{meta.get('transformation')}" 编写 SQLite SQL。
@@ -185,8 +185,8 @@ class DataAnalystEngine:
                     if status_callback: status_callback(f"✅ 获取 {len(exec_res['data'])} 行结论数据")
                     if exec_res['data']: analysis_context += f"阶段{i+1}: {json.dumps(exec_res['data'][:1], ensure_ascii=False)}\n"
             
-            # [v6.7.5] 增加 source_samples 伪数据支持，防止界面空白
-            samples = {t: t_context[t].get('sample', [t_context[t]['cols'][0]]) for t in t_context}
+            # [v6.7.6] 修正：确保 samples 始终为列表格式，对齐 Pandas 要求
+            samples = {t: t_context[t].get('sample', [{"信息": "暂无样本数据"}]) for t in t_context}
             final_data.append({"meta": meta, "sqls": sqls, "data": exec_res["data"], "source_samples": samples})
 
         def report_gen():
