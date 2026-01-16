@@ -165,12 +165,12 @@ class DataAnalystEngine:
                         t_context[t]["sample"] = r['data'][0]
                 except: pass
 
-            sql_prompt = f"针对任务 \"{meta.get('transformation')}\" 编写 SQLite SQL。
+            sql_prompt = f"""针对任务 "{meta.get('transformation')}" 编写 SQLite SQL。
 模型: {json.dumps(t_context, ensure_ascii=False)}
 前序上下文: {analysis_context}
 【严格要求】: 必须返回标准 JSON，不要包含 Markdown 代码块之外的任何文字。
 格式: {{"sqlite": "SELECT...", "standard": "...", "dataworks": "..."}}
-"
+"""
             sqls = {"sqlite": ""}
             try:
                 raw_res = model_client.complete(sql_prompt).text
