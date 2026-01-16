@@ -4075,20 +4075,22 @@ elif active_kb_name:
                         for info in doc_manager.manifest['files']:
                             report_md += f"## 📄 {info.get('name')}\n- **分类**: {info.get('category', '未分类')}\n- **摘要**: {info.get('summary', '暂无摘要')}\n\n---\n"
                         
-                if report_md:
-                    # [Audit] 记录报告导出行为
-                    try:
-                        from src.auth.audit_logger import AuditLogger
-                        AuditLogger.log(
-                            st.session_state.get('user', 'guest'), 
-                            "KB_EXPORT_REPORT", 
-                            f"生成并下载知识库报告: {active_kb_name}", 
-                            action_type="EXPORT",
-                            ip=get_client_ip()
-                        )
-                    except: pass
-                    
-                    st.download_button(label="📝 MD 报告", data=report_md, file_name=f"{active_kb_name}_报告.md", mime='text/markdown', use_container_width=True, key=f"dl_md_h_{active_kb_name}")
+                        if can_download:
+                            if report_md:
+                                # [Audit] 记录报告导出行为
+                                try:
+                                    from src.auth.audit_logger import AuditLogger
+                                    from src.common.utils import get_client_ip
+                                    AuditLogger.log(
+                                        st.session_state.get('user', 'guest'), 
+                                        "KB_EXPORT_REPORT", 
+                                        f"生成并下载知识库报告: {active_kb_name}", 
+                                        action_type="EXPORT",
+                                        ip=get_client_ip()
+                                    )
+                                except: pass
+                                
+                                st.download_button(label="📝 MD 报告", data=report_md, file_name=f"{active_kb_name}_报告.md", mime='text/markdown', use_container_width=True, key=f"dl_md_h_{active_kb_name}")
                         else:
                             st.button("📝 MD 报告", disabled=True, key=f"dl_md_h_{active_kb_name}_disabled", help="无下载权限")
 
