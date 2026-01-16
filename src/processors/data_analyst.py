@@ -42,7 +42,6 @@ class DataAnalystEngine:
         return list(set(relevant))[:8] if relevant else list(all_tables.keys())[:3]
 
     def _ensure_sandbox_ready(self, schemas: Dict[str, Any], model_client, status_callback=None, target_tables: List[str] = None, conn=None) -> Dict[str, str]:
-        # 支持外部传入 connection，保持 session
         should_close = False
         if conn is None:
             conn = sqlite3.connect(self.db_path)
@@ -110,24 +109,19 @@ class DataAnalystEngine:
         if not os.path.exists(self.schema_path): return {"success": False, "logic": "架构缺失"}
         with open(self.schema_path, 'r', encoding='utf-8') as f: full_schemas = json.load(f)
         
-        # [v6.7.8] 重要重构：开启持久化数据库会话，支持 TEMPORARY TABLE
         session_conn = sqlite3.connect(self.db_path, timeout=60)
         
         try:
-            # 1. 元数据拦截
             if any(k in query for k in ["指标", "结构", "字典", "有哪些表"]):
                 prompt = f"基于以下模型回答: {query}\n{json.dumps(full_schemas, ensure_ascii=False)[:4000]}"
                 def gen():
                     for char in model_client.complete(prompt).text: yield char
-                session_conn.close()
                 return {"stages": [], "logic_gen": gen(), "success": True, "macro_context": "架构咨询"}
 
             rel_tables = self._get_relevant_tables(query, full_schemas)
             mapping = self._ensure_sandbox_ready(full_schemas, model_client, status_callback, rel_tables, conn=session_conn)
-            
             sub_schema = {mapping.get(t, t): full_schemas['tables'][t] for t in rel_tables if t in full_schemas['tables']}
             
-            # 2. 任务拆解
             prompt = f"将需求 {query} 拆解为 2-3 个 SQL 阶段。JSON 数组: [{{stage_id, title, transformation, goal}}]\n模型: {json.dumps(sub_schema, ensure_ascii=False)}"
             try:
                 res = model_client.complete(prompt).text
@@ -137,8 +131,7 @@ class DataAnalystEngine:
             final_data = []
             analysis_context = ""
             for i, meta in enumerate(stages_meta):
-                if status_callback: status_callback(f"⚙️ [Stage {i+1}] 构建 SQL 推演逻辑...")
-                
+                if status_callback: status_callback(f"⚙️ [Stage {i+1}] 构建 SQL 逻辑...")
                 t_context = {}
                 for t in sub_schema:
                     info = sub_schema[t]
@@ -146,41 +139,35 @@ class DataAnalystEngine:
                     keep = ['status', 'state', 'date', 'time', 'amount', 'price', 'total', 'id', 'name', '合规', '成本', '延迟']
                     filtered = [c for c in cols if any(k in c['name'].lower() or k in str(c.get('comment','')).lower() for k in keep)]
                     t_context[t] = {"desc": info.get("desc"), "cols": filtered if filtered else cols[:10]}
-                    # 样本探测 (复用 session)
                     try:
                         r = self.execute_sql(f"SELECT * FROM {t} LIMIT 1", conn=session_conn)
                         if r["success"] and r["data"]:
                             t_context[t]["sample"] = r['data'][0]
                     except: pass
 
-                sql_prompt = f"""编写分析 SQL 任务: {meta.get('transformation')}
-模型: {json.dumps(t_context, ensure_ascii=False)}
-前序发现: {analysis_context}
-【严格要求】: 返回标准 JSON: {{"sqlite": "...", "standard": "...", "dataworks": "..."}}
-"""
+                sql_prompt = f"编写分析 SQL 任务: {meta.get('transformation')}\n模型: {json.dumps(t_context, ensure_ascii=False)}\n前序发现: {analysis_context}\n返回标准 JSON: {{"sqlite": "...", "standard": "...", "dataworks": "..."}}"
                 sqls = {"sqlite": ""}
                 try:
                     sqls = self._extract_json(model_client.complete(sql_prompt).text) or {"sqlite": ""}
                 except: pass
 
-                if status_callback: status_callback(f"🧪 [Stage {i+1}] 正在执行逻辑验证...")
+                if status_callback: status_callback(f"🧪 [Stage {i+1}] 执行验证中...")
                 exec_res = {"success": False, "data": []}
                 if sqls.get("sqlite"):
-                    # 使用 session 执行
                     exec_res = self.execute_sql(sqls["sqlite"], model_client, conn=session_conn)
                     if exec_res["success"]:
                         if exec_res['data']:
                             if status_callback: status_callback(f"✅ 命中 {len(exec_res['data'])} 行数据")
                             analysis_context += f"阶段{i+1}: {json.dumps(exec_res['data'][:1], ensure_ascii=False)}\n"
                         else:
-                            # [v6.7.8] 自愈：如果是建表语句，自动通过查询回显结果
+                            # [v6.7.9] 自愈：如果是 DDL，自动通过采样回显
                             m_table = re.search(r'CREATE\s+(?:TEMPORARY\s+)?TABLE\s+([a-zA-Z0-9_]+)', sqls["sqlite"], re.I)
                             if m_table:
                                 t_name = m_table.group(1)
                                 verify_res = self.execute_sql(f"SELECT * FROM {t_name} LIMIT 5", conn=session_conn)
                                 if verify_res["success"] and verify_res["data"]:
                                     exec_res["data"] = verify_res["data"]
-                                    if status_callback: status_callback(f"✅ 表 {t_name} 已创建并注入数据")
+                                    if status_callback: status_callback(f"✅ 表 {t_name} 数据已准备就绪")
                 
                 final_data.append({"meta": meta, "sqls": sqls, "data": exec_res["data"], "source_samples": {t: t_context[t].get('sample', {}) for t in t_context}})
 
@@ -203,23 +190,25 @@ class DataAnalystEngine:
         if conn is None:
             conn = sqlite3.connect(self.db_path, timeout=30)
             should_close = True
-        
         try:
             conn.row_factory = lambda c, r: dict([(col[0], r[idx]) for idx, col in enumerate(c.description)])
             cursor = conn.cursor()
             clean_sql = sql.replace('\\n', ' ').replace('```sql', '').replace('```', '').strip()
             statements = [s.strip() for s in clean_sql.split(';') if s.strip()]
             rows = []
+            # [v6.7.9] 扩展查询起始符，支持 CTE
+            QUERY_STARTERS = ("SELECT", "WITH", "VALUES", "PRAGMA", "EXPLAIN")
             for stmt in statements:
                 if not stmt: continue
                 try:
                     cursor.execute(stmt)
-                    if stmt.upper().startswith("SELECT"): rows = cursor.fetchall()
+                    if any(stmt.upper().startswith(s) for s in QUERY_STARTERS):
+                        rows = cursor.fetchall()
                 except Exception as e:
-                    if model_client and stmt.upper().startswith("SELECT"):
-                        fix = model_client.complete(f"修正 SQL 语法错误: {e}\nSQL: {stmt}\n仅输出 SQL").text
-                        fixed = fix.replace('```sql', '').replace('```', '').strip()
-                        cursor.execute(fixed)
+                    if model_client and any(stmt.upper().startswith(s) for s in QUERY_STARTERS):
+                        fix = model_client.complete(f"修正 SQL: {e}\nSQL: {stmt}").text
+                        fixed_stmt = fix.replace('```sql', '').replace('```', '').strip()
+                        cursor.execute(fixed_stmt)
                         rows = cursor.fetchall()
             conn.commit()
             return {"success": True, "data": rows}
@@ -253,7 +242,7 @@ class DataAnalystEngine:
             if semantic_docs and model_client:
                 docs = "".join([open(p, 'r', errors='ignore').read()[:5000] for p in semantic_docs])
                 try:
-                    res = model_client.complete(f"基于物理表 {json.dumps(physical_tables)} 和文档构建模型。返回 JSON").text
+                    res = model_client.complete(f"构建模型。返回 JSON").text
                     match = re.search(r'(\{.*\})', res, re.DOTALL)
                     if match:
                         semantic = json.loads(match.group(1))
