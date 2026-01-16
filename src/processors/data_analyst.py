@@ -164,14 +164,14 @@ class DataAnalystEngine:
                             if status_callback: status_callback(f"✅ 命中 {len(exec_res['data'])} 行数据")
                             analysis_context += f"阶段{i+1}: {json.dumps(exec_res['data'][:1], ensure_ascii=False)}\n"
                         else:
-                            # [v6.7.9] 自愈：如果是 DDL，自动通过采样回显
+                            # 自愈：如果是 DDL，自动通过采样回显
                             m_table = re.search(r'CREATE\s+(?:TEMPORARY\s+)?TABLE\s+([a-zA-Z0-9_]+)', sqls["sqlite"], re.I)
                             if m_table:
                                 t_name = m_table.group(1)
                                 verify_res = self.execute_sql(f"SELECT * FROM {t_name} LIMIT 5", conn=session_conn)
                                 if verify_res["success"] and verify_res["data"]:
                                     exec_res["data"] = verify_res["data"]
-                                    if status_callback: status_callback(f"✅ 表 {t_name} 数据已准备就绪")
+                                    if status_callback: status_callback(f"✅ 表 {t_name} 数据已就绪")
                 
                 final_data.append({"meta": meta, "sqls": sqls, "data": exec_res["data"], "source_samples": {t: t_context[t].get('sample', {}) for t in t_context}})
 
@@ -200,20 +200,23 @@ class DataAnalystEngine:
             clean_sql = sql.replace('\\n', ' ').replace('```sql', '').replace('```', '').strip()
             statements = [s.strip() for s in clean_sql.split(';') if s.strip()]
             rows = []
-            # [v6.7.9] 扩展查询起始符，支持 CTE
+            # [v6.8.0] 定义产生结果集的关键字，增加鲁棒性匹配
             QUERY_STARTERS = ("SELECT", "WITH", "VALUES", "PRAGMA", "EXPLAIN")
             for stmt in statements:
                 if not stmt: continue
                 try:
                     cursor.execute(stmt)
-                    if any(stmt.upper().startswith(s) for s in QUERY_STARTERS):
+                    # 核心修复：移除所有前导注释和空白后再判定
+                    clean_stmt = re.sub(r'^(\s*(--.*|/\*.*?\*/)\s*)+', '', stmt, flags=re.MULTILINE).strip()
+                    if any(clean_stmt.upper().startswith(s) for s in QUERY_STARTERS):
                         rows = cursor.fetchall()
                 except Exception as e:
-                    if model_client and any(stmt.upper().startswith(s) for s in QUERY_STARTERS):
+                    if model_client:
                         fix = model_client.complete(f"修正 SQL: {e}\nSQL: {stmt}").text
                         fixed_stmt = fix.replace('```sql', '').replace('```', '').strip()
                         cursor.execute(fixed_stmt)
-                        rows = cursor.fetchall()
+                        if any(fixed_stmt.upper().startswith(s) for s in QUERY_STARTERS):
+                            rows = cursor.fetchall()
             conn.commit()
             return {"success": True, "data": rows}
         except Exception as e: return {"success": False, "error": str(e), "data": []}
