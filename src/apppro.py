@@ -1040,10 +1040,6 @@ with st.sidebar:
         st.rerun()
 
     with tab_main:
-        # ... 原有代码保持不变 ...
-        # (定位到知识库控制台)
-
-
         # 知识库控制台标题与一键配置完全一行化
         console_col1, console_col2, console_col3 = st.columns([4, 1, 0.5])
         with console_col1:
