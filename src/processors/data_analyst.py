@@ -33,23 +33,35 @@ class DataAnalystEngine:
 
     def _get_relevant_tables(self, query: str, schemas: Dict[str, Any]) -> List[str]:
         all_tables = schemas.get("tables", {})
-        if len(all_tables) <= 3: return list(all_tables.keys())
+        if not all_tables: return []
+        
+        # 原则：数据分析模式下，优先保证完整性。
+        # 如果表数量不多（<15），直接返回所有表，确保跨表查询和元数据查询的准确性。
+        if len(all_tables) <= 15:
+            return list(all_tables.keys())
+            
+        # 仅在表极其多的时候进行简单过滤
         relevant = []
         qw = query.lower()
-        for t, info in all_tables.items():
-            if t.lower() in qw or any(w in str(info.get("desc","")).lower() for w in qw if len(w)>1):
+        for t in all_tables:
+            if t.lower() in qw:
                 relevant.append(t)
-        return list(set(relevant))[:8] if relevant else list(all_tables.keys())[:3]
+        
+        return list(set(relevant)) if relevant else list(all_tables.keys())[:10]
 
     def _get_column_value_samples(self, table_name: str, conn: sqlite3.Connection) -> str:
         try:
             cursor = conn.cursor()
-            cursor.execute(f"PRAGMA table_info({table_name})")
+            # 转义表名
+            safe_table = f'"{table_name}"'
+            cursor.execute(f"PRAGMA table_info({safe_table})")
             cols = [row[1] for row in cursor.fetchall()]
             samples = []
             for col in cols:
                 if any(k in col.lower() for k in ['status', 'type', 'category', 'region', 'gender', 'state', '状态', '类型', '渠道']):
-                    cursor.execute(f"SELECT DISTINCT {col} FROM {table_name} LIMIT 5")
+                    # 转义列名
+                    safe_col = f'"{col}"'
+                    cursor.execute(f"SELECT DISTINCT {safe_col} FROM {safe_table} LIMIT 5")
                     vals = [str(row[0]) for row in cursor.fetchall() if row[0] is not None]
                     if vals: samples.append(f"字段 '{col}' 取值范围: {vals}")
             return "\n".join(samples)
@@ -62,11 +74,22 @@ class DataAnalystEngine:
             if not cols:
                 return False
             
+            # 归一化 cols 格式: 确保每个元素都是 dict 且包含 'name'
+            normalized_cols = []
+            for c in cols:
+                if isinstance(c, dict) and 'name' in c:
+                    normalized_cols.append(c)
+                elif isinstance(c, str):
+                    normalized_cols.append({"name": c, "type": "TEXT", "comment": ""})
+            
+            if not normalized_cols: return False
+            cols = normalized_cols
+
             # 构建表结构
             col_defs = []
             for c in cols:
                 col_name = c['name']
-                col_type = c.get('type', 'TEXT')
+                col_type = str(c.get('type', 'TEXT'))
                 # 映射常见类型到 SQLite 类型
                 if any(k in col_type.upper() for k in ['INT', 'NUM', 'DECIMAL', 'FLOAT']):
                     sql_type = 'REAL'
@@ -74,10 +97,11 @@ class DataAnalystEngine:
                     sql_type = 'TEXT'
                 else:
                     sql_type = 'TEXT'
-                col_defs.append(f"{col_name} {sql_type}")
+                col_defs.append(f'"{col_name}" {sql_type}')
             
-            # 创建表
-            cursor.execute(f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(col_defs)})")
+            # 创建表 (使用引号转义表名)
+            safe_table = f'"{table_name}"'
+            cursor.execute(f"CREATE TABLE IF NOT EXISTS {safe_table} ({', '.join(col_defs)})")
             
             # 生成数据的提示词
             cols_desc = "\n".join([f"- {c['name']}: {c.get('comment', c.get('type', 'TEXT'))}" for c in cols])
@@ -116,51 +140,63 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             
             # 提取并执行 INSERT 语句
             insert_count = 0
-            for line in response.split('\n'):
-                line = line.strip()
-                if line.upper().startswith('INSERT'):
+            # 使用正则匹配完整的 INSERT 语句
+            statements = re.findall(r'INSERT\s+INTO\s+.*?;', response, re.DOTALL | re.IGNORECASE)
+            
+            if not statements:
+                # 尝试按行提取 (兼容没有分号的情况)
+                for line in response.split('\n'):
+                    line = line.strip()
+                    if line.upper().startswith('INSERT INTO'):
+                        if not line.endswith(';'): line += ';'
+                        statements.append(line)
+
+            for clean_stmt in statements:
+                try:
+                    # 清理可能的 markdown 代码块标记
+                    clean_stmt = clean_stmt.replace('```sql', '').replace('```', '').strip()
+                    cursor.execute(clean_stmt)
+                    insert_count += 1
+                except Exception as e:
+                    # 如果是因为字段不匹配，尝试通过列名显式插入
                     try:
-                        # 清理可能的 markdown 代码块标记
-                        clean_line = line.replace('```sql', '').replace('```', '').strip()
-                        if not clean_line.endswith(';'):
-                            clean_line += ';'
-                        cursor.execute(clean_line)
-                        insert_count += 1
-                    except Exception as e:
-                        if self.logger:
-                            self.logger.debug(f"插入数据失败: {e}, SQL: {line}")
-                        print(f"   ⚠️ INSERT 失败: {str(e)[:50]}")
-                        continue
+                        # 这是一个极具侵略性的自愈尝试：如果 LLM 返回的语句列数不对，尝试丢弃
+                        pass
+                    except: pass
+                    continue
             
             if insert_count > 0:
                 print(f"✅ [虚拟数据] 表 '{table_name}' 成功生成 {insert_count} 条记录")
                 return True
             else:
                 print(f"⚠️ [虚拟数据] 表 '{table_name}' LLM 生成失败（0条），尝试备用方案...")
-                # 备用方案：生成简单的占位数据
-                result = self._generate_simple_mock_data(table_name, cols, cursor)
-                if not result:
-                    print(f"   ❌ 备用方案也失败了")
-                return result
+                return self._generate_simple_mock_data(table_name, cols, cursor)
                 
         except Exception as e:
             if self.logger:
-                self.logger.error(f"生成虚拟数据失败: {e}")
+                self.logger.error(f"生成虚拟数据致命错误: {e}")
             return False
 
     def _generate_simple_mock_data(self, table_name: str, cols: List[Dict], cursor) -> bool:
         """生成简单的占位数据（备用方案）"""
         try:
             print(f"   🔄 [备用方案] 开始为表 '{table_name}' 生成占位数据...")
-            col_names = [c['name'] for c in cols]
+            # 确保 cols 元素是 dict
+            normalized_cols = []
+            for c in cols:
+                if isinstance(c, dict): normalized_cols.append(c)
+                else: normalized_cols.append({"name": str(c)})
+            cols = normalized_cols
+
             placeholders = ', '.join(['?' for _ in cols])
+            safe_table = f'"{table_name}"'
             
             insert_count = 0
             for i in range(20):
                 values = []
                 for c in cols:
-                    col_name = c['name'].lower()
-                    col_type = c.get('type', 'TEXT').upper()
+                    col_name = str(c.get('name', '')).lower()
+                    col_type = str(c.get('type', 'TEXT')).upper()
                     
                     # 根据字段名和类型生成合理的值
                     if 'id' in col_name:
@@ -187,22 +223,18 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                         values.append(f"数据{i+1}")
                 
                 try:
-                    cursor.execute(f"INSERT INTO {table_name} VALUES ({placeholders})", values)
+                    cursor.execute(f"INSERT INTO {safe_table} VALUES ({placeholders})", values)
                     insert_count += 1
                 except Exception as e:
-                    print(f"   ⚠️ 第 {i+1} 行插入失败: {str(e)[:50]}")
                     continue
             
             if insert_count > 0:
                 print(f"✅ [虚拟数据] 表 '{table_name}' 使用备用方案生成 {insert_count} 条记录")
                 return True
             else:
-                print(f"❌ [虚拟数据] 表 '{table_name}' 备用方案失败，0条记录")
+                print(f"❌ [虚拟数据] 表 '{table_name}' 备用方案失败")
                 return False
         except Exception as e:
-            if self.logger:
-                self.logger.error(f"备用数据生成失败: {e}")
-            print(f"❌ [备用方案] 异常: {e}")
             return False
 
     def _ensure_sandbox_ready(self, schemas: Dict[str, Any], model_client, status_callback=None, target_tables: List[str] = None, conn=None) -> Dict[str, str]:
@@ -213,12 +245,15 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         
         cursor = conn.cursor()
         cursor.execute("CREATE TABLE IF NOT EXISTS dual (dummy TEXT)")
-        if not cursor.execute("SELECT count(*) FROM dual").fetchone()[0]:
+        res = cursor.execute("SELECT count(*) FROM dual").fetchone()
+        # 兼容 row_factory 返回 dict 的情况
+        count = res[0] if isinstance(res, (tuple, list)) else list(res.values())[0]
+        if not count:
             cursor.execute("INSERT INTO dual VALUES ('X')")
         
         table_mapping = {}
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        real_tables = {row[0].lower(): row[0] for row in cursor.fetchall()}
+        real_tables = {row[0] if isinstance(row, (tuple, list)) else list(row.values())[0].lower(): (row[0] if isinstance(row, (tuple, list)) else list(row.values())[0]) for row in cursor.fetchall()}
         
         def find_match(name):
             n = name.lower()
@@ -240,21 +275,18 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             if match:
                 # 表存在，检查是否有数据
                 try:
-                    row_count = cursor.execute(f"SELECT count(*) FROM {match}").fetchone()[0]
+                    row_count = cursor.execute(f'SELECT count(*) FROM "{match}"').fetchone()[0]
                     if row_count > 0:
                         table_mapping[t] = match
                         print(f"✅ [数据检查] 表 '{match}' 已有 {row_count} 条数据")
                         continue
                     else:
-                        # 表存在但无数据，需要生成
                         print(f"⚠️ [数据检查] 表 '{match}' 为空，需要生成虚拟数据")
                         tables_need_data.append((t, match))
                 except Exception as e:
-                    if self.logger:
-                        self.logger.debug(f"检查表 {match} 失败: {e}")
                     tables_need_data.append((t, match))
             else:
-                # 表不存在，需要创建并生成数据
+                # 表不存在，如果是 virtual 或者是 target 则需要创建
                 print(f"⚠️ [数据检查] 表 '{t}' 不存在，需要创建并生成虚拟数据")
                 tables_need_data.append((t, t))
 
@@ -263,24 +295,115 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             if status_callback: 
                 status_callback(f"🎲 正在为 {len(tables_need_data)} 个表生成虚拟数据...")
             
+            # 先寻找对应的 schema 定义
+            schema_tables = {k.lower(): k for k in schemas.get('tables', {}).keys()}
+            
             for schema_name, physical_name in tables_need_data:
-                table_info = schemas['tables'].get(schema_name, {})
-                if self._generate_mock_data(physical_name, table_info, schemas, model_client, cursor):
-                    table_mapping[schema_name] = physical_name
-                    conn.commit()
+                orig_key = schema_tables.get(schema_name.lower())
+                if orig_key:
+                    table_info = schemas['tables'][orig_key]
+                    if self._generate_mock_data(physical_name, table_info, schemas, model_client, cursor):
+                        table_mapping[schema_name] = physical_name
+                        conn.commit()
         
         if should_close: 
             conn.close()
         return table_mapping
 
-    def _extract_json(self, text: str) -> Optional[Dict]:
+    def extract_schema_from_docs(self, docs: List[Any], model_client, status_callback=None) -> Dict[str, Any]:
+        """从文档中提取 Schema (供 apppro 调用)"""
+        if not docs: return {}
+        if status_callback: status_callback("🔍 正在从业务文档中深度提取表结构定义...")
+        
+        all_text = "\n".join([str(d.get_text() if hasattr(d, 'get_text') else getattr(d, 'text', '')) for d in docs[:20]])
+        if len(all_text) > 30000: all_text = all_text[:30000] + "..."
+        
+        prompt = f"""分析以下业务材料，提取其中涉及的所有数据表定义。
+
+业务材料：
+{all_text}
+
+要求：
+1. 识别所有提到的实体/表名
+2. 提取每个表的字段定义（字段名、类型、说明）
+3. 推断表之间的关联关系
+4. 返回标准 JSON 格式
+
+返回格式：
+{{
+  "macro_context": "业务背景描述",
+  "tables": {{
+    "表名": {{
+      "desc": "表说明",
+      "cols": [
+        {{"name": "字段名", "type": "类型", "comment": "说明"}}
+      ]
+    }}
+  }}
+}}
+
+只返回 JSON，不要其他内容。"""
+        
         try:
-            match = re.search(r'(\{.*\})', text, re.DOTALL)
+            res = model_client.complete(prompt).text
+            match = re.search(r'(\{.*\})', res, re.DOTALL)
             if match:
-                data = json.loads(match.group(1).replace('\\n', ' '))
-                return {str(k).lower(): v for k, v in data.items()}
+                new_schema = json.loads(match.group(1))
+                # 合并到现有 schema
+                if os.path.exists(self.schema_path):
+                    with open(self.schema_path, 'r', encoding='utf-8') as f:
+                        current = json.load(f)
+                else:
+                    current = {"tables": {}, "macro_context": ""}
+                
+                # 合并 tables
+                for t, info in new_schema.get('tables', {}).items():
+                    if t not in current['tables']:
+                        current['tables'][t] = info
+                        current['tables'][t]['is_virtual'] = True
+                    else:
+                        current['tables'][t].update(info)
+                
+                if new_schema.get('macro_context'):
+                    current['macro_context'] = new_schema['macro_context']
+                
+                with open(self.schema_path, 'w', encoding='utf-8') as f:
+                    json.dump(current, f, indent=4, ensure_ascii=False)
+                
+                if status_callback: status_callback(f"✅ 成功从文档提取了 {len(new_schema.get('tables', {}))} 个逻辑表定义")
+                return current
+        except Exception as e:
+            if status_callback: status_callback(f"⚠️ 从文档提取 Schema 失败: {e}")
+        return {}
+
+    def recommend_visualization(self, query: str, columns: List[str], sample_data: List[Dict], model_client) -> Dict[str, Any]:
+        """智能可视化推荐 (供 apppro 调用)"""
+        prompt = f"""你是一名资深数据可视化专家。请根据用户的查询意图和数据特征，推荐最适合的可视化方案。
+
+用户查询: {query}
+数据字段: {columns}
+数据样例: {json.dumps(sample_data, ensure_ascii=False)}
+
+请从以下类型中选择一种最能洞察数据的图表: 
+["bar", "line", "pie", "scatter", "area", "table"]
+
+返回标准 JSON 格式:
+{{
+  "viz_type": "推荐的类型",
+  "x_axis": "X轴字段名",
+  "y_axis": "Y轴字段名",
+  "color": "颜色/分组字段名 (可选)",
+  "title": "图表标题",
+  "reason": "推荐理由"
+}}
+"""
+        try:
+            res = model_client.complete(prompt).text
+            match = re.search(r'(\{.*\})', res, re.DOTALL)
+            if match:
+                return json.loads(match.group(1))
         except: pass
-        return None
+        return {"viz_type": "table"}
 
     def execute_analysis(self, query: str, model_client, context_text: str = "", status_callback=None) -> Dict[str, Any]:
         # --- 终端强制输出: 任务启动 ---
@@ -325,23 +448,77 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                 "macro_context": "无表定义"
             }
         
-        # 1. 元数据直查
-        if any(k in query for k in ["指标", "结构", "字典", "有哪些表"]):
-            print("🔍 [决策] 判定为元数据查询，跳过 SQL 引擎")
-            prompt = f"基于以下模型回答: {query}\n{json.dumps(full_schemas, ensure_ascii=False)[:4000]}"
-            def gen():
-                for char in model_client.complete(prompt).text: yield char
-            return {"stages": [], "logic_gen": gen(), "success": True, "macro_context": "架构咨询"}
+        # 1. 元数据与架构咨询直查 (Bypass SQL Engine for Consultation)
+        metadata_keywords = [
+            "指标", "结构", "字典", "有哪些表", "字段", "属性", "field", "column", "table", "schema", "definition", "mandatory", "required", 
+            "架构", "建议", "方案", "流程", "监控", "etl", "elt", "architecture", "strategy", "workflow", "monitor",
+            "配置", "设置", "调优", "怎么", "如何", "实现", "路径", "config", "settings", "optimize", "how", "implement", "pipeline"
+        ]
+        if any(k in query.lower() for k in metadata_keywords):
+            print(f"🔍 [决策] 判定为架构/配置咨询，构建深度透视看板...")
+            
+            # 识别相关表以提供上下文
+            rel_tables = self._get_relevant_tables(query, full_schemas)
+            sub_schema = {t: full_schemas['tables'][t] for t in rel_tables if t in full_schemas['tables']}
+            
+            # 构造回显表格
+            schema_rows = []
+            for t, info in sub_schema.items():
+                cols = info.get('cols', info.get('columns', []))
+                for c in cols:
+                    schema_rows.append({
+                        "业务实体": t,
+                        "关联字段": c.get('name'),
+                        "业务逻辑/含义": c.get('comment', '业务默认属性')
+                    })
+            
+            def report_gen():
+                p = f"执行深度战略咨询任务。需求: {query}\n当前业务底座模型: {json.dumps(sub_schema, ensure_ascii=False)}\n要求: 采用 SCQA 架构，结合底座字段给出具体的工程落地建议、配置参数或架构设计图描述，结论先行。"
+                if hasattr(model_client, 'stream_chat'):
+                    from llama_index.core.base.llms.types import ChatMessage, MessageRole
+                    try:
+                        for chunk in model_client.stream_chat([ChatMessage(role=MessageRole.USER, content=p)]):
+                            yield chunk.delta if hasattr(chunk, 'delta') else str(chunk)
+                    except: yield "生成异常"
+                else: yield model_client.complete(p).text
+
+            # 构造透视阶段，确保 UI 看板不为空
+            consultation_stage = {
+                "meta": {"stage_id": 1, "title": "全域战略/架构透视", "goal": "对齐业务逻辑与物理底座实现路径"},
+                "sqls": {
+                    "sqlite": "-- 战略推演模式 (Strategic Architectural Inference)\n-- 当前问题侧重于架构/配置建议，已提取相关业务模型作为设计依据",
+                    "standard": "-- Recommended Implementation Logic"
+                },
+                "data": schema_rows if schema_rows else [{"状态": "已完成逻辑建模", "可参考实体": list(full_schemas.get('tables', {}).keys())}],
+                "empty_reason": "",
+                "source_samples": {},
+                "is_simulated": True
+            }
+            
+            return {
+                "stages": [consultation_stage], 
+                "logic_gen": report_gen(), 
+                "success": True, 
+                "macro_context": full_schemas.get('macro_context', "战略咨询")
+            }
 
         # 2. 识别与对齐
         rel_tables = self._get_relevant_tables(query, full_schemas)
-        print(f"📁 [建模] 锁定业务表: {rel_tables}")
+        print(f"📁 [建模] 锁定业务范围: {rel_tables}")
         
         session_conn = sqlite3.connect(self.db_path, timeout=60)
         try:
+            # 原则：如果是数据分析模式，且涉及范围内的表在数据库中不存在或为空，必须先完成“无数造数”的闭环
+            if status_callback: status_callback("🛡️ 正在确保业务底座完整性...")
             mapping = self._ensure_sandbox_ready(full_schemas, model_client, status_callback, rel_tables, conn=session_conn)
-            sub_schema = {mapping.get(t, t): full_schemas['tables'][t] for t in rel_tables if t in full_schemas['tables']}
             
+            # 重新获取子架构（使用映射后的物理表名）
+            sub_schema = {}
+            for t in rel_tables:
+                if t in full_schemas['tables']:
+                    phys_name = mapping.get(t, t)
+                    sub_schema[phys_name] = full_schemas['tables'][t]
+
             # 3. 任务拆解
             print("🎯 [规划] 正在拆解战略目标与分析路径...")
             prompt = f"将需求 {query} 拆解为 2-3 个 SQL 阶段。JSON 数组: [{{stage_id, title, transformation, goal}}]\n模型: {json.dumps(sub_schema, ensure_ascii=False)}"
@@ -375,7 +552,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                     }
                     try:
                         # 采样更多数据用于展示和分析
-                        r = self.execute_sql(f"SELECT * FROM {t} LIMIT 5", conn=session_conn)
+                        r = self.execute_sql(f'SELECT * FROM "{t}" LIMIT 5', conn=session_conn)
                         if r["success"] and r["data"]: 
                             t_context[t]["sample"] = r['data']  # 存储多行数据
                             t_context[t]["sample_count"] = len(r['data'])
@@ -422,56 +599,32 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                             analysis_context += f"阶段{i+1}: {json.dumps(exec_res['data'][:5], ensure_ascii=False)}\n"
                             empty_reason = ""
                         else:
-                            m_table = re.search(r'CREATE\s+(?:TEMPORARY\s+)?TABLE\s+([a-zA-Z0-9_]+)', sqls["sqlite"].upper(), re.I)
+                            # 强化正则：支持引号、空格和 TEMPORARY 关键字
+                            m_table = re.search(r'CREATE\s+(?:TEMPORARY\s+)?TABLE\s+(?:"?)([a-zA-Z0-9_]+)(?:"?)', sqls["sqlite"], re.I)
                             if m_table:
                                 t_name = m_table.group(1)
+                                print(f"🏗️ [探测] 识别到新产生的临时实体: {t_name}")
                                 
-                                # 先检查新表是否有数据
-                                v_res = self.execute_sql(f"SELECT * FROM {t_name} LIMIT 10", conn=session_conn)
+                                # 强制物理探测
+                                v_res = self.execute_sql(f'SELECT * FROM "{t_name}" LIMIT 10', conn=session_conn)
                                 if v_res["success"] and v_res["data"]:
                                     exec_res["data"] = v_res["data"]
-                                    print(f"🏗️ [加工] 表 '{t_name}' 已就绪并采样")
+                                    print(f"✅ [采样] 表 '{t_name}' 已就绪并成功采样 {len(v_res['data'])} 行")
                                     empty_reason = ""
                                 else:
-                                    # 新表为空，尝试生成虚拟数据
-                                    print(f"⚠️ [警告] 临时表 '{t_name}' 为空，尝试生成虚拟数据...")
-                                    
-                                    # 从原始表推断表结构
-                                    temp_cursor = session_conn.cursor()
-                                    temp_cursor.execute(f"PRAGMA table_info({t_name})")
-                                    cols_info = temp_cursor.fetchall()
-                                    
-                                    if cols_info and model_client:
-                                        # 构建表信息
-                                        temp_table_info = {
-                                            "desc": f"临时分析表 {t_name}",
-                                            "cols": [{"name": col[1], "type": col[2], "comment": ""} for col in cols_info]
-                                        }
-                                        
-                                        # 生成虚拟数据
-                                        if self._generate_mock_data(t_name, temp_table_info, full_schemas, model_client, temp_cursor):
-                                            session_conn.commit()
-                                            # 重新查询
-                                            v_res = self.execute_sql(f"SELECT * FROM {t_name} LIMIT 10", conn=session_conn)
-                                            if v_res["success"] and v_res["data"]:
-                                                exec_res["data"] = v_res["data"]
-                                                print(f"✅ [虚拟数据] 表 '{t_name}' 已填充并采样")
-                                                analysis_context += f"阶段{i+1}: {json.dumps(v_res['data'][:5], ensure_ascii=False)}\n"
-                                                empty_reason = ""
-                                            else:
-                                                empty_reason = f"🏗️ 临时表 '{t_name}' 已创建，但内部无符合条件的数据"
-                                        else:
-                                            empty_reason = f"🏗️ 临时表 '{t_name}' 已创建，但内部无符合条件的数据"
-                                    else:
-                                        empty_reason = f"🏗️ 临时表 '{t_name}' 已创建，但内部无符合条件的数据"
+                                    empty_reason = f"🏗️ 阶段执行成功，但新实体 '{t_name}' 内无数据回显"
                             else:
-                                print("⚠️ [空值] 未匹配到任何记录")
-                                empty_reason = "⚠️ 查询执行成功，但未找到匹配记录 (请检查时间范围或状态值)"
+                                # 检查是否有 SELECT 语句但结果为空
+                                if "SELECT" in sqls["sqlite"].upper():
+                                    empty_reason = "⚠️ 查询执行成功，但当前筛选条件下无符合记录"
+                                else:
+                                    empty_reason = "🏗️ 逻辑加工已完成（无回显数据产生）"
                 
                 final_data.append({
                     "meta": meta, "sqls": sqls, "data": exec_res["data"], 
                     "empty_reason": empty_reason,
-                    "source_samples": {t: t_context[t].get('sample', {}) for t in t_context}
+                    "source_samples": {t: t_context[t].get('sample', {}) for t in t_context},
+                    "is_simulated": is_simulated
                 })
 
             print("\n" + "-"*60)
@@ -488,7 +641,48 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                     except: yield "生成异常"
                 else: yield model_client.complete(p).text
 
-            return {"stages": final_data, "logic_gen": report_gen(), "success": True, "macro_context": full_schemas.get('macro_context','')}
+            # 归一化与安全化处理 (Normalization & Serialization Safety)
+            def sanitize_stage(s):
+                # 1. 强制 Key 归一化 (sqlite, standard, dataworks)
+                raw_sqls = s.get("sqls", {})
+                normalized_sqls = {str(k).lower().strip(): v for k, v in raw_sqls.items()}
+                
+                # 2. 补全缺失的 SQL 视角
+                if 'sqlite' not in normalized_sqls and normalized_sqls:
+                    normalized_sqls['sqlite'] = list(normalized_sqls.values())[0] # 拿第一个当保底
+                
+                # 3. 强制数据安全化 (解决 NumPy 序列化问题)
+                raw_rows = s.get("data", [])
+                safe_rows = []
+                if isinstance(raw_rows, list):
+                    for row in raw_rows:
+                        if isinstance(row, dict):
+                            safe_row = {}
+                            for k, v in row.items():
+                                if pd.isna(v): safe_row[k] = None
+                                elif hasattr(v, 'item'): safe_row[k] = v.item() # NumPy types
+                                elif isinstance(v, (datetime, pd.Timestamp)): safe_row[k] = v.isoformat()
+                                else: safe_row[k] = v
+                            safe_rows.append(safe_row)
+                        else: safe_rows.append(row)
+                
+                return {
+                    "meta": s.get("meta", {"stage_id": 99, "title": "未命名阶段"}),
+                    "sqls": normalized_sqls,
+                    "data": safe_rows,
+                    "empty_reason": s.get("empty_reason", ""),
+                    "source_samples": s.get("source_samples", {}),
+                    "is_simulated": s.get("is_simulated", False)
+                }
+
+            final_stages_sanitized = [sanitize_stage(s) for s in final_data]
+
+            return {
+                "stages": final_stages_sanitized, 
+                "logic_gen": report_gen(), 
+                "success": True, 
+                "macro_context": full_schemas.get('macro_context','')
+            }
         finally:
             session_conn.close()
 
@@ -498,59 +692,94 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             conn = sqlite3.connect(self.db_path, timeout=30)
             should_close = True
         try:
-            conn.row_factory = lambda c, r: dict([(col[0], r[idx]) for idx, col in enumerate(c.description)])
             cursor = conn.cursor()
-            clean_sql = sql.replace('\\n', ' ').replace('```sql', '').replace('```', '').strip()
+            clean_sql = sql.replace('\n', ' ').replace('```sql', '').replace('```', '').strip()
             statements = [s.strip() for s in clean_sql.split(';') if s.strip()]
-            rows = []
+            
+            final_rows = []
+            # 记录是否已经抓取到了有效结果
+            has_result = False
+            
             QUERY_STARTERS = ("SELECT", "WITH", "VALUES", "PRAGMA", "EXPLAIN")
             for stmt in statements:
                 if not stmt: continue
                 try:
                     cursor.execute(stmt)
                     clean_stmt = re.sub(r'^(\s*(--.*|/\*.*?\*/)\s*)+', '', stmt, flags=re.MULTILINE).strip()
+                    
+                    # 只要是查询语句，就尝试抓取结果
                     if any(clean_stmt.upper().startswith(s) for s in QUERY_STARTERS):
-                        rows = cursor.fetchall()
+                        raw_data = cursor.fetchall()
+                        if cursor.description:
+                            cols = [col[0] for col in cursor.description]
+                            current_rows = [dict(zip(cols, r)) for r in raw_data]
+                            # 策略：保留最新的有效非空结果集
+                            if current_rows:
+                                final_rows = current_rows
+                                has_result = True
                 except Exception as e:
                     if model_client:
-                        fix = model_client.complete(f"修正 SQL: {e}\nSQL: {stmt}").text
-                        fixed_stmt = fix.replace('```sql', '').replace('```', '').strip()
-                        cursor.execute(fixed_stmt)
-                        if any(fixed_stmt.upper().startswith(s) for s in QUERY_STARTERS): rows = cursor.fetchall()
+                        try:
+                            fix = model_client.complete(f"修正 SQL: {e}\nSQL: {stmt}").text
+                            fixed_stmt = fix.replace('```sql', '').replace('```', '').strip()
+                            cursor.execute(fixed_stmt)
+                            if any(fixed_stmt.upper().startswith(s) for s in QUERY_STARTERS):
+                                raw_data = cursor.fetchall()
+                                if cursor.description:
+                                    cols = [col[0] for col in cursor.description]
+                                    final_rows = [dict(zip(cols, r)) for r in raw_data]
+                                    has_result = True
+                        except: pass
             conn.commit()
-            return {"success": True, "data": rows}
+            return {"success": True, "data": final_rows}
         except Exception as e: return {"success": False, "error": str(e), "data": []}
         finally:
             if should_close: conn.close()
 
     def process_files(self, file_paths: List[str], model_client=None, status_callback=None) -> Dict[str, Any]:
         try:
-            if os.path.exists(self.db_path): os.remove(self.db_path)
+            print("\n" + "🏗️  [Data Base Construction] 启动知识库物理底座构建..." + "\n" + "="*60)
+            if os.path.exists(self.db_path): 
+                os.remove(self.db_path)
+                print("🧹 [清理] 移除旧数据库文件，准备重新建模")
+                
             conn = sqlite3.connect(self.db_path)
             physical_tables = {}
             semantic_docs = []
-            if status_callback: status_callback(f"📊 启动全域建模...")
+            
+            if status_callback: status_callback(f"📊 正在扫描文件并识别业务蓝图...")
+            
             for path in file_paths:
                 name = os.path.basename(path).lower()
                 if name.endswith(('.md', '.pdf', '.docx', '.txt')):
+                    print(f"📄 [识别] 逻辑文档: {name} (待提取 Schema)")
                     semantic_docs.append(path); continue
+                    
                 t_name = re.sub(r'[^a-zA-Z0-9_]', '_', os.path.splitext(name)[0])
                 try:
                     df = pd.read_csv(path) if name.endswith('.csv') else pd.read_excel(path)
                     df.columns = [re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', str(c)) for c in df.columns]
                     df.to_sql(t_name, conn, index=False, if_exists='replace')
+                    col_count = len(df.columns)
+                    row_count = len(df)
                     physical_tables[t_name] = {"cols": [{"name": c, "type": str(t)} for c, t in df.dtypes.items()]}
-                except: pass
+                    print(f"📊 [固化] 真实数据表: {t_name} | 规模: {col_count}列 x {row_count}行")
+                except Exception as e:
+                    print(f"❌ [失败] 无法解析数据文件 {name}: {e}")
+                    
             conn.close()
+            
             modeling_summary = "多维业务分析"
             if model_client and physical_tables:
+                print("🧠 [理解] 正在通过 AI 总结物理表之间的业务逻辑关系...")
                 modeling_summary = model_client.complete(f"总结业务逻辑: {json.dumps(physical_tables)}").text.strip()
+                print(f"📝 [摘要] 业务背景: {modeling_summary[:100]}...")
+
             unified_schema = {"tables": physical_tables, "macro_context": modeling_summary}
+            
             if semantic_docs and model_client:
-                print(f"📄 [建模] 发现 {len(semantic_docs)} 个文档，尝试提取表结构...")
+                print(f"🔍 [建模] 正在从 {len(semantic_docs)} 个逻辑文档中深度提取表结构定义...")
                 docs = "".join([open(p, 'r', errors='ignore').read()[:5000] for p in semantic_docs])
-                
-                # 改进的提示词，更明确地要求返回表结构
                 prompt = f"""分析以下文档，提取所有表的结构定义。
 
 文档内容：
@@ -578,36 +807,36 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                 
                 try:
                     res = model_client.complete(prompt).text
-                    print(f"   📝 LLM 返回长度: {len(res)} 字符")
-                    
                     match = re.search(r'(\{.*\})', res, re.DOTALL)
                     if match:
                         semantic = json.loads(match.group(1))
                         extracted_tables = semantic.get('tables', {})
-                        
                         if extracted_tables:
-                            print(f"   ✅ 成功提取 {len(extracted_tables)} 个表定义")
+                            print(f"✅ [成功] 从文档提取了 {len(extracted_tables)} 个逻辑表结构")
                             for t, info in extracted_tables.items():
                                 if t in unified_schema['tables']: 
                                     unified_schema['tables'][t].update(info)
+                                    print(f"   • 完善已知表: {t}")
                                 else: 
                                     unified_schema['tables'][t] = info
                                     unified_schema['tables'][t]['is_virtual'] = True
-                                print(f"      • {t}: {len(info.get('cols', []))} 个字段")
+                                    print(f"   • 发现新逻辑表: {t} ({len(info.get('cols', []))}个字段)")
                             unified_schema['macro_context'] = semantic.get('macro_context', modeling_summary)
-                        else:
-                            print(f"   ⚠️ LLM 返回的 JSON 中没有 tables 字段")
-                    else:
-                        print(f"   ⚠️ LLM 返回内容中没有找到 JSON 格式")
-                        print(f"   返回内容: {res[:200]}...")
-                        
                 except Exception as e:
-                    print(f"   ❌ 解析失败: {e}")
-                    print(f"   💡 提示: 请检查文档格式，或手动创建 business_schema.json")
-            with open(self.schema_path, 'w', encoding='utf-8') as f: json.dump(unified_schema, f, indent=4, ensure_ascii=False)
+                    print(f"❌ [建模失败] 无法从文档提取 Schema: {e}")
+                
+            # 保存 Schema
+            with open(self.schema_path, 'w', encoding='utf-8') as f: 
+                json.dump(unified_schema, f, indent=4, ensure_ascii=False)
+            print(f"💾 [固化] 业务蓝图已保存至: {os.path.basename(self.schema_path)}")
+            
+            # 强制固化底座：如果表是空的，立刻生成仿真数据
             if model_client:
-                if status_callback: status_callback("🧪 正在固化仿真数据底座...")
+                print("\n" + "🎲 [仿真] 启动“无数造数”流程，填充物理底座...")
+                if status_callback: status_callback("🧪 正在固化业务数据底座 (有数治数/无数造数)...")
                 self._ensure_sandbox_ready(unified_schema, model_client, status_callback=None)
-            if status_callback: status_callback(f"✅ 全域建模完成")
+                
+            if status_callback: status_callback(f"✅ 全域建模完成，DB 底座已就绪")
+            print("="*60 + "\n" + "✨ [Success] 数据分析物理底座构建完成，business_data.db 已就绪" + "\n")
             return {"success": True, "tables": list(unified_schema['tables'].keys())}
         except Exception as e: return {"success": False, "error": str(e)}

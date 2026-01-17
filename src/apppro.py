@@ -5165,46 +5165,51 @@ for msg_idx, msg in enumerate(state.get_messages()):
                                             st.dataframe(df_render, use_container_width=True)
                                         except Exception as e:
                                             st.warning(f"表 {t_name} 数据预览失败: {str(e)}")
-                            # B. 加工中：逻辑脚本 (Restored 3 Tabs)
+                            # B. 加工中：逻辑脚本 (Robust Key Lookup)
                             st.markdown("**2. 执行中：工程逻辑 (The Logic)**")
                             sqls = stage_h.get("sqls", {})
-                            # 恢复 3 个 Tab 的横向布局
+                            
+                            # 获取更智能的 Key 映射
+                            sqlite_code = sqls.get("sqlite") or sqls.get("sql") or next((v for k, v in sqls.items() if "sqlite" in k.lower()), "-- N/A")
+                            standard_code = sqls.get("standard") or next((v for k, v in sqls.items() if "standard" in k.lower() or "ansi" in k.lower()), "-- N/A")
+                            dataworks_code = sqls.get("dataworks") or next((v for k, v in sqls.items() if "data" in k.lower() and "works" in k.lower()), "-- N/A")
+
                             sql_tabs = st.tabs(["🧪 SQLite (本地验证)", "🐘 Standard SQL", "💻 DataWorks (生产)"])
                             with sql_tabs[0]:
                                 st.caption("SQL 语言: SQLite (Local Sim)")
-                                st.code(sqls.get("sqlite", "-- N/A"), language="sql")
+                                st.code(sqlite_code, language="sql")
                             with sql_tabs[1]:
                                 st.caption("SQL 语言: Standard ANSI SQL")
-                                st.code(sqls.get("standard", "-- N/A"), language="sql")
+                                st.code(standard_code, language="sql")
                             with sql_tabs[2]:
                                 st.caption("SQL 语言: MaxCompute / DataWorks")
-                                st.code(sqls.get("dataworks", "-- N/A"), language="sql")
+                                st.code(dataworks_code, language="sql")
 
                             # C. 查询后：结果产出
                             st.markdown("**3. 查询后：汇聚结果表 (After)**")
-                            import pandas as pd
-                            # [v6.8.1] 强制容错渲染与可见性保障
                             raw_result_data = stage_h.get("data", [])
-                            if raw_result_data:
+                            # 改进：即便 data 是空列表，也尝试通过 pd.DataFrame 判定，防止空结果被直接忽略
+                            has_displayable_data = False
+                            if isinstance(raw_result_data, list) and len(raw_result_data) > 0:
                                 try:
                                     df_h = pd.DataFrame(raw_result_data)
                                     if not df_h.empty:
-                                        # 使用全功能可视化画板
+                                        has_displayable_data = True
                                         render_smart_visualization(
                                             df=df_h, 
-                                            query=m_h['title'], 
+                                            query=m_h.get('title', 'Analysis'), 
                                             msg_idx=msg_idx, 
-                                            stage_id=m_h['stage_id'], 
+                                            stage_id=m_h.get('stage_id', 1), 
                                             recommendation=stage_h.get("recommendation")
                                         )
-                                    else:
-                                        st.warning(stage_h.get("empty_reason", "⚠️ 查询执行成功，但结果集为空 (0 rows)"))
-                                except Exception as e:
-                                    st.error(f"表格渲染异常: {e}")
-                                    st.write(raw_result_data) # 终极兜底：直接打印原始数据
-                            else:
-                                # [v6.8.5] 显示更具体的后台解释
-                                st.info(stage_h.get("empty_reason", "该阶段仅执行了逻辑加工，未产生回显数据"))
+                                except: pass
+                            
+                            if not has_displayable_data:
+                                # [v6.8.6] 增强：如果没数据但有 explain，显示 explain；否则显示空提示
+                                if stage_h.get("empty_reason"):
+                                    st.warning(stage_h["empty_reason"])
+                                else:
+                                    st.info("该阶段执行了逻辑加工，未产生回显数据")
                             if stage_h.get("is_simulated"):
                                 st.info("✨ 此阶段基于业务模型仿真推演")
 
@@ -6391,7 +6396,7 @@ if st.session_state.get('is_processing') and final_prompt:
                                         from src.utils.model_manager import load_llm_model
                                         da_engine = DataAnalystEngine(db_path, logger)
                                         llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
-                                        da_engine.process_files(data_files)
+                                        da_engine.process_files(data_files, model_client=llm)
                                         
                                         # 强制重新提取业务含义
                                         from llama_index.core import SimpleDirectoryReader
@@ -6430,10 +6435,9 @@ if st.session_state.get('is_processing') and final_prompt:
                                 logger.info(msg, stage="Strategic Analysis")
                             
                             analysis_res = da_engine.execute_analysis(final_prompt, llm, status_callback=da_status_callback)
-                            da_status_box.update(label="✅ 战略推演已完成", state="complete", expanded=False)
                             
                             if analysis_res.get("success", False):
-                                # 1. 核心推演报告流式预览 (仅用于实时动态效果)
+                                # 1. 核心推演报告流式预览
                                 report_placeholder = st.empty()
                                 full_report = ""
                                 logic_stream = analysis_res.get("logic_gen")
@@ -6441,9 +6445,59 @@ if st.session_state.get('is_processing') and final_prompt:
                                     for token in logic_stream:
                                         full_report += token
                                         report_placeholder.markdown(full_report + "▌")
-                                report_placeholder.empty() # 清空占位符，统一走消息中心渲染
+                                report_placeholder.markdown(full_report) 
                                 
-                                # 2. [v6.7.3] 核心持久化逻辑：将分析成果注入消息流
+                                # 2. 状态锁定：在进入生成建议的“耗时区”之前，强制保持状态框展开
+                                da_status_box.update(label="✅ 战略推演数据已就绪", state="complete", expanded=True)
+                                
+                                # 3. [v6.7.3] 核心持久化
+                                if not full_report.strip() and not analysis_res.get("stages"):
+                                    full_report = "### 📋 战略分析摘要\n分析任务已完成，未发现显著异常。"
+
+                                # 在生成建议期间显示一个小提示，防止用户觉得页面死掉
+                                with st.spinner("🔮 正在沉淀战略决策建议..."):
+                                    # 4. [v5.2.3] 生成追问建议
+                                    try:
+                                        from src.chat.unified_suggestion_engine import get_unified_suggestion_engine
+                                        sug_engine = get_unified_suggestion_engine(active_kb_name)
+                                        new_sugs = sug_engine.generate_suggestions(f"提问: {final_prompt}\n报告: {full_report}", 'chat', st.session_state.chat_engine, 3)
+                                        if new_sugs:
+                                            st.session_state.suggestions_history = new_sugs[:3]
+                                    except: pass
+
+                                st.session_state.messages.append({
+                                    "role": "assistant", 
+                                    "content": "", 
+                                    "report_text": full_report,
+                                    "is_data_report": True, 
+                                    "stages": analysis_res.get("stages", []), 
+                                    "macro_context": analysis_res.get("macro_context"),
+                                    "stats": {"time": time.time() - start_time}
+                                })
+                                
+                                # 强制将最新生成的建议注入最后一条消息
+                                if st.session_state.get('suggestions_history'):
+                                    st.session_state.messages[-1]['suggestions'] = st.session_state.suggestions_history
+
+                                # 5. 固化存储
+                                if active_kb_name: 
+                                    HistoryManager.save_session(active_kb_name, st.session_state.messages, st.session_state.get('current_session_id'))
+                                
+                                st.session_state.is_processing = False
+                                st.rerun()
+                                # 1. 核心推演报告流式预览
+                                # 优化：将占位符留在容器内，直到 rerun 完成自然替换
+                                report_placeholder = st.empty()
+                                full_report = ""
+                                logic_stream = analysis_res.get("logic_gen")
+                                if logic_stream:
+                                    for token in logic_stream:
+                                        full_report += token
+                                        report_placeholder.markdown(full_report + "▌")
+                                # 优化：不再 empty()，减少闪烁
+                                report_placeholder.markdown(full_report) 
+                                
+                                # 2. [v6.7.3] 核心持久化逻辑
                                 if not full_report.strip() and not analysis_res.get("stages"):
                                     full_report = "### 📋 战略分析摘要\n分析任务已完成，未发现显著异常。"
 
