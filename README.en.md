@@ -12,8 +12,8 @@
 
 # RAG Pro Max - Enterprise AI Document QA & Data Analysis System
 
-**Version**: v6.7.0 (Governance & Attachment Unification)  
-![Version](https://img.shields.io/badge/version-v6.7.0-brightgreen)
+**Version**: v6.7.1 (Stable Production Edition)  
+![Version](https://img.shields.io/badge/version-v6.7.1-brightgreen)
 
 RAG Pro Max is an enterprise-grade agent system that integrates full-scale document migration (RAG), automated web crawling, and physical-loop data analysis.
 

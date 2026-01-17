@@ -12,8 +12,8 @@
 
 # RAG Pro Max - 企业级智能文档问答与数据分析系统
 
-**当前版本**: v6.7.0 (Governance & Attachment Unification)  
-![Version](https://img.shields.io/badge/version-v6.7.0-brightgreen)
+**当前版本**: v6.7.1 (Stable Production Edition)  
+![Version](https://img.shields.io/badge/version-v6.7.1-brightgreen)
 
 RAG Pro Max 是一款专为企业级复杂场景打造的智能体系统，深度融合了全量文档搬运（RAG）、自动化网页抓取与物理闭环的数据分析能力。
 

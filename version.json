@@ -1,7 +1,13 @@
 {
-  "version": "6.7.0",
+  "version": "6.7.1",
   "name": "RAG Pro Max",
-  "edition": "Repair & Enhancement Edition",
+  "edition": "Stable Production Edition",
   "release_date": "2026-01-17",
-  "status": "Production-Stable"
+  "status": "Production-Stable",
+  "build": "stable-final",
+  "critical_fixes": [
+    "pandas scope issue resolved",
+    "data analysis three-stage workflow stabilized",
+    "order_analysis view created for field mapping"
+  ]
 }
