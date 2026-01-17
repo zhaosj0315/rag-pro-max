@@ -12,12 +12,22 @@
 
 # RAG Pro Max - Intelligent Document Q&A System
 
-**Version**: v6.6.0  
-![Version](https://img.shields.io/badge/version-v6.6.0-brightgreen)
+**Version**: v6.7.0  
+![Version](https://img.shields.io/badge/version-v6.7.0-brightgreen)
 ![Status](https://img.shields.io/badge/status-Stable-blue)
-![Last Update](https://img.shields.io/badge/last%20update-2026--01--15-orange)
+![Last Update](https://img.shields.io/badge/last%20update-2026--01--17-orange)
 
-## 🚀 RAG Pro Max v6.6.0
+## 🚀 RAG Pro Max v6.7.0 (Governance & Attachment Unification)
+### 🛡️ Unified Governance Matrix
+- **Global Visibility**: Deeply integrated physical lifecycle and permission distribution. Real-time display of "Creation Date" and "Last Modified," increasing governance efficiency by 200%.
+- **Deterministic Batch Actions**: Fully resolved table selection state issues. Supports one-click "Select All" for physical deletion or ownership transfer.
+
+### 📎 Universal Attachment Parsing
+- **Logic Normalization**: Chat attachments now share 100% of the same parsing core as Knowledge Base builds, supporting instant injection of 20+ formats (CSV/Excel/Code).
+- **Multi-image OCR Append**: Supports sequential image uploads with automatic identification content merging, perfectly adapted for multi-turn image Q&A scenarios.
+
+### 💻 Terminal Self-healing Diagnostics
+- **Service Status Awareness**: Introduced port-level survival checks, supporting one-click forced cleaning and service restart for port 8899 occupations.
 ### 🚀 Strategic Command Center (v6.6.0)
 - **Immersive Login Screen**: Completely redesigned with a 95% full-width layout, removing traditional borders for a high-impact visual experience.
 - **Global Status HUD**: Integrated fixed-bottom system status bar (READY / METAL / Version), displaying real-time acceleration status.

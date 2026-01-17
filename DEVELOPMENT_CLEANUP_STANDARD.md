@@ -1,302 +1,134 @@
-# 开发过程清理标准 (Development Cleanup Standard)
+# 全局代码质量与重构标准 (Global Code Quality & Refactoring Standard)
 
-**版本**: v5.5.8  
-**更新日期**: 2026-01-11
-
-
-## 🎯 核心原则
-**非必要不保留 - 开发完成后删除所有过程性材料，只保留应用启动和运行必需的核心文件**
+**版本**: v6.0.0 (Architect Edition)  
+**更新日期**: 2026-01-16  
+**适用范围**: 所有代码提交、重构任务及清理工作
 
 ---
 
-## 🗑️ 必须删除的过程性材料清单
+## 🛡️ 核心法则 (Rules of Engagement)
 
-### 📋 内部开发文档
-**原则**: 内部流程文档，用户不需要
-```
-PRODUCTION_RELEASE_STANDARD.md     # 内部发布标准
-RELEASE_CHECKLIST.md              # 内部发布清单
-PROJECT_STRUCTURE_V*.md           # 内部结构文档
-DOCUMENTATION_STRATEGY.md         # 临时策略文档
-REFACTOR_PROGRESS_RECORD.md       # 重构进度记录
-PHASE_*.md                        # 阶段性开发文档
-GRADUAL_REFACTOR_PLAN.md          # 重构计划文档
-```
+本项目的代码维护遵循**"外科手术式"**原则：稳健、精准、零副作用。任何操作必须严格遵守以下三大铁律，违反任何一条均视为未完成任务。
 
-### 🛠️ 开发工具和脚本
-**原则**: 临时开发辅助工具，应用运行不需要
-```
-tools/                            # 开发分析工具目录
-  ├── code_analyzer.py            # 代码分析工具
-  ├── code_quality.py             # 代码质量检查
-  ├── doc_consistency_check.py    # 文档一致性检查
-  ├── module_duplication_checker.py # 模块重复检查
-  ├── refactor_executor.py        # 重构执行工具
-  ├── test_coverage.py            # 测试覆盖率工具
-  └── test_validator.py           # 测试验证工具
+### 1. 零回归 (Zero Regression / 100% Compatibility)
+*   **定义**: 重构后的代码在**输入参数、输出结果、异常抛出类型、副作用（如日志、DB写入）**上必须与原代码保持完全一致。
+*   **红线**: 禁止为了"代码优美"而改变任何外部行为。如果不确定行为是否一致，**禁止修改**。
 
-# 旧版本脚本
-rag                               # 旧版本启动脚本
-kbllama                          # 旧版本工具脚本
-view_crawl_logs.py               # 临时调试脚本
-```
+### 2. 黑盒原则 (Black Box Principle)
+*   **定义**: 外部调用者（Importer / Caller）不应感知到内部实现的任何变化。
+*   **操作**: 
+    *   保持函数签名（Signature）不变。
+    *   保持模块导出（Exports）不变。
+    *   私有化重构：新逻辑应封装在内部，对外暴露的接口仅仅是代理调用。
 
-### 📁 版本历史文档
-**原则**: 历史版本信息，当前版本不需要
-```
-docs/                            # 历史文档目录
-  ├── features/                  # 版本特性历史
-  │   ├── V1.6_FEATURES.md
-  │   ├── V1.7_FEATURES.md
-  │   ├── V2.0_FEATURES.md
-  │   └── V2.1_FEATURES.md
-  ├── installation/              # 安装历史版本
-  ├── performance/               # 性能历史记录
-  └── *.md                       # 其他历史文档
-```
-
-### 📊 测试和导出数据
-**原则**: 开发测试产生的临时数据
-```
-exports/                         # 测试导出数据
-test_*_output/                   # 测试输出目录
-refactor_backups/                # 重构备份
-PRODUCTION_RELEASE_REPORT_*.md   # 生产发布报告
-*_test_*.txt                     # 测试文本文件
-*_test_*.json                    # 测试JSON文件
-```
-
-### 🔧 技术细节文档
-**原则**: 过于技术细节，推广不需要
-```
-UX_IMPROVEMENTS.md               # 内部UX改进记录
-BM25.md                         # BM25技术实现细节
-RERANK.md                       # 重排序技术实现细节
-OCR_LOGGING_SYSTEM.md           # 内部日志系统文档
-RESOURCE_PROTECTION_V2.md       # 内部资源保护文档
-```
-
-### 🗂️ 备份和临时文件
-**原则**: 开发过程产生的临时文件
-```
-*_backup.py                      # 代码备份文件
-*_old.py                        # 旧版本代码
-*.pre-migration                  # 迁移前备份
-crawler_state*.json             # 爬虫状态文件
-*.tmp, *.temp                   # 临时文件
-.DS_Store                       # 系统文件
-```
+### 3. 防御性编程 (Defensive Programming)
+*   **定义**: 面对不确定的依赖关系（如反射调用、动态导入），**宁可保留也不误删**。
+*   **操作**: 
+    *   如果不确定某段代码是否被引用，使用 `# TODO: [Review] Potential dead code, pending audit` 标记，而不是直接删除。
+    *   保留"过时"的接口作为 Wrapper 调用新接口，并标记 `@deprecated`，而不是直接移除。
 
 ---
 
-## ✅ 必须保留的核心文件
+## 🧹 代码清理标准 (Code Cleanup Standard)
 
-### 🚀 应用启动必需
-```
-src/                            # 源代码目录
-config/                         # 配置文件目录
-tests/                          # 测试代码
-scripts/                        # 部署和维护脚本
-requirements.txt                # 依赖管理
-version.json                    # 版本信息
-```
+### 1. 识别并清理过程性代码
+**目标**: 移除开发过程中产生的中间态逻辑。
 
-### 📚 用户和推广必需
-```
-README.md                       # 项目门面
-CHANGELOG.md                    # 版本记录
-DEPLOYMENT.md                   # 部署指南
-FAQ.md                         # 常见问题
-FIRST_TIME_GUIDE.md            # 快速上手
-USER_MANUAL.md                 # 使用手册
-API_DOCUMENTATION.md                         # 接口文档
-ARCHITECTURE.md                # 架构说明
-TESTING.md                     # 测试说明
-CONTRIBUTING.md                # 贡献指南
-LICENSE                        # 开源许可
-```
+| 类型 | 特征 | 处理方式 |
+| :--- | :--- | :--- |
+| **版本后缀函数** | `func_v1`, `func_old`, `_backup_2025` | **删除**。确认新版 `func` 已完全接管逻辑且测试通过后，彻底移除旧版。 |
+| **临时调试代码** | `print("DEBUG: here")`, `if 1==1: # temporary bypass` | **删除**。所有非结构化日志（非 `logger` 调用）必须移除。 |
+| **废弃的特性开关** | `if Feature_X_Enabled:` (Feature X 已全量上线) | **固化**。移除判断逻辑，直接保留 `True` 分支的代码，删除 `False` 分支。 |
+| **死代码 (Dead Code)** | IDE 提示 "Unreachable code" 或 0 引用（需谨慎） | **删除前确认**。必须全局搜索字符串（grep）以防反射调用。无法确认时保留并注释。 |
 
-### 🔧 维护标准文档
-```
-DOCUMENTATION_MAINTENANCE_STANDARD.md  # 文档维护标准
-NON_ESSENTIAL_PUSH_STANDARD.md        # 推送规范
-DEVELOPMENT_CLEANUP_STANDARD.md       # 本文档
-```
+### 2. 清理废弃材料 (Asset Cleanup)
+*(保留原 v5.5.8 的文件清理清单，作为本标准的一部分)*
+
+*   **内部文档**: 删除 `PHASE_*.md`, `*_STRATEGY.md` 等过程性文档。
+*   **临时脚本**: 删除 `tools/debug_*.py`, `test_temp_*.py`。
+*   **历史遗留**: 删除 `rag` (旧启动脚本), `kbllama`。
 
 ---
 
-## 🛠️ 清理执行工具
+## 🏗️ 重构与优化协议 (Refactoring Protocol)
 
-### 自动清理脚本
-**位置**: `scripts/cleanup_development_materials.sh`
-```bash
-#!/bin/bash
-# 自动清理开发过程材料
+针对逻辑设计粗糙或复杂度过高的模块，必须按以下步骤执行。
 
-echo "🧹 清理开发过程材料"
-echo "=================="
+### 1. 准备阶段
+*   **理解上下文**: 阅读该模块所有相关测试。如果有测试缺失，**先补全测试，再开始重构**。
+*   **锁定行为**: 确保当前测试全部通过 (`pytest tests/target_module.py`)。
 
-# 删除内部开发文档
-rm -f PRODUCTION_RELEASE_STANDARD.md
-rm -f RELEASE_CHECKLIST.md
-rm -f PROJECT_STRUCTURE_V*.md
-rm -f DOCUMENTATION_STRATEGY.md
-rm -f REFACTOR_PROGRESS_RECORD.md
-rm -f PHASE_*.md
+### 2. 执行阶段 (对比模式)
+在提交记录或 Pull Request 中，必须清晰展示优化逻辑。
 
-# 删除开发工具
-rm -rf tools/
-rm -f rag kbllama view_crawl_logs.py
+**Case 1: 逻辑简化**
+*   **Before**:
+    ```python
+    # 过程性冗余：手动过滤
+    result = []
+    for item in items:
+        if item.is_valid():
+            result.append(item)
+    return result
+    ```
+*   **After**:
+    ```python
+    # 优化点：使用列表推导式，提升可读性
+    return [item for item in items if item.is_valid()]
+    ```
 
-# 删除版本历史文档
-rm -rf docs/
+**Case 2: 消除硬编码**
+*   **Before**:
+    ```python
+    path = "/Users/zhaosj/Documents/rag-pro-max/data"
+    ```
+*   **After**:
+    ```python
+    # 优化点：使用项目配置路径，增强移植性
+    from src.config import SETTINGS
+    path = SETTINGS.DATA_DIR
+    ```
 
-# 删除测试数据
-rm -rf exports/ test_*_output/ refactor_backups/
-rm -f PRODUCTION_RELEASE_REPORT_*.md
-rm -f *_test_*.txt *_test_*.json
-
-# 删除技术细节文档
-rm -f UX_IMPROVEMENTS.md BM25.md RERANK.md
-rm -f OCR_LOGGING_SYSTEM.md RESOURCE_PROTECTION_V2.md
-
-# 删除备份和临时文件
-rm -f *_backup.py *_old.py *.pre-migration
-rm -f crawler_state*.json *.tmp *.temp .DS_Store
-
-echo "✅ 开发过程材料清理完成！"
-```
-
-### 清理检查脚本
-**位置**: `scripts/check_cleanup_completeness.py`
-```python
-#!/usr/bin/env python3
-"""检查开发材料清理完整性"""
-
-import os
-import glob
-
-def check_cleanup():
-    """检查是否还有未清理的开发材料"""
-    
-    # 检查模式列表
-    patterns_to_check = [
-        "PRODUCTION_RELEASE_STANDARD.md",
-        "RELEASE_CHECKLIST.md", 
-        "PROJECT_STRUCTURE_V*.md",
-        "tools/",
-        "docs/",
-        "exports/",
-        "*_test_*.txt",
-        "UX_IMPROVEMENTS.md",
-        "*_backup.py",
-        "crawler_state*.json"
-    ]
-    
-    found_files = []
-    for pattern in patterns_to_check:
-        matches = glob.glob(pattern)
-        found_files.extend(matches)
-    
-    if found_files:
-        print("❌ 发现未清理的开发材料:")
-        for f in found_files:
-            print(f"  - {f}")
-        return False
-    else:
-        print("✅ 开发材料清理完整")
-        return True
-
-if __name__ == "__main__":
-    check_cleanup()
-```
+### 3. 验证阶段
+*   **单元测试**: 必须 100% 通过。
+*   **集成测试**: 运行相关业务流程的端到端测试。
+*   **静态检查**: 运行 `pylint` / `mypy` 确保无新引入的类型错误。
 
 ---
 
-## 📋 清理执行流程
+## ⚠️ 风险评估与应对 (Risk Management)
 
-### 开发完成后的清理步骤
+在执行任何变更前，必须进行风险自评。
 
-1. **备份重要数据** (可选)
-   ```bash
-   # 备份用户数据和配置
-   cp -r vector_db_storage/ backup/
-   cp -r chat_histories/ backup/
-   ```
-
-2. **运行清理脚本**
-   ```bash
-   ./scripts/cleanup_development_materials.sh
-   ```
-
-3. **验证清理结果**
-   ```bash
-   python scripts/check_cleanup_completeness.py
-   ```
-
-4. **最终检查**
-   ```bash
-   # 确保应用仍可正常启动
-   python tests/factory_test.py --quick
-   ```
+| 风险等级 | 场景 | 应对措施 |
+| :--- | :--- | :--- |
+| **高危 (Critical)** | 修改核心引擎 (`rag_engine.py`), 认证模块 (`auth/`), 文件读写 | 1. 必须有覆盖率 >90% 的测试。<br>2. 必须保留旧逻辑快照（注释掉）至少一个版本。<br>3. 必须人工复核。 |
+| **中等 (Medium)** | UI 调整 (`apppro.py`), 辅助工具类 | 1. 本地运行验证。<br>2. 检查 UI 布局无崩坏。 |
+| **低 (Low)** | 删除未引用的 `.md` 文件, 修正错别字 | 直接执行。 |
 
 ---
 
-## 🎯 清理标准
+## 📝 必须保留的核心文件清单 (Whitelist)
 
-### 判断标准
-**保留条件** (满足任一条件即保留):
-- ✅ 应用启动必需
-- ✅ 用户使用必需  
-- ✅ 推广展示必需
-- ✅ 长期维护必需
+**原则**: 除了以下核心资产，其他未被引用的文件均在潜在清理范围内。
 
-**删除条件** (满足任一条件即删除):
-- ❌ 仅开发过程需要
-- ❌ 内部流程文档
-- ❌ 临时调试工具
-- ❌ 历史版本信息
-- ❌ 测试临时数据
-
-### 质量标准
-清理完成后项目应满足:
-- 📁 **文件精简**: 只保留核心必需文件
-- 🚀 **启动正常**: 应用可正常启动运行
-- 📚 **文档完整**: 用户文档齐全
-- 🔧 **维护友好**: 保留维护标准文档
+1.  **源码**: `src/` (含 `__init__.py`)
+2.  **配置**: `config/*.json` (生产环境配置)
+3.  **测试**: `tests/` (作为回归基准)
+4.  **文档**: `README.md`, `USER_MANUAL.md`, `API_DOCUMENTATION.md`, `CHANGELOG.md`
+5.  **标准**: `DEVELOPMENT_CLEANUP_STANDARD.md` (本文档), `CONTINUOUS_QUALITY_SOP.md`
+6.  **环境**: `requirements.txt`, `Dockerfile`, `docker-compose.yml`
 
 ---
 
-## 📊 清理效果评估
+## 🚀 执行工具 (Tooling)
 
-### 清理前后对比
-| 项目 | 清理前 | 清理后 | 减少 |
-|------|--------|--------|------|
-| 总文件数 | ~3500+ | ~3000 | ~500+ |
-| 文档数量 | ~30+ | ~12 | ~18 |
-| 工具脚本 | ~50+ | ~30 | ~20 |
-| 目录层级 | 复杂 | 简洁 | 优化 |
-
-### 效果指标
-- ✅ **用户友好**: 文档精简易懂
-- ✅ **推广效果**: 突出核心功能
-- ✅ **维护成本**: 降低维护负担
-- ✅ **项目形象**: 专业简洁
+*   **清理脚本**: 使用 `./scripts/cleanup_development_materials.sh` 进行文件级清理。
+*   **依赖检查**: 使用 `pip-audit` 检查安全风险。
+*   **死代码扫描**: 使用 `vulture` (需配置白名单) 辅助发现死代码。
 
 ---
 
-## 🔄 定期维护
-
-### 每次开发周期后
-- [ ] 运行清理脚本
-- [ ] 检查清理完整性
-- [ ] 验证应用功能
-- [ ] 更新维护文档
-
-### 版本发布前
-- [ ] 完整清理检查
-- [ ] 文档同步验证
-- [ ] 推送安全检查
-- [ ] 最终质量确认
-
-**维护目标**: 保持项目精简专业，专注核心价值！
+**结语**:  
+代码质量不是一蹴而就的，而是通过每一次遵循本标准的"微创手术"积累而来的。  
+**Keep it Clean, Keep it Safe.**

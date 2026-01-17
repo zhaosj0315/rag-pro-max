@@ -181,9 +181,13 @@ from src.ui.progress_monitor import progress_monitor
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings, StorageContext, load_index_from_storage
 from llama_index.core.memory import ChatMemoryBuffer
 
-def display_user_message_with_attachments(prompt, original_query=None):
-    """显示用户消息，包含附件信息"""
-    with st.chat_message("user", avatar="🧑💻"):
+def display_user_message_safe(prompt, original_query=None):
+    """显示用户消息，包含附件信息 (Safe Mode)"""
+    # 使用 container 替代 st.chat_message 以避开头像验证错误
+    with st.container():
+        # 简单的用户消息样式
+        st.markdown(f"**👤 You:**")
+        
         # 检查是否有附件信息
         if 'last_query_attachments' in st.session_state and original_query and original_query in st.session_state.last_query_attachments:
             attachments = st.session_state.last_query_attachments[original_query]
@@ -195,7 +199,9 @@ def display_user_message_with_attachments(prompt, original_query=None):
                 if attachments.get('file_content'):
                     with st.expander("📄 文件内容", expanded=False):
                         st.text(attachments['file_content'][:300] + ("..." if len(attachments['file_content']) > 300 else ""))
-        st.markdown(prompt)
+        
+        # 显示消息内容 (引用样式)
+        st.info(prompt, icon="🗨️")
 
 def enhanced_web_search(final_prompt, logger):
     """增强的联网搜索功能"""
@@ -1006,7 +1012,10 @@ if not st.session_state.get("logged_in"):
 # ==========================================
 # Force refresh
 from src.auth.login_page import render_login_page
-from src.auth.resource_governance import render_resource_governance
+import importlib
+import src.auth.resource_governance
+importlib.reload(src.auth.resource_governance)
+from src.auth.resource_governance import render_resource_governance_v9
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     render_login_page()
     st.stop()
@@ -1050,91 +1059,7 @@ with st.sidebar:
     # 渲染 Admin 专用 Tab (物理对齐)
     if is_admin and len(tabs) > 5:
         with tabs[5]:
-            render_resource_governance()
-
-    # --- 图片提问功能 ---
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("**📸 图片提问**")
-    uploaded_image = st.sidebar.file_uploader(
-        "上传图片，自动识别文字",
-        type=['jpg', 'jpeg', 'png', 'bmp', 'tiff'],
-        help="支持截图、拍照等图片，系统会自动识别文字内容",
-        label_visibility="collapsed",
-        key="image_question_uploader"
-    )
-    
-    if uploaded_image:
-        # 显示图片预览
-        from PIL import Image
-        import io
-        
-        image = Image.open(uploaded_image)
-        st.sidebar.image(image, caption="上传的图片", use_container_width=True)
-        
-        # macOS 原生 OCR 识别
-        if st.sidebar.button("🔍 识别文字并提问", use_container_width=True):
-            with st.sidebar.spinner("正在识别图片文字..."):
-                try:
-                    # 使用 macOS 原生 OCR
-                    import subprocess
-                    import tempfile
-                    
-                    # 保存临时文件
-                    with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
-                        image.save(tmp_file.name)
-                        tmp_path = tmp_file.name
-                    
-                    # 调用 macOS 原生 OCR
-                    result = subprocess.run(
-                        ['osascript', '-e', f'''
-                        use framework "Vision"
-                        use framework "AppKit"
-                        
-                        set imagePath to "{tmp_path}"
-                        set imageURL to current application's |NSURL|'s fileURLWithPath:imagePath
-                        set requestHandler to current application's VNImageRequestHandler's alloc()'s initWithURL:imageURL options:(missing value)
-                        set ocrRequest to current application's VNRecognizeTextRequest's alloc()'s init()
-                        ocrRequest's setRecognitionLevel:(current application's VNRequestTextRecognitionLevelAccurate)
-                        ocrRequest's setRecognitionLanguages:({{\"zh-Hans\", \"en-US\"}})
-                        
-                        requestHandler's performRequests:{{ocrRequest}} |error|:(missing value)
-                        
-                        set observations to ocrRequest's results()
-                        set textResult to ""
-                        repeat with observation in observations
-                            set textResult to textResult & (observation's topCandidates:(1))'s firstObject()'s |string|() & linefeed
-                        end repeat
-                        return textResult
-                        '''],
-                        capture_output=True,
-                        text=True,
-                        timeout=30
-                    )
-                    
-                    # 清理临时文件
-                    import os
-                    os.unlink(tmp_path)
-                    
-                    if result.returncode == 0 and result.stdout.strip():
-                        recognized_text = result.stdout.strip()
-                        st.sidebar.success(f"✅ 识别成功！共 {len(recognized_text)} 字")
-                        
-                        # 显示识别的文字
-                        with st.sidebar.expander("📝 识别的文字", expanded=True):
-                            st.text_area("", recognized_text, height=150, label_visibility="collapsed")
-                        
-                        # 将识别的文字加入问题队列
-                        if st.sidebar.button("💬 使用此文字提问", use_container_width=True):
-                            st.session_state.question_queue.append(recognized_text)
-                            st.sidebar.success("✅ 已加入提问队列")
-                            st.rerun()
-                    else:
-                        st.sidebar.error("❌ 识别失败，请确保图片清晰")
-                        
-                except Exception as e:
-                    st.sidebar.error(f"❌ OCR 识别出错: {str(e)}")
-                    # 备用方案提示
-                    st.sidebar.info("💡 提示：请确保使用 macOS 系统")
+            render_resource_governance_v9()
 
     # --- 退出登录按钮 ---
     st.sidebar.markdown("---")
@@ -5807,120 +5732,81 @@ if st.session_state.get('last_web_search_results'):
 if 'temp_attachments' not in st.session_state:
     st.session_state.temp_attachments = {'image_text': None, 'file_content': None, 'file_names': []}
 
+# 注入紧凑型上传器 CSS
+st.markdown("""
+<style>
+/* 针对该区域的上传组件进行极简优化 */
+div[data-testid="stFileUploader"] {
+    margin-bottom: -20px;
+}
+div[data-testid="stFileUploader"] section {
+    padding: 0.2rem 0.5rem !important;
+    min-height: 5rem !important;
+    height: 5rem !important;
+    background-color: rgba(0,0,0,0.02);
+}
+/* 缩小图标 */
+div[data-testid="stFileUploader"] svg {
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+}
+/* 缩小并隐藏多余文字 */
+div[data-testid="stFileUploader"] section > div > div > span {
+    font-size: 0.7rem !important;
+}
+div[data-testid="stFileUploader"] section > div > div > small {
+    display: none !important;
+}
+/* 优化上传后的文件显示列表 */
+div[data-testid="stFileUploader"] ul {
+    margin-top: -10px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 with st.container():
-    col1, col2, col3 = st.columns([1, 1, 8])
+    # 合并为一个上传入口
+    uploaded_attachment = st.file_uploader(
+        "📎 上传附件 (图片OCR / 文档内容)", 
+        type=['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'pdf', 'docx', 'txt', 'md', 'csv', 'xlsx', 'xls', 'pptx', 'ppt', 'json', 'html', 'xml', 'py', 'js', 'sql', 'log'],
+        key="universal_attach",
+        label_visibility="collapsed",
+        help="支持上传图片(自动OCR)或文档(自动提取内容)以辅助提问"
+    )
     
-    with col1:
-        uploaded_image = st.file_uploader(
-            "📷 图片", 
-            type=['jpg', 'jpeg', 'png', 'bmp', 'tiff'],
-            key="temp_image_attach",
-            label_visibility="collapsed",
-            help="上传图片，OCR识别后辅助提问"
-        )
-    
-    with col2:
-        uploaded_file = st.file_uploader(
-            "📄 文件",
-            type=['pdf', 'docx', 'txt', 'md'],
-            key="temp_file_attach",
-            label_visibility="collapsed",
-            help="上传文件，提取内容后辅助提问"
-        )
-    
-    # 处理图片 OCR
-    if uploaded_image and uploaded_image.name not in st.session_state.temp_attachments['file_names']:
-        with st.spinner("🔍 识别图片文字..."):
-            try:
-                import tempfile
-                import subprocess
-                with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_image.name.split('.')[-1]}") as tmp:
-                    tmp.write(uploaded_image.read())
-                    tmp_path = tmp.name
+    # 通用处理逻辑
+    if uploaded_attachment and uploaded_attachment.name not in st.session_state.temp_attachments['file_names']:
+        from src.utils.file_upload_handler import process_uploaded_file_content
+        
+        with st.spinner("📄 正在智能解析附件内容..."):
+            text_content, error_msg = process_uploaded_file_content(uploaded_attachment)
+            
+            if text_content:
+                # 判断是图片还是文档（用于区分存储字段，虽然最终都是拼接到 Prompt）
+                file_ext = uploaded_attachment.name.split('.')[-1].lower()
+                is_image = file_ext in ['jpg', 'jpeg', 'png', 'bmp', 'tiff']
                 
-                # macOS 原生 OCR
-                result = subprocess.run(
-                    ['osascript', '-e', f'''
-                    use framework "Vision"
-                    use framework "AppKit"
-                    set imagePath to "{tmp_path}"
-                    set imageURL to current application's |NSURL|'s fileURLWithPath:imagePath
-                    set requestHandler to current application's VNImageRequestHandler's alloc()'s initWithURL:imageURL options:(missing value)
-                    set ocrRequest to current application's VNRecognizeTextRequest's alloc()'s init()
-                    ocrRequest's setRecognitionLevel:(current application's VNRequestTextRecognitionLevelAccurate)
-                    ocrRequest's setRecognitionLanguages:({"zh-Hans", "en-US"})
-                    requestHandler's performRequests:{{ocrRequest}} |error|:(missing value)
-                    set observations to ocrRequest's results()
-                    set textResult to ""
-                    repeat with observation in observations
-                        set textResult to textResult & (observation's topCandidates:(1))'s firstObject()'s |string|() & linefeed
-                    end repeat
-                    return textResult
-                    '''],
-                    capture_output=True, text=True, timeout=30
-                )
+                target_field = 'image_text' if is_image else 'file_content'
                 
-                os.unlink(tmp_path)
-                recognized_text = result.stdout.strip()
+                # 限制长度，避免超出 token (仅对非图片文档做限制，OCR结果通常较短)
+                if not is_image and len(text_content) > 3000:
+                    text_content = text_content[:3000] + "\n...(内容过长，已截断)"
                 
-                if recognized_text:
-                    st.session_state.temp_attachments['image_text'] = recognized_text
-                    st.session_state.temp_attachments['file_names'].append(uploaded_image.name)
-                    st.success(f"✅ 已识别图片文字（{len(recognized_text)} 字符）")
-                else:
-                    st.warning("⚠️ 未识别到文字")
-            except Exception as e:
-                st.error(f"❌ OCR 失败: {str(e)}")
-    
-    # 处理文件内容提取
-    if uploaded_file and uploaded_file.name not in st.session_state.temp_attachments['file_names']:
-        with st.spinner("📄 提取文件内容..."):
-            try:
-                file_content = ""
-                file_type = uploaded_file.name.split('.')[-1].lower()
+                # 追加内容
+                current_text = st.session_state.temp_attachments[target_field] or ""
+                st.session_state.temp_attachments[target_field] = current_text + "\n" + text_content if current_text else text_content
+                st.session_state.temp_attachments['file_names'].append(uploaded_attachment.name)
                 
-                if file_type == 'txt' or file_type == 'md':
-                    file_content = uploaded_file.read().decode('utf-8', errors='ignore')
-                elif file_type == 'pdf':
-                    import PyMuPDF as fitz
-                    import tempfile
-                    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
-                        tmp.write(uploaded_file.read())
-                        tmp_path = tmp.name
-                    doc = fitz.open(tmp_path)
-                    file_content = "\n".join([page.get_text() for page in doc])
-                    doc.close()
-                    os.unlink(tmp_path)
-                elif file_type == 'docx':
-                    from docx import Document
-                    import tempfile
-                    with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp:
-                        tmp.write(uploaded_file.read())
-                        tmp_path = tmp.name
-                    doc = Document(tmp_path)
-                    file_content = "\n".join([p.text for p in doc.paragraphs])
-                    os.unlink(tmp_path)
-                
-                if file_content:
-                    # 限制长度，避免超出 token
-                    if len(file_content) > 3000:
-                        file_content = file_content[:3000] + "\n...(内容过长，已截断)"
-                    
-                    st.session_state.temp_attachments['file_content'] = file_content
-                    st.session_state.temp_attachments['file_names'].append(uploaded_file.name)
-                    st.success(f"✅ 已提取文件内容（{len(file_content)} 字符）")
-                else:
-                    st.warning("⚠️ 未提取到内容")
-            except Exception as e:
-                st.error(f"❌ 文件提取失败: {str(e)}")
+                st.success(f"✅ 已解析: {uploaded_attachment.name} ({len(text_content)} 字符)")
+            else:
+                st.error(f"❌ 解析失败: {error_msg}")
     
     # 显示已添加的附件
     if st.session_state.temp_attachments['image_text'] or st.session_state.temp_attachments['file_content']:
-        with col3:
-            st.caption("📎 附件已添加，将作为上下文辅助提问")
-            if st.button("🗑️ 清空附件", key="clear_attachments"):
-                st.session_state.temp_attachments = {'image_text': None, 'file_content': None, 'file_names': []}
-                st.rerun()
+        st.caption(f"📎 已添加 {len(st.session_state.temp_attachments['file_names'])} 个附件，将作为上下文辅助提问")
+        if st.button("🗑️ 清空附件", key="clear_attachments"):
+            st.session_state.temp_attachments = {'image_text': None, 'file_content': None, 'file_names': []}
+            st.rerun()
 
 # 保持输入框形态一致，避免布局跳动
 if st.session_state.get('is_processing'):
@@ -6471,7 +6357,7 @@ if st.session_state.get('is_processing') and final_prompt:
         if active_kb_name: HistoryManager.save_session(active_kb_name, state.get_messages(), st.session_state.get('current_session_id'))
 
         # UI 仅显示原始问题或带引用的简洁版
-        display_user_message_with_attachments(user_display_prompt, st.session_state.get('current_active_query'))
+        display_user_message_safe(user_display_prompt, st.session_state.get('current_active_query'))
         
         with st.chat_message("assistant", avatar="🤖"):
             msg_placeholder = st.empty()

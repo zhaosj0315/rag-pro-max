@@ -1,8 +1,40 @@
-# RAG Pro Max v6.6.5 企业级系统架构文档
+# RAG Pro Max v6.7.0 企业级系统架构文档
 
-**版本**: v6.6.5 (Repair & Enhancement Edition)  
-**更新日期**: 2026-01-16  
-**核心特性**: 饱和式抓取引擎、按需建表、表名自愈、全局悬浮导航
+**版本**: v6.7.0 (Governance & Attachment Unification)  
+**更新日期**: 2026-01-17  
+**核心特性**: 资源治理矩阵、万能附件解析、终端自愈诊断
+
+---
+
+## 🏗️ 附件解析架构 (Universal Attachment Handling)
+
+为了解决对话增强功能中临时解析逻辑与核心加载逻辑的分裂，v6.7.0 引入了**归一化解析管线**：
+
+### 1. 统一处理器 (`src/utils/file_upload_handler.py`)
+该模块作为 UI 层与文件处理层的中间件，提供以下能力：
+- **Context Preservation**: 自动创建临时文件以适配核心解析器。
+- **Core Reuse**: 直接调用 `src/file_processor.py` 中的 `_load_single_file`，确保附件解析质量与入库质量 100% 对齐。
+- **Multi-modal Branching**: 自动识别图片类与非图片类文件，分别走 OCR 追加或纯文本提取链路。
+
+### 2. 流转逻辑
+```
+User Upload (UI)
+    ↓
+File Upload Handler (Middleware)
+    ↓
+File Processor (Core Logic)
+    ↓
+Prompt Context Injection
+```
+
+---
+
+## 🛡️ 资源治理架构 (Enhanced Governance)
+
+### 1. 物理与逻辑双透视
+系统不再通过单一的数据库记录管理资产，而是通过 **“Manifest + FileSystem”** 双重扫描构建治理视图：
+- **Activity Monitoring**: 通过对知识库物理目录的递归时间戳扫描，计算出“最后修改时间”。
+- **Smart Categorization**: 根据库名称模式（Regex）与 Manifest 元数据自动推断库类型。
 
 ---
 

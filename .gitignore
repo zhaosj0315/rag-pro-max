@@ -105,5 +105,7 @@ scratchpad.txt
 aliyun_adb_docs_*/
 aliyun_adb_mysql_docs_*/
 .gemini_backup/
+monitoring_alerts/
 config/sessions.json
 config/users.json
+config/kb_sharing.json
