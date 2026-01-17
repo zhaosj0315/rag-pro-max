@@ -452,7 +452,37 @@ def render_smart_visualization(df, query, msg_idx, stage_id, recommendation=None
             except Exception as e:
                 st.warning(f"AI 视图渲染失败，请切换至手动模式。")
         else:
-            st.info("AI 正在根据数据学习业务模式...")
+            # [v6.7.11 Hotfix] 临时AI推荐生成
+            if not df.empty and len(num_cols) > 0:
+                try:
+                    # 简单的AI推荐逻辑
+                    if len(df) == 1:
+                        # 单行数据，使用指标卡
+                        val = df[num_cols[0]].iloc[0]
+                        st.caption("💡 **AI洞察**: 检测到单一关键指标，推荐使用指标卡展示")
+                        fig = go.Figure(go.Indicator(
+                            mode = "number",
+                            value = val,
+                            title = {"text": f"{num_cols[0]}"},
+                            domain = {'x': [0, 1], 'y': [0, 1]}
+                        ))
+                        fig.update_layout(margin=dict(t=40, l=0, r=0, b=0))
+                        st.plotly_chart(fig, use_container_width=True, key=f"{key_base}_ai_temp")
+                    elif len(cat_cols) > 0 and len(num_cols) > 0:
+                        # 有分类和数值列，使用柱状图
+                        st.caption("💡 **AI洞察**: 检测到分类与数值数据，推荐柱状图展示分布特征")
+                        fig = px.bar(clean_df, x=cat_cols[0], y=num_cols[0], 
+                                   title="AI推荐：数据分布分析", template="plotly_white")
+                        fig.update_layout(margin=dict(t=40, l=0, r=0, b=0))
+                        st.plotly_chart(fig, use_container_width=True, key=f"{key_base}_ai_temp")
+                    else:
+                        # 默认显示数据表
+                        st.caption("💡 **AI洞察**: 数据结构复杂，推荐查看详细数据表")
+                        st.dataframe(df, use_container_width=True)
+                except Exception as e:
+                    st.info("AI 正在根据数据学习业务模式...")
+            else:
+                st.info("AI 正在根据数据学习业务模式...")
 
     # --- Tab 1: 业务转化 (漏斗图) ---
     with tabs[1]:
