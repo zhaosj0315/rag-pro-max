@@ -783,6 +783,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                     print(f"🔄 [SQL Fix] Added sqlite key from: {sql_key}")
                 
                 # 3. 强制数据安全化封装函数
+                import pandas as pd_local
                 def make_safe(rows):
                     if not isinstance(rows, list): return []
                     safe = []
@@ -790,9 +791,9 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                         if isinstance(row, dict):
                             s_row = {}
                             for k, v in row.items():
-                                if pd.isna(v): s_row[k] = None
+                                if pd_local.isna(v): s_row[k] = None
                                 elif hasattr(v, 'item'): s_row[k] = v.item() 
-                                elif isinstance(v, (datetime, pd.Timestamp)): s_row[k] = v.isoformat()
+                                elif isinstance(v, (datetime, pd_local.Timestamp)): s_row[k] = v.isoformat()
                                 else: s_row[k] = v
                             safe.append(s_row)
                         else: safe.append(str(row))
