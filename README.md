@@ -52,7 +52,7 @@ RAG Pro Max 是一款专为企业级复杂场景打造的智能体系统，深�
 - [📘 **企业用户手册**](USER_MANUAL.md) - 完整功能操作指引
 - [🎭 **虚拟数据生成指南**](docs/MOCK_DATA_GUIDE.md) - 仿真造数全攻略 (🆕)
 - [❓ **常见问题 (FAQ)**](FAQ.md) - 疑难杂症快速排除
-- [🚀 **快速上手指南**](FIRST_TIME_GUIDE.md) - 5分钟部署运行
+- [🚀 **快速上手指南**](docs/standards/FIRST_TIME_GUIDE.md) - 5分钟部署运行
 
 ### 🛠️ 开发与管理规范
 - [🧹 **材料维护执行指南**](docs/standards/MATERIAL_MAINTENANCE_GUIDE.md)

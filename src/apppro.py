@@ -55,7 +55,20 @@ except ImportError:
 
 # 极其早地初始化日志，防止任何模块在加载时触发
 # Force reload: 2026-01-16
-from src.app_logging import LogManager
+try:
+    from src.app_logging import LogManager
+except ImportError:
+    try:
+        from app_logging import LogManager
+    except ImportError:
+        # 如果都失败了，创建一个简单的替代品
+        class LogManager:
+            def __init__(self): pass
+            def log(self, *args, **kwargs): pass
+            def info(self, *args, **kwargs): pass
+            def error(self, *args, **kwargs): pass
+            def success(self, *args, **kwargs): pass
+
 logger = LogManager()
 
 # 极其早地抑制 Pydantic 警告
@@ -5195,13 +5208,21 @@ for msg_idx, msg in enumerate(state.get_messages()):
                                     df_h = pd.DataFrame(raw_result_data)
                                     if not df_h.empty:
                                         has_displayable_data = True
-                                        render_smart_visualization(
-                                            df=df_h, 
-                                            query=m_h.get('title', 'Analysis'), 
-                                            msg_idx=msg_idx, 
-                                            stage_id=m_h.get('stage_id', 1), 
-                                            recommendation=stage_h.get("recommendation")
-                                        )
+                                        
+                                        # 检查是否有数值列
+                                        num_cols = [c for c in df_h.columns if pd.api.types.is_numeric_dtype(df_h[c])]
+                                        if num_cols:
+                                            render_smart_visualization(
+                                                df=df_h, 
+                                                query=m_h.get('title', 'Analysis'), 
+                                                msg_idx=msg_idx, 
+                                                stage_id=m_h.get('stage_id', 1), 
+                                                recommendation=stage_h.get("recommendation")
+                                            )
+                                        else:
+                                            # [v6.7.9 Fix] 如果无数值列（如架构咨询），则优雅回退至表格显示
+                                            st.caption("📋 详细数据列表 (非数值分析结果)")
+                                            st.dataframe(df_h, use_container_width=True)
                                 except: pass
                             
                             if not has_displayable_data:

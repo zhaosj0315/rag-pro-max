@@ -38,16 +38,26 @@ class DataAnalystEngine:
         # 原则：数据分析模式下，优先保证完整性。
         # 如果表数量不多（<15），直接返回所有表，确保跨表查询和元数据查询的准确性。
         if len(all_tables) <= 15:
-            return list(all_tables.keys())
-            
-        # 仅在表极其多的时候进行简单过滤
-        relevant = []
-        qw = query.lower()
-        for t in all_tables:
-            if t.lower() in qw:
-                relevant.append(t)
+            base_tables = list(all_tables.keys())
+        else:
+            # 仅在表极其多的时候进行简单过滤
+            relevant = []
+            qw = query.lower()
+            for t in all_tables:
+                if t.lower() in qw:
+                    relevant.append(t)
+            base_tables = list(set(relevant)) if relevant else list(all_tables.keys())[:10]
         
-        return list(set(relevant)) if relevant else list(all_tables.keys())[:10]
+        # [v6.7.10 Fix] 动态检测查询中可能需要的表
+        qw = query.lower()
+        potential_tables = []
+        
+        # 检测订单相关查询
+        if any(word in qw for word in ['订单', 'order', '促销码', 'promo', '购买', '交易', '金额']):
+            if 'orders' not in [t.lower() for t in base_tables]:
+                potential_tables.append('orders')
+        
+        return base_tables + potential_tables
 
     def _get_column_value_samples(self, table_name: str, conn: sqlite3.Connection) -> str:
         try:
@@ -175,6 +185,48 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         except Exception as e:
             if self.logger:
                 self.logger.error(f"生成虚拟数据致命错误: {e}")
+            return False
+
+    def _create_missing_table(self, table_name: str, schemas: Dict, model_client, cursor) -> bool:
+        """动态创建缺失的表"""
+        try:
+            # 根据表名推断可能的结构
+            table_suggestions = {
+                'orders': {
+                    'cols': [
+                        {'name': 'order_id', 'type': 'TEXT', 'comment': '订单唯一标识'},
+                        {'name': 'user_id', 'type': 'INTEGER', 'comment': '用户ID，关联users表'},
+                        {'name': 'product_id', 'type': 'TEXT', 'comment': '商品ID，关联products表'},
+                        {'name': 'quantity', 'type': 'INTEGER', 'comment': '购买数量'},
+                        {'name': 'unit_price', 'type': 'REAL', 'comment': '单价'},
+                        {'name': 'total_amount', 'type': 'REAL', 'comment': '订单总金额'},
+                        {'name': 'promo_code', 'type': 'TEXT', 'comment': '促销码'},
+                        {'name': 'order_date', 'type': 'TEXT', 'comment': '订单日期'},
+                        {'name': 'status', 'type': 'TEXT', 'comment': '订单状态'}
+                    ],
+                    'desc': '订单表，记录用户购买行为'
+                }
+            }
+            
+            table_info = table_suggestions.get(table_name.lower())
+            if not table_info:
+                print(f"⚠️ [Dynamic Schema] 未知表类型 '{table_name}'，跳过创建")
+                return False
+            
+            # 创建表
+            cols_sql = []
+            for col in table_info['cols']:
+                cols_sql.append(f'"{col["name"]}" {col["type"]}')
+            
+            create_sql = f'CREATE TABLE IF NOT EXISTS "{table_name}" ({", ".join(cols_sql)})'
+            cursor.execute(create_sql)
+            print(f"🏗️ [Dynamic Schema] 创建表: {create_sql}")
+            
+            # 生成数据
+            return self._generate_mock_data(table_name, table_info, schemas, model_client, cursor)
+            
+        except Exception as e:
+            print(f"❌ [Dynamic Schema] 创建表 '{table_name}' 失败: {e}")
             return False
 
     def _generate_simple_mock_data(self, table_name: str, cols: List[Dict], cursor) -> bool:
@@ -305,6 +357,13 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                     if self._generate_mock_data(physical_name, table_info, schemas, model_client, cursor):
                         table_mapping[schema_name] = physical_name
                         conn.commit()
+                else:
+                    # [v6.7.10 Fix] 动态创建缺失的表
+                    print(f"🔧 [Dynamic Schema] 检测到查询需要表 '{schema_name}' 但 schema 中未定义，尝试动态创建...")
+                    if self._create_missing_table(schema_name, schemas, model_client, cursor):
+                        table_mapping[schema_name] = physical_name
+                        conn.commit()
+                        print(f"✅ [Dynamic Schema] 成功创建表 '{schema_name}' 并生成数据")
         
         if should_close: 
             conn.close()
@@ -405,6 +464,27 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         except: pass
         return {"viz_type": "table"}
 
+    def _extract_json(self, text: str) -> Dict[str, Any]:
+        """提取文本中的 JSON 对象或数组"""
+        try:
+            # 尝试直接解析整个文本
+            return json.loads(text.strip())
+        except:
+            try:
+                # 尝试提取 JSON 对象
+                match = re.search(r'(\{.*\})', text, re.DOTALL)
+                if match:
+                    return json.loads(match.group(1))
+            except: pass
+            
+            try:
+                # 尝试提取 JSON 数组
+                match = re.search(r'(\[.*\])', text, re.DOTALL)
+                if match:
+                    return json.loads(match.group(1))
+            except: pass
+        return {}
+
     def execute_analysis(self, query: str, model_client, context_text: str = "", status_callback=None) -> Dict[str, Any]:
         # --- 终端强制输出: 任务启动 ---
         print("\n" + "="*60)
@@ -450,11 +530,13 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         
         # 1. 元数据与架构咨询直查 (Bypass SQL Engine for Consultation)
         metadata_keywords = [
-            "指标", "结构", "字典", "有哪些表", "字段", "属性", "field", "column", "table", "schema", "definition", "mandatory", "required", 
-            "架构", "建议", "方案", "流程", "监控", "etl", "elt", "architecture", "strategy", "workflow", "monitor",
-            "配置", "设置", "调优", "怎么", "如何", "实现", "路径", "config", "settings", "optimize", "how", "implement", "pipeline"
+            "字典", "有哪些表", "字段属性", "field", "column", "table", "schema", "definition", "mandatory", "required", 
+            "架构建议", "ETL", "架构设计", "业务模型", "建模规范"
         ]
-        if any(k in query.lower() for k in metadata_keywords):
+        # 优化判定：仅当 query 纯粹侧重于元数据查询且不包含具体业务指标时才进入
+        is_metadata_query = any(k in query.lower() for k in metadata_keywords) and not any(k in query.lower() for k in ["多少", "金额", "总计", "平均", "最高", "最低", "趋势", "统计", "销量", "订单"])
+        
+        if is_metadata_query:
             print(f"🔍 [决策] 判定为架构/配置咨询，构建深度透视看板...")
             
             # 识别相关表以提供上下文
@@ -463,14 +545,19 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             
             # 构造回显表格
             schema_rows = []
+            sample_for_ui = {} # 用于触发“查询前”预览
             for t, info in sub_schema.items():
                 cols = info.get('cols', info.get('columns', []))
+                t_rows = []
                 for c in cols:
-                    schema_rows.append({
-                        "业务实体": t,
-                        "关联字段": c.get('name'),
-                        "业务逻辑/含义": c.get('comment', '业务默认属性')
-                    })
+                    row = {
+                        "字段名": c.get('name'),
+                        "逻辑含义": c.get('comment', '业务默认属性'),
+                        "数据类型": c.get('type', 'TEXT')
+                    }
+                    schema_rows.append({"业务实体": t, **row})
+                    t_rows.append(row)
+                sample_for_ui[t] = t_rows[:5] # 每个表采样前5个定义作为预览
             
             def report_gen():
                 p = f"执行深度战略咨询任务。需求: {query}\n当前业务底座模型: {json.dumps(sub_schema, ensure_ascii=False)}\n要求: 采用 SCQA 架构，结合底座字段给出具体的工程落地建议、配置参数或架构设计图描述，结论先行。"
@@ -484,14 +571,19 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
 
             # 构造透视阶段，确保 UI 看板不为空
             consultation_stage = {
-                "meta": {"stage_id": 1, "title": "全域战略/架构透视", "goal": "对齐业务逻辑与物理底座实现路径"},
+                "meta": {
+                    "stage_id": 1, 
+                    "title": "全域战略/架构透视", 
+                    "goal": "对齐业务逻辑与物理底座实现路径",
+                    "transformation": "深度提取业务实体的逻辑模型与关联关系"
+                },
                 "sqls": {
                     "sqlite": "-- 战略推演模式 (Strategic Architectural Inference)\n-- 当前问题侧重于架构/配置建议，已提取相关业务模型作为设计依据",
                     "standard": "-- Recommended Implementation Logic"
                 },
                 "data": schema_rows if schema_rows else [{"状态": "已完成逻辑建模", "可参考实体": list(full_schemas.get('tables', {}).keys())}],
                 "empty_reason": "",
-                "source_samples": {},
+                "source_samples": sample_for_ui, # 关键修复：补全此项以触发 UI “查询前” 渲染
                 "is_simulated": True
             }
             
@@ -505,6 +597,9 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         # 2. 识别与对齐
         rel_tables = self._get_relevant_tables(query, full_schemas)
         print(f"📁 [建模] 锁定业务范围: {rel_tables}")
+        
+        # [v6.7.0 Fix] 判定是否为仿真模式：只要涉及的表中有一个是虚拟表，整体判定为仿真模式
+        is_simulated = any(full_schemas.get('tables', {}).get(t, {}).get('is_virtual', False) for t in rel_tables)
         
         session_conn = sqlite3.connect(self.db_path, timeout=60)
         try:
@@ -524,7 +619,20 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             prompt = f"将需求 {query} 拆解为 2-3 个 SQL 阶段。JSON 数组: [{{stage_id, title, transformation, goal}}]\n模型: {json.dumps(sub_schema, ensure_ascii=False)}"
             try:
                 res = model_client.complete(prompt).text
-                stages_meta = json.loads(re.search(r'(\[.*\])', res, re.DOTALL).group(1))
+                # 使用统一的 JSON 提取方法
+                extracted = self._extract_json(res)
+                if isinstance(extracted, list):
+                    stages_meta = extracted
+                elif isinstance(extracted, dict) and 'stages' in extracted:
+                    stages_meta = extracted['stages']
+                else:
+                    # 尝试提取数组
+                    match = re.search(r'(\[.*\])', res, re.DOTALL)
+                    if match:
+                        stages_meta = json.loads(match.group(1))
+                    else:
+                        raise ValueError("无法提取阶段信息")
+                        
                 for s in stages_meta:
                     print(f"   📍 Stage {s['stage_id']}: {s['title']} | 目标: {s['goal']}")
             except: 
@@ -580,17 +688,28 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
 """
                 sqls = {"sqlite": ""}
                 try:
-                    sqls = self._extract_json(model_client.complete(sql_prompt).text) or {"sqlite": ""}
+                    print("🚨 [DEBUG] 开始生成 SQL...")  # 强制输出
+                    ai_response = model_client.complete(sql_prompt).text
+                    print(f"🤖 [AI Response] {ai_response[:200]}...")  # 调试输出
+                    sqls = self._extract_json(ai_response) or {"sqlite": ""}
+                    print(f"🔍 [Extracted SQLs] {list(sqls.keys())}")  # 调试输出
                     if sqls.get('sqlite'):
                         print(f"📜 [SQL] {sqls['sqlite']}")
-                except: pass
+                    else:
+                        print("⚠️ [Warning] 未提取到有效的 SQLite 查询")
+                        print(f"🔍 [Raw AI Response] {ai_response}")  # 显示完整响应
+                except Exception as e:
+                    print(f"❌ [Error] SQL 生成失败: {e}")
+                    pass
 
                 if status_callback: status_callback(f"🧪 [Stage {i+1}] 执行逻辑验证...")
                 exec_res = {"success": False, "data": []}
                 empty_reason = "该阶段执行了逻辑加工，未产生回显数据"
                 
                 if sqls.get("sqlite"):
+                    print(f"🚀 [Executing] 开始执行 SQL...")
                     exec_res = self.execute_sql(sqls["sqlite"], model_client, conn=session_conn)
+                    print(f"📊 [Exec Result] Success: {exec_res['success']}, Data Count: {len(exec_res.get('data', []))}")
                     if exec_res["success"]:
                         if exec_res['data']:
                             r_count = len(exec_res['data'])
@@ -620,12 +739,18 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                                 else:
                                     empty_reason = "🏗️ 逻辑加工已完成（无回显数据产生）"
                 
-                final_data.append({
-                    "meta": meta, "sqls": sqls, "data": exec_res["data"], 
+                # 构建阶段数据
+                stage_data = {
+                    "meta": meta, 
+                    "sqls": sqls, 
+                    "data": exec_res["data"], 
                     "empty_reason": empty_reason,
                     "source_samples": {t: t_context[t].get('sample', {}) for t in t_context},
                     "is_simulated": is_simulated
-                })
+                }
+                
+                print(f"📦 [Stage Data] Meta: {meta.get('title')}, SQLs: {list(sqls.keys())}, Data: {len(exec_res['data'])} rows, Samples: {list(stage_data['source_samples'].keys())}")
+                final_data.append(stage_data)
 
             print("\n" + "-"*60)
             print("🧠 [总结] 正在合成最终战略洞察报告...")
@@ -643,39 +768,63 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
 
             # 归一化与安全化处理 (Normalization & Serialization Safety)
             def sanitize_stage(s):
+                print(f"🧹 [Sanitize] Processing stage: {s.get('meta', {}).get('title', 'Unknown')}")
+                
                 # 1. 强制 Key 归一化 (sqlite, standard, dataworks)
                 raw_sqls = s.get("sqls", {})
                 normalized_sqls = {str(k).lower().strip(): v for k, v in raw_sqls.items()}
+                print(f"🔧 [SQL Keys] Raw: {list(raw_sqls.keys())} -> Normalized: {list(normalized_sqls.keys())}")
                 
                 # 2. 补全缺失的 SQL 视角
                 if 'sqlite' not in normalized_sqls and normalized_sqls:
-                    normalized_sqls['sqlite'] = list(normalized_sqls.values())[0] # 拿第一个当保底
+                    # 尝试寻找任何包含 sql 关键字的 key
+                    sql_key = next((k for k in normalized_sqls if 'sql' in k), list(normalized_sqls.keys())[0])
+                    normalized_sqls['sqlite'] = normalized_sqls[sql_key]
+                    print(f"🔄 [SQL Fix] Added sqlite key from: {sql_key}")
                 
-                # 3. 强制数据安全化 (解决 NumPy 序列化问题)
-                raw_rows = s.get("data", [])
-                safe_rows = []
-                if isinstance(raw_rows, list):
-                    for row in raw_rows:
+                # 3. 强制数据安全化封装函数
+                def make_safe(rows):
+                    if not isinstance(rows, list): return []
+                    safe = []
+                    for row in rows:
                         if isinstance(row, dict):
-                            safe_row = {}
+                            s_row = {}
                             for k, v in row.items():
-                                if pd.isna(v): safe_row[k] = None
-                                elif hasattr(v, 'item'): safe_row[k] = v.item() # NumPy types
-                                elif isinstance(v, (datetime, pd.Timestamp)): safe_row[k] = v.isoformat()
-                                else: safe_row[k] = v
-                            safe_rows.append(safe_row)
-                        else: safe_rows.append(row)
+                                if pd.isna(v): s_row[k] = None
+                                elif hasattr(v, 'item'): s_row[k] = v.item() 
+                                elif isinstance(v, (datetime, pd.Timestamp)): s_row[k] = v.isoformat()
+                                else: s_row[k] = v
+                            safe.append(s_row)
+                        else: safe.append(str(row))
+                    return safe
+
+                # 4. 处理核心数据集与采样数据集
+                safe_data = make_safe(s.get("data", []))
+                raw_samples = s.get("source_samples", {})
+                safe_samples = {}
+                if isinstance(raw_samples, dict):
+                    for t_name, rows in raw_samples.items():
+                        safe_samples[t_name] = make_safe(rows)
                 
-                return {
+                print(f"📊 [Data] Safe data: {len(safe_data)} rows, Safe samples: {len(safe_samples)} tables")
+                
+                result = {
                     "meta": s.get("meta", {"stage_id": 99, "title": "未命名阶段"}),
                     "sqls": normalized_sqls,
-                    "data": safe_rows,
+                    "data": safe_data,
                     "empty_reason": s.get("empty_reason", ""),
-                    "source_samples": s.get("source_samples", {}),
+                    "source_samples": safe_samples,
                     "is_simulated": s.get("is_simulated", False)
                 }
+                
+                print(f"✅ [Sanitized] Stage complete: {result['meta'].get('title')}")
+                return result
 
             final_stages_sanitized = [sanitize_stage(s) for s in final_data]
+            
+            print(f"\n🎯 [Final Result] Returning {len(final_stages_sanitized)} stages")
+            for i, stage in enumerate(final_stages_sanitized):
+                print(f"   Stage {i+1}: {stage['meta'].get('title')} - Data: {len(stage['data'])} rows, SQLs: {list(stage['sqls'].keys())}")
 
             return {
                 "stages": final_stages_sanitized, 

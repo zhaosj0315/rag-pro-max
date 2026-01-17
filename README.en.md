@@ -52,7 +52,7 @@ RAG Pro Max is an enterprise-grade agent system that integrates full-scale docum
 - [📘 **Enterprise User Manual**](USER_MANUAL.md) - Full operation guide
 - [🎭 **Mock Data Guide**](docs/MOCK_DATA_GUIDE.md) - Comprehensive simulation guide (🆕)
 - [❓ **FAQ**](FAQ.md) - Troubleshooting and solutions
-- [🚀 **First Time Guide**](FIRST_TIME_GUIDE.md) - 5-minute deployment
+- [🚀 **First Time Guide**](docs/standards/FIRST_TIME_GUIDE.md) - 5-minute deployment
 
 ### 🛠️ Standards & Management
 - [🧹 **Material Maintenance Guide**](docs/standards/MATERIAL_MAINTENANCE_GUIDE.md)

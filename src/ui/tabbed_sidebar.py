@@ -314,7 +314,7 @@ class TabbedSidebar:
             "🚀 快速上手": {
                 "expanded": True,
                 "items": {
-                    "3步启动向导": ("FIRST_TIME_GUIDE.md", "核心流程介绍"),
+                    "3步启动向导": ("docs/standards/FIRST_TIME_GUIDE.md", "核心流程介绍"),
                     "系统部署指南": ("DEPLOYMENT.md", "Docker与本地环境安装"),
                     "版本特性总览": ("version.json", "v6.6.8 更新说明")
                 }
@@ -337,7 +337,7 @@ class TabbedSidebar:
             "🔧 操作与规范": {
                 "expanded": False,
                 "items": {
-                    "图片 OCR 专项": ("IMAGE_OCR_GUIDE.md", "GPU加速与Vision引擎说明"),
+                    "图片 OCR 专项": ("docs/standards/IMAGE_OCR_GUIDE.md", "GPU加速与Vision引擎说明"),
                     "日志审计与合规": ("LOGGING_AND_NOTIFICATION_STANDARD.md", "行为审计与安全看板"),
                     "常见问题 (FAQ)": ("FAQ.md", "常见故障自愈手册")
                 }
@@ -353,7 +353,7 @@ class TabbedSidebar:
 
         # 初始化状态
         if "current_doc_path" not in st.session_state:
-            st.session_state.current_doc_path = "FIRST_TIME_GUIDE.md"
+            st.session_state.current_doc_path = "docs/standards/FIRST_TIME_GUIDE.md"
             st.session_state.current_doc_title = "3步启动向导"
 
         nav_col, content_col = st.columns([1.3, 3.7])
