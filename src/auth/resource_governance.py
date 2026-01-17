@@ -32,8 +32,8 @@ ALL_PERMISSIONS_MAP = {
     "view_stats": "📊 查看监控"
 }
 
-def render_resource_governance_v9():
-    st.toast("已加载增强版资源矩阵 v9 (移除日期筛选)", icon="🛠️")
+def render_resource_governance_v10():
+    st.toast("已加载增强版资源矩阵 v10 (时间探测加固)", icon="🕒")
     from src.auth.audit_logger import AuditLogger
     st.markdown("### 👥 系统用户与资源调度")
     
@@ -95,17 +95,30 @@ def render_resource_governance_v9():
                             doc_count += 1
             except: pass
             
-            # 时间格式化
-            created_at = manifest.get('created_at', '未知')
-            if created_at != '未知':
+            # 时间格式化 (v6.8.9 增强版：多级嗅探)
+            created_raw = manifest.get('created_time') or manifest.get('created_at') or manifest.get('added_at')
+            created_str = '未知'
+            
+            if created_raw:
                 try:
-                    # 尝试解析 ISO 格式
-                    dt = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    # 尝试解析 ISO 格式 (处理 T, Z 等分隔符)
+                    iso_str = str(created_raw).replace('Z', '').split('.')[0] # 移除毫秒位
+                    if 'T' in iso_str:
+                        dt = datetime.datetime.fromisoformat(iso_str)
+                    else:
+                        dt = datetime.datetime.strptime(iso_str, '%Y-%m-%d %H:%M:%S')
                     created_str = dt.strftime('%Y-%m-%d %H:%M')
                 except:
-                    created_str = created_at[:16]
-            else:
-                created_str = '未知'
+                    # 字符串截取保底 (YYYY-MM-DD HH:MM)
+                    created_str = str(created_raw).replace('T', ' ')[:16]
+            
+            # 如果依然未知，使用物理文件夹创建时间保底
+            if created_str == '未知' or not created_str:
+                try:
+                    ctime = os.path.getctime(kb_path)
+                    created_str = datetime.datetime.fromtimestamp(ctime).strftime('%Y-%m-%d %H:%M')
+                except:
+                    created_str = '未知'
 
             last_mod_str = datetime.datetime.fromtimestamp(last_modified).strftime('%Y-%m-%d %H:%M') if last_modified > 0 else "无记录"
 

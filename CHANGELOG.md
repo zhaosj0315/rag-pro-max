@@ -7,6 +7,12 @@
 - **智能类型识别**: 引入基于命名空间与文件特征的自动分类机制（文档库/网页库/对话库），支持按类型精准筛选。
 - **确定性全选**: 重构了 `st.data_editor` 的状态同步逻辑，通过动态 Key 强制刷新，实现了 100% 可靠的“全选列表”批量操作。
 
+### 📚 文档治理：核心逻辑沉淀与材料维护 (Material Maintenance)
+- **核心沉淀 (Knowledge Asset)**: 新增 `CORE_FEATURE_IMPLEMENTATION.md` 与 `DATA_ANALYSIS_WORKFLOW.md`，将系统 5 大核心功能与数据分析的物理闭环逻辑固化为永久性技术资产。
+- **架构校准 (Arch Sync)**: 更新 `ARCHITECTURE.md`，确立 **“构建即就绪 (Build-First)”** 为数据分析引擎的顶层设计准则。
+- **手册重构 (UX Documentation)**: 全量重写 `USER_MANUAL.md`，修正过时的“问答造数”引导，统一资产包描述，消除用户歧义。
+- **物理清理 (Standardization)**: 执行全量材料维护。合并冗余 Mock Data 文档为 `docs/MOCK_DATA_GUIDE.md`，清空 5000+ 临时文件，并将根目录测试/维护脚本按规范归档至 `tests/` 和 `scripts/`。
+
 ### 📎 对话增强：万能附件解析器 (Universal Attachment Unification)
 - **逻辑归一化**: 移除 UI 层临时的 OCR 与 PDF 解析代码，统一接入系统核心 `process_uploaded_file_content` 处理器。
 - **全格式对齐**: 附件上传现在与知识库构建共享相同的底层逻辑，原生支持 CSV、Excel、PPTX、Code 等 20+ 种格式的即时上下文注入。

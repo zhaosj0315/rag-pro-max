@@ -40,7 +40,14 @@ Prompt Context Injection
 
 ## 🧠 Data Analyst Agent 2.0 架构
 
-### 1. 记忆与自愈引擎 (Memory & Healing Engine)
+### 1. 构建即就绪 (Build-First Architecture)
+本项目数据分析引擎遵循“物理闭环”原则，严禁将数据准备工作推迟至对话阶段：
+- **物理底座前置构建**：点击“构建知识库”时，系统必须完成从 Schema 提取到物理 DB 注入的全链路，确保后续对话是基于确定性的物理实体而非实时推演。
+- **有数传数 (Deterministic Ingestion)**：解析 CSV/Excel 时，利用 `pandas` 强制固化为 SQLite 物理表。
+- **无数造数 (Synthetic Bootstrapping)**：对于 PDF/MD 等非结构化需求文档，系统自动提取逻辑 Schema 并启动仿真引擎注入模拟数据，确保 `business_data.db` 始终处于非空且可查询状态。
+- **数据指纹对齐 (Fingerprint Alignment)**：在对话生成前，必须从物理 DB 中提取列值采样（Value Samples），确保 SQL 生成精准对齐真实的物理取值分布。
+
+### 2. 记忆与自愈引擎 (Memory & Healing Engine)
 *   **On-Demand Schema Loading**: 
     *   **Pruning**: 在数据库校验前，先根据问题进行相关性裁剪（Relevant Table Selection），仅保留当前查询必需的表定义。
     *   **Speed**: 避免了对百表规模知识库的全量扫描，将环境初始化时间从 $O(N)$ 降至 $O(1)$。

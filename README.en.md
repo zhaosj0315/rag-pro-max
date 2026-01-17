@@ -10,257 +10,78 @@
 
 ---
 
-# RAG Pro Max - Intelligent Document Q&A System
+# RAG Pro Max - Enterprise AI Document QA & Data Analysis System
 
-**Version**: v6.7.0  
+**Version**: v6.7.0 (Governance & Attachment Unification)  
 ![Version](https://img.shields.io/badge/version-v6.7.0-brightgreen)
-![Status](https://img.shields.io/badge/status-Stable-blue)
-![Last Update](https://img.shields.io/badge/last%20update-2026--01--17-orange)
 
-## 🚀 RAG Pro Max v6.7.0 (Governance & Attachment Unification)
+RAG Pro Max is an enterprise-grade agent system that integrates full-scale document migration (RAG), automated web crawling, and physical-loop data analysis.
+
+---
+
+## 🚀 v6.7.0 Key Features
+
 ### 🛡️ Unified Governance Matrix
-- **Global Visibility**: Deeply integrated physical lifecycle and permission distribution. Real-time display of "Creation Date" and "Last Modified," increasing governance efficiency by 200%.
-- **Deterministic Batch Actions**: Fully resolved table selection state issues. Supports one-click "Select All" for physical deletion or ownership transfer.
+- **Physical Perspective**: Real-time filesystem scanning shows "Creation Date" and "Last Modified" for knowledge bases, increasing governance efficiency by 200%.
+- **Deterministic Batch Operations**: Fixes state loss in tables, supporting "Select All" for bulk physical deletion or permission transfers.
 
 ### 📎 Universal Attachment Parsing
-- **Logic Normalization**: Chat attachments now share 100% of the same parsing core as Knowledge Base builds, supporting instant injection of 20+ formats (CSV/Excel/Code).
-- **Multi-image OCR Append**: Supports sequential image uploads with automatic identification content merging, perfectly adapted for multi-turn image Q&A scenarios.
+- **Pipeline Unification**: Chat attachments now share 100% of the same underlying parsing kernel as KB construction, supporting 20+ formats (CSV/Excel/Code).
+- **Multi-image OCR Append**: Perfect for multi-turn image QA, automatically merging recognized content.
 
-### 💻 Terminal Self-healing Diagnostics
-- **Service Status Awareness**: Introduced port-level survival checks, supporting one-click forced cleaning and service restart for port 8899 occupations.
-### 🚀 Strategic Command Center (v6.6.0)
-- **Immersive Login Screen**: Completely redesigned with a 95% full-width layout, removing traditional borders for a high-impact visual experience.
-- **Global Status HUD**: Integrated fixed-bottom system status bar (READY / METAL / Version), displaying real-time acceleration status.
-- **Premium UI Components**: Introduced Glassmorphism feature cards and quick-access shortcuts for a professional look and feel.
+### 🧠 Data Analyst 2.0 (Build-First Architecture)
+- **Build-Phase Physical Loop**: Follows the "Build-First" principle. All tasks from Schema extraction to physical DB (SQLite) injection are completed during the build phase.
+- **Synthetic Bootstrapping**: Automatically generates simulation data for logical documents, ensuring meaningful responses from the very first question.
+- **Drill-Down Analysis**: Supports continuous probing based on anomalies found in previous steps, automatically inheriting SQL context.
 
-### 🧠 Data Analyst Agent (v6.6.0)
-- **Context Injection**: Enables cross-stage analysis memory. Stage 2 can now perceive findings from Stage 1 (e.g., anomalous IDs) to generate drill-down SQL automatically.
-- **Analysis Memory**: The system automatically records successful SQL templates. It recalls historical experience via Few-Shot learning for similar queries, getting smarter over time.
-- **Explainable SQL**: Forces AI to use **CTEs (Common Table Expressions)** and **Plain-Language Comments**, transforming complex SQL logic into linear processes readable by business users.
-
-### 🛡️ Core Stability Fixes (v6.6.0)
-- **Duplicate Response Fix**: 
-    - **Character-Level**: Fixed "stuttering" duplicate text in streaming output (Delta Calculation logic).
-    - **UI-Level**: Fixed the issue where analysis reports were rendered twice in the chat stream (Field Isolation & Mutually Exclusive Display).
-- **State Sync Repair**: Resolved text rollback anomalies in mixed streaming modes.
-
-### 📦 Data Sovereignty & Full Export (v5.5.8 Update)
-- **Ultimate Asset Package**: One-click export of 01-06 structure, including raw documents, chat history (MD), strategic models, and vector snapshots.
-- **Cross-Directory Salvage**: Automated retrieval of search results from temporary folders to ensure complete data portability.
-- **Admin Asset Inventory**: New 'Asset Hub' in admin dashboard for cross-user batch filtering and deep cleanup.
-- **Self-Healing Infrastructure**: Optimized log system with automated fallback to user home directory, bypassing macOS permission issues.
-
-## 🚀 RAG Pro Max v5.5.8
-### 💎 Universal Strategic Modeling (v5.5.8 Major Update)
-- **Multi-modal Alignment**: Supports mixed input of PDF/MD dictionaries and CSV/Excel tables, automatically locking business definitions to physical table structures.
-- **Virtual Strategic Sandbox**: Introducing the "Golden Mock Data" engine, enabling one-click simulation of 20 closed-loop data records even with only data dictionaries.
-- **Forced Routing Guard**: Completely isolates Data Analysis and RAG pipelines, ensuring professional analysis dashboard outputs via `st.rerun()`.
-- **Zero-Crash Stability**: Deeply optimized initialization scopes, eliminating `NameError` for critical variables like `logger` and `time` under extreme loads.
-- **Auto-Format Sensing**: System automatically triggers the "Business Semantic Brain" whenever tables or dictionary files are detected.
+### 🕷️ Saturation Crawl Engine
+- **Saturation Queue**: Replaces BFS recursion with a saturation queue mode to ensure 100% capture of large documentation sites.
+- **Anti-Scraping Protection**: Intelligent throttling combined with random physical delays to evade WAF firewalls.
 
 ---
 
-## ✨ Core Features
+## 📚 Documentation Center
 
-### 🔒 **Privacy-First & Offline Deployment**
-- **Complete Offline Deployment**: Data never leaves your internal network
-- **Local Processing**: All computations performed on local servers
-- **Zero Data Upload**: 100% local storage of document content
-- **Private Customization**: Supports independent operation in intranet environments
+### 📂 Core Implementation & Architecture (For Developers)
+- [📐 **System Architecture**](ARCHITECTURE.md) - Latest v6.7.0 definition
+- [💎 **Core Feature Implementation**](CORE_FEATURE_IMPLEMENTATION.md) - Underlying logic of 5 core features (🆕)
+- [📊 **Data Analysis Workflow**](DATA_ANALYSIS_WORKFLOW.md) - Physical loop & simulation standards (🆕)
+- [🔧 **API Documentation**](API_DOCUMENTATION.md) - Backend service definitions
 
-### 🏢 **Enterprise-Grade Features**
-- **Local LLM Support**: Ollama integration, no internet required
-- **Docker Containerization**: Secure environment isolation
-- **Self-hosted Vector Database**: Sensitive information stays internal
-- **Open Source Transparency**: Complete source code for security auditing
+### 📖 User Guides
+- [📘 **Enterprise User Manual**](USER_MANUAL.md) - Full operation guide
+- [🎭 **Mock Data Guide**](docs/MOCK_DATA_GUIDE.md) - Comprehensive simulation guide (🆕)
+- [❓ **FAQ**](FAQ.md) - Troubleshooting and solutions
+- [🚀 **First Time Guide**](FIRST_TIME_GUIDE.md) - 5-minute deployment
 
-### 🔬 Intelligent Research & Deep Analysis (Enhanced in v5.5.8)
-- **Deep Research Mode**: Simulates expert-level multi-step analysis, fact-checking, and cross-domain knowledge integration
-- **Research Instruction Injection**: Automatically decomposes complex questions into multi-dimensional analysis
-- **Status Indicator Bar**: Real-time display of four core capabilities: "Thinking, Networking, Searching, Researching"
-
-### 🌐 Internet Search & Real-time Enhancement
-- **DuckDuckGo Integration**: Automatically fetches latest internet information as real-time supplement to knowledge base
-- **Quality Assessment System**: Integrated intelligent quality analyzer with automatic authority scoring (🏆/⭐/⚠️)
-- **Collapsible Display**: Search details sorted by quality and collapsed in status bar by default
-
-### 🔄 Continuous Optimization System (New in v5.5.8)
-- **Virtuous Cycle Mechanism**: Automated optimization workflow of patrol → analyze → plan → implement → verify
-- **Intelligent Monitoring**: Automatic monitoring of code quality, performance metrics, test coverage, documentation completeness
-- **Auto Optimization**: Executes automated improvement tasks like cleanup, refactoring, performance tuning
-- **Visual Dashboard**: Real-time display of optimization effects and system health status
+### 🛠️ Standards & Management
+- [🧹 **Material Maintenance Guide**](docs/standards/MATERIAL_MAINTENANCE_GUIDE.md)
+- [📝 **Documentation Standard**](docs/standards/DOCUMENTATION_MAINTENANCE_STANDARD.md)
+- [🔒 **Push Standard**](docs/standards/NON_ESSENTIAL_PUSH_STANDARD.md)
 
 ---
 
-## 🏗️ System Architecture
+## 🏗️ Installation
 
-### Four-Layer Architecture Design
-```
-Presentation Layer (UI)    - Streamlit Interface Components
-    ↓
-Service Layer             - Business Logic Services
-    ↓  
-Common Layer              - Shared Utility Modules
-    ↓
-Utils Layer               - Low-level Tool Functions
-```
+### Requirements
+- **Python**: 3.10+
+- **Memory**: 8GB+
+- **Disk**: 10GB+ (for model cache)
 
-### Core Modules
-- **apppro.py** - Main application entry (4,127 lines)
-- **services/** - File services, knowledge base services, configuration services
-- **processors/** - Document processors, web crawlers (15 modules)
-- **ui/** - User interface components (30 modules)
-- **utils/** - Utility function library (48 modules)
-- **Total**: 180 Python files, 51 test files
-
----
-
-## 🚀 Quick Start
-
-### System Requirements
-- **Python**: 3.8+ (Recommended 3.10+)
-- **Memory**: 4GB+ (Recommended 8GB+)
-- **Disk**: 10GB+ (Including model cache)
-- **GPU**: Optional (CUDA/MPS support)
-
-### Installation & Deployment
-
-#### macOS/Linux Auto Installation
+### Quick Start
 ```bash
 git clone https://github.com/zhaosj0315/rag-pro-max.git
 cd rag-pro-max
-./scripts/deploy_linux.sh  # Linux
-pip install -r requirements.txt  # macOS
-```
-
-#### Windows Auto Installation
-```cmd
-git clone https://github.com/zhaosj0315/rag-pro-max.git
-cd rag-pro-max
-scripts\deploy_windows.bat
-```
-
-#### Docker Deployment
-```bash
-./scripts/docker-build.sh
-docker-compose up -d
-# Access: http://localhost:8501
-```
-
-### Launch Application
-```bash
-# Recommended (with tests)
+pip install -r requirements.txt
 ./start.sh
-
-# Direct launch
-streamlit run src/apppro.py
 ```
-
----
-
-## ⚙️ Configuration
-
-### Model Configuration
-Supports multiple LLM backends:
-- **OpenAI**: GPT-3.5/GPT-4
-- **Ollama**: Local models (qwen2.5:7b, etc.)
-- **Others**: OpenAI-compatible interfaces
-
-### Core Configuration Files
-```
-config/
-├── app_config.json      # Application configuration
-├── rag_config.json      # RAG parameters
-└── scheduler_config.json # Scheduler configuration
-```
-
----
-
-## 🛡️ Enterprise Security & Compliance
-
-### ✅ Suitable Scenarios
-- **Financial Institutions**: Absolute confidentiality of customer data
-- **Government Departments**: Secure processing of classified documents
-- **Healthcare Organizations**: Strict protection of patient privacy
-- **Manufacturing Enterprises**: Internal circulation of technical materials
-
-### 🔐 Security Mechanisms
-- **Zero Network Dependency**: Core functions require no internet
-- **Data Sovereignty**: Document content strictly localized
-- **Container Isolation**: Docker environment security isolation
-- **Source Transparency**: Fully open source, security auditable
-
----
-
-## 📊 Performance Benchmarks
-
-### Processing Speed
-| Document Type | Size | Processing Time | GPU Acceleration |
-|---------------|------|----------------|------------------|
-| PDF | 10MB | ~45s | ✅ 2-5x |
-| DOCX | 5MB | ~20s | ✅ Auto |
-| Web Pages | 100 pages | ~2min | ✅ Parallel |
-
-### System Resources
-| Scenario | CPU | GPU | Memory |
-|----------|-----|-----|--------|
-| Idle | 5-10% | 0% | 2-3GB |
-| Processing | 60-85% | 99% | 10-15GB |
-| Query | 10-20% | 50-70% | 5-8GB |
-
----
-
-## 🧪 Testing & Validation
-
-### Factory Testing
-```bash
-# Run complete tests
-python tests/factory_test.py
-
-# Test Coverage: 88/97 passed (92.8%)
-# Test Categories: Environment, Configuration, Modules, Documents, Vector DB, etc.
-```
-
----
-
-## 📚 Documentation
-
-- [📋 Deployment Guide](docs/en/DEPLOYMENT.md)
-- [🧪 Testing Guide](docs/en/TESTING.md) 
-- [❓ FAQ](docs/en/FAQ.md)
-- [🤝 Contributing Guide](docs/en/CONTRIBUTING.md)
-- [📝 Changelog](CHANGELOG.md)
-
----
-
-## 📞 Contact & Support
-
-- **GitHub**: https://github.com/zhaosj0315/rag-pro-max
-- **Technical Support**: zhaosj0315@github.com
-- **Business Cooperation**: Enterprise WeChat/DingTalk consultation
-- **Deployment Services**: Professional implementation team available
 
 ---
 
 ## 📜 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
-
----
-
-## 🙏 Acknowledgments
-
-Thanks to the following open source projects:
-- [Streamlit](https://streamlit.io/) - Web application framework
-- [LlamaIndex](https://www.llamaindex.ai/) - RAG framework
-- [ChromaDB](https://www.trychroma.com/) - Vector database
-- [HuggingFace](https://huggingface.co/) - Model platform
-
----
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 <div align="center">
-
-**If this project helps you, please give it a ⭐️ Star!**
 
 Made with ❤️ by RAG Pro Max Team
 
