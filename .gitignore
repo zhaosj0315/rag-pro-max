@@ -110,3 +110,4 @@ config/sessions.json
 config/users.json
 config/kb_sharing.json
 temp_uploads/
+.env
