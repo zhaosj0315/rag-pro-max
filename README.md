@@ -12,18 +12,23 @@
 
 # RAG Pro Max - 企业级智能文档问答与数据分析系统
 
-**当前版本**: v6.7.3 (Strategic Intelligence Edition)  
-![Version](https://img.shields.io/badge/version-v6.7.3-brightgreen)
+**当前版本**: v6.8.6 (Audit Command Center Edition)  
+![Version](https://img.shields.io/badge/version-v6.8.6-brightgreen)
 
-RAG Pro Max 是一款专为企业级复杂场景打造的智能体系统，深度融合了全量文档搬运（RAG）、自动化网页抓取与 **Strategic Workshop (战略分析车间)** 的精准仿真分析能力。
+RAG Pro Max 是一款专为企业级复杂场景打造的智能体系统，深度融合了全量文档搬运（RAG）、自动化网页抓取与 **Audit Command Center (审计指挥中心)** 的实时安全管控能力。
 
 ---
 
-## 🚀 v6.7.3 核心特性
+## 🚀 v6.8.6 核心特性
 
-### 🎨 Login UX 极致优化 (Final Polish)
-- **访客链接纯净化**: 登录页“访客身份浏览”由按钮样式重构为纯文字链接，消除视觉冗余，显著提升工业级质感。
-- **原子化 CSS 架构**: 采用锚点隔离技术与核武器级样式覆盖，确保 UI 在 Streamlit 框架下依然保持极致的品牌调性。
+### 🛡️ 审计指挥中心 (Audit Center)
+- **实时风险画像**: 引入 24 小时风险得分脉搏图与行为维度热力分布，全天候监控异常操作。
+- **活跃会话侦听**: 支持管理员实时监控在线用户动作，并在发现异常时执行“一键熔断（强制踢出）”。
+- **穿透式记录**: 审计流水支持资源 ID 级追溯，精准记录谁在什么时候操作了哪个具体的知识库。
+
+### 💻 终端控制增强 (Terminal UX+)
+- **全尺寸自适应**: 支持终端窗口高度自由拉伸（400-2000px）及原生全屏沉浸模式。
+- **独立弹窗模式**: 支持在独立浏览器标签页开启运维通道，彻底解决 Iframe 局限性。
 
 ### 🧠 Strategic Workshop 3.0 (战略分析车间)
 - **精准选表引擎**: 采用 LLM 驱动的语义剪枝，从海量表中精准锁定核心业务表，查询初始化速度提升 500%。

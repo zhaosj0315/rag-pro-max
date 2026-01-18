@@ -1,15 +1,1 @@
-{
-  "version": "6.7.3",
-  "name": "RAG Pro Max",
-  "edition": "Stable Production Edition",
-  "release_date": "2026-01-18",
-  "status": "Production-Stable",
-  "build": "strategic-workshop-final-v2",
-  "critical_fixes": [
-    "Login page Guest Button UI refinement (pure text link)",
-    "LLM-driven precise table identification implemented",
-    "Removed manual table list bloating in Strategic Workshop",
-    "Strategic Analysis chain optimized for targeted data generation",
-    "Enhanced domain knowledge for tax and export data categorization"
-  ]
-}
+{"version": "6.8.6", "edition": "Audit Command Center Edition", "last_update": "2026-01-18"}

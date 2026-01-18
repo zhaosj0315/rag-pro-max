@@ -1,8 +1,25 @@
-# RAG Pro Max v6.7.3 企业级系统架构文档
+# RAG Pro Max v6.8.6 企业级系统架构文档
 
-**版本**: v6.7.3 (Strategic Intelligence Edition)  
+**版本**: v6.8.6 (Audit Command Center Edition)  
 **更新日期**: 2026-01-18  
-**核心特性**: Login CSS Architecture v2.0、Strategic Workshop 3.0、精准选表引擎
+**核心特性**: Audit Risk Pulse 2.0、Live Session Monitoring、终端全屏架构
+
+---
+
+## 🛡️ 安全审计指挥中心架构 (v6.8.6)
+
+在 v6.8.6 中，系统安全能力从“静态记录”演进为“动态风控大盘”：
+
+### 1. 全域风险画像引擎 (Risk Profiling Engine)
+- **时序风险建模**: 引入基于行为权重的滑动窗口计算。系统实时计算 24 小时内每一小时的 `Risk Score`：
+    - `Critical Score (50pts)`: 物理删除、暴力破解、强制干预。
+    - `Warning Score (10pts)`: 敏感权限变更、批量下载。
+    - `Info Score (1pt)`: 常规问答、资源检索。
+- **行为热力语义分布**: 利用语义映射层将 `action_type` 聚合为问答、管理、获取、安全四大象限，揭示全员意图画像。
+
+### 2. 实时会话侦听管线 (Live Intelligence Pipeline)
+- **设备指纹追踪**: 引入 MD5 设备哈希指纹，结合 IP 物理位置，实现对多账号异地共享或单账号多地攻击的秒级识别。
+- **熔断控制逻辑**: 通过 `SessionManager.revoke_user_sessions` 与前端 UI 的深度绑定，管理员可以在审计视图中直接阻断特定账号的通信链路。
 
 ---
 
