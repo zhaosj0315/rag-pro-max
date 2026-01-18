@@ -1061,7 +1061,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                 table_info_fmt = {
                     "cols": schema_info['cols'],
                     "desc": t_desc,
-                    "is_pending": True # 标记为待生成
+                    "is_virtual": True # 标记为虚拟表 (JIT造数)
                 }
                 
                 return {t_name: table_info_fmt}
