@@ -955,17 +955,30 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         if matched_sigs >= 2:
             return "SCHEMA"
 
-        # 2. 规则速判: 行数极多且无特征通常是数据
+        # 2. 检查列值特征 (v6.9.6 Fix: 检查是否包含类型关键字，如 string, varchar 等)
+        type_keywords = ['string', 'int', 'varchar', 'char', 'double', 'float', 'decimal', 'numeric', 'timestamp', 'date', 'datetime', 'boolean', 'integer']
+        for col in df.columns:
+            # 抽样前10行非空值
+            sample_values = df[col].dropna().astype(str).str.lower().str.strip().tolist()[:10]
+            if not sample_values: continue
+            
+            matches = sum(1 for v in sample_values if any(tk == v or tk in v for tk in type_keywords))
+            # 如果一列中有超过 30% 的值看起来像数据类型，判定为 SCHEMA
+            if matches >= 3 or (len(sample_values) > 0 and matches / len(sample_values) >= 0.5):
+                print(f"📊 [特征发现] 列 '{col}' 包含大量类型关键字 ({matches}/{len(sample_values)}) -> 判定为 SCHEMA")
+                return "SCHEMA"
+
+        # 3. 规则速判: 行数极多且无特征通常是数据
         if len(df) > 500:
             return "DATA"
         
-        # 3. 语义关键词检查
+        # 4. 语义关键词检查
         schema_keywords = ['type', '类型', 'description', '描述', 'comment', '备注', 'length', '长度', 'pk', '主键']
         if any(k in headers for k in schema_keywords) and len(df) < 100:
             # 这是一个较强信号，但交给 LLM 确认
             pass
 
-        # 4. LLM 深度仲裁 (采样数据指纹)
+        # 5. LLM 深度仲裁 (采样数据指纹)
         sample_rows = df.head(5).to_string(index=False)
         prompt = f"""请判断以下表格片段的【本质属性】。
 
@@ -995,29 +1008,34 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         """[图纸解析] 将 Schema 定义文件解析为标准 JSON 结构 (支持多表)"""
         # [v6.9.3] 增加启发式多表识别
         headers = [str(c).lower().strip() for c in df.columns]
-        table_name_cols = ['表英文名', '表名', 'table name', 'table_name', 'entity', '实体名']
-        table_col = next((c for c, h in zip(df.columns, headers) if h in table_name_cols), None)
+        # [v6.9.6] 增强列名映射
+        table_name_cols = ['表英文名', '表名', 'table name', 'table_name', 'entity', '实体名', '对象名']
+        col_name_cols = ['字段名称', '字段名', 'column name', 'column_name', 'field', '字段']
+        col_type_cols = ['字段类型分', '数据类型', '类型', 'type', 'data type', '字段类型']
+        col_comment_cols = ['字段中文名', '注释', '说明', 'comment', 'description', '描述', '含义']
+
+        table_col = next((c for c, h in zip(df.columns, headers) if any(s in h for s in table_name_cols)), None)
         
         if table_col:
             print(f"🧩 [启发式识别] 检测到多表定义列: {table_col}")
             extracted_tables = {}
             for t_name, group in df.groupby(table_col):
-                if pd.isna(t_name) or str(t_name).strip() == "": continue
+                if pd.isna(t_name) or str(t_name).strip() == "" or str(t_name).lower() == 'nan': continue
                 
                 # 尝试寻找列名、类型、注释列
                 cols = []
-                col_name_key = next((c for c, h in zip(df.columns, headers) if h in ['字段名称', '字段名', 'column name', 'field', '字段']), None)
-                col_type_key = next((c for c, h in zip(df.columns, headers) if h in ['字段类型分', '数据类型', '类型', 'type', 'data type']), None)
-                col_comment_key = next((c for c, h in zip(df.columns, headers) if h in ['字段中文名', '注释', '说明', 'comment', 'description', '描述']), None)
+                col_name_key = next((c for c, h in zip(df.columns, headers) if any(s in h for s in col_name_cols)), None)
+                col_type_key = next((c for c, h in zip(df.columns, headers) if any(s in h for s in col_type_cols)), None)
+                col_comment_key = next((c for c, h in zip(df.columns, headers) if any(s in h for s in col_comment_cols)), None)
                 
                 for _, row in group.iterrows():
-                    c_name = str(row[col_name_key]) if col_name_key else "unknown"
-                    if c_name == "nan" or c_name.strip() == "": continue
+                    c_name = str(row[col_name_key]).strip() if col_name_key else ""
+                    if c_name == "nan" or c_name == "": continue
                     
                     cols.append({
                         "name": c_name,
-                        "type": str(row[col_type_key]) if col_type_key else "TEXT",
-                        "comment": str(row[col_comment_key]) if col_comment_key else ""
+                        "type": str(row[col_type_key]).strip() if col_type_key else "TEXT",
+                        "comment": str(row[col_comment_key]).strip() if col_comment_key else ""
                     })
                 
                 if cols:
@@ -1035,10 +1053,14 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         content = df.to_string()
         if len(content) > 10000: content = content[:10000] + "..." # 防止过长
         
-        prompt = f"""这是一份数据表结构定义文档。请解析它并提取表结构。
+        prompt = f"""这是一份数据表结构定义文档。请解析它并提取其中定义的所有表结构。
 
 文档内容:
 {content}
+
+【重要指令】:
+如果文档内容看起来像是“数据字典”（即每一行描述一个字段，包含表名、列名、类型等），请务必按照结构提取。
+不要把“数据字典”本身当成业务数据！
 
 要求:
 1. 识别其中定义的所有表
@@ -1065,7 +1087,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
 
     def smart_ingest_file(self, file_path: str, conn: sqlite3.Connection, model_client) -> Dict[str, Any]:
         """[双轨构建] 智能判断并处理单个文件"""
-        name = os.path.basename(file_path)
+        name = os.path.basename(file_path).lower()
         print(f"\n🔍 [嗅探] 正在分析文件特征: {name}")
         
         try:
@@ -1078,9 +1100,14 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             # 清洗列名
             df.columns = [re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', str(c)).strip() for c in df.columns]
             
-            # 2. 智能仲裁 (如果没有 model_client，默认当做 DATA 处理)
+            # 2. 智能仲裁 (v6.9.6 Fix: 优先检查文件名)
             file_type = "DATA"
-            if model_client:
+            # 强信号关键词
+            schema_hints = ['表结构', '数据字典', 'schema', 'dictionary', 'blueprint', '字段定义', '表定义']
+            if any(k in name for k in schema_hints):
+                print(f"📁 [文件名命中] 识别到 Schema 关键词 '{[k for k in schema_hints if k in name][0]}' -> 强制切换建筑师模式")
+                file_type = "SCHEMA"
+            elif model_client:
                 file_type = self._classify_content(df, model_client)
             
             # 3. 双轨分流
