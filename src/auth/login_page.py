@@ -146,40 +146,81 @@ def render_login_page():
             text-shadow: 0 1px 2px rgba(0,0,0,0.8);
         }
 
-        /* --- 右侧：登录控制台 (强制上提，消除间隙) --- */
+        /* --- 右侧：登录控制台 (统一卡片化) --- */
         .login-panel {
             background: rgba(15, 23, 42, 0.85); 
-            backdrop-filter: blur(24px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 24px;
-            padding: 2.5rem 3rem 3rem 3rem;
-            box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(32px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 28px;
+            padding: 0 !important; /* 移除内边距，交给内部容器精确控制 */
+            box-shadow: 0 40px 80px -15px rgba(0, 0, 0, 0.9);
             position: relative;
-            /* 极限上提，实现视平线绝对对齐 */
-            margin-top: -4rem !important; 
+            margin-top: -2rem !important;
+            overflow: hidden;
         }
-        
-        .status-dot {
-            width: 8px; height: 8px; background-color: #4ade80; border-radius: 50%;
-            display: inline-block; margin-right: 6px; box-shadow: 0 0 8px #4ade80;
+
+        .panel-header {
+            padding: 2rem 2.5rem 1.5rem 2.5rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .panel-content {
+            padding: 1.5rem 2.5rem 2rem 2.5rem;
+        }
+
+        .guest-link-container {
+            text-align: center;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
         }
         
         .stTextInput input {
-            background-color: #f8fafc !important;
-            border: 2px solid #cbd5e1 !important;
-            color: #000000 !important;
-            height: 3.5rem; font-size: 1.1rem; border-radius: 10px !important;
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            color: #ffffff !important;
+            height: 3.2rem; font-size: 1rem; border-radius: 12px !important;
         }
-        .stTextInput input::placeholder { color: #475569 !important; opacity: 1 !important; }
-        .stTextInput label p { color: #ffffff !important; font-size: 1rem !important; font-weight: 700 !important; }
-        .stTabs [data-baseweb="tab"] { color: #cbd5e1 !important; font-size: 1.1rem !important; font-weight: 600 !important; }
-        .stTabs [data-baseweb="tab"][aria-selected="true"] { color: #ffffff !important; border-bottom: 3px solid #3b82f6 !important; }
+        .stTextInput input:focus {
+            border-color: #3b82f6 !important;
+            background-color: rgba(255, 255, 255, 0.08) !important;
+        }
+        .stTextInput label p { color: #94a3b8 !important; font-size: 0.85rem !important; font-weight: 500 !important; margin-bottom: 4px; }
+        
+        /* Tab 样式深度定制：消除漂浮感 */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 24px;
+            background-color: transparent !important;
+            padding-left: 2.5rem !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+        .stTabs [data-baseweb="tab"] {
+            height: 45px !important;
+            color: #64748b !important;
+            font-size: 0.95rem !important;
+            font-weight: 600 !important;
+            padding: 0 !important;
+        }
+        .stTabs [data-baseweb="tab"][aria-selected="true"] {
+            color: #3b82f6 !important;
+            background-color: transparent !important;
+        }
+        .stTabs [data-baseweb="tab-highlight"] {
+            background-color: #3b82f6 !important;
+        }
+
         button[kind="primary"] {
-            height: 3.5rem; font-size: 1.1rem !important; font-weight: 700 !important;
-            background: #3b82f6 !important; box-shadow: 0 10px 20px -5px rgba(59, 130, 246, 0.5) !important;
+            width: 100% !important;
+            height: 3.5rem; font-size: 1rem !important; font-weight: 700 !important;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            border: none !important;
+            border-radius: 12px !important;
+            transition: all 0.3s ease !important;
         }
-        button[kind="secondary"] {
-            height: 3rem; border: 1px solid rgba(255,255,255,0.3) !important; color: #cbd5e1 !important; background: transparent !important;
+        button[kind="primary"]:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px -8px rgba(59, 130, 246, 0.6) !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -188,7 +229,7 @@ def render_login_page():
     now = datetime.now()
     greeting = "🚀 智慧中台 · 全速进化" if 5 <= now.hour < 18 else "🌙 深夜备战 · 永不熄灯"
 
-    col_left, col_spacer, col_right = st.columns([1.5, 0.2, 1])
+    col_left, col_spacer, col_right = st.columns([1.4, 0.15, 1.1])
 
     # --- 左侧：驾驶舱 ---
     with col_left:
@@ -249,32 +290,38 @@ def render_login_page():
         </div>
         """, unsafe_allow_html=True)
 
-    # --- 右侧：指挥中心 ---
+    # --- 右侧：指挥中心 (合体重构版) ---
     with col_right:
-        # 毁灭性合并：将容器开启、标题区、状态指示全部合在一个 markdown 中，铲除所有“占位废墟”
+        # 1. 开启统一卡片容器 + 头部区
         panel_header_html = """
         <div class="login-panel">
-            <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+            <div class="panel-header">
                 <div style="display:flex; align-items:center; justify-content:space-between;">
-                    <h1 style='color:white; margin:0; font-size:2rem; font-weight:800; letter-spacing:0.5px;'>指挥中心</h1>
-                    <div style="display:flex; align-items:center; background:rgba(74,222,128,0.1); padding:4px 10px; border-radius:20px; border:1px solid rgba(74,222,128,0.3);">
+                    <h1 style='color:white; margin:0; font-size:1.8rem; font-weight:800; letter-spacing:0.5px;'>指挥中心</h1>
+                    <div style="display:flex; align-items:center; background:rgba(74,222,128,0.1); padding:4px 12px; border-radius:20px; border:1px solid rgba(74,222,128,0.25);">
                         <div class="status-dot"></div>
-                        <span style="color:#4ade80; font-size:0.7rem; font-weight:700; letter-spacing:0.5px;">在线</span>
+                        <span style="color:#4ade80; font-size:0.75rem; font-weight:700; letter-spacing:0.5px;">在线</span>
                     </div>
                 </div>
-                <div style="color:#94a3b8; font-size:0.85rem; letter-spacing:1px; margin-top:6px; font-weight:500;">SECURE ACCESS TERMINAL v6.6.0</div>
+                <div style="color:#64748b; font-size:0.8rem; letter-spacing:1px; margin-top:8px; font-weight:500; font-family:monospace;">SECURE ACCESS TERMINAL v6.7.2</div>
             </div>
         """
         st.markdown(panel_header_html, unsafe_allow_html=True)
         
-        tab_login, tab_register = st.tabs(["账号登录", "注册账号"])
+        # 2. 内容区 (Tab 与 表单)
+        # 注意：Streamlit 的 tabs 无法完全嵌套在 HTML div 内部渲染，
+        # 我们通过 CSS padding 控制其视觉位置，使其看起来在卡片内。
+        tab_login, tab_register = st.tabs(["账号登录", "快速注册"])
         
         with tab_login:
-            with st.form("login_form"):
+            st.markdown('<div class="panel-content">', unsafe_allow_html=True)
+            with st.form("login_form", clear_on_submit=False):
                 u = st.text_input("用户名", placeholder="请输入用户名", label_visibility="visible")
                 p = st.text_input("密码", type="password", placeholder="请输入密码", label_visibility="visible")
-                st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
-                if st.form_submit_button("启动指挥系统", use_container_width=True, type="primary"):
+                st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
+                submit = st.form_submit_button("启动指挥系统", use_container_width=True, type="primary")
+                
+                if submit:
                     if u and p:
                         from src.auth.user_auth import authenticate_user
                         success, info = authenticate_user(u, p)
@@ -288,22 +335,35 @@ def render_login_page():
                             st.rerun()
                         else: st.error(f"❌ {info}")
             
-            st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-            if st.button("访客模式 (仅预览)", use_container_width=True, type="secondary"):
+            # 3. 访客模式弱化：改造成卡片页脚的文字链接
+            st.markdown('<div class="guest-link-container">', unsafe_allow_html=True)
+            if st.button("以访客身份进入预览模式", key="guest_btn", help="仅限浏览公开知识库", use_container_width=False):
                 st.session_state.logged_in = True; st.session_state.user = "guest_user"; st.session_state.role = "guest"; st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True) # 闭合 login-content
 
         with tab_register:
+            st.markdown('<div class="panel-content">', unsafe_allow_html=True)
             with st.form("reg_form"):
                 nu = st.text_input("新用户名", placeholder="设置您的登录 ID", label_visibility="visible")
-                np = st.text_input("New Password", type="password", placeholder="设置安全密码", label_visibility="visible")
-                st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
-                if st.form_submit_button("初始化账号", use_container_width=True, type="primary"):
+                np = st.text_input("设置密码", type="password", placeholder="设置安全密码", label_visibility="visible")
+                st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
+                if st.form_submit_button("完成初始化", use_container_width=True, type="primary"):
                     if nu and np:
                         success, msg = register_user(nu, np)
                         if success: st.success("✅ 注册成功！请切换至登录页")
                         else: st.error(f"❌ {msg}")
+            st.markdown('</div>', unsafe_allow_html=True)
         
-        st.markdown('</div>', unsafe_allow_html=True) # 闭合 login-panel
+        st.markdown('</div>', unsafe_allow_html=True) # 闭合 login-panel外层容器
+
+    # --- 底部版权 ---
+    st.markdown(f"""
+    <div style="position: fixed; bottom: 1.5rem; left: 0; width: 100%; text-align: center; color: rgba(255,255,255,0.2); font-size: 0.7rem; font-family: monospace; pointer-events: none;">
+        RAG PRO MAX STRATEGIC EDITION v6.7.2 &copy; 2026 | 系统运行正常
+    </div>
+    """, unsafe_allow_html=True)
+
 
     # --- 底部版权 ---
     st.markdown(f"""
