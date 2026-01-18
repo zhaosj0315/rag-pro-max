@@ -10,17 +10,11 @@ class AuditLogger:
     _lock = threading.Lock()
 
     @staticmethod
-    def log(user, action, details, action_type="GENERIC", status="success", ip=None, browser=None, diff=None):
+    def log(user, action, details, action_type="GENERIC", status="success", level="INFO", resource_id=None, cost_ms=0, ip=None, browser=None, diff=None):
         """
-        [v6.6.6] 企业级全量审计引擎
-        :param user: 操作用户名
-        :param action: 动作简称
-        :param details: 业务详情
-        :param action_type: 动作分类 (AUTH, KB_MGMT, DATA_PROCESS, ADMIN, SECURITY, CRAWL, PREVIEW)
-        :param status: 状态 (success, failed, warning, intercepted)
-        :param ip: 客户端IP
-        :param browser: UA信息
-        :param diff: 变更对比字典 {'old': ..., 'new': ...}
+        [v6.8.6] 增强型审计引擎
+        :param level: 风险等级 (INFO, WARNING, CRITICAL)
+        :param resource_id: 关联资源ID
         """
         log_entry = {
             "timestamp": datetime.now().isoformat(),
@@ -29,9 +23,12 @@ class AuditLogger:
             "action": action,
             "details": details,
             "status": status,
+            "level": level,
+            "resource_id": resource_id,
+            "cost_ms": cost_ms,
             "ip": ip or "unknown",
             "ua": browser or "unknown",
-            "diff": diff # 存储变更前后对比
+            "diff": diff
         }
         
         # 确保目录存在
