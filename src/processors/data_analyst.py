@@ -644,7 +644,23 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         print(f"📁 [建模] 锁定业务范围: {rel_tables}")
         
         # [v6.7.0 Fix] 判定是否为仿真模式：只要涉及的表中有一个是虚拟表，整体判定为仿真模式
-        is_simulated = any(full_schemas.get('tables', {}).get(t, {}).get('is_virtual', False) for t in rel_tables)
+        # [v6.9.0 Fix] 增强判定：如果表中没有任何数据，也视为仿真模式（自动启动救护逻辑）
+        def check_table_empty(t_name, conn):
+            try:
+                # 尝试直接查询计数
+                c = conn.cursor()
+                # 处理可能存在的引号
+                safe_t = f'"{t_name}"' if '"' not in t_name else t_name
+                count = c.execute(f"SELECT count(*) FROM {safe_t}").fetchone()[0]
+                return count == 0
+            except:
+                return True # 如果查询失败，保守认为可能是没数据的空表/新表
+
+        tables_empty_status = {t: check_table_empty(t, session_conn) for t in rel_tables if t in full_schemas.get('tables', {})}
+        is_simulated = any(full_schemas.get('tables', {}).get(t, {}).get('is_virtual', False) for t in rel_tables) or any(tables_empty_status.values())
+        
+        if is_simulated:
+            print(f"🎭 [仿真模式] 激活。检测到虚拟表或空表: {[t for t, empty in tables_empty_status.items() if empty]}")
         
         session_conn = sqlite3.connect(self.db_path, timeout=60)
         try:
