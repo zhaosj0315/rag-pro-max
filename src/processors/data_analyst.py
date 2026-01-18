@@ -77,8 +77,8 @@ class DataAnalystEngine:
             return "\n".join(samples)
         except: return ""
 
-    def _generate_mock_data(self, table_name: str, table_info: Dict, schemas: Dict, model_client, cursor) -> bool:
-        """生成虚拟数据并插入表中"""
+    def _generate_mock_data(self, table_name: str, table_info: Dict, schemas: Dict, model_client, cursor, query_context: str = "") -> bool:
+        """生成虚拟数据并插入表中，注入查询上下文以确保数据相关性"""
         try:
             cols = table_info.get('cols', table_info.get('columns', []))
             if not cols:
@@ -118,27 +118,38 @@ class DataAnalystEngine:
             macro_context = schemas.get('macro_context', '业务数据')
             table_desc = table_info.get('desc', table_name)
             
+            # --- 核心改进：注入意图约束 ---
+            intent_instruction = ""
+            if query_context:
+                intent_instruction = f"""
+【强制约束 - 意图对齐】:
+用户当前的问题是: "{query_context}"
+你生成的 30 条数据中，必须包含至少 10-15 条能够直接支撑回答该问题的典型记录。
+例如：如果涉及筛选条件（如某类别、某时间段、某阈值），请确保生成的记录中有符合这些条件的值，不要生成完全无关的数据。
+"""
+
             prompt = f"""为数据表 '{table_name}' 生成 30 条真实、合理的测试数据。
 
 表说明: {table_desc}
 业务背景: {macro_context}
+{intent_instruction}
 
 字段定义:
 {cols_desc}
 
 要求:
 1. 生成标准的 SQLite INSERT 语句
-2. 数据要符合业务逻辑，相互关联
+2. 数据要符合业务逻辑，相互关联，且必须满足上述【意图对齐】约束，确保后续 SQL 查询能查到结果。
 3. 日期格式: YYYY-MM-DD，时间格式: YYYY-MM-DD HH:MM:SS
 4. 数值字段使用纯数字，不要带单位
 5. 每条语句独立一行，以分号结尾
-6. 只输出 INSERT 语句，不要其他内容
+6. 只输出 INSERT 语句，不要其他内容。
 
 示例格式:
 INSERT INTO {table_name} VALUES ('value1', 'value2', 123);
 INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
 
-            print(f"🎲 [虚拟数据] 正在为表 '{table_name}' 生成测试数据...")
+            print(f"🎲 [意图感知造数] 正在为表 '{table_name}' 生成相关测试数据...")
             
             try:
                 response = model_client.complete(prompt).text
@@ -168,18 +179,13 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                     cursor.execute(clean_stmt)
                     insert_count += 1
                 except Exception as e:
-                    # 如果是因为字段不匹配，尝试通过列名显式插入
-                    try:
-                        # 这是一个极具侵略性的自愈尝试：如果 LLM 返回的语句列数不对，尝试丢弃
-                        pass
-                    except: pass
                     continue
             
             if insert_count > 0:
-                print(f"✅ [虚拟数据] 表 '{table_name}' 成功生成 {insert_count} 条记录")
+                print(f"✅ [造数完成] 成功生成 {insert_count} 条与问题高度相关的记录")
                 return True
             else:
-                print(f"⚠️ [虚拟数据] 表 '{table_name}' LLM 生成失败（0条），尝试备用方案...")
+                print(f"⚠️ [造数失败] LLM 生成失败（0条），尝试备用方案...")
                 return self._generate_simple_mock_data(table_name, cols, cursor)
                 
         except Exception as e:
@@ -289,7 +295,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         except Exception as e:
             return False
 
-    def _ensure_sandbox_ready(self, schemas: Dict[str, Any], model_client, status_callback=None, target_tables: List[str] = None, conn=None) -> Dict[str, str]:
+    def _ensure_sandbox_ready(self, schemas: Dict[str, Any], model_client, status_callback=None, target_tables: List[str] = None, conn=None, query_context: str = "") -> Dict[str, str]:
         should_close = False
         if conn is None:
             conn = sqlite3.connect(self.db_path)
@@ -383,7 +389,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
 {all_text}
 
 要求：
-1. 识别所有提到的实体/表名
+1. 识别所有提到的实体/表名（优先使用英文名，如果没有则翻译为英文）
 2. 提取每个表的字段定义（字段名、类型、说明）
 3. 推断表之间的关联关系
 4. 返回标准 JSON 格式
@@ -392,11 +398,12 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
 {{
   "macro_context": "业务背景描述",
   "tables": {{
-    "表名": {{
+    "table_name_en": {{
       "desc": "表说明",
       "cols": [
-        {{"name": "字段名", "type": "类型", "comment": "说明"}}
-      ]
+        {{"name": "field_name", "type": "TEXT/INTEGER/REAL", "comment": "说明"}}
+      ],
+      "is_virtual": true
     }}
   }}
 }}
@@ -404,10 +411,17 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
 只返回 JSON，不要其他内容。"""
         
         try:
+            print(f"🧠 [Schema提取] 正在请求 LLM 解析文档结构...")
             res = model_client.complete(prompt).text
             match = re.search(r'(\{.*\})', res, re.DOTALL)
             if match:
                 new_schema = json.loads(match.group(1))
+                
+                # 验证提取结果有效性
+                if not new_schema.get('tables'):
+                    print(f"⚠️ [Schema提取] LLM 返回了 JSON 但没有表定义")
+                    return {}
+
                 # 合并到现有 schema
                 if os.path.exists(self.schema_path):
                     with open(self.schema_path, 'r', encoding='utf-8') as f:
@@ -416,23 +430,36 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                     current = {"tables": {}, "macro_context": ""}
                 
                 # 合并 tables
+                extracted_count = 0
                 for t, info in new_schema.get('tables', {}).items():
-                    if t not in current['tables']:
-                        current['tables'][t] = info
-                        current['tables'][t]['is_virtual'] = True
+                    # 规范化表名
+                    safe_t = re.sub(r'[^a-zA-Z0-9_]', '_', t).lower()
+                    if safe_t not in current['tables']:
+                        current['tables'][safe_t] = info
+                        # 确保标记为虚拟表，触发后续的 JIT 造数
+                        current['tables'][safe_t]['is_virtual'] = True
+                        extracted_count += 1
+                        print(f"   ✅ [提取成功] 发现表: {safe_t} ({len(info.get('cols', []))} 字段)")
                     else:
-                        current['tables'][t].update(info)
+                        current['tables'][safe_t].update(info)
                 
                 if new_schema.get('macro_context'):
                     current['macro_context'] = new_schema['macro_context']
                 
+                # 立即落盘
                 with open(self.schema_path, 'w', encoding='utf-8') as f:
                     json.dump(current, f, indent=4, ensure_ascii=False)
                 
-                if status_callback: status_callback(f"✅ 成功从文档提取了 {len(new_schema.get('tables', {}))} 个逻辑表定义")
+                success_msg = f"✅ 成功从文档提取了 {extracted_count} 个逻辑表定义，Schema 已更新"
+                print(success_msg)
+                if status_callback: status_callback(success_msg)
                 return current
+            else:
+                print(f"❌ [Schema提取] 无法从 LLM 响应中提取 JSON")
         except Exception as e:
-            if status_callback: status_callback(f"⚠️ 从文档提取 Schema 失败: {e}")
+            err_msg = f"⚠️ 从文档提取 Schema 失败: {e}"
+            print(err_msg)
+            if status_callback: status_callback(err_msg)
         return {}
 
     def recommend_visualization(self, query: str, columns: List[str], sample_data: List[Dict], model_client) -> Dict[str, Any]:
@@ -534,7 +561,13 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             "架构建议", "ETL", "架构设计", "业务模型", "建模规范"
         ]
         # 优化判定：仅当 query 纯粹侧重于元数据查询且不包含具体业务指标时才进入
-        is_metadata_query = any(k in query.lower() for k in metadata_keywords) and not any(k in query.lower() for k in ["多少", "金额", "总计", "平均", "最高", "最低", "趋势", "统计", "销量", "订单"])
+        # [v6.8.9 Fix] 增加对“造数/模拟/数据”等意图的豁免，防止造数请求被拦截为 Schema 查询
+        exclude_keywords = [
+            "多少", "金额", "总计", "平均", "最高", "最低", "趋势", "统计", "销量", "订单",
+            "数据", "data", "mock", "sample", "record", "row", "generate", "simulate", "create", "insert", 
+            "生成", "模拟", "造数", "样例", "记录", "内容", "content", "values"
+        ]
+        is_metadata_query = any(k in query.lower() for k in metadata_keywords) and not any(k in query.lower() for k in exclude_keywords)
         
         if is_metadata_query:
             print(f"🔍 [决策] 判定为架构/配置咨询，构建深度透视看板...")
@@ -596,6 +629,18 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
 
         # 2. 识别与对齐
         rel_tables = self._get_relevant_tables(query, full_schemas)
+        
+        # --- [v6.7.3 Fix] 虚拟表强制激活 (Virtual Table Force Activation) ---
+        # 如果当前查询涉及的表是虚拟表(从Word/Text提取)，必须强制纳入检查列表以触发造数
+        # 否则系统可能会因为"物理表不存在"而直接放弃
+        virtual_tables = [t for t in full_schemas.get('tables', {}) if full_schemas['tables'][t].get('is_virtual')]
+        if virtual_tables:
+            # 简单的关键词匹配：如果问题里提到了虚拟表的表名或别名，就强制加入
+            for vt in virtual_tables:
+                if vt not in rel_tables and (vt.lower() in query.lower() or any(k in query.lower() for k in [vt, "员工", "考勤", "employee", "attendance"])):
+                    rel_tables.append(vt)
+                    print(f"🔌 [Force Attach] 强制关联虚拟表: {vt}")
+
         print(f"📁 [建模] 锁定业务范围: {rel_tables}")
         
         # [v6.7.0 Fix] 判定是否为仿真模式：只要涉及的表中有一个是虚拟表，整体判定为仿真模式
@@ -605,7 +650,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         try:
             # 原则：如果是数据分析模式，且涉及范围内的表在数据库中不存在或为空，必须先完成“无数造数”的闭环
             if status_callback: status_callback("🛡️ 正在确保业务底座完整性...")
-            mapping = self._ensure_sandbox_ready(full_schemas, model_client, status_callback, rel_tables, conn=session_conn)
+            mapping = self._ensure_sandbox_ready(full_schemas, model_client, status_callback, rel_tables, conn=session_conn, query_context=query)
             
             # 重新获取子架构（使用映射后的物理表名）
             sub_schema = {}
@@ -707,37 +752,50 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                 empty_reason = "该阶段执行了逻辑加工，未产生回显数据"
                 
                 if sqls.get("sqlite"):
-                    print(f"🚀 [Executing] 开始执行 SQL...")
-                    exec_res = self.execute_sql(sqls["sqlite"], model_client, conn=session_conn)
-                    print(f"📊 [Exec Result] Success: {exec_res['success']}, Data Count: {len(exec_res.get('data', []))}")
+                    current_sql = sqls["sqlite"].strip()
+                    sql_snippet = (current_sql[:100] + '...') if len(current_sql) > 100 else current_sql
+                    print(f"🚀 [Stage {i+1}] 执行 SQL: {sql_snippet}")
+                    
+                    exec_res = self.execute_sql(current_sql, model_client, conn=session_conn)
+                    print(f"📊 [Attempt 1] 结果: {'✅' if exec_res['data'] else '⚠️'} 命中 {len(exec_res.get('data', []))} 行")
+                    
+                    # --- [v6.7.2 Fix] 模拟环境下的空结果自愈 (Empty Result Rescue) ---
+                    if not exec_res['data'] and is_simulated:
+                        print(f"🔄 [自愈循环] 模拟库表 '{list(t_context.keys())}' 数据不足，正在根据意图补全...")
+                        
+                        rescue_tables = [t for t in t_context.keys()]
+                        for t in rescue_tables:
+                            orig_key = next((k for k in full_schemas.get('tables', {}).keys() if k.lower() == t.lower()), None)
+                            if orig_key:
+                                table_info = full_schemas['tables'][orig_key]
+                                self._generate_mock_data(t, table_info, full_schemas, model_client, session_conn.cursor(), query_context=query)
+                        
+                        session_conn.commit()
+                        
+                        print(f"🚀 [Attempt 2] 数据补全完成，正在执行二次验证...")
+                        exec_res = self.execute_sql(current_sql, model_client, conn=session_conn)
+                        print(f"📊 [Final Result] 结果: {'✅' if exec_res['data'] else '❌'} 最终命中 {len(exec_res.get('data', []))} 行")
+
                     if exec_res["success"]:
                         if exec_res['data']:
                             r_count = len(exec_res['data'])
-                            print(f"✅ [结果] 成功命中 {r_count} 行记录")
-                            if status_callback: status_callback(f"✅ 命中 {r_count} 行数据")
-                            analysis_context += f"阶段{i+1}: {json.dumps(exec_res['data'][:5], ensure_ascii=False)}\n"
+                            if status_callback: status_callback(f"✅ 成功获取 {r_count} 条核心业务数据")
+                            analysis_context += f"阶段{i+1}结果采样: {json.dumps(exec_res['data'][:5], ensure_ascii=False)}\n"
                             empty_reason = ""
                         else:
                             # 强化正则：支持引号、空格和 TEMPORARY 关键字
-                            m_table = re.search(r'CREATE\s+(?:TEMPORARY\s+)?TABLE\s+(?:"?)([a-zA-Z0-9_]+)(?:"?)', sqls["sqlite"], re.I)
+                            m_table = re.search(r'CREATE\s+(?:TEMPORARY\s+)?TABLE\s+(?:"?)([a-zA-Z0-9_]+)(?:"?)', current_sql, re.I)
                             if m_table:
                                 t_name = m_table.group(1)
-                                print(f"🏗️ [探测] 识别到新产生的临时实体: {t_name}")
-                                
-                                # 强制物理探测
+                                print(f"🏗️ [探测] 识别到中间加工表: {t_name}")
                                 v_res = self.execute_sql(f'SELECT * FROM "{t_name}" LIMIT 10', conn=session_conn)
                                 if v_res["success"] and v_res["data"]:
                                     exec_res["data"] = v_res["data"]
-                                    print(f"✅ [采样] 表 '{t_name}' 已就绪并成功采样 {len(v_res['data'])} 行")
                                     empty_reason = ""
                                 else:
-                                    empty_reason = f"🏗️ 阶段执行成功，但新实体 '{t_name}' 内无数据回显"
+                                    empty_reason = f"🏗️ 阶段执行成功，但加工表 '{t_name}' 为空"
                             else:
-                                # 检查是否有 SELECT 语句但结果为空
-                                if "SELECT" in sqls["sqlite"].upper():
-                                    empty_reason = "⚠️ 查询执行成功，但当前筛选条件下无符合记录"
-                                else:
-                                    empty_reason = "🏗️ 逻辑加工已完成（无回显数据产生）"
+                                empty_reason = "⚠️ 逻辑验证通过，但当前筛选条件下无符合记录"
                 
                 # 构建阶段数据
                 stage_data = {
@@ -850,6 +908,266 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         finally:
             session_conn.close()
 
+    def _classify_content(self, df: pd.DataFrame, model_client) -> str:
+        """[智能仲裁] 判断文件内容是 'DATA' (事实数据) 还是 'SCHEMA' (定义文档)"""
+        # 1. 规则速判: 行数极多通常是数据
+        if len(df) > 100:
+            return "DATA"
+        
+        # 2. 规则速判: 列名包含明显定义特征
+        headers = [str(c).lower() for c in df.columns]
+        schema_keywords = ['type', '类型', 'description', '描述', 'comment', '备注', 'length', '长度', 'pk', '主键']
+        if any(k in headers for k in schema_keywords) and len(df) < 50:
+            # 这是一个强信号，但也可能只是巧合，交给 LLM 确认
+            pass
+
+        # 3. LLM 深度仲裁
+        # 采样数据指纹
+        sample_rows = df.head(5).to_string(index=False)
+        prompt = f"""请判断以下表格片段的【本质属性】。
+
+表格指纹:
+{sample_rows}
+
+选项 A: [DATA]
+特征: 这是业务发生的记录(流水/明细)。
+内容: 包含具体的人名、时间、金额、ID值等事实。
+行动: 我应该直接入库。
+
+选项 B: [SCHEMA]
+特征: 这是对数据表的结构定义(数据字典)。
+内容: 包含字段名、数据类型(Int/String)、字段长度、业务含义描述。
+行动: 我应该理解结构并模拟数据。
+
+请仅返回: [DATA] 或 [SCHEMA]"""
+
+        try:
+            res = model_client.complete(prompt).text.strip()
+            if "[SCHEMA]" in res or "SCHEMA" in res: return "SCHEMA"
+            return "DATA"
+        except:
+            return "DATA" # 默认保守策略
+
+    def _parse_schema_file(self, df: pd.DataFrame, model_client) -> Dict[str, Any]:
+        """[图纸解析] 将 Schema 定义文件解析为标准 JSON 结构"""
+        content = df.to_string()
+        prompt = f"""这是一份数据表结构定义文档。请解析它并提取表结构。
+
+文档内容:
+{content}
+
+要求:
+1. 识别它定义的表名（如果文档没写，根据字段内容推断一个合理的英文表名）
+2. 提取所有列定义（字段名、类型、说明）
+3. 返回标准 JSON:
+{{
+  "table_name": "推断的表名",
+  "desc": "表的业务含义",
+  "cols": [
+    {{"name": "字段名", "type": "类型", "comment": "说明"}}
+  ]
+}}
+
+只返回 JSON。"""
+        try:
+            res = model_client.complete(prompt).text
+            return self._extract_json(res)
+        except: return {}
+
+    def smart_ingest_file(self, file_path: str, conn: sqlite3.Connection, model_client) -> Dict[str, Any]:
+        """[双轨构建] 智能判断并处理单个文件"""
+        name = os.path.basename(file_path)
+        print(f"\n🔍 [嗅探] 正在分析文件特征: {name}")
+        
+        try:
+            # 1. 读取内容
+            if name.endswith('.csv'):
+                df = pd.read_csv(file_path)
+            else:
+                df = pd.read_excel(file_path)
+            
+            # 清洗列名
+            df.columns = [re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', str(c)).strip() for c in df.columns]
+            
+            # 2. 智能仲裁 (如果没有 model_client，默认当做 DATA 处理)
+            file_type = "DATA"
+            if model_client:
+                file_type = self._classify_content(df, model_client)
+            
+            # 3. 双轨分流
+            if file_type == "DATA":
+                print(f"📦 [仲裁结果] 判定为【实体数据】 -> 启动搬运工模式")
+                t_name = re.sub(r'[^a-zA-Z0-9_]', '_', os.path.splitext(name)[0])
+                df.to_sql(t_name, conn, index=False, if_exists='replace')
+                print(f"✅ [入库] 成功写入表 '{t_name}' ({len(df)} 行)")
+                
+                # 返回元数据供 Schema 注册
+                return {
+                    t_name: {"cols": [{"name": c, "type": str(t)} for c, t in df.dtypes.items()]}
+                }
+                
+            else:
+                print(f"📐 [仲裁结果] 判定为【结构定义】 -> 启动建筑师模式 (理解->建模->模拟)")
+                
+                # A. 理解图纸
+                schema_info = self._parse_schema_file(df, model_client)
+                if not schema_info or not schema_info.get('cols'):
+                    print("⚠️ [警告] 无法解析 Schema 结构，降级为普通入库")
+                    # 降级处理
+                    t_name = "raw_" + re.sub(r'[^a-zA-Z0-9_]', '_', os.path.splitext(name)[0])
+                    df.to_sql(t_name, conn, index=False, if_exists='replace')
+                    return {}
+
+                t_name = schema_info.get('table_name', 'analyzed_table')
+                t_desc = schema_info.get('desc', '自动解析表')
+                print(f"🧠 [理解] 识别到表定义: {t_name} ({t_desc})")
+                
+                # B. 构建空表 (Physically Create Table)
+                cursor = conn.cursor()
+                cols_sql = []
+                for col in schema_info['cols']:
+                    # 简单类型映射
+                    c_type = "TEXT"
+                    if "int" in col['type'].lower(): c_type = "INTEGER"
+                    elif "float" in col['type'].lower() or "double" in col['type'].lower(): c_type = "REAL"
+                    cols_sql.append(f'"{col["name"]}" {c_type}')
+                
+                create_sql = f'CREATE TABLE IF NOT EXISTS "{t_name}" ({", ".join(cols_sql)})'
+                cursor.execute(f"DROP TABLE IF EXISTS \"{t_name}\"") # 覆盖模式
+                cursor.execute(create_sql)
+                
+                # C. 延迟构建 (JIT Construction)
+                # 核心变更：不再立即生成数据，而是仅注册元数据
+                # 数据生成将推迟到 execute_analysis -> _ensure_sandbox_ready 阶段按需执行
+                print(f"💤 [延迟] 影子数据生成已挂起。已记录表结构与血缘潜力，等待查询触发...")
+                
+                # 构造 table_info 格式
+                table_info_fmt = {
+                    "cols": schema_info['cols'],
+                    "desc": t_desc,
+                    "is_pending": True # 标记为待生成
+                }
+                
+                return {t_name: table_info_fmt}
+
+        except Exception as e:
+            print(f"❌ [错误] 处理文件 {name} 失败: {e}")
+            return {}
+
+    def process_files(self, file_paths: List[str], model_client=None, status_callback=None) -> Dict[str, Any]:
+        try:
+            print("\n" + "🏗️  [Data Base Construction] 启动知识库逻辑底座构建 (Metadata First)..." + "\n" + "="*60)
+            if os.path.exists(self.db_path): 
+                os.remove(self.db_path)
+                print("🧹 [清理] 移除旧数据库文件，准备重新建模")
+                
+            conn = sqlite3.connect(self.db_path)
+            physical_tables = {}
+            semantic_docs = []
+            
+            if status_callback: status_callback(f"📊 正在提取元数据并推演业务血缘...")
+            
+            for path in file_paths:
+                name = os.path.basename(path).lower()
+                
+                # 1. 非结构化文档 -> 语义理解路径
+                if name.endswith(('.md', '.pdf', '.docx', '.txt')):
+                    print(f"📄 [识别] 逻辑文档: {name} (待提取 Schema)")
+                    semantic_docs.append(path)
+                    continue
+                
+                # 2. 结构化文件 -> 智能双轨路径
+                if name.endswith(('.csv', '.xlsx', '.xls')):
+                    # 调用新写的智能入库方法
+                    table_meta = self.smart_ingest_file(path, conn, model_client)
+                    if table_meta:
+                        physical_tables.update(table_meta)
+                    
+            conn.close()
+            
+            modeling_summary = "多维业务分析"
+            if model_client and physical_tables:
+                print("\n🧬 [血缘] 正在推演表与表之间的逻辑关联 (Bloodline Inference)...")
+                # 升级 Prompt：专注于关系和业务流转
+                prompt_lineage = f"""分析以下数据表的定义，推导它们之间的“业务血缘关系”。
+
+表结构定义:
+{json.dumps(physical_tables, ensure_ascii=False)}
+
+要求:
+1. 识别外键关系 (如 orders.user_id -> users.id)
+2. 描述业务流转方向 (如 用户 -> 下单 -> 支付)
+3. 生成一段宏观的业务场景描述
+
+请输出一段清晰的业务逻辑摘要。"""
+                modeling_summary = model_client.complete(prompt_lineage).text.strip()
+                print(f"📝 [摘要] 业务血缘: {modeling_summary[:100]}...")
+
+            unified_schema = {"tables": physical_tables, "macro_context": modeling_summary}
+            
+            if semantic_docs and model_client:
+                print(f"🔍 [建模] 正在从 {len(semantic_docs)} 个逻辑文档中深度提取表结构定义...")
+                docs = "".join([open(p, 'r', errors='ignore').read()[:5000] for p in semantic_docs])
+                prompt = f"""分析以下文档，提取所有表的结构定义。
+
+文档内容：
+{docs}
+
+要求：
+1. 识别所有提到的表名
+2. 提取每个表的字段定义（字段名、类型、说明）
+3. 推断表之间的关联关系
+4. 返回标准 JSON 格式
+
+返回格式：
+{{
+  "macro_context": "业务背景描述",
+  "tables": {{
+    "表名": {{
+      "desc": "表说明",
+      "cols": [
+        {{"name": "字段名", "type": "类型", "comment": "说明"}}
+      ]
+    }}
+  }}
+}}
+
+只返回 JSON，不要其他内容。"""
+                
+                try:
+                    res = model_client.complete(prompt).text
+                    match = re.search(r'(\{.*\})', res, re.DOTALL)
+                    if match:
+                        semantic = json.loads(match.group(1))
+                        extracted_tables = semantic.get('tables', {})
+                        if extracted_tables:
+                            print(f"✅ [成功] 从文档提取了 {len(extracted_tables)} 个逻辑表结构")
+                            for t, info in extracted_tables.items():
+                                if t in unified_schema['tables']: 
+                                    unified_schema['tables'][t].update(info)
+                                    print(f"   • 完善已知表: {t}")
+                                else: 
+                                    unified_schema['tables'][t] = info
+                                    unified_schema['tables'][t]['is_virtual'] = True
+                                    print(f"   • 发现新逻辑表: {t} ({len(info.get('cols', []))}个字段)")
+                            unified_schema['macro_context'] = semantic.get('macro_context', modeling_summary)
+                except Exception as e:
+                    print(f"❌ [建模失败] 无法从文档提取 Schema: {e}")
+                
+            # 保存 Schema
+            with open(self.schema_path, 'w', encoding='utf-8') as f: 
+                json.dump(unified_schema, f, indent=4, ensure_ascii=False)
+            print(f"💾 [固化] 业务蓝图已保存至: {os.path.basename(self.schema_path)}")
+            
+            # 延迟构建策略：构建阶段仅完成 Schema 固化，不生成数据
+            # 数据生成将在 execute_analysis -> _ensure_sandbox_ready 中按需触发 (JIT)
+            print("\n" + "💤 [延迟] 物理底座数据生成已挂起。等待首次查询触发即时造数 (JIT)...")
+                
+            if status_callback: status_callback(f"✅ 全域建模完成，DB 底座已就绪 (结构化)")
+            print("="*60 + "\n" + "✨ [Success] 数据分析物理底座构建完成，business_data.db 已就绪" + "\n")
+            return {"success": True, "tables": list(unified_schema['tables'].keys())}
+        except Exception as e: return {"success": False, "error": str(e)}
+
     def execute_sql(self, sql: str, model_client=None, conn=None) -> Dict[str, Any]:
         should_close = False
         if conn is None:
@@ -899,108 +1217,3 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         except Exception as e: return {"success": False, "error": str(e), "data": []}
         finally:
             if should_close: conn.close()
-
-    def process_files(self, file_paths: List[str], model_client=None, status_callback=None) -> Dict[str, Any]:
-        try:
-            print("\n" + "🏗️  [Data Base Construction] 启动知识库物理底座构建..." + "\n" + "="*60)
-            if os.path.exists(self.db_path): 
-                os.remove(self.db_path)
-                print("🧹 [清理] 移除旧数据库文件，准备重新建模")
-                
-            conn = sqlite3.connect(self.db_path)
-            physical_tables = {}
-            semantic_docs = []
-            
-            if status_callback: status_callback(f"📊 正在扫描文件并识别业务蓝图...")
-            
-            for path in file_paths:
-                name = os.path.basename(path).lower()
-                if name.endswith(('.md', '.pdf', '.docx', '.txt')):
-                    print(f"📄 [识别] 逻辑文档: {name} (待提取 Schema)")
-                    semantic_docs.append(path); continue
-                    
-                t_name = re.sub(r'[^a-zA-Z0-9_]', '_', os.path.splitext(name)[0])
-                try:
-                    df = pd.read_csv(path) if name.endswith('.csv') else pd.read_excel(path)
-                    df.columns = [re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', str(c)) for c in df.columns]
-                    df.to_sql(t_name, conn, index=False, if_exists='replace')
-                    col_count = len(df.columns)
-                    row_count = len(df)
-                    physical_tables[t_name] = {"cols": [{"name": c, "type": str(t)} for c, t in df.dtypes.items()]}
-                    print(f"📊 [固化] 真实数据表: {t_name} | 规模: {col_count}列 x {row_count}行")
-                except Exception as e:
-                    print(f"❌ [失败] 无法解析数据文件 {name}: {e}")
-                    
-            conn.close()
-            
-            modeling_summary = "多维业务分析"
-            if model_client and physical_tables:
-                print("🧠 [理解] 正在通过 AI 总结物理表之间的业务逻辑关系...")
-                modeling_summary = model_client.complete(f"总结业务逻辑: {json.dumps(physical_tables)}").text.strip()
-                print(f"📝 [摘要] 业务背景: {modeling_summary[:100]}...")
-
-            unified_schema = {"tables": physical_tables, "macro_context": modeling_summary}
-            
-            if semantic_docs and model_client:
-                print(f"🔍 [建模] 正在从 {len(semantic_docs)} 个逻辑文档中深度提取表结构定义...")
-                docs = "".join([open(p, 'r', errors='ignore').read()[:5000] for p in semantic_docs])
-                prompt = f"""分析以下文档，提取所有表的结构定义。
-
-文档内容：
-{docs}
-
-要求：
-1. 识别所有提到的表名
-2. 提取每个表的字段定义（字段名、类型、说明）
-3. 返回标准 JSON 格式
-
-返回格式：
-{{
-  "macro_context": "业务背景描述",
-  "tables": {{
-    "表名": {{
-      "desc": "表说明",
-      "cols": [
-        {{"name": "字段名", "type": "类型", "comment": "说明"}}
-      ]
-    }}
-  }}
-}}
-
-只返回 JSON，不要其他内容。"""
-                
-                try:
-                    res = model_client.complete(prompt).text
-                    match = re.search(r'(\{.*\})', res, re.DOTALL)
-                    if match:
-                        semantic = json.loads(match.group(1))
-                        extracted_tables = semantic.get('tables', {})
-                        if extracted_tables:
-                            print(f"✅ [成功] 从文档提取了 {len(extracted_tables)} 个逻辑表结构")
-                            for t, info in extracted_tables.items():
-                                if t in unified_schema['tables']: 
-                                    unified_schema['tables'][t].update(info)
-                                    print(f"   • 完善已知表: {t}")
-                                else: 
-                                    unified_schema['tables'][t] = info
-                                    unified_schema['tables'][t]['is_virtual'] = True
-                                    print(f"   • 发现新逻辑表: {t} ({len(info.get('cols', []))}个字段)")
-                            unified_schema['macro_context'] = semantic.get('macro_context', modeling_summary)
-                except Exception as e:
-                    print(f"❌ [建模失败] 无法从文档提取 Schema: {e}")
-                
-            # 保存 Schema
-            with open(self.schema_path, 'w', encoding='utf-8') as f: 
-                json.dump(unified_schema, f, indent=4, ensure_ascii=False)
-            print(f"💾 [固化] 业务蓝图已保存至: {os.path.basename(self.schema_path)}")
-            
-            # 强制固化底座：如果表是空的，立刻生成仿真数据
-            if model_client:
-                print("\n" + "🎲 [仿真] 启动“无数造数”流程，填充物理底座...")
-                if status_callback: status_callback("🧪 正在固化业务数据底座 (有数治数/无数造数)...")
-                self._ensure_sandbox_ready(unified_schema, model_client, status_callback=None)
-                
-            if status_callback: status_callback(f"✅ 全域建模完成，DB 底座已就绪")
-            print("="*60 + "\n" + "✨ [Success] 数据分析物理底座构建完成，business_data.db 已就绪" + "\n")
-            return {"success": True, "tables": list(unified_schema['tables'].keys())}
-        except Exception as e: return {"success": False, "error": str(e)}

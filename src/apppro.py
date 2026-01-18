@@ -1613,7 +1613,7 @@ with st.sidebar:
                 da_files = st.file_uploader(
                     "上传业务表单或数据字典", 
                     accept_multiple_files=True, 
-                    type=['csv', 'xlsx', 'xls', 'md', 'markdown'],
+                    type=['csv', 'xlsx', 'xls', 'md', 'markdown', 'docx', 'doc'],
                     key="da_uploader",
                     label_visibility="collapsed"
                 )
