@@ -360,7 +360,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                 orig_key = schema_tables.get(schema_name.lower())
                 if orig_key:
                     table_info = schemas['tables'][orig_key]
-                    if self._generate_mock_data(physical_name, table_info, schemas, model_client, cursor):
+                    if self._generate_mock_data(physical_name, table_info, schemas, model_client, cursor, query_context=query_context):
                         table_mapping[schema_name] = physical_name
                         conn.commit()
                 else:
