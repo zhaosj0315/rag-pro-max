@@ -1,10 +1,17 @@
-# RAG Pro Max v6.7.2 企业级系统架构文档
+# RAG Pro Max v6.7.3 企业级系统架构文档
 
-**版本**: v6.7.2 (Strategic Intelligence Edition)  
+**版本**: v6.7.3 (Strategic Intelligence Edition)  
 **更新日期**: 2026-01-18  
-**核心特性**: Strategic Workshop 3.0、精准选表引擎、外科手术式数据仿真
+**核心特性**: Login CSS Architecture v2.0、Strategic Workshop 3.0、精准选表引擎
 
 ---
+
+## 🎨 登录页 CSS 架构 (v6.7.3)
+
+在 v6.7.3 中，我们通过“原子化”样式覆盖技术重构了登录交互：
+- **精准锚点定位**: 在 Python 组件层注入 `.login-anchor` 锚点，配合 CSS `:has` 伪类（`[data-testid="stVerticalBlock"]:has(.login-anchor)`）实现了对登录区域的深度选择与隔离样式控制。
+- **核武器级样式清洗**: 针对 Streamlit 自带的高优先级 Secondary Button 样式，通过 `!important` 强制剥离 `background`, `border`, `box-shadow` 及 `border-radius`，实现了按钮组件到纯文字链接的形态转化。
+- **布局间距计算**: 废弃了传统的 `panel-footer` 容器，直接利用 CSS `margin-top` 实现了与上方表单按钮的精准垂直分离（1.5rem）。
 
 ## 🧠 Strategic Workshop 3.0 架构 (v6.7.2)
 

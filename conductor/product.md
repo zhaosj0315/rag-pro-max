@@ -9,9 +9,9 @@ RAG Pro Max is an enterprise-grade intelligent document Q&A and data analysis sy
 - **Multi-modal**: Handles 20+ file formats and provides integrated OCR for images.
 - **Reliable Scraping**: Uses a saturation queue pipeline for 100% crawling coverage of documentation sites.
 
-## Key Features (v6.7.0)
+## Key Features (v6.7.3)
+- **Login UX Refinement**: Atomized CSS architecture and pure-text link interaction for a distraction-free authentication experience.
+- **Strategic Workshop 3.0**: LLM-driven precise table identification and surgical data simulation (v6.7.2+).
 - **Resource Governance Matrix**: Physical and logical management of knowledge base assets with determinative batch operations.
 - **Universal Attachment Parsing**: Unified pipeline for chat attachments and KB construction, supporting 20+ formats.
 - **Data Analyst 2.0**: Automated Schema extraction, physical DB (SQLite) injection, and synthetic data generation.
-- **Saturation Crawling Engine**: 1:1 logical cloning of documentation sites with WAF evasion.
-- **Unified Command Center**: Streamlit-based UI for management and interaction.

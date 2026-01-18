@@ -12,14 +12,18 @@
 
 # RAG Pro Max - 企业级智能文档问答与数据分析系统
 
-**当前版本**: v6.7.2 (Strategic Intelligence Edition)  
-![Version](https://img.shields.io/badge/version-v6.7.2-brightgreen)
+**当前版本**: v6.7.3 (Strategic Intelligence Edition)  
+![Version](https://img.shields.io/badge/version-v6.7.3-brightgreen)
 
 RAG Pro Max 是一款专为企业级复杂场景打造的智能体系统，深度融合了全量文档搬运（RAG）、自动化网页抓取与 **Strategic Workshop (战略分析车间)** 的精准仿真分析能力。
 
 ---
 
-## 🚀 v6.7.2 核心特性
+## 🚀 v6.7.3 核心特性
+
+### 🎨 Login UX 极致优化 (Final Polish)
+- **访客链接纯净化**: 登录页“访客身份浏览”由按钮样式重构为纯文字链接，消除视觉冗余，显著提升工业级质感。
+- **原子化 CSS 架构**: 采用锚点隔离技术与核武器级样式覆盖，确保 UI 在 Streamlit 框架下依然保持极致的品牌调性。
 
 ### 🧠 Strategic Workshop 3.0 (战略分析车间)
 - **精准选表引擎**: 采用 LLM 驱动的语义剪枝，从海量表中精准锁定核心业务表，查询初始化速度提升 500%。

@@ -41,9 +41,9 @@ def render_login_page():
             min-height: 100vh !important;
         }
         
-        /* 核心：整体内容升空 200px，确保重心处于屏幕上1/3位置 */
+        /* 核心：找回被切掉的主标题，确保RAG Pro Max完整显示 */
         [data-testid="stHorizontalBlock"] {
-            transform: translateY(-200px) !important;
+            transform: translateY(-130px) !important;
         }
 
         /* --- 左侧：驾驶舱仪表盘 --- */
@@ -176,51 +176,57 @@ def render_login_page():
             padding: 1rem 0rem;
         }
 
-        /* 3. 访客链接：彻底文字化 (强制剥离所有层级的背景色) */
-        .panel-footer {
-            text-align: center;
-            padding: 0 !important;
-            margin-top: 2rem !important;
+        /* 3. 访客链接：彻底文字化 (利用 :has 穿透到真实的按钮容器) */
+        /* 这里的核心逻辑是：找到包含 .login-anchor 的那一列，然后对其中的次要按钮进行“核武器级”样式清洗 */
+        [data-testid="stVerticalBlock"]:has(.login-anchor) [data-testid="stButton"] {
+            display: flex !important;
+            justify-content: center !important;
             background: transparent !important;
+            margin-top: 1.5rem !important; /* 增加顶部间距，避开上方按钮 */
         }
-        
-        /* 深度穿透：针对按钮及其所有父级容器进行透明化处理 */
-        .panel-footer [data-testid="stButton"],
-        .panel-footer [data-testid="stButton"] > div,
-        .panel-footer [data-testid="stButton"] button,
-        .panel-footer [data-testid="stButton"] button > div {
+
+        [data-testid="stVerticalBlock"]:has(.login-anchor) button[kind="secondary"] {
             background: transparent !important;
             background-color: transparent !important;
+            background-image: none !important;
             border: none !important;
             border-radius: 0 !important;
             box-shadow: none !important;
-            color: #9CA3AF !important; /* 浅灰色 (#9CA3AF) */
+            padding: 0 !important;
+            margin: 0 !important;
+            outline: none !important;
+            color: #9CA3AF !important;
             font-size: 0.85rem !important;
             font-weight: 500 !important;
             text-decoration: none !important;
-            display: inline-block !important;
-            width: auto !important;
-            height: auto !important;
             min-height: 0 !important;
+            width: auto !important;
             line-height: 1.5 !important;
-            padding: 0 !important;
-            margin: 0 !important;
+            -webkit-appearance: none !important;
+            transition: color 0.2s ease !important;
         }
-        
-        .panel-footer [data-testid="stButton"] button:hover {
-            color: #60a5fa !important; /* 亮蓝色悬停 */
+
+        /* 强制覆盖所有可能的子元素背景 */
+        [data-testid="stVerticalBlock"]:has(.login-anchor) button[kind="secondary"] * {
+            background: transparent !important;
+            background-color: transparent !important;
+        }
+
+        /* 悬停状态：变蓝并加下划线 */
+        [data-testid="stVerticalBlock"]:has(.login-anchor) button[kind="secondary"]:hover {
+            color: #60a5fa !important;
             text-decoration: underline !important;
             background: transparent !important;
             background-color: transparent !important;
         }
-        
-        /* 强制移除任何可能的边框或轮廓 */
-        .panel-footer [data-testid="stButton"] button:focus,
-        .panel-footer [data-testid="stButton"] button:active {
+
+        /* 激活与焦点状态：保持透明 */
+        [data-testid="stVerticalBlock"]:has(.login-anchor) button[kind="secondary"]:active,
+        [data-testid="stVerticalBlock"]:has(.login-anchor) button[kind="secondary"]:focus {
             background: transparent !important;
             background-color: transparent !important;
-            box-shadow: none !important;
             color: #60a5fa !important;
+            box-shadow: none !important;
         }
         
         /* 4. 右侧列对齐优化：将 Tab 栏下移，使其与左侧流程图顶部对齐 */
@@ -276,9 +282,9 @@ def render_login_page():
             box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4) !important;
         }
         
-        /* 占位符颜色 (Placeholder) - 提高对比度 */
+        /* 占位符颜色 (Placeholder) - 提高对比度到最佳可读性 */
         ::placeholder {
-            color: #9CA3AF !important; /* 浅灰色，提高可读性 */
+            color: #9CA3AF !important; /* 浅灰色，最佳可读性 */
             -webkit-text-fill-color: #9CA3AF !important;
         }
 
@@ -447,10 +453,8 @@ def render_login_page():
             st.markdown('</div>', unsafe_allow_html=True)
         
         # 3. 访客页脚 (纯文字链接居中)
-        st.markdown('<div class="panel-footer">', unsafe_allow_html=True)
         if st.button("没有账号？以访客身份浏览", key="guest_btn", help="仅限浏览公开知识库", use_container_width=False):
             st.session_state.logged_in = True; st.session_state.user = "guest_user"; st.session_state.role = "guest"; st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
     # --- 4. 全局状态页脚 (固定沉底，全宽居中) ---
     st.markdown(f"""
