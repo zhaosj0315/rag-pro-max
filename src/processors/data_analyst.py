@@ -989,23 +989,69 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             return "DATA" # 默认保守策略
 
     def _parse_schema_file(self, df: pd.DataFrame, model_client) -> Dict[str, Any]:
-        """[图纸解析] 将 Schema 定义文件解析为标准 JSON 结构"""
+        """[图纸解析] 将 Schema 定义文件解析为标准 JSON 结构 (支持多表)"""
+        # [v6.9.3] 增加启发式多表识别
+        headers = [str(c).lower().strip() for c in df.columns]
+        table_name_cols = ['表英文名', '表名', 'table name', 'table_name', 'entity', '实体名']
+        table_col = next((c for c, h in zip(df.columns, headers) if h in table_name_cols), None)
+        
+        if table_col:
+            print(f"🧩 [启发式识别] 检测到多表定义列: {table_col}")
+            extracted_tables = {}
+            for t_name, group in df.groupby(table_col):
+                if pd.isna(t_name) or str(t_name).strip() == "": continue
+                
+                # 尝试寻找列名、类型、注释列
+                cols = []
+                col_name_key = next((c for c, h in zip(df.columns, headers) if h in ['字段名称', '字段名', 'column name', 'field', '字段']), None)
+                col_type_key = next((c for c, h in zip(df.columns, headers) if h in ['字段类型分', '数据类型', '类型', 'type', 'data type']), None)
+                col_comment_key = next((c for c, h in zip(df.columns, headers) if h in ['字段中文名', '注释', '说明', 'comment', 'description', '描述']), None)
+                
+                for _, row in group.iterrows():
+                    c_name = str(row[col_name_key]) if col_name_key else "unknown"
+                    if c_name == "nan" or c_name.strip() == "": continue
+                    
+                    cols.append({
+                        "name": c_name,
+                        "type": str(row[col_type_key]) if col_type_key else "TEXT",
+                        "comment": str(row[col_comment_key]) if col_comment_key else ""
+                    })
+                
+                if cols:
+                    extracted_tables[str(t_name)] = {
+                        "table_name": str(t_name),
+                        "desc": f"从字典文件提取的表: {t_name}",
+                        "cols": cols
+                    }
+            
+            if extracted_tables:
+                print(f"   ✅ 成功从列特征中提取了 {len(extracted_tables)} 个表结构")
+                return {"tables": extracted_tables}
+
+        # --- 降级方案：LLM 解析 ---
         content = df.to_string()
+        if len(content) > 10000: content = content[:10000] + "..." # 防止过长
+        
         prompt = f"""这是一份数据表结构定义文档。请解析它并提取表结构。
 
 文档内容:
 {content}
 
 要求:
-1. 识别它定义的表名（如果文档没写，根据字段内容推断一个合理的英文表名）
-2. 提取所有列定义（字段名、类型、说明）
-3. 返回标准 JSON:
+1. 识别其中定义的所有表
+2. 提取每个表的所有列定义（字段名、类型、说明）
+3. 返回标准 JSON 格式:
 {{
-  "table_name": "推断的表名",
-  "desc": "表的业务含义",
-  "cols": [
-    {{"name": "字段名", "type": "类型", "comment": "说明"}}
-  ]
+  "tables": {{
+    "table_name_1": {{
+      "table_name": "table_name_1",
+      "desc": "业务含义",
+      "cols": [
+        {{"name": "字段名", "type": "类型", "comment": "说明"}}
+      ]
+    }},
+    ...
+  }}
 }}
 
 只返回 JSON。"""
@@ -1050,45 +1096,56 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                 print(f"📐 [仲裁结果] 判定为【结构定义】 -> 启动建筑师模式 (理解->建模->模拟)")
                 
                 # A. 理解图纸
-                schema_info = self._parse_schema_file(df, model_client)
-                if not schema_info or not schema_info.get('cols'):
+                parse_res = self._parse_schema_file(df, model_client)
+                
+                # 兼容多种返回格式 (v6.9.3)
+                extracted_tables = {}
+                if "tables" in parse_res:
+                    extracted_tables = parse_res["tables"]
+                elif "table_name" in parse_res and "cols" in parse_res:
+                    # 旧版格式兼容
+                    t_name = parse_res.get('table_name', 'analyzed_table')
+                    extracted_tables[t_name] = parse_res
+
+                if not extracted_tables:
                     print("⚠️ [警告] 无法解析 Schema 结构，降级为普通入库")
                     # 降级处理
                     t_name = "raw_" + re.sub(r'[^a-zA-Z0-9_]', '_', os.path.splitext(name)[0])
                     df.to_sql(t_name, conn, index=False, if_exists='replace')
                     return {}
 
-                t_name = schema_info.get('table_name', 'analyzed_table')
-                t_desc = schema_info.get('desc', '自动解析表')
-                print(f"🧠 [理解] 识别到表定义: {t_name} ({t_desc})")
+                final_meta = {}
+                for t_name, info in extracted_tables.items():
+                    t_desc = info.get('desc', info.get('table_name', '自动解析表'))
+                    cols = info.get('cols', [])
+                    if not cols: continue
+
+                    print(f"🧠 [理解] 识别到表定义: {t_name} ({t_desc})")
+                    
+                    # B. 构建空表 (Physically Create Table)
+                    cursor = conn.cursor()
+                    cols_sql = []
+                    for col in cols:
+                        # 简单类型映射
+                        c_type = "TEXT"
+                        c_type_raw = str(col.get('type', 'TEXT')).lower()
+                        if "int" in c_type_raw: c_type = "INTEGER"
+                        elif "float" in c_type_raw or "double" in c_type_raw or "decimal" in c_type_raw: c_type = "REAL"
+                        cols_sql.append(f'"{col["name"]}" {c_type}')
+                    
+                    create_sql = f'CREATE TABLE IF NOT EXISTS "{t_name}" ({", ".join(cols_sql)})'
+                    cursor.execute(f"DROP TABLE IF EXISTS \"{t_name}\"") # 覆盖模式
+                    cursor.execute(create_sql)
+                    
+                    # C. 注册元数据 (JIT Construction)
+                    final_meta[t_name] = {
+                        "cols": cols,
+                        "desc": t_desc,
+                        "is_virtual": True
+                    }
                 
-                # B. 构建空表 (Physically Create Table)
-                cursor = conn.cursor()
-                cols_sql = []
-                for col in schema_info['cols']:
-                    # 简单类型映射
-                    c_type = "TEXT"
-                    if "int" in col['type'].lower(): c_type = "INTEGER"
-                    elif "float" in col['type'].lower() or "double" in col['type'].lower(): c_type = "REAL"
-                    cols_sql.append(f'"{col["name"]}" {c_type}')
-                
-                create_sql = f'CREATE TABLE IF NOT EXISTS "{t_name}" ({", ".join(cols_sql)})'
-                cursor.execute(f"DROP TABLE IF EXISTS \"{t_name}\"") # 覆盖模式
-                cursor.execute(create_sql)
-                
-                # C. 延迟构建 (JIT Construction)
-                # 核心变更：不再立即生成数据，而是仅注册元数据
-                # 数据生成将推迟到 execute_analysis -> _ensure_sandbox_ready 阶段按需执行
-                print(f"💤 [延迟] 影子数据生成已挂起。已记录表结构与血缘潜力，等待查询触发...")
-                
-                # 构造 table_info 格式
-                table_info_fmt = {
-                    "cols": schema_info['cols'],
-                    "desc": t_desc,
-                    "is_virtual": True # 标记为虚拟表 (JIT造数)
-                }
-                
-                return {t_name: table_info_fmt}
+                print(f"💤 [延迟] 已成功从字典提取 {len(final_meta)} 个表结构，等待查询触发造数...")
+                return final_meta
 
         except Exception as e:
             print(f"❌ [错误] 处理文件 {name} 失败: {e}")

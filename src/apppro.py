@@ -6458,7 +6458,8 @@ if st.session_state.get('is_processing') and final_prompt:
                                         logger.warning(f"⚠️ 引擎按需唤醒异常: {e}")
 
                         # B. 战略推演工作坊逻辑
-                        if os.path.exists(schema_path) and (manual_da_on or "is_data_kb" in locals()):
+                        is_data_kb = os.path.exists(schema_path)
+                        if is_data_kb and (manual_da_on or "is_data_kb" in locals()):
                             from src.auth.audit_logger import AuditLogger
                             from src.common.utils import get_client_ip
                             AuditLogger.log(
