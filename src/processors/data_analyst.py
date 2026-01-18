@@ -263,9 +263,13 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                         values.append(f"ID{i+1:04d}")
                     elif any(k in col_name for k in ['name', '名称', '姓名']):
                         values.append(f"测试{i+1}")
-                    elif any(k in col_name for k in ['date', '日期', 'time', '时间']):
+                    elif any(k in col_name for k in ['date', '日期', 'time', '时间', 'rfq']):
                         values.append(f"2025-01-{(i%28)+1:02d}")
-                    elif any(k in col_name for k in ['amount', 'price', 'sales', '金额', '价格', '销售']):
+                    elif any(k in col_name for k in ['tjny', 'month', '月份', '年月']):
+                        values.append(f"2025-{((i%12)+1):02d}")
+                    elif any(k in col_name for k in ['year', '年份']):
+                        values.append(f"202{i%5}")
+                    elif any(k in col_name for k in ['amount', 'price', 'sales', '金额', '价格', '销售', 'je']):
                         values.append(str((i+1) * 1000 + (i*137) % 1000))
                     elif any(k in col_name for k in ['status', '状态']):
                         values.append(['正常', '待审核', '已完成'][i % 3])
