@@ -7,13 +7,6 @@
         "@modelcontextprotocol/server-filesystem",
         "/Users/zhaosj/Documents/rag-pro-max"
       ]
-    },
-    "fetch": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-fetch"
-      ]
     }
   }
 }

@@ -12,11 +12,16 @@ def render_login_page():
             overflow: hidden !important;
             height: 100vh !important;
             font-family: 'Inter', sans-serif;
+            background-color: #0f172a !important; /* 强制全局背景深色 */
+        }
+        
+        [data-testid="stAppViewContainer"] {
+            background-color: #0f172a !important;
         }
         
         /* 核心背景 */
         .stApp {
-            background-color: #0f172a;
+            background-color: #0f172a !important;
             background-image: 
                 radial-gradient(at 0% 0%, rgba(96, 165, 250, 0.15) 0px, transparent 50%),
                 radial-gradient(at 98% 100%, rgba(244, 114, 182, 0.15) 0px, transparent 50%),
@@ -219,24 +224,67 @@ def render_login_page():
             margin-top: 15.5rem; /* 经过精确计算，避开左侧标题与副标题的高度 */
         }
         
-        /* 4. 输入框对比度强化 (悬浮模式必备) */
-        .stTextInput input {
-            background-color: rgba(255, 255, 255, 0.03) !important;
-            border: 1px solid rgba(255, 255, 255, 0.15) !important;
-            backdrop-filter: blur(8px) !important;
+        /* 4. 输入框对比度强化 (全环境终极适配版) */
+        /* 针对自动填充 (Autofill) 的强制覆盖，防止浏览器自动变白/变黄 */
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover, 
+        input:-webkit-autofill:focus, 
+        input:-webkit-autofill:active {
+            -webkit-box-shadow: 0 0 0 1000px #1e293b inset !important;
+            -webkit-text-fill-color: #ffffff !important;
+            caret-color: #ffffff !important;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+
+        /* 针对所有可能的输入框容器层级进行深色锁定 */
+        .stTextInput, [data-testid="stTextInput"], div[data-baseweb="input"] {
+            background-color: #1e293b !important;
+            border-radius: 12px !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        }
+
+        /* 穿透所有层级，强制内联输入框样式 */
+        .stTextInput input, 
+        [data-testid="stTextInput"] input,
+        div[data-baseweb="input"] input {
+            background-color: transparent !important; /* 依靠外层容器显色 */
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            caret-color: #ffffff !important; 
+            height: 3.2rem !important; 
+            font-size: 1.1rem !important; 
+            padding: 0 1rem !important;
+            border: none !important;
+            box-shadow: none !important;
         }
         
-        .stTextInput input {
-            background-color: rgba(255, 255, 255, 0.05) !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            color: #ffffff !important;
-            height: 3.2rem; font-size: 1rem; border-radius: 12px !important;
+        /* 强制覆盖所有内层可能出现的白色/灰色背景 div */
+        div[data-baseweb="input"] div, 
+        div[data-testid="stTextInput"] div {
+            background-color: transparent !important;
         }
-        .stTextInput input:focus {
+
+        /* 焦点状态下的增强 */
+        [data-testid="stTextInput"]:focus-within, 
+        div[data-baseweb="input"]:focus-within {
             border-color: #3b82f6 !important;
-            background-color: rgba(255, 255, 255, 0.08) !important;
+            background-color: #0f172a !important;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4) !important;
         }
-        .stTextInput label p { color: #94a3b8 !important; font-size: 0.85rem !important; font-weight: 500 !important; margin-bottom: 4px; }
+        
+        /* 占位符颜色 (Placeholder) */
+        ::placeholder {
+            color: rgba(255, 255, 255, 0.3) !important;
+            -webkit-text-fill-color: rgba(255, 255, 255, 0.3) !important;
+        }
+
+        /* 标签标题文字显色 */
+        .stTextInput label p { 
+            color: #cbd5e1 !important; 
+            font-size: 0.9rem !important; 
+            font-weight: 600 !important;
+            margin-bottom: 4px;
+        }
         
         /* Tab 样式深度定制：消除漂浮感 */
         .stTabs [data-baseweb="tab-list"] {
@@ -271,6 +319,13 @@ def render_login_page():
         button[kind="primary"]:hover {
             transform: translateY(-2px);
             box-shadow: 0 12px 24px -8px rgba(59, 130, 246, 0.6) !important;
+        }
+        
+        /* 5. 彻底移除表单边框与背景 */
+        [data-testid="stForm"] {
+            background-color: transparent !important;
+            border: none !important;
+            padding: 0 !important;
         }
         </style>
     """, unsafe_allow_html=True)
