@@ -1,0 +1,9 @@
+Attribute,ValueType,Comment
+store_code,String,门店编号 (如 SH001)
+city,String,所在城市
+district,String,行政区
+address,String,详细地址
+manager_name,String,店长姓名
+open_date,Date,开业日期
+daily_traffic,Integer,日均客流
+is_flagship,Boolean,是否旗舰店 (True/False)

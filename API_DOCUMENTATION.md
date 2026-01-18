@@ -1,19 +1,22 @@
-# RAG Pro Max v6.7.0 企业级API文档
+# RAG Pro Max v6.7.2 企业级API文档
 
-**版本**: v6.7.0  
-**更新日期**: 2026-01-17  
+**版本**: v6.7.2  
+**更新日期**: 2026-01-18  
 **适用范围**: 企业级API集成  
 
 ---
 
 ## 🏢 企业级API概述
 
-RAG Pro Max v6.7.0 提供完整的RESTful API接口，支持企业级集成和自动化部署。
+RAG Pro Max v6.7.2 提供完整的RESTful API接口，支持企业级集成和自动化部署。
 
-### 💎 v6.7.0 新型特性支持
-- **归一化附件解析**: 新增 `/parse_attachment` 接口，支持图片 OCR、PDF、CSV 等 20+ 格式的统一解析流。
-- **高维资产透视**: `/kb/list` 接口现在返回 `created_at` 与 `last_modified` 元数据，支持按类型过滤。
-- **自愈式 SQL 建模**: 建模 API 现在集成表名自愈逻辑，自动修复生成 SQL 中的命名偏差。
+### 💎 v6.7.2 Strategic Workshop API 特性
+- **精准选表API**: 新增 `/analysis/select_tables` 接口，支持基于语义的智能表选择
+- **领域感知配置**: `/analysis/domain_config` 接口，支持配置跨境贸易和财税领域的语义规则
+- **按需数据生成**: `/analysis/generate_targeted_data` 接口，只为指定字段生成仿真数据
+- **归一化附件解析**: `/parse_attachment` 接口，支持图片 OCR、PDF、CSV 等 20+ 格式的统一解析流
+- **高维资产透视**: `/kb/list` 接口现在返回 `created_at` 与 `last_modified` 元数据，支持按类型过滤
+- **自愈式 SQL 建模**: 建模 API 现在集成表名自愈逻辑，自动修复生成 SQL 中的命名偏差
 
 ### 🔒 企业安全特性
 - **本地部署**: 所有API在企业内网运行
