@@ -950,10 +950,15 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         
         # 2. 规则速判: 列名包含明显定义特征
         headers = [str(c).lower().strip() for c in df.columns]
-        # [v6.9.2 Fix] 增强 Schema 文件特征识别
-        # 如果包含 "table name", "column name", "data type" 等组合，几乎必是 Schema
-        strong_schema_signals = ['table name', 'column name', 'data type', '字段名', '数据类型', '表名']
-        if sum(1 for h in headers if h in strong_schema_signals) >= 2:
+        # [v6.9.4 Fix] 进一步增强 Schema 文件特征识别 (支持部分匹配)
+        # 如果表头包含以下关键词中的两个或更多，基本判定为 Schema
+        schema_sigs = ['table', 'column', 'field', 'data type', '字段', '类型', '表名', '表英']
+        matched_sigs = 0
+        for h in headers:
+            if any(s in h for s in schema_sigs):
+                matched_sigs += 1
+        
+        if matched_sigs >= 2:
             return "SCHEMA"
 
         schema_keywords = ['type', '类型', 'description', '描述', 'comment', '备注', 'length', '长度', 'pk', '主键']
