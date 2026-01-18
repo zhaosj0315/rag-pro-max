@@ -662,6 +662,8 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         
         # [v6.7.0 Fix] 判定是否为仿真模式：只要涉及的表中有一个是虚拟表，整体判定为仿真模式
         # [v6.9.0 Fix] 增强判定：如果表中没有任何数据，也视为仿真模式（自动启动救护逻辑）
+        session_conn = sqlite3.connect(self.db_path, timeout=60)
+        
         def check_table_empty(t_name, conn):
             try:
                 # 尝试直接查询计数
@@ -679,7 +681,6 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         if is_simulated:
             print(f"🎭 [仿真模式] 激活。检测到虚拟表或空表: {[t for t, empty in tables_empty_status.items() if empty]}")
         
-        session_conn = sqlite3.connect(self.db_path, timeout=60)
         try:
             # 原则：如果是数据分析模式，且涉及范围内的表在数据库中不存在或为空，必须先完成“无数造数”的闭环
             if status_callback: status_callback("🛡️ 正在确保业务底座完整性...")
