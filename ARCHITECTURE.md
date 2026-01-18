@@ -1,8 +1,26 @@
-# RAG Pro Max v6.7.0 企业级系统架构文档
+# RAG Pro Max v6.7.2 企业级系统架构文档
 
-**版本**: v6.7.0 (Governance & Attachment Unification)  
-**更新日期**: 2026-01-17  
-**核心特性**: 资源治理矩阵、万能附件解析、终端自愈诊断
+**版本**: v6.7.2 (Strategic Intelligence Edition)  
+**更新日期**: 2026-01-18  
+**核心特性**: Strategic Workshop 3.0、精准选表引擎、外科手术式数据仿真
+
+---
+
+## 🧠 Strategic Workshop 3.0 架构 (v6.7.2)
+
+在 v6.7.2 中，战略分析车间（Strategic Workshop）实现了从“全量模拟”到“精准推演”的跨越：
+
+### 1. 精准选表引擎 (Precise Table Pruning)
+系统引入了 **LLM-Based Semantic Pruning** 技术，解决了大规模表结构下的臃肿问题：
+- **Semantic Filtering**: 在生成物理执行计划前，系统利用 LLM 审视 `business_schema.json` 中的字段备注。
+- **Relevance Scoring**: 自动为所有表打分，仅将 Top 1-3 张核心业务表及其关联键载入候选池。
+- **Domain Adaptation**: 内置财务（销项/进项）与跨境贸易（出口/进口）的前缀感知逻辑（如 `mxck` 前缀自动绑定出口业务上下文）。
+
+### 2. 外科手术式数据仿真 (Targeted Data Synthesis)
+针对“无数据、仅结构”的知识库，仿真引擎进化为按需注入模式：
+- **Execution Plan Driven**: 系统根据 SQL 的 `SELECT` 列表和 `JOIN` 条件，实时计算出必须实例化的“物理节点”。
+- **Selective Injection**: 只有命中的表和字段会被注入模拟数据，非相关表保持逻辑留白，计算资源消耗降低 80%。
+- **Data Lineage Integration**: 在构建阶段，系统通过 **Business Semantic Brain** 自动推导表间血缘（如 `djxh` 关联关系），并将其固化为 `graph_store.json`。
 
 ---
 

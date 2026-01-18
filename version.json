@@ -1,13 +1,14 @@
 {
-  "version": "6.7.1",
+  "version": "6.7.2",
   "name": "RAG Pro Max",
   "edition": "Stable Production Edition",
-  "release_date": "2026-01-17",
+  "release_date": "2026-01-18",
   "status": "Production-Stable",
-  "build": "stable-final",
+  "build": "strategic-workshop-final",
   "critical_fixes": [
-    "pandas scope issue resolved",
-    "data analysis three-stage workflow stabilized",
-    "order_analysis view created for field mapping"
+    "LLM-driven precise table identification implemented",
+    "Removed manual table list bloating in Strategic Workshop",
+    "Strategic Analysis chain optimized for targeted data generation",
+    "Enhanced domain knowledge for tax and export data categorization"
   ]
 }
