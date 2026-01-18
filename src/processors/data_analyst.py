@@ -40,25 +40,35 @@ class DataAnalystEngine:
             try:
                 table_list = []
                 for t, info in all_tables.items():
-                    cols = [c['name'] for c in info.get('cols', [])]
-                    table_list.append(f"- {t}: {info.get('desc', '')} (字段: {', '.join(cols[:10])})")
+                    # [v6.9.8 Fix] 提供完整的字段名和注释，以便 LLM 精准识别业务含义
+                    cols_info = [f"{c['name']}({c.get('comment','')})" for c in info.get('cols', [])]
+                    table_list.append(f"- {t}: {info.get('desc', '')}\n  字段: {', '.join(cols_info)}")
                 
                 table_str = "\n".join(table_list)
-                prompt = f"""分析用户问题，从给定的表列表中选择【最相关】的 1-3 张表来回答问题。
-如果没有完全匹配的表，选择最接近的。
+                prompt = f"""你是一个资深数据分析专家。请分析用户问题，从给定的【数据表清单】中选择最合适的 1-3 张表。
+
+【领域知识库】:
+- 'mx_mxck' 开头的表通常关联【出口 (Export)】业务。
+- 'mx_mxjk' 开头的表通常关联【进口 (Import)】业务。
+- 'mx_mxxx' 开头的表通常关联【销项/销售 (Sales/Output)】业务，主要反映国内销售。
+- 'mx_mxjx' 开头的表通常关联【进项/采购 (Purchase/Input)】业务。
+- 'mx_mxqy' 或 'mx_mxnsr' 开头的表存储【企业/纳税人基本信息】（包含行业、地址、规模等）。
 
 用户问题: {query}
 
-候选表列表:
+待选表清单:
 {table_str}
 
 要求:
-1. 只返回表名，多个表名用逗号分隔
-2. 不要解释原因
-3. 只选择确实需要的表，不要全选
-
-返回格式示例: table1, table2"""
+1. 只返回表名，多个表名用逗号分隔（如: table1, table2）。
+2. 严禁解释原因，严禁返回额外文字。
+3. 必须精准区分“出口销售”与“国内销售”。如果问题问销售但没提出口，优先选择销项(xx)表。
+4. 必须考虑是否需要关联企业信息表（如行业、区域分布）。"""
                 
+                # 限制表清单长度，防止 Token 溢出 (保留关键信息)
+                if len(table_str) > 15000:
+                    table_str = table_str[:15000] + "... (截断)"
+
                 res = model_client.complete(prompt).text.strip()
                 selected = [t.strip().strip('"').strip("'") for t in res.split(',') if t.strip()]
                 # 过滤掉不存在的表
