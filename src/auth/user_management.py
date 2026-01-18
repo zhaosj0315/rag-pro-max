@@ -78,40 +78,40 @@ def render_resource_governance():
             
             # 物理信息统计
             total_size = 0
-                file_count = 0
-                doc_count = 0
-                last_modified = None
+            file_count = 0
+            doc_count = 0
+            last_modified = None
                 
+            try:
+                for root, _, files in os.walk(kb_path):
+                    for f in files:
+                        file_path = os.path.join(root, f)
+                        file_size = os.path.getsize(file_path)
+                        total_size += file_size
+                        file_count += 1
+                        
+                        # 统计文档数量（排除系统文件）
+                        if not f.startswith('.') and f.endswith(('.txt', '.pdf', '.docx', '.md')):
+                            doc_count += 1
+                        
+                        # 获取最后修改时间
+                        mod_time = os.path.getmtime(file_path)
+                        if not last_modified or mod_time > last_modified:
+                            last_modified = mod_time
+            except: 
+                pass
+            
+            # 创建时间和最后修改时间
+            created_time = manifest.get('created_at', '未知')
+            if created_time != '未知':
                 try:
-                    for root, _, files in os.walk(kb_path):
-                        for f in files:
-                            file_path = os.path.join(root, f)
-                            file_size = os.path.getsize(file_path)
-                            total_size += file_size
-                            file_count += 1
-                            
-                            # 统计文档数量（排除系统文件）
-                            if not f.startswith('.') and f.endswith(('.txt', '.pdf', '.docx', '.md')):
-                                doc_count += 1
-                            
-                            # 获取最后修改时间
-                            mod_time = os.path.getmtime(file_path)
-                            if not last_modified or mod_time > last_modified:
-                                last_modified = mod_time
-                except: 
-                    pass
-                
-                # 创建时间和最后修改时间
-                created_time = manifest.get('created_at', '未知')
-                if created_time != '未知':
-                    try:
-                        created_time = datetime.datetime.fromisoformat(created_time.replace('Z', '+00:00')).strftime('%Y-%m-%d %H:%M')
-                    except:
-                        created_time = created_time[:16] if len(created_time) > 16 else created_time
-                
-                last_mod_str = '未知'
-                if last_modified:
-                    last_mod_str = datetime.datetime.fromtimestamp(last_modified).strftime('%Y-%m-%d %H:%M')
+                    created_time = datetime.datetime.fromisoformat(created_time.replace('Z', '+00:00')).strftime('%Y-%m-%d %H:%M')
+                except:
+                    created_time = created_time[:16] if len(created_time) > 16 else created_time
+            
+            last_mod_str = '未知'
+            if last_modified:
+                last_mod_str = datetime.datetime.fromtimestamp(last_modified).strftime('%Y-%m-%d %H:%M')
                 
                 # 权限信息
                 is_public = kb in sharing_config.get("public_kbs", [])
@@ -905,54 +905,54 @@ def render_resource_governance():
         AuditLogger.log(current_user, "TERMINAL_ACCESS", "管理员访问终端控制功能", 
                        action_type="SECURITY", ip=get_client_ip())
             
-            col_svc, col_status = st.columns([1, 4])
-            with col_svc:
-                if st.button("启动终端服务 (8899)", key="btn_start_term", use_container_width=True):
-                    import subprocess
-                    # 使用 wssh 启动服务，监听 8899 端口，--fbidhttp=False 允许非 HTTP 访问 (WS)
-                    # 注意：在后台运行，不阻塞主进程
-                    try:
-                        subprocess.Popen(["wssh", "--port=8899", "--fbidhttp=False"], 
-                                       stdout=subprocess.DEVNULL, 
-                                       stderr=subprocess.DEVNULL)
-                        st.toast("终端服务正在启动...", icon="⏳")
-                        time.sleep(2)
-                        st.success("服务已发送启动指令")
-                        time.sleep(1)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"启动失败: {e}")
+        col_svc, col_status = st.columns([1, 4])
+        with col_svc:
+            if st.button("启动终端服务 (8899)", key="btn_start_term", use_container_width=True):
+                import subprocess
+                # 使用 wssh 启动服务，监听 8899 端口，--fbidhttp=False 允许非 HTTP 访问 (WS)
+                # 注意：在后台运行，不阻塞主进程
+                try:
+                    subprocess.Popen(["wssh", "--port=8899", "--fbidhttp=False"], 
+                                   stdout=subprocess.DEVNULL, 
+                                   stderr=subprocess.DEVNULL)
+                    st.toast("终端服务正在启动...", icon="⏳")
+                    time.sleep(2)
+                    st.success("服务已发送启动指令")
+                    time.sleep(1)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"启动失败: {e}")
 
-            # 检查服务状态
-            import requests
-            import streamlit.components.v1 as components
-            terminal_url = "http://localhost:8899"
-            
-            try:
-                # 检查服务是否响应
-                response = requests.get(terminal_url, timeout=2)
-                if response.status_code == 200:
-                    st.success("✅ WebSSH 服务运行正常")
+        # 检查服务状态
+        import requests
+        import streamlit.components.v1 as components
+        terminal_url = "http://localhost:8899"
+        
+        try:
+            # 检查服务是否响应
+            response = requests.get(terminal_url, timeout=2)
+            if response.status_code == 200:
+                st.success("✅ WebSSH 服务运行正常")
+                
+                # 提供两种访问方式
+                tab1, tab2 = st.tabs(["🖥️ 内嵌终端", "🔗 新窗口打开"])
+                
+                with tab1:
+                    components.iframe(terminal_url, height=600, scrolling=True)
+                
+                with tab2:
+                    st.markdown(f"**直接访问链接：** [{terminal_url}]({terminal_url})")
+                    st.info("💡 如果内嵌终端无法正常显示，请点击上方链接在新窗口中打开")
                     
-                    # 提供两种访问方式
-                    tab1, tab2 = st.tabs(["🖥️ 内嵌终端", "🔗 新窗口打开"])
-                    
-                    with tab1:
-                        components.iframe(terminal_url, height=600, scrolling=True)
-                    
-                    with tab2:
-                        st.markdown(f"**直接访问链接：** [{terminal_url}]({terminal_url})")
-                        st.info("💡 如果内嵌终端无法正常显示，请点击上方链接在新窗口中打开")
-                        
-                else:
-                    st.error(f"❌ WebSSH 服务响应异常 (状态码: {response.status_code})")
-                    
-            except requests.exceptions.ConnectionError:
-                st.error("❌ 无法连接到 WebSSH 服务 (端口 8899)")
-                st.info("请点击上方'启动终端服务'按钮启动服务")
-            except Exception as e:
-                st.error(f"❌ 连接检查失败: {e}")
-                st.markdown(f"**备用访问：** [{terminal_url}]({terminal_url})")
+            else:
+                st.error(f"❌ WebSSH 服务响应异常 (状态码: {response.status_code})")
+                
+        except requests.exceptions.ConnectionError:
+            st.error("❌ 无法连接到 WebSSH 服务 (端口 8899)")
+            st.info("请点击上方'启动终端服务'按钮启动服务")
+        except Exception as e:
+            st.error(f"❌ 连接检查失败: {e}")
+            st.markdown(f"**备用访问：** [{terminal_url}]({terminal_url})")
 
 def format_size(size):
     for unit in ['B', 'KB', 'MB', 'GB']:
