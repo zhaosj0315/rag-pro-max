@@ -118,6 +118,8 @@ class DataAnalystEngine:
             macro_context = schemas.get('macro_context', '业务数据')
             table_desc = table_info.get('desc', table_name)
             
+            print(f"📋 [造数规格] 表 '{table_name}' | 字段范围: {[c['name'] for c in cols]}")
+
             # --- 核心改进：注入意图约束 ---
             intent_instruction = ""
             if query_context:
