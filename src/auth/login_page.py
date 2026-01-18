@@ -41,9 +41,9 @@ def render_login_page():
             min-height: 100vh !important;
         }
         
-        /* 核心：整体内容升空 70px，确保不遮挡顶部且重心平衡 */
+        /* 核心：整体内容升空 200px，确保重心处于屏幕上1/3位置 */
         [data-testid="stHorizontalBlock"] {
-            transform: translateY(-70px) !important;
+            transform: translateY(-200px) !important;
         }
 
         /* --- 左侧：驾驶舱仪表盘 --- */
@@ -187,7 +187,8 @@ def render_login_page():
         /* 深度穿透：针对按钮及其所有父级容器进行透明化处理 */
         .panel-footer [data-testid="stButton"],
         .panel-footer [data-testid="stButton"] > div,
-        .panel-footer [data-testid="stButton"] button {
+        .panel-footer [data-testid="stButton"] button,
+        .panel-footer [data-testid="stButton"] button > div {
             background: transparent !important;
             background-color: transparent !important;
             border: none !important;
@@ -202,6 +203,8 @@ def render_login_page():
             height: auto !important;
             min-height: 0 !important;
             line-height: 1.5 !important;
+            padding: 0 !important;
+            margin: 0 !important;
         }
         
         .panel-footer [data-testid="stButton"] button:hover {
@@ -215,6 +218,7 @@ def render_login_page():
         .panel-footer [data-testid="stButton"] button:focus,
         .panel-footer [data-testid="stButton"] button:active {
             background: transparent !important;
+            background-color: transparent !important;
             box-shadow: none !important;
             color: #60a5fa !important;
         }
@@ -240,7 +244,7 @@ def render_login_page():
         .stTextInput, [data-testid="stTextInput"], div[data-baseweb="input"] {
             background-color: #1e293b !important;
             border-radius: 12px !important;
-            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            border: 1px solid rgba(255, 255, 255, 0.3) !important; /* 提亮边框 */
         }
 
         /* 穿透所有层级，强制内联输入框样式 */
@@ -272,10 +276,10 @@ def render_login_page():
             box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4) !important;
         }
         
-        /* 占位符颜色 (Placeholder) */
+        /* 占位符颜色 (Placeholder) - 提高对比度 */
         ::placeholder {
-            color: rgba(255, 255, 255, 0.3) !important;
-            -webkit-text-fill-color: rgba(255, 255, 255, 0.3) !important;
+            color: #9CA3AF !important; /* 浅灰色，提高可读性 */
+            -webkit-text-fill-color: #9CA3AF !important;
         }
 
         /* 标签标题文字显色 */

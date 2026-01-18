@@ -48,7 +48,7 @@ RAG Pro Max is an enterprise-grade agent system that integrates full-scale docum
 ## 📚 Documentation Center
 
 ### 📂 Core Implementation & Architecture (For Developers)
-- [📐 **System Architecture**](ARCHITECTURE.md) - Latest v6.7.0 definition
+- [📐 **System Architecture**](ARCHITECTURE.md) - Latest v6.7.2 definition
 - [💎 **Core Feature Implementation**](CORE_FEATURE_IMPLEMENTATION.md) - Underlying logic of 5 core features (🆕)
 - [📊 **Data Analysis Workflow**](DATA_ANALYSIS_WORKFLOW.md) - Physical loop & simulation standards (🆕)
 - [🔧 **API Documentation**](API_DOCUMENTATION.md) - Backend service definitions
