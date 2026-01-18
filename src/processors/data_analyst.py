@@ -31,33 +31,60 @@ class DataAnalystEngine:
             with open(self.memory_path, 'w', encoding='utf-8') as f: json.dump(memories[-50:], f, indent=2, ensure_ascii=False)
         except: pass
 
-    def _get_relevant_tables(self, query: str, schemas: Dict[str, Any]) -> List[str]:
+    def _get_relevant_tables(self, query: str, schemas: Dict[str, Any], model_client=None) -> List[str]:
         all_tables = schemas.get("tables", {})
         if not all_tables: return []
         
-        # 原则：数据分析模式下，优先保证完整性。
-        # 如果表数量不多（<15），直接返回所有表，确保跨表查询和元数据查询的准确性。
-        if len(all_tables) <= 15:
+        # [v6.9.7 Upgrade] 引入 LLM 识别精准表范围
+        if model_client:
+            try:
+                table_list = []
+                for t, info in all_tables.items():
+                    cols = [c['name'] for c in info.get('cols', [])]
+                    table_list.append(f"- {t}: {info.get('desc', '')} (字段: {', '.join(cols[:10])})")
+                
+                table_str = "\n".join(table_list)
+                prompt = f"""分析用户问题，从给定的表列表中选择【最相关】的 1-3 张表来回答问题。
+如果没有完全匹配的表，选择最接近的。
+
+用户问题: {query}
+
+候选表列表:
+{table_str}
+
+要求:
+1. 只返回表名，多个表名用逗号分隔
+2. 不要解释原因
+3. 只选择确实需要的表，不要全选
+
+返回格式示例: table1, table2"""
+                
+                res = model_client.complete(prompt).text.strip()
+                selected = [t.strip().strip('"').strip("'") for t in res.split(',') if t.strip()]
+                # 过滤掉不存在的表
+                valid_selected = [t for t in selected if t in all_tables]
+                
+                if valid_selected:
+                    print(f"🎯 [精准识别] LLM 选定了 {len(valid_selected)} 张表: {valid_selected}")
+                    return valid_selected
+            except Exception as e:
+                print(f"⚠️ [精准识别失败] 降级到规则引擎: {e}")
+
+        # --- 降级方案：规则匹配 ---
+        # 如果表数量不多（<5），直接返回所有表
+        if len(all_tables) <= 5:
             base_tables = list(all_tables.keys())
         else:
-            # 仅在表极其多的时候进行简单过滤
+            # 简单关键词匹配
             relevant = []
             qw = query.lower()
-            for t in all_tables:
-                if t.lower() in qw:
+            for t, info in all_tables.items():
+                t_desc = str(info.get('desc', '')).lower()
+                if t.lower() in qw or any(k in t_desc for k in ['销售', '企业', '分布', '区域', '行业', '产品']):
                     relevant.append(t)
-            base_tables = list(set(relevant)) if relevant else list(all_tables.keys())[:10]
+            base_tables = list(set(relevant)) if relevant else list(all_tables.keys())[:5]
         
-        # [v6.7.10 Fix] 动态检测查询中可能需要的表
-        qw = query.lower()
-        potential_tables = []
-        
-        # 检测订单相关查询
-        if any(word in qw for word in ['订单', 'order', '促销码', 'promo', '购买', '交易', '金额']):
-            if 'orders' not in [t.lower() for t in base_tables]:
-                potential_tables.append('orders')
-        
-        return base_tables + potential_tables
+        return base_tables
 
     def _get_column_value_samples(self, table_name: str, conn: sqlite3.Connection) -> str:
         try:
@@ -590,7 +617,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             print(f"🔍 [决策] 判定为架构/配置咨询，构建深度透视看板...")
             
             # 识别相关表以提供上下文
-            rel_tables = self._get_relevant_tables(query, full_schemas)
+            rel_tables = self._get_relevant_tables(query, full_schemas, model_client)
             sub_schema = {t: full_schemas['tables'][t] for t in rel_tables if t in full_schemas['tables']}
             
             # 构造回显表格
@@ -645,7 +672,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             }
 
         # 2. 识别与对齐
-        rel_tables = self._get_relevant_tables(query, full_schemas)
+        rel_tables = self._get_relevant_tables(query, full_schemas, model_client)
         
         # --- [v6.7.3 Fix] 虚拟表强制激活 (Virtual Table Force Activation) ---
         # 如果当前查询涉及的表是虚拟表(从Word/Text提取)，必须强制纳入检查列表以触发造数
