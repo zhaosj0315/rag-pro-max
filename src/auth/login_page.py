@@ -26,22 +26,30 @@ def render_login_page():
         }
 
         .block-container {
-            padding-top: 2rem !important;
+            padding-top: 0rem !important;
             padding-bottom: 0rem !important;
-            padding-left: 4rem !important;
-            padding-right: 4rem !important;
-            max-width: 98% !important;
+            padding-left: 5rem !important;
+            padding-right: 5rem !important;
+            max-width: 95% !important;
+            display: flex !important;
+            align-items: center !important;
+            min-height: 100vh !important;
+        }
+        
+        /* 核心：整体内容升空 70px，确保不遮挡顶部且重心平衡 */
+        [data-testid="stHorizontalBlock"] {
+            transform: translateY(-70px) !important;
         }
 
         /* --- 左侧：驾驶舱仪表盘 --- */
         .hero-title {
-            font-size: 4.5rem;
+            font-size: 4.8rem;
             font-weight: 900;
-            letter-spacing: -2px;
+            letter-spacing: -2.5px;
             color: #ffffff !important; 
-            margin-bottom: 0.5rem;
-            line-height: 1.1;
-            text-shadow: 0 0 40px rgba(59, 130, 246, 0.4);
+            margin-bottom: 0.8rem;
+            line-height: 1.0;
+            text-shadow: 0 0 50px rgba(59, 130, 246, 0.5);
         }
         .hero-subtitle {
             font-size: 1.2rem;
@@ -146,34 +154,76 @@ def render_login_page():
             text-shadow: 0 1px 2px rgba(0,0,0,0.8);
         }
 
-        /* --- 右侧：登录控制台 (统一卡片化) --- */
-        .login-panel {
-            background: rgba(15, 23, 42, 0.85); 
-            backdrop-filter: blur(32px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 28px;
-            padding: 0 !important; /* 移除内边距，交给内部容器精确控制 */
-            box-shadow: 0 40px 80px -15px rgba(0, 0, 0, 0.9);
-            position: relative;
-            margin-top: -2rem !important;
-            overflow: hidden;
+        /* --- 右侧：登录控制台 (极致极简·悬浮版) --- */
+        /* 1. 移除大方框，改用悬浮布局 */
+        [data-testid="stVerticalBlock"]:has(.login-anchor) {
+            background: transparent !important; 
+            border: none !important;
+            padding: 0 !important;
+            gap: 0 !important;
+            box-shadow: none !important;
+            margin-top: 0rem !important; /* 移除手动位移，依靠 Flexbox 居中 */
+            overflow: visible !important;
         }
 
-        .panel-header {
-            padding: 2rem 2.5rem 1.5rem 2.5rem;
-            background: rgba(255, 255, 255, 0.03);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
+        /* 2. 内容区净化 */
         .panel-content {
-            padding: 1.5rem 2.5rem 2rem 2.5rem;
+            padding: 1rem 0rem;
         }
 
-        .guest-link-container {
+        /* 3. 访客链接：彻底文字化 (强制剥离所有层级的背景色) */
+        .panel-footer {
             text-align: center;
-            margin-top: 1.5rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 0 !important;
+            margin-top: 2rem !important;
+            background: transparent !important;
+        }
+        
+        /* 深度穿透：针对按钮及其所有父级容器进行透明化处理 */
+        .panel-footer [data-testid="stButton"],
+        .panel-footer [data-testid="stButton"] > div,
+        .panel-footer [data-testid="stButton"] button {
+            background: transparent !important;
+            background-color: transparent !important;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            color: #9CA3AF !important; /* 浅灰色 (#9CA3AF) */
+            font-size: 0.85rem !important;
+            font-weight: 500 !important;
+            text-decoration: none !important;
+            display: inline-block !important;
+            width: auto !important;
+            height: auto !important;
+            min-height: 0 !important;
+            line-height: 1.5 !important;
+        }
+        
+        .panel-footer [data-testid="stButton"] button:hover {
+            color: #60a5fa !important; /* 亮蓝色悬停 */
+            text-decoration: underline !important;
+            background: transparent !important;
+            background-color: transparent !important;
+        }
+        
+        /* 强制移除任何可能的边框或轮廓 */
+        .panel-footer [data-testid="stButton"] button:focus,
+        .panel-footer [data-testid="stButton"] button:active {
+            background: transparent !important;
+            box-shadow: none !important;
+            color: #60a5fa !important;
+        }
+        
+        /* 4. 右侧列对齐优化：将 Tab 栏下移，使其与左侧流程图顶部对齐 */
+        .login-column-spacer {
+            margin-top: 15.5rem; /* 经过精确计算，避开左侧标题与副标题的高度 */
+        }
+        
+        /* 4. 输入框对比度强化 (悬浮模式必备) */
+        .stTextInput input {
+            background-color: rgba(255, 255, 255, 0.03) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            backdrop-filter: blur(8px) !important;
         }
         
         .stTextInput input {
@@ -290,27 +340,15 @@ def render_login_page():
         </div>
         """, unsafe_allow_html=True)
 
-    # --- 右侧：指挥中心 (合体重构版) ---
+    # --- 右侧：极简登录卡片 (完全封装版) ---
     with col_right:
-        # 1. 开启统一卡片容器 + 头部区
-        panel_header_html = """
-        <div class="login-panel">
-            <div class="panel-header">
-                <div style="display:flex; align-items:center; justify-content:space-between;">
-                    <h1 style='color:white; margin:0; font-size:1.8rem; font-weight:800; letter-spacing:0.5px;'>指挥中心</h1>
-                    <div style="display:flex; align-items:center; background:rgba(74,222,128,0.1); padding:4px 12px; border-radius:20px; border:1px solid rgba(74,222,128,0.25);">
-                        <div class="status-dot"></div>
-                        <span style="color:#4ade80; font-size:0.75rem; font-weight:700; letter-spacing:0.5px;">在线</span>
-                    </div>
-                </div>
-                <div style="color:#64748b; font-size:0.8rem; letter-spacing:1px; margin-top:8px; font-weight:500; font-family:monospace;">SECURE ACCESS TERMINAL v6.7.2</div>
-            </div>
-        """
-        st.markdown(panel_header_html, unsafe_allow_html=True)
+        # 增加占位层，实现左右对齐
+        st.markdown('<div class="login-column-spacer"></div>', unsafe_allow_html=True)
         
-        # 2. 内容区 (Tab 与 表单)
-        # 注意：Streamlit 的 tabs 无法完全嵌套在 HTML div 内部渲染，
-        # 我们通过 CSS padding 控制其视觉位置，使其看起来在卡片内。
+        # 1. 注入容器锁定锚点 (隐藏)
+        st.markdown('<div class="login-anchor"></div>', unsafe_allow_html=True)
+        
+        # 2. 交互内容区 (Tabs 直接封顶)
         tab_login, tab_register = st.tabs(["账号登录", "快速注册"])
         
         with tab_login:
@@ -334,13 +372,7 @@ def render_login_page():
                             st.session_state.role = info.get('role', 'standard_user')
                             st.rerun()
                         else: st.error(f"❌ {info}")
-            
-            # 3. 访客模式弱化：改造成卡片页脚的文字链接
-            st.markdown('<div class="guest-link-container">', unsafe_allow_html=True)
-            if st.button("以访客身份进入预览模式", key="guest_btn", help="仅限浏览公开知识库", use_container_width=False):
-                st.session_state.logged_in = True; st.session_state.user = "guest_user"; st.session_state.role = "guest"; st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True) # 闭合 login-content
 
         with tab_register:
             st.markdown('<div class="panel-content">', unsafe_allow_html=True)
@@ -355,19 +387,15 @@ def render_login_page():
                         else: st.error(f"❌ {msg}")
             st.markdown('</div>', unsafe_allow_html=True)
         
-        st.markdown('</div>', unsafe_allow_html=True) # 闭合 login-panel外层容器
+        # 3. 访客页脚 (纯文字链接居中)
+        st.markdown('<div class="panel-footer">', unsafe_allow_html=True)
+        if st.button("没有账号？以访客身份浏览", key="guest_btn", help="仅限浏览公开知识库", use_container_width=False):
+            st.session_state.logged_in = True; st.session_state.user = "guest_user"; st.session_state.role = "guest"; st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- 底部版权 ---
+    # --- 4. 全局状态页脚 (固定沉底，全宽居中) ---
     st.markdown(f"""
-    <div style="position: fixed; bottom: 1.5rem; left: 0; width: 100%; text-align: center; color: rgba(255,255,255,0.2); font-size: 0.7rem; font-family: monospace; pointer-events: none;">
-        RAG PRO MAX STRATEGIC EDITION v6.7.2 &copy; 2026 | 系统运行正常
-    </div>
-    """, unsafe_allow_html=True)
-
-
-    # --- 底部版权 ---
-    st.markdown(f"""
-    <div style="position: fixed; bottom: 1.5rem; left: 0; width: 100%; text-align: center; color: rgba(255,255,255,0.3); font-size: 0.7rem; font-family: monospace; pointer-events: none;">
-        RAG PRO MAX 企业版 v6.6.0 &copy; 2026 | 系统运行正常
+    <div style="position: fixed; bottom: 1.5rem; left: 0; width: 100%; text-align: center; color: rgba(255,255,255,0.25); font-size: 0.7rem; font-family: monospace; pointer-events: none; letter-spacing: 1px; z-index: 9999;">
+        RAG PRO MAX STRATEGIC EDITION v6.7.2 &copy; 2026 | 系统状态: 正常运行
     </div>
     """, unsafe_allow_html=True)
