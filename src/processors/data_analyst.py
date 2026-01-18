@@ -948,7 +948,13 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             return "DATA"
         
         # 2. 规则速判: 列名包含明显定义特征
-        headers = [str(c).lower() for c in df.columns]
+        headers = [str(c).lower().strip() for c in df.columns]
+        # [v6.9.2 Fix] 增强 Schema 文件特征识别
+        # 如果包含 "table name", "column name", "data type" 等组合，几乎必是 Schema
+        strong_schema_signals = ['table name', 'column name', 'data type', '字段名', '数据类型', '表名']
+        if sum(1 for h in headers if h in strong_schema_signals) >= 2:
+            return "SCHEMA"
+
         schema_keywords = ['type', '类型', 'description', '描述', 'comment', '备注', 'length', '长度', 'pk', '主键']
         if any(k in headers for k in schema_keywords) and len(df) < 50:
             # 这是一个强信号，但也可能只是巧合，交给 LLM 确认
