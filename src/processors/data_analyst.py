@@ -944,14 +944,8 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
 
     def _classify_content(self, df: pd.DataFrame, model_client) -> str:
         """[智能仲裁] 判断文件内容是 'DATA' (事实数据) 还是 'SCHEMA' (定义文档)"""
-        # 1. 规则速判: 行数极多通常是数据
-        if len(df) > 100:
-            return "DATA"
-        
-        # 2. 规则速判: 列名包含明显定义特征
+        # 1. 优先检查表头特征 (v6.9.5 Fix: 防止大字典因为行数多被误判为 DATA)
         headers = [str(c).lower().strip() for c in df.columns]
-        # [v6.9.4 Fix] 进一步增强 Schema 文件特征识别 (支持部分匹配)
-        # 如果表头包含以下关键词中的两个或更多，基本判定为 Schema
         schema_sigs = ['table', 'column', 'field', 'data type', '字段', '类型', '表名', '表英']
         matched_sigs = 0
         for h in headers:
@@ -961,13 +955,17 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         if matched_sigs >= 2:
             return "SCHEMA"
 
+        # 2. 规则速判: 行数极多且无特征通常是数据
+        if len(df) > 500:
+            return "DATA"
+        
+        # 3. 语义关键词检查
         schema_keywords = ['type', '类型', 'description', '描述', 'comment', '备注', 'length', '长度', 'pk', '主键']
-        if any(k in headers for k in schema_keywords) and len(df) < 50:
-            # 这是一个强信号，但也可能只是巧合，交给 LLM 确认
+        if any(k in headers for k in schema_keywords) and len(df) < 100:
+            # 这是一个较强信号，但交给 LLM 确认
             pass
 
-        # 3. LLM 深度仲裁
-        # 采样数据指纹
+        # 4. LLM 深度仲裁 (采样数据指纹)
         sample_rows = df.head(5).to_string(index=False)
         prompt = f"""请判断以下表格片段的【本质属性】。
 
