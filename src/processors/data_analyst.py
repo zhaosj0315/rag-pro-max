@@ -178,9 +178,20 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                 try:
                     # 清理可能的 markdown 代码块标记
                     clean_stmt = clean_stmt.replace('```sql', '').replace('```', '').strip()
+                    
+                    # [v6.9.1 Fix] 强制纠正 LLM 可能幻觉的表名
+                    # 匹配 INSERT INTO xxx ...
+                    match_table = re.search(r'INSERT\s+INTO\s+(?:"?)([\w\d_]+)(?:"?)', clean_stmt, re.IGNORECASE)
+                    if match_table:
+                        gen_table = match_table.group(1)
+                        if gen_table.lower() != table_name.lower():
+                            # 替换为正确的表名
+                            clean_stmt = re.sub(r'INSERT\s+INTO\s+(?:"?)[\w\d_]+(?:"?)', f'INSERT INTO "{table_name}"', clean_stmt, flags=re.IGNORECASE)
+
                     cursor.execute(clean_stmt)
                     insert_count += 1
                 except Exception as e:
+                    print(f"   ⚠️ [Insert Skip] {e}")
                     continue
             
             if insert_count > 0:
