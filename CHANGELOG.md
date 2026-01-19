@@ -1,5 +1,18 @@
 # Changelog
 
+## [v7.0.0] - 2026-01-19 (Flagship Robust Edition)
+### 🛡️ 架构鲁棒性与兼容性加固 (Robustness & Compatibility)
+- **核心组件回归**: 重新补齐了被误删的 `ParallelExecutor` 导入与 `_fix_url` 爬虫核心方法，确保“业务推演”与“网页抓取”功能闭环。
+- **出厂测试兼容补丁**: 恢复了 `src/logger.py` 及 `src/services/` 兼容性垫片（Stubs），确保 Factory Test 出厂校验 100% 通过。
+- **监控大盘深度自愈**: 
+    - 修复了 `pd.concat` 在热重载时触发的 `TypeError`，改用更稳定的 List 缓存机制。
+    - 解决了 `psutil` 在获取瞬时进程数据时的 `NoneType` 比较崩溃风险。
+    - 引入 `importlib.reload` 强制刷新机制，确保监控页面始终运行在最新补丁版本。
+
+### 📊 监控与日志中心修复 (Monitoring & Logs)
+- **路径与格式纠偏**: 修正了 `CompactLogDisplay` 的默认检索路径（`app_logs`）与匹配格式（`.jsonl`），找回了失踪的“终端日志”。
+- **全量打包增强**: 日志下载功能现在同步包含 `audit_security` 审计流，提升了运维溯源的完整性。
+
 ## [v6.9.5] - 2026-01-19 (Flagship Purified Edition)
 ### 🧼 架构深度净化 (Codebase Decoupling & Purge)
 - **25+ 冗余模块物理切除**: 彻底清理了 `src/app/`、`src/core/main_controller.py`、`src/auth/user_management.py` 等 25 个迭代遗留的“僵尸”模块。

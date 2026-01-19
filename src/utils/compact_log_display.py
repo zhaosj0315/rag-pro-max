@@ -13,7 +13,7 @@ from typing import List, Dict, Optional
 class CompactLogDisplay:
     """紧凑日志显示器"""
     
-    def __init__(self, log_dir: str = "logs"):
+    def __init__(self, log_dir: str = "app_logs"):
         self.log_dir = Path(log_dir)
         self.max_lines_preview = 3  # 预览显示的最大行数
         self.max_char_per_line = 80  # 每行最大字符数
@@ -238,9 +238,9 @@ def render_compact_log_management():
 def _clear_all_logs():
     """清空所有日志"""
     try:
-        log_dir = Path("logs")
+        log_dir = Path("app_logs")
         if log_dir.exists():
-            for log_file in log_dir.glob("*.log"):
+            for log_file in log_dir.glob("*.jsonl"):
                 with open(log_file, 'w', encoding='utf-8') as f:
                     f.write("")
         st.success("✅ 已清空所有日志")
@@ -253,7 +253,7 @@ def _package_all_logs():
         import zipfile
         import io
         
-        log_dir = Path("logs")
+        log_dir = Path("app_logs")
         if not log_dir.exists():
             st.warning("没有找到日志目录")
             return
@@ -261,7 +261,10 @@ def _package_all_logs():
         # 创建ZIP文件
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            for log_file in log_dir.glob("*.log"):
+            for log_file in log_dir.glob("*.jsonl"):
+                zip_file.write(log_file, log_file.name)
+            # 同时也打包 audit 审计日志
+            for log_file in log_dir.glob("audit_security.*"):
                 zip_file.write(log_file, log_file.name)
         
         zip_buffer.seek(0)

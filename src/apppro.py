@@ -7,6 +7,9 @@ import json
 import glob
 import re
 
+# 提前导入并行执行核心 (v6.9.7)
+from src.utils.parallel_executor import ParallelExecutor, get_global_executor
+
 # --- Monkey Patch: 修复 Streamlit FileWatcher Race Condition ---
 # 捕获 watchdog 线程中的 FileNotFoundError (通常由临时文件快速删除引起)
 try:
@@ -679,6 +682,16 @@ from src.utils.error_handler_enhanced import error_handler
 from src.utils.memory_manager_enhanced import memory_manager
 from src.ui.performance_dashboard_enhanced import performance_dashboard
 from src.ui.user_experience_enhanced import ux_enhancer
+
+# 引入并行执行模块 (v6.9.6)
+from src.utils.safe_parallel_tasks import safe_process_node_worker as process_node_worker, extract_metadata_task
+
+# 引入聊天模块 (Stage 7)
+from src.chat import ChatEngine
+
+# 引入配置模块 (Stage 8)
+from src.config import ConfigLoader, ConfigValidator
+
 PageStyle.setup_page()
 
 # 注入 CSS [v6.4.9] 强化双滚动条消除方案
@@ -6655,8 +6668,8 @@ if st.session_state.get('is_processing') and final_prompt:
                                 'text': text
                             })
                         
-                        # 使用并行执行器处理节点（优化并行阈值）
-                        executor = ParallelExecutor()
+                        # 使用单例并行执行器处理节点
+                        executor = get_global_executor()
                         tasks = [(d, active_kb_name) for d in node_data]
                         # 启用真正的并行处理，降低阈值到2个节点
                         parallel_threshold = 2

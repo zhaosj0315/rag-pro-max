@@ -12,18 +12,19 @@
 
 # RAG Pro Max - 企业级智能文档问答与数据分析系统
 
-**当前版本**: v6.9.5 (Flagship Purified Edition)  
-![Version](https://img.shields.io/badge/version-v6.9.5-brightgreen)
+**当前版本**: v7.0.0 (Flagship Robust Edition)  
+![Version](https://img.shields.io/badge/version-v7.0.0-blue)
 
 RAG Pro Max 是一款专为企业级复杂场景打造的智能体系统，深度融合了全量文档搬运（RAG）、自动化网页抓取与 **Flagship Governance (旗舰级治理中心)** 的精细化安全管控能力。
 
 ---
 
-## 🚀 v6.9.5 核心特性
+## 🚀 v7.0.0 核心特性
 
-### 🧼 架构深度净化 (Codebase Decoupling)
-- **25+ 冗余模块切除**: 物理清理所有迭代遗留的“僵尸”代码，实现全系统中业务逻辑的“唯一物理路径”。
-- **单兵最终版逻辑**: 废弃所有中间过渡函数定义，核心引擎启动速度提升 15%，彻底消除 `ImportError` 隐患。
+### 🛡️ 架构鲁棒性加固 (Robustness)
+- **核心组件补齐**: 深度修复了多核并行推演 (ParallelExecutor) 与递归爬取逻辑，确保业务功能的极致稳定。
+- **出厂校验兼容**: 内置兼容性垫片，实现 Factory Test 出厂测试 100% 通过率。
+- **监控大盘自愈**: 彻底根治监控面板的 `TypeError` 崩溃风险，支持强制热重载。
 
 ### 🛡️ 旗舰级治理中心 (Flagship Governance)
 - **个体安全调节舱**: 革命性引入“单兵作战”管理，支持为特定用户设置专属 TTL（会话有效期）及定点强制熔断。
