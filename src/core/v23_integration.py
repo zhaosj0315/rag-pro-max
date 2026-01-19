@@ -36,51 +36,6 @@ class V23Integration:
         # 可以在这里添加自定义的告警处理逻辑
         pass
     
-    def render_v23_sidebar(self):
-        """渲染v2.3.0侧边栏功能"""
-        st.sidebar.markdown("---")
-        st.sidebar.subheader("🚀 v2.3.0 智能监控")
-        
-        # 快速状态显示
-        recommendations = self.scheduler.get_recommendations()
-        current_load = recommendations['current_load']
-        
-        # 负载等级汉化 [v6.6.1]
-        level_map = {"low": "轻量", "medium": "中等", "high": "高负荷", "critical": "极高"}
-        cpu_lv = level_map.get(current_load['cpu_level'].lower(), current_load['cpu_level'])
-        mem_lv = level_map.get(current_load['memory_level'].lower(), current_load['memory_level'])
-        
-        # 系统状态指示器
-        cpu_color = "🟢" if current_load['cpu_percent'] < 50 else "🟡" if current_load['cpu_percent'] < 80 else "🔴"
-        memory_color = "🟢" if current_load['memory_percent'] < 60 else "🟡" if current_load['memory_percent'] < 85 else "🔴"
-        
-        st.sidebar.metric(
-            f"{cpu_color} 处理器 (CPU)", 
-            f"{current_load['cpu_percent']:.1f}%",
-            delta=f"当前负载: {cpu_lv}"
-        )
-        
-        st.sidebar.metric(
-            f"{memory_color} 内存 (MEM)", 
-            f"{current_load['memory_percent']:.1f}%",
-            delta=f"当前负载: {mem_lv}"
-        )
-        
-        # 智能建议
-        if recommendations['recommendations']:
-            with st.sidebar.expander("💡 优化建议"):
-                for rec in recommendations['recommendations'][:3]:  # 显示前3个建议
-                    st.write(f"• {rec}")
-        
-        # 告警摘要
-        alert_summary = self.alert_system.get_alert_summary()
-        if alert_summary['total_alerts_24h'] > 0:
-            with st.sidebar.expander(f"🚨 告警 ({alert_summary['total_alerts_24h']})"):
-                st.write(f"• 严重: {alert_summary['critical_alerts_24h']}")
-                st.write(f"• 警告: {alert_summary['warning_alerts_24h']}")
-                if alert_summary['most_common_type']:
-                    st.write(f"• 主要类型: {alert_summary['most_common_type']}")
-    
     def render_monitoring_tab(self):
         """渲染监控标签页"""
         tab1, tab2, tab3, tab4 = st.tabs(["📊 系统监控", "📈 进度追踪", "⚙️ 智能调度", "📋 终端日志"])

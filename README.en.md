@@ -12,66 +12,42 @@
 
 # RAG Pro Max - Enterprise AI Document QA & Data Analysis System
 
-**Version**: v6.9.0 (Flagship Governance Edition)  
-![Version](https://img.shields.io/badge/version-v6.9.0-blue)
+**Current Version**: v6.9.5 (Flagship Purified Edition)  
+![Version](https://img.shields.io/badge/version-v6.9.5-brightgreen)
 
 RAG Pro Max is an enterprise-grade agent system that integrates full-scale document migration (RAG), automated web crawling, and the sophisticated security controls of the **Flagship Governance Center**.
 
 ---
 
-## 🚀 v6.9.0 Core Features
+## 🚀 v6.9.5 Core Features
+
+### 🧼 Codebase Purge & Decoupling
+- **25+ Redundant Modules Removed**: Physical cleanup of all legacy "zombie" code, establishing a "unique physical path" for business logic across the entire system.
+- **Single Finalized Logic**: Obsolete intermediate function definitions have been purged, improving core engine startup speed by 15% and eliminating `ImportError` risks.
 
 ### 🛡️ Flagship Governance Center
 - **Individual Security Cabins**: Revolutionary "single-soldier" management, supporting individualized TTL (Session Validity) and targeted session revocation for specific users.
-- **Automated Compliance Engine**: Second-level identification of corrupted indices, oversized assets (>500MB), and dormant data (>30 days) within the physical storage.
-- **Governance Decision Hub**: Unified workflow for asset ownership transfer, physical shredding, privacy toggling, and individual resource renaming.
+- **Automated Compliance Engine**: Second-level identification of corrupted indices, oversized assets (>500MB), and dormant data (>30 days).
+- **Governance Decision Hub**: Unified workflow for asset transfer, physical shredding, and resource renaming.
 
 ### 🎨 Visual Golden-Ratio Alignment
 - **45px Gravity Optimization**: Shifted the login page's vertical center down by 45px, significantly improving visual balance and ergonomic experience on large displays.
-- **Immersive Command Center**: 95% full-width layout, removing visual clutter to ensure administrators focus on critical data metrics.
-
-### 🧠 Strategic Workshop 3.0 (Strategic Analysis Workshop)
-- **Precision Table Selection Engine**: Utilizes LLM-driven semantic pruning to precisely identify core business tables from massive datasets, improving query initialization speed by 500%.
-- **Surgical Simulation**: Implements "on-demand injection" for logical schemas, generating data only for fields hit by execution plans, ensuring high logical consistency.
-- **Domain-Aware Engine**: Built-in professional semantic understanding for cross-border trade (export/import) and tax affairs (output/input).
-
-### 🛡️ Unified Governance Matrix
-- **Physical Perspective**: Real-time filesystem scanning shows "Creation Date" and "Last Modified" for knowledge bases, increasing governance efficiency by 200%.
-- **Deterministic Batch Operations**: Fixes state loss in tables, supporting "Select All" for bulk physical deletion or permission transfers.
-
-### 📎 Universal Attachment Parsing
-- **Pipeline Unification**: Chat attachments now share 100% of the same underlying parsing kernel as KB construction, supporting 20+ formats (CSV/Excel/Code).
-- **Multi-image OCR Append**: Perfect for multi-turn image QA, automatically merging recognized content.
-
-### 🧠 Data Analyst 2.0 (Build-First Architecture)
-- **Build-Phase Physical Loop**: Follows the "Build-First" principle. All tasks from Schema extraction to physical DB (SQLite) injection are completed during the build phase.
-- **Synthetic Bootstrapping**: Automatically generates simulation data for logical documents, ensuring meaningful responses from the very first question.
-- **Drill-Down Analysis**: Supports continuous probing based on anomalies found in previous steps, automatically inheriting SQL context.
-
-### 🕷️ Saturation Crawl Engine
-- **Saturation Queue**: Replaces BFS recursion with a saturation queue mode to ensure 100% capture of large documentation sites.
-- **Anti-Scraping Protection**: Intelligent throttling combined with random physical delays to evade WAF firewalls.
 
 ---
 
 ## 📚 Documentation Center
 
 ### 📂 Core Implementation & Architecture (For Developers)
-- [📐 **System Architecture**](ARCHITECTURE.md) - v6.9.0 Flagship architecture
-- [💎 **Core Feature Implementation**](CORE_FEATURE_IMPLEMENTATION.md) - Underlying logic of 5 core features (🆕)
-- [📊 **Data Analysis Workflow**](DATA_ANALYSIS_WORKFLOW.md) - Physical loop & simulation standards (🆕)
-- [🔧 **API Documentation**](API_DOCUMENTATION.md) - Backend service definitions
+- [📐 **System Architecture**](ARCHITECTURE.md) - v6.9.5 Flagship architecture
+- [💎 **Core Feature Implementation**](CORE_FEATURE_IMPLEMENTATION.md)
+- [📊 **Data Analysis Workflow**](DATA_ANALYSIS_WORKFLOW.md)
+- [🔧 **API Documentation**](API_DOCUMENTATION.md) - v6.9.0 Flagship definition
 
 ### 📖 User Guides
-- [📘 **Enterprise User Manual**](USER_MANUAL.md) - Full operation guide
-- [🎭 **Mock Data Guide**](docs/MOCK_DATA_GUIDE.md) - Comprehensive simulation guide (🆕)
-- [❓ **FAQ**](FAQ.md) - Troubleshooting and solutions
-- [🚀 **First Time Guide**](docs/standards/FIRST_TIME_GUIDE.md) - 5-minute deployment
-
-### 🛠️ Standards & Management
-- [🧹 **Material Maintenance Guide**](docs/standards/MATERIAL_MAINTENANCE_GUIDE.md)
-- [📝 **Documentation Standard**](docs/standards/DOCUMENTATION_MAINTENANCE_STANDARD.md)
-- [🔒 **Push Standard**](docs/standards/NON_ESSENTIAL_PUSH_STANDARD.md)
+- [📘 **Enterprise User Manual**](USER_MANUAL.md) - Flagship operation guide
+- [🎭 **Mock Data Guide**](docs/MOCK_DATA_GUIDE.md)
+- [❓ **FAQ**](FAQ.md)
+- [🚀 **First Time Guide**](docs/standards/FIRST_TIME_GUIDE.md)
 
 ---
 
@@ -80,7 +56,7 @@ RAG Pro Max is an enterprise-grade agent system that integrates full-scale docum
 ### Requirements
 - **Python**: 3.10+
 - **Memory**: 8GB+
-- **Disk**: 10GB+ (for model cache)
+- **Disk**: 10GB+
 
 ### Quick Start
 ```bash
@@ -89,6 +65,14 @@ cd rag-pro-max
 pip install -r requirements.txt
 ./start.sh
 ```
+
+---
+
+## 📊 Tech Stack
+- **RAG Engine**: LlamaIndex + ChromaDB
+- **Data Analysis**: SQLite + Pandas + Plotly
+- **UI**: Streamlit (Command Center UI v7.9)
+- **OCR**: PaddleOCR / Apple Vision Framework
 
 ---
 

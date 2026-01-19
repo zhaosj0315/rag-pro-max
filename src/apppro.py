@@ -87,12 +87,6 @@ import os
 # 在最开始设置环境变量，禁用PaddleOCR详细日志
 import os
 
-def get_default_model():
-    """统一获取默认模型"""
-    from src.services.config_service import get_config_service
-    config_service = get_config_service()
-    return config_service.get_default_model()
-
 def update_all_model_configs(new_model):
     """统一更新所有地方的模型配置"""
     from src.services.config_service import get_config_service
@@ -598,9 +592,6 @@ from src.utils.app_utils import (
     handle_kb_switching
 )
 
-# 引入主控制器
-from src.core.main_controller import MainController
-
 # 引入知识库处理器
 from src.kb.kb_processor import KBProcessor
 
@@ -667,8 +658,6 @@ from src.ui.model_selectors import (
     render_hf_embedding_selector
 )
 
-# 引入 UI 高级配置 (Stage 3.2.3)
-
 # 引入 UI 配置表单 (Stage 3.2.2)
 from src.ui.config_forms import render_basic_config
 
@@ -681,43 +670,15 @@ from src.processors import UploadHandler, IndexBuilder
 # ⚠️ 关键修复：强制使用本地模型，避免 OpenAI 默认
 os.environ['LLAMA_INDEX_EMBED_MODEL'] = 'local'
 
-# 兼容旧代码的包装函数
-def get_embed(provider, model, key, url):
-    """兼容旧代码的包装函数"""
-    return load_embedding_model(provider, model, key, url)
-
-def get_llm(provider, model, key, url, temp):
-    """兼容旧代码的包装函数"""
-    return load_llm_model(provider, model, key, url, temp)
-
 # 引入文件处理模块
 from src.file_processor import scan_directory_safe
 
 
-# from src.ui.compact_sidebar import render_compact_sidebar  # 已删除冗余模块
 # 增强功能模块 (v1.7.4)
 from src.utils.error_handler_enhanced import error_handler
 from src.utils.memory_manager_enhanced import memory_manager
 from src.ui.performance_dashboard_enhanced import performance_dashboard
 from src.ui.user_experience_enhanced import ux_enhancer
-
-# 引入并行执行模块
-from src.utils.parallel_executor import ParallelExecutor
-from src.utils.safe_parallel_tasks import safe_process_node_worker as process_node_worker, extract_metadata_task
-
-# 引入聊天模块 (Stage 7)
-from src.chat import ChatEngine
-
-# 引入配置模块 (Stage 8)
-from src.config import ConfigLoader, ConfigValidator
-
-# 多进程函数：文档分块解析（移到模块级别）
-# 引入文档解析器
-from src.processors.document_parser import _parse_single_doc, _parse_batch_docs
-
-# ==========================================
-# 1. 页面配置与样式
-# ==========================================
 PageStyle.setup_page()
 
 # 注入 CSS [v6.4.9] 强化双滚动条消除方案
@@ -2851,7 +2812,7 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
 
     # 设置嵌入模型
     logger.info(f"🔧 设置嵌入模型: {embed_model} (provider: {embed_provider})")
-    embed = get_embed(embed_provider, embed_model, embed_key, embed_url)
+    embed = load_embedding_model(embed_provider, embed_model, embed_key, embed_url)
     if not embed:
         logger.warning(f"⚠️ 嵌入模型加载失败: {embed_model}，尝试离线模式")
         try:
@@ -6147,7 +6108,7 @@ if st.session_state.get('is_processing') and final_prompt:
                 if embed_model != required_model:
                     logger.info(f"🔄 强制切换模型: {embed_model} → {required_model} (维度: {kb_dim}D)")
                     embed_model = required_model
-                    embed = get_embed(embed_provider, embed_model, embed_key, embed_url)
+                    embed = load_embedding_model(embed_provider, embed_model, embed_key, embed_url)
                     if embed:
                         Settings.embed_model = embed
                         logger.info(f"✅ 模型已切换")
@@ -6601,7 +6562,7 @@ if st.session_state.get('is_processing') and final_prompt:
                         logger.log("INFO", "开始检索相关文档", stage="查询对话", details={"kb_name": active_kb_name})
                         
                         # 确保 embedding 模型已设置
-                        embed = get_embed(embed_provider, embed_model, embed_key, embed_url)
+                        embed = load_embedding_model(embed_provider, embed_model, embed_key, embed_url)
                         if embed:
                             Settings.embed_model = embed
                         

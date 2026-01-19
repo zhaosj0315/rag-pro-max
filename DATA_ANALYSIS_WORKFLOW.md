@@ -1,6 +1,6 @@
 # 数据分析模式：开发流程与架构设计规范 (Data Analysis Workflow)
 
-**版本**: v1.0.0
+**版本**: v6.9.5 (Flagship Purified Edition)
 **核心原则**: 构建即就绪，物理必闭环。
 
 ---
@@ -51,7 +51,7 @@
 ### 阶段 4：对话与推演 (Query & Inference)
 1. **SQL 分步生成**: 拆解多级分析任务。
 2. **动态执行**: 捕获 `sqlite3` 报错，利用 AI 自动修正 SQL。
-3. **安全审计**: 每次 SQL 执行与数据导出行为，均自动向 **Audit Command Center** 发送 `resource_id` 与风险加权信号。
+3. **安全审计**: 每次 SQL 执行与数据导出行为，均自动向 **Flagship Governance Center** 发送 `resource_id` 与风险加权信号。
 4. **可视化适配**: 采样 Top 5 数据并格式化为图表前端可读的 JSON 结构。
 
 ---

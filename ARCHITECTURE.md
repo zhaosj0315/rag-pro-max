@@ -1,8 +1,22 @@
-# RAG Pro Max v6.9.0 企业级系统架构文档
+# RAG Pro Max v6.9.5 企业级系统架构文档
 
-**版本**: v6.9.0 (Flagship Governance Edition)  
+**版本**: v6.9.5 (Flagship Purified Edition)  
 **更新日期**: 2026-01-19  
-**核心特性**: Individual Security Cabins, Multi-modal Resource Compliance, 45px Visual Alignment
+**核心特性**: Pure Logic Unification, Modular De-cluttering, Core Entry Slimming
+
+---
+
+## 🧼 架构净化与逻辑唯一化 (v6.9.5)
+
+在 v6.9.5 迭代中，系统完成了历史上最彻底的架构“瘦身”，确立了以下核心设计准则：
+
+### 1. 逻辑唯一性收口 (Pure Logic Unification)
+- **物理去冗余**: 彻底清除了全项目中重复定义的中间版本函数。例如，`render_resource_governance` 在经历 19 次迭代后，现在全项目**有且仅有一个**物理定义位置，杜绝了版本误用。
+- **函数级解耦**: 通过删除 `_is_valid_url`、`render_v23_sidebar` 等过时的局部方法，实现了核心类的“功能内聚”。
+
+### 2. 扁平化极简入口架构
+- **入口心脏瘦身**: `src/apppro.py` 废弃了所有的中间层包装器（如 `get_embed`, `get_llm`），改为直接调用底层核心 Service。
+- **架构回归**: 物理删除了 `src/app/` 这一层级的过度抽象，将整个系统还原为高性能、低延迟的扁平化 Streamlit 指挥中枢。
 
 ---
 

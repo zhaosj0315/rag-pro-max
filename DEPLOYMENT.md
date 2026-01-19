@@ -1,8 +1,8 @@
-# RAG Pro Max v6.7.0 企业级部署指南 (Governance & Unification Edition)
+# RAG Pro Max v6.9.5 企业级部署指南 (Flagship Purified Edition)
 
-**版本**: v6.7.0  
-**更新日期**: 2026-01-17  
-**核心特性**: 资源治理矩阵、万能附件解析、前置构建物理闭环
+**版本**: v6.9.5  
+**更新日期**: 2026-01-19  
+**核心特性**: 架构深度净化、个体安全调节舱、全合规自动巡检
 
 ---
 
@@ -53,7 +53,7 @@ docker-compose up -d --build
 ---
 
 ## 🐳 Docker 镜像说明
-v6.7.0 官方镜像标签为 `ragpromax/rag-pro-max:v6.7.0`。
+v6.9.5 官方镜像标签为 `ragpromax/rag-pro-max:v6.9.5`。
 请在 `docker-compose.yml` 中确保更新版本号。
 
 ---
