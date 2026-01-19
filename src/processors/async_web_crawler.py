@@ -116,7 +116,8 @@ class AsyncWebCrawler:
         saved_files = []
         
         # 只要队列不空，就一直爬下去 (复刻 while 循环)
-        while urls_to_visit and len(saved_files) < 2000:
+        # [v7.0.1] 提升安全上限至 50,000 页，与同步爬虫保持一致
+        while urls_to_visit and len(saved_files) < 50000:
             current_url = urls_to_visit.pop()
             
             if current_url in self.visited_urls:

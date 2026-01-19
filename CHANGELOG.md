@@ -1,5 +1,10 @@
 # Changelog
 
+## [v7.0.1] - 2026-01-19 (Flagship Extended Edition)
+### 🕷️ 网页抓取能力饱和式增强 (Crawler Saturation)
+- **解除瓶颈**: 彻底拆除了异步并发爬虫中硬编码的 2000 页上限。
+- **全量对齐**: 将抓取安全水位线从 2000 正式提升至 **50,000** 页，实现了与同步爬虫标准的物理统一，完美支持超大规模文档站的全量搬运。
+
 ## [v7.0.0] - 2026-01-19 (Flagship Robust Edition)
 ### 🛡️ 架构鲁棒性与兼容性加固 (Robustness & Compatibility)
 - **核心组件回归**: 重新补齐了被误删的 `ParallelExecutor` 导入与 `_fix_url` 爬虫核心方法，确保“业务推演”与“网页抓取”功能闭环。
