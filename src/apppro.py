@@ -1058,7 +1058,7 @@ from src.auth.login_page import render_login_page
 import importlib
 import src.auth.resource_governance
 importlib.reload(src.auth.resource_governance)
-from src.auth.resource_governance import render_resource_governance_v12
+from src.auth.resource_governance import render_resource_governance_v15
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     render_login_page()
     st.stop()
@@ -1102,7 +1102,7 @@ with st.sidebar:
     # 渲染 Admin 专用 Tab (物理对齐)
     if is_admin and len(tabs) > 5:
         with tabs[5]:
-            render_resource_governance_v12()
+            render_resource_governance_v15()
 
     # --- 退出登录按钮 ---
     st.sidebar.markdown("---")

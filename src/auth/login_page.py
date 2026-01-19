@@ -43,7 +43,7 @@ def render_login_page():
         
         /* 核心：找回被切掉的主标题，确保RAG Pro Max完整显示 */
         [data-testid="stHorizontalBlock"] {
-            transform: translateY(-130px) !important;
+            transform: translateY(-85px) !important;
         }
 
         /* --- 左侧：驾驶舱仪表盘 --- */
