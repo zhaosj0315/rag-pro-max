@@ -52,7 +52,7 @@ RAG Pro Max 是一款专为企业级复杂场景打造的智能体系统，深�
 ## 📚 文档资源中心
 
 ### 📂 核心实现与架构 (开发者必读)
-- [📐 **系统架构总纲**](ARCHITECTURE.md) - v6.7.0 最新架构定义
+- [📐 **系统架构总纲**](ARCHITECTURE.md) - v6.9.0 旗舰版架构定义
 - [💎 **核心功能实现详述**](CORE_FEATURE_IMPLEMENTATION.md) - 5大主心骨功能底层逻辑 (🆕)
 - [📊 **数据分析开发流程**](DATA_ANALYSIS_WORKFLOW.md) - 物理闭环与仿真引擎标准 (🆕)
 - [🔧 **API 接口文档**](API_DOCUMENTATION.md) - 后端服务定义

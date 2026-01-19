@@ -24,37 +24,30 @@
     - **休眠状态监测**: 比较 `time.time()` 与文件系统 `st_mtime` 的 delta 值，判定资源是否进入 30 天冷数据期。
 - **治理指令流水线**: 整合 `KBManager.rename`、`shutil.rmtree` 和 `set_kb_public` 接口，形成统一的资产决策输出端。
 
----
-
-## 🎨 视觉对齐架构 (v6.8.8)
-
-在 v6.8.8 中，我们通过样式重力模拟技术优化了登录页：
-- **重心偏移算法**: 采用 `translateY(-85px)` 取代原本的 `-130px`。该偏移量是基于 16:9 与 21:9 屏幕比例的交集计算得出的，确保在不同分辨率下，主标题均能处于视觉“黄金安全区”。
-- **留白缓冲 (Gutter Architecture)**: 增加了顶部 45px 的透明 padding 区块，有效吸收了大屏设备带来的视觉空旷感。
-
-## 🛡️ 安全审计指挥中心架构 (v6.8.6)
-
-在 v6.8.6 中，系统安全能力从“静态记录”演进为“动态风控大盘”：
-
-### 1. 全域风险画像引擎 (Risk Profiling Engine)
-- **时序风险建模**: 引入基于行为权重的滑动窗口计算。系统实时计算 24 小时内每一小时的 `Risk Score`：
-    - `Critical Score (50pts)`: 物理删除、暴力破解、强制干预。
-    - `Warning Score (10pts)`: 敏感权限变更、批量下载。
-    - `Info Score (1pt)`: 常规问答、资源检索。
-- **行为热力语义分布**: 利用语义映射层将 `action_type` 聚合为问答、管理、获取、安全四大象限，揭示全员意图画像。
-
-### 2. 实时会话侦听管线 (Live Intelligence Pipeline)
-- **设备指纹追踪**: 引入 MD5 设备哈希指纹，结合 IP 物理位置，实现对多账号异地共享或单账号多地攻击的秒级识别。
-- **熔断控制逻辑**: 通过 `SessionManager.revoke_user_sessions` 与前端 UI 的深度绑定，管理员可以在审计视图中直接阻断特定账号的通信链路。
+### 3. 全域风险画像系统 (Unified Risk Profiling)
+- **时序风险建模**: 整合了 24 小时风险得分脉搏图。系统实时计算行为权重（Critical=50, Warning=10, Info=1），揭示全员意图画像。
+- **设备指纹追踪**: 引入 MD5 设备哈希指纹，结合 IP 物理位置，实现对异常登录或共享账号的秒级识别。
 
 ---
 
-## 🎨 登录页 CSS 架构 (v6.7.3)
+## 🎨 视觉对齐与交互架构 (v6.8.8)
 
-在 v6.7.3 中，我们通过“原子化”样式覆盖技术重构了登录交互：
-- **精准锚点定位**: 在 Python 组件层注入 `.login-anchor` 锚点，配合 CSS `:has` 伪类（`[data-testid="stVerticalBlock"]:has(.login-anchor)`）实现了对登录区域的深度选择与隔离样式控制。
-- **核武器级样式清洗**: 针对 Streamlit 自带的高优先级 Secondary Button 样式，通过 `!important` 强制剥离 `background`, `border`, `box-shadow` 及 `border-radius`，实现了按钮组件到纯文字链接的形态转化。
-- **布局间距计算**: 废弃了传统的 `panel-footer` 容器，直接利用 CSS `margin-top` 实现了与上方表单按钮的精准垂直分离（1.5rem）。
+### 1. 登录页重心偏移算法
+- **黄金分割优化**: 采用 `translateY(-85px)` 取代原本的 `-130px`。该偏移量基于多分辨率交集计算，确保主标题处于视觉“黄金安全区”。
+- **留白缓冲 (Gutter Architecture)**: 增加顶部 45px 透明 padding，显著缓解大屏设备的视觉空旷感。
+
+### 2. 交互样式原子化覆盖
+- **精细化选择器**: 利用 CSS `:has` 伪类（`[data-testid="stVerticalBlock"]:has(.login-anchor)`）实现了对 Streamlit 原生组件的深度样式隔离。
+- **样式清洗**: 针对高优先级组件，通过 `!important` 强制剥离背景、边框，实现了组件形态的平滑转化。
+
+---
+
+## 🏗️ 架构瘦身与代码净化 (System Cleanup)
+
+在 v6.9.0 迭代中，系统完成了史上最大规模的代码治理，物理删除了 25+ 冗余模块：
+- **废弃 UI 架构**: 移除了 `src/app/` 和 `src/ui/sidebar_manager.py` 等旧版模块化尝试，统一回归 `apppro.py` 极简流式架构。
+- **逻辑归口**: 清理了 `MainController` 与 `user_management.py`，将核心业务逻辑整合至 `common/business.py` 与旗舰治理中心。
+- **性能减负**: 移除了过时的 `optimization_manager.py` 与 `logger.py` 包装器，全面转向 `LogManager` 高性能日志体系。
 
 ## 🧠 Strategic Workshop 3.0 架构 (v6.7.2)
 
