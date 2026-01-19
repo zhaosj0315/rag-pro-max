@@ -1,191 +1,103 @@
-# RAG Pro Max v6.9.0 企业级API文档
+# RAG Pro Max v8.0.0 企业级API文档
 
-**版本**: v6.9.0 (Flagship Governance Edition)  
+**版本**: v8.0.0 (Flagship Dual-Core Edition)  
 **更新日期**: 2026-01-19  
 **适用范围**: 企业级API集成  
 
 ---
 
-## 🏢 企业级API概述
+## 🧬 双核联动API概述
 
-RAG Pro Max v6.9.0 提供完整的RESTful API接口，支持企业级集成和自动化部署。
+RAG Pro Max v8.0.0 标志着 API 从单一的文档检索向 **“语义+逻辑”** 双核驱动的全面跃迁。
 
-### 💎 v6.9.0 Flagship Governance API 特性
-- **个体安全策略API**: 新增 `/auth/user_settings` 接口，支持为特定用户配置专属 TTL（会话有效期）
-- **定点熔断API**: `/auth/revoke_sessions` 支持按用户名即时切断所有活跃通信链路
-- **全合规资产透视**: `/kb/list` 接口增强，实时返回损坏状态、容量警报及活跃度元数据
-- **精准选表API**: `/analysis/select_tables` 接口，支持基于语义的智能表选择
-- **领域感知配置**: `/analysis/domain_config` 接口，支持配置跨境贸易和财税领域的语义规则
-- **自愈式 SQL 建模**: 建模 API 现在集成表名自愈逻辑，自动修复生成 SQL 中的命名偏差
-
-### 🔒 企业安全特性
-- **本地部署**: 所有API在企业内网运行，物理隔离安全
-- **零数据上传**: API调用不向外部发送数据，数据主权完全掌控
-- **访问控制**: 支持IP白名单、JWT Token 校验与账户锁定机制
-- **审计日志**: 基于 `LogManager` 的高性能异步审计流水记录
-
----
-
-## 🚀 快速开始
-
-### 启动API服务
-```bash
-# 启动主应用 (Streamlit 仪表盘)
-streamlit run src/apppro.py
-
-# 启动后端API服务
-python src/api/fastapi_server.py
-```
+### 💎 v8.0.0 Dual-Core API 特性
+- **智能数据分析开关**: `/kb/process` 接口新增 `enable_data_analysis` 参数，一键激活 SQL 逻辑增强。
+- **混合结果集**: `/query` 接口现在支持返回“数文对照”数据，同时包含 RAG 文本证据与 SQL 计算结果。
+- **全合规资产透视**: `/kb/list` 接口增强，实时返回物理索引与影子数据库的健康状态。
+- **自愈式 SQL 建模**: 建模 API 集成真数据判定逻辑，自动规避语义型表格的无效建表。
 
 ---
 
 ## 📋 核心API端点
 
-### 1. 健康检查与能力宣告
+### 1. 健康检查与双核状态
 ```http
 GET /health
 ```
-
-**描述**: 检查API服务状态及当前启用的旗舰功能
 
 **响应示例**:
 ```json
 {
   "status": "healthy",
-  "version": "6.9.0",
-  "edition": "Flagship Governance",
-  "timestamp": "2026-01-19T12:00:00Z",
+  "version": "8.0.0",
+  "edition": "Flagship Dual-Core",
   "features": {
-    "individual_ttl": true,
-    "compliance_scan": true,
+    "dual_core_engine": true,
+    "sql_assistant": true,
     "gpu_accelerated": true
   }
 }
 ```
 
-### 2. 智能查询
+### 2. 知识库构建 (双核模式)
 ```http
-POST /query
+POST /kb/process
 ```
-
-**描述**: 执行智能文档查询
 
 **请求参数**:
 ```json
 {
-  "query": "旗舰版治理中心的新特性有哪些？",
-  "kb_name": "系统文档",
+  "kb_name": "Sales_Report_2025",
+  "action_mode": "NEW",
   "options": {
-    "enable_web_search": false,
-    "enable_deep_think": true,
-    "enable_research": true,
-    "language": "zh-CN"
+    "use_ocr": true,
+    "enable_data_analysis": true,
+    "extract_metadata": true,
+    "generate_summary": true
   }
+}
+```
+
+**逻辑说明**:
+- 勾选 `enable_data_analysis` 后，系统会在构建向量索引的同时，对 `raw_sources/` 目录下的表格执行物理建表。
+
+### 3. 智能联动查询
+```http
+POST /query
+```
+
+**请求参数**:
+```json
+{
+  "query": "分析去年的销售趋势并给出相关政策说明",
+  "kb_name": "Sales_Report_2025",
+  "mode": "dual_core"
 }
 ```
 
 **响应示例**:
 ```json
 {
-  "answer": "旗舰版治理中心引入了个体安全调节舱、全合规扫描引擎等核心特性...",
-  "sources": [
-    {
-      "document": "README.md",
-      "page": 1,
-      "confidence": 0.98
-    }
-  ],
-  "metadata": {
-    "response_time": 1.2,
-    "tokens_used": 240,
-    "search_enabled": false,
-    "research_enabled": true
-  }
+  "answer": "根据数据分析显示，去年销售呈现 15% 的稳步增长。财报第 5 页提到...",
+  "data_evidence": {
+    "sql": "SELECT SUM(amount) FROM sales...",
+    "result_table": [ ... ],
+    "chart_type": "line"
+  },
+  "text_evidence": [
+    { "doc": "report.pdf", "text": "销售增长主要由于..." }
+  ]
 }
 ```
-
-### 3. 资产清单 (含合规元数据)
-```http
-GET /knowledge-bases
-```
-
-**描述**: 获取所有知识库及其治理状态
-
-**响应示例**:
-```json
-{
-  "knowledge_bases": [
-    {
-      "name": "Finance_2025",
-      "owner": "admin",
-      "compliance_status": "✅ 合规",
-      "last_active": "2026-01-19",
-      "size_mb": 42.5
-    },
-    {
-      "name": "Temp_Dump",
-      "owner": "guest",
-      "compliance_status": "⚠️ 容量预警",
-      "last_active": "2025-12-01",
-      "size_mb": 650.2
-    }
-  ],
-  "total_count": 2
-}
-```
-
-### 4. 文档上传与解析
-```http
-POST /upload
-```
-
-**描述**: 上传文档并自动触发旗舰级解析流
 
 ---
 
 ## 🛡️ 企业安全配置
 
-### API密钥认证
-```bash
-export RAG_API_KEY="your-secure-api-key"
-```
-
-### IP白名单
-```json
-{
-  "security": {
-    "ip_whitelist": ["192.168.1.0/24"]
-  }
-}
-```
+### 权限与配额
+- **存储配额**: API 返回包含 `storage_quota_mb` 与 `current_usage` 信息。
+- **个体熔断**: 支持通过 API 一键注销特定用户的 JWT 令牌。
 
 ---
 
-## 📊 监控与指标
-
-### 治理指标端点
-```http
-GET /metrics/governance
-```
-
-**响应示例**:
-```json
-{
-  "total_assets": 15,
-  "compliance_rate": "93.3%",
-  "zombie_assets": 1,
-  "large_assets": 2,
-  "total_physical_load": "1.2 GB"
-}
-```
-
----
-
-## 📞 企业支持
-
-- **API集成支持**: api-support@rag-pro-max.com
-- **GitHub**: https://github.com/zhaosj0315/rag-pro-max
-
----
-
-**🎯 目标**: 为企业提供安全、极简、旗舰级的API服务
+**🎯 目标**: 为企业提供全能、精准、安全的智能双核API服务

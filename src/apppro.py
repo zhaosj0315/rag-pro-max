@@ -2283,24 +2283,30 @@ with st.sidebar:
                 else:
                     force_reindex = False
 
-                # 剩下的3个选项显示在一行
-                opt_col1, opt_col2, opt_col3 = st.columns(3)
-                with opt_col1:
-                    use_ocr = st.checkbox("🔍 OCR识别", value=default_val, key="kb_use_ocr", help="识别PDF中的图片文字")
-                with opt_col2:
-                    extract_metadata = st.checkbox("📊 元数据", value=default_val, key="kb_extract_metadata", help="提取文件分类、关键词")
-                with opt_col3:
-                    generate_summary = st.checkbox("📝 生成摘要", value=default_val, key="kb_generate_summary", help="生成AI摘要")
+                # [v8.0] 选项布局重构：增加智能数据分析
+                opt_row1_col1, opt_row1_col2 = st.columns(2)
+                with opt_row1_col1:
+                    use_ocr = st.checkbox("🔍 OCR文字识别", value=default_val, key="kb_use_ocr", help="识别图片或PDF中的文字")
+                with opt_row1_col2:
+                    enable_data_analysis = st.checkbox("💎 智能数据分析", value=False, key="kb_enable_data_analysis", help="自动识别真数据，构建物理库，启用SQL决策")
+
+                opt_row2_col1, opt_row2_col2 = st.columns(2)
+                with opt_row2_col1:
+                    extract_metadata = st.checkbox("📊 元数据提取", value=default_val, key="kb_extract_metadata", help="自动提取文件分类、关键词")
+                with opt_row2_col2:
+                    generate_summary = st.checkbox("📝 自动摘要生成", value=default_val, key="kb_generate_summary", help="为每份文件生成AI摘要")
                 
                 # 保存到session state
                 st.session_state.use_ocr = use_ocr
                 st.session_state.generate_summary = generate_summary
+                st.session_state.enable_data_analysis = enable_data_analysis
                 
                 # 更新状态提示
                 options = []
-                if force_reindex: options.append("重建索引")
-                if extract_metadata: options.append("元数据")
+                if force_reindex: options.append("重建")
                 if use_ocr: options.append("OCR")
+                if enable_data_analysis: options.append("分析")
+                if extract_metadata: options.append("元数据")
                 if generate_summary: options.append("摘要")
                 
                 if options:
@@ -2806,7 +2812,7 @@ def jump_to_knowledge_base(kb_name: str, output_base: str):
     logger.log("知识库跳转", "complete", f"✅ 跳转函数执行完成: {kb_name}")
 
 
-def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extract_metadata=False, generate_summary=False, force_reindex=False, owner=None):
+def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extract_metadata=False, generate_summary=False, force_reindex=False, owner=None, enable_data_analysis=False):
     """处理知识库逻辑 (Stage 4.2 - 使用 IndexBuilder)"""
     global logger
     
@@ -2918,8 +2924,9 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
         docs = []
 
     # 2. 判断是否启用数据分析模式 & 是否允许空文档
-    is_da_mode = st.session_state.get('is_data_analysis_mode', False)
+    is_da_mode = enable_data_analysis or st.session_state.get('kb_enable_data_analysis', False)
     
+    # [v8.0 关键变更] 如果启用了数据分析，即使没有传统文本，也允许 RAG 构建流程继续
     has_data_files = False
     if os.path.exists(current_target_path):
         import glob
@@ -2981,16 +2988,17 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
         logger.warning(f"⚠️ 原始文件归档失败: {e}")
 
     # 5. 数据分析引擎处理 (必须在归档之后)
-    # 扫描归档后的文件
-    import glob
-    data_files = []
-    if os.path.exists(raw_sources_dir):
-        csvs = glob.glob(os.path.join(raw_sources_dir, "**/*.csv"), recursive=True)
-        excels = glob.glob(os.path.join(raw_sources_dir, "**/*.xlsx"), recursive=True) + glob.glob(os.path.join(raw_sources_dir, "**/*.xls"), recursive=True)
-        mds = glob.glob(os.path.join(raw_sources_dir, "**/*.md"), recursive=True) + glob.glob(os.path.join(raw_sources_dir, "**/*.markdown"), recursive=True)
-        data_files = csvs + excels + mds
-    
-    if is_da_mode or data_files:
+    # [v8.0 联动架构] 仅当用户勾选了“智能数据分析”高级选项时才执行
+    if is_da_mode:
+        # 扫描归档后的文件
+        import glob
+        data_files = []
+        if os.path.exists(raw_sources_dir):
+            csvs = glob.glob(os.path.join(raw_sources_dir, "**/*.csv"), recursive=True)
+            excels = glob.glob(os.path.join(raw_sources_dir, "**/*.xlsx"), recursive=True) + glob.glob(os.path.join(raw_sources_dir, "**/*.xls"), recursive=True)
+            mds = glob.glob(os.path.join(raw_sources_dir, "**/*.md"), recursive=True) + glob.glob(os.path.join(raw_sources_dir, "**/*.markdown"), recursive=True)
+            data_files = csvs + excels + mds
+        
         status_container.write("📂 [专项] 启动业务语义大脑引擎...")
         from src.processors.data_analyst import DataAnalystEngine
         from src.utils.model_manager import load_llm_model
@@ -3420,7 +3428,8 @@ if btn_start:
                             extract_metadata=current_extract_metadata,
                             generate_summary=current_generate_summary,
                             force_reindex=current_force_reindex,
-                            owner=st.session_state.get('user', 'admin')
+                            owner=st.session_state.get('user', 'admin'),
+                            enable_data_analysis=st.session_state.get('kb_enable_data_analysis', False)
                         )
                         
                         logger.log("网页抓取", "success", f"✅ 知识库创建并归档成功: {kb_name}")
@@ -3644,7 +3653,8 @@ if btn_start:
                             extract_metadata=current_extract_metadata,
                             generate_summary=current_generate_summary,
                             force_reindex=current_force_reindex,
-                            owner=st.session_state.get('user', 'admin')
+                            owner=st.session_state.get('user', 'admin'),
+                            enable_data_analysis=st.session_state.get('kb_enable_data_analysis', False)
                         )
                         
                         logger.log("智能搜索", "success", f"✅ 知识库创建并归档成功: {kb_name}")
@@ -3794,7 +3804,8 @@ if btn_start:
                 extract_metadata=current_extract_metadata,
                 generate_summary=current_generate_summary,
                 force_reindex=current_force_reindex,
-                owner=current_user # 明确传递所有者
+                owner=current_user, # 明确传递所有者
+                enable_data_analysis=st.session_state.get('kb_enable_data_analysis', False)
             )
             # st.session_state.current_nav 等跳转逻辑已移至 process_knowledge_base_logic 内部的 jump_to_knowledge_base
             

@@ -1,70 +1,65 @@
-# 数据分析模式：开发流程与架构设计规范 (Data Analysis Workflow)
+# 数据分析：双核联动开发流程与架构设计规范 (Data Analysis Workflow)
 
-**版本**: v6.9.5 (Flagship Purified Edition)
-**核心原则**: 构建即就绪，物理必闭环。
+**版本**: v8.0.0 (Flagship Dual-Core Edition)
+**核心原则**: 语义底座 + 结构化增强 (Shadow Mapping)，物理必闭环。
 
 ---
 
 ## 一、 业务架构 (Business Architecture)
 
-数据分析模式的设计目标是为用户提供一个“从模糊需求到物理底座，再到结构化洞察”的完整链路。
+在 v8.0.0 架构下，数据分析不再是一个独立的模式，而是作为 RAG 知识库的**“高级逻辑插件”**存在。系统提供“从语义检索到结构化计算”的无缝切换体验。
 
-### 1. 场景双轨制
-- **场景 A：数据驱动 (Data-Driven)**
-  - 输入：CSV, XLSX, SQL 导出文件。
-  - 核心：提取真实物理结构，直接固化。
-- **场景 B：需求驱动 (Requirement-Driven)**
-  - 输入：业务 PRD, 指引手册, 纯文本需求。
-  - 核心：通过 LLM 推演逻辑模型 (Logical Model) -> 映射为物理模型 (Physical Model) -> 仿真数据填充。
+### 1. 场景双核联动
+- **语义层 (Base Layer)**: 100% 的材料经过 RAG 切片与向量化，保证定性问题的准确回答。
+- **逻辑层 (Augmented Layer)**:
+  - **有数映射**: 探测归档目录中的 CSV/XLSX，物理固化为影子表。
+  - **定义赋能**: 如果物理表缺乏字段说明，引擎反向检索 RAG 索引中的“业务文档”，提取字段释义（Comments）。
 
 ---
 
 ## 二、 基础架构设计 (Infrastructure Design)
 
 ### 1. 物理存储层 (Storage)
-- **数据库**: SQLite (轻量级、无盘化/本地文件、事务支持)。
+- **数据库**: SQLite。
 - **文件路径**: `vector_db_storage/{KB_NAME}/business_data.db`。
-- **Schema 存储**: `vector_db_storage/{KB_NAME}/business_schema.json`。
-
-### 2. 仿真引擎 (Simulation Engine)
-- **逻辑**: 基于提取的 `is_virtual` 字段。
-- **注入策略**: 针对日期、数值、分类字段，AI 生成符合业务逻辑分布的样本（如销售额在 100-10000 之间，日期在最近一年内）。
+- **协同存储**: 与 `index_store.json` (RAG索引) 同级并存。
 
 ---
 
-## 三、 开发与构建流程 (Development Workflow)
+## 三、 开发与构建流程 (v8.0 联动版)
 
-### 阶段 1：扫描与识别 (Scan & Identify)
-1. **分类**: 区分“结构化数据文件”与“半结构化/非结构化文档”。
-2. **初步清理**: 归一化表名（去除非法字符），转换编码。
+### 阶段 1：归一化摄入 (Normalized Ingestion)
+1. **统一路径**: 无论是爬虫还是上传，文件统一归档至 `raw_sources/`。
+2. **底座先行**: 首先触发全量 RAG 构建流程。
 
-### 阶段 2：建模与固化 (Modeling & Solidification)
-1. **有数固化**: `df.to_sql()`。
-2. **逻辑提取**: 对文档进行递归摘要，提取 `TABLE` 定义、`COLUMN` 定义及业务释义。
-3. **合并蓝图**: 将物理表与逻辑表合并为一份 `unified_schema`。
+### 阶段 2：智能探测与分流 (Detection & Branching)
+1. **意图检查**: 读取 `enable_data_analysis` 标志位。
+2. **真数据判定 (Validator)**: 扫描 `raw_sources/`，计算数值密度。
+3. **分流**: 
+   - 勾选且为真数据 ➡ 进入「结构化建模」。
+   - 未勾选或低分表格 ➡ 仅保留语义索引。
 
-### 阶段 3：底座自愈与仿真 (Self-Healing & Simulation)
-1. **环境自检**: `_ensure_sandbox_ready()`。
-2. **造数闭环**: 如果表为空或仅有逻辑定义，立刻启动 `_populate_mock_data()`。
-3. **就绪声明**: 打印 `✨ [Success] 数据分析物理底座构建完成`。
+### 阶段 3：结构化影子映射 (Shadow Solidification)
+1. **建模固化**: `df.to_sql()` 生成物理影子表。
+2. **自愈仿真**: 针对只有逻辑定义（需求文档）的表，启动 AI 仿真注入。
 
-### 阶段 4：对话与推演 (Query & Inference)
-1. **SQL 分步生成**: 拆解多级分析任务。
-2. **动态执行**: 捕获 `sqlite3` 报错，利用 AI 自动修正 SQL。
-3. **安全审计**: 每次 SQL 执行与数据导出行为，均自动向 **Flagship Governance Center** 发送 `resource_id` 与风险加权信号。
-4. **可视化适配**: 采样 Top 5 数据并格式化为图表前端可读的 JSON 结构。
+### 阶段 4：双核协同响应 (Dual-Core Inference)
+1. **路由判断**: 识别用户提问是定性（RAG）还是定量（SQL）。
+2. **数文对照**: 
+   - 输出 SQL 计算结论。
+   - 输出 RAG 文本证据（支持跳转至原文对应页码）。
 
 ---
 
 ## 四、 运维与演进规范
 
-1. **不可删除性**: `business_data.db` 与 `business_schema.json` 是知识库的核心资产，非重建请求不可删除。
-2. **版本一致性**: 每次通过 `apppro.py` 构建完成后，必须更新 `version.json` 中的构建指纹。
+1. **资源治理**: **旗舰治理中心** 必须同时巡检 `.db` 数据库与向量索引的健康度。
+2. **不可删除性**: `business_data.db` 是实现“数文对照”的核心底座，禁止单独删除。
 
 ---
 
 ## 📑 开发者 Checkbox
-- [ ] 构建完成后，`business_data.db` 文件是否存在？
-- [ ] `business_schema.json` 是否包含业务背景描述？
-- [ ] 针对虚拟表，生成的模拟数据是否满足统计学分布？
-- [ ] 历史对话是否能完整重绘 SQL 可视化看板？
+- [ ] RAG 索引构建是否成功？
+- [ ] 勾选高级选项后，`business_data.db` 是否在 KB 目录下生成？
+- [ ] SQL 生成是否包含业务语义注释（来自 RAG 提取）？
+- [ ] 旗舰治理中心是否能正确识别该“双核”库的容量状态？
