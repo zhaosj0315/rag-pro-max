@@ -12,18 +12,23 @@
 
 # RAG Pro Max - Enterprise AI Document QA & Data Analysis System
 
-**Version**: v6.8.6 (Audit Command Center Edition)  
-![Version](https://img.shields.io/badge/version-v6.8.6-brightgreen)
+**Version**: v6.9.0 (Flagship Governance Edition)  
+![Version](https://img.shields.io/badge/version-v6.9.0-blue)
 
-RAG Pro Max is an enterprise-grade agent system that integrates full-scale document migration (RAG), automated web crawling, and **Strategic Workshop 3.0** precision simulation analysis capabilities.
+RAG Pro Max is an enterprise-grade agent system that integrates full-scale document migration (RAG), automated web crawling, and the sophisticated security controls of the **Flagship Governance Center**.
 
 ---
 
-## 🚀 v6.8.6 Core Features
+## 🚀 v6.9.0 Core Features
 
-### 🎨 Login UX Refinement (Final Polish)
-- **Guest Link Purification**: The "Browse as Guest" option on the login page has been refactored from a button style to a pure text link, eliminating visual clutter and enhancing the professional industrial feel.
-- **Atomic CSS Architecture**: Leverages anchor isolation and aggressive style overriding to maintain a high-end brand aesthetic within the Streamlit framework.
+### 🛡️ Flagship Governance Center
+- **Individual Security Cabins**: Revolutionary "single-soldier" management, supporting individualized TTL (Session Validity) and targeted session revocation for specific users.
+- **Automated Compliance Engine**: Second-level identification of corrupted indices, oversized assets (>500MB), and dormant data (>30 days) within the physical storage.
+- **Governance Decision Hub**: Unified workflow for asset ownership transfer, physical shredding, privacy toggling, and individual resource renaming.
+
+### 🎨 Visual Golden-Ratio Alignment
+- **45px Gravity Optimization**: Shifted the login page's vertical center down by 45px, significantly improving visual balance and ergonomic experience on large displays.
+- **Immersive Command Center**: 95% full-width layout, removing visual clutter to ensure administrators focus on critical data metrics.
 
 ### 🧠 Strategic Workshop 3.0 (Strategic Analysis Workshop)
 - **Precision Table Selection Engine**: Utilizes LLM-driven semantic pruning to precisely identify core business tables from massive datasets, improving query initialization speed by 500%.

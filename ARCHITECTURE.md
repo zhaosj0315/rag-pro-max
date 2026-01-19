@@ -1,10 +1,36 @@
-# RAG Pro Max v6.8.6 企业级系统架构文档
+# RAG Pro Max v6.9.0 企业级系统架构文档
 
-**版本**: v6.8.6 (Audit Command Center Edition)  
-**更新日期**: 2026-01-18  
-**核心特性**: Audit Risk Pulse 2.0、Live Session Monitoring、终端全屏架构
+**版本**: v6.9.0 (Flagship Governance Edition)  
+**更新日期**: 2026-01-19  
+**核心特性**: Individual Security Cabins, Multi-modal Resource Compliance, 45px Visual Alignment
 
 ---
+
+## 🛡️ 旗舰级治理中心架构 (v6.9.0)
+
+在 v6.9.0 中，系统架构实现了从“宽泛审计”到“精细化生命周期治理”的质变：
+
+### 1. 个体化安全策略架构 (Individualized Security Strategy)
+- **策略优先级 (Settings Priority)**: 引入三级 TTL（生存时间）判定逻辑：
+    1. `Level 1`: 用户专属设置 (User-specific settings in `sessions.json`).
+    2. `Level 2`: 全局默认配置 (Global default).
+    3. `Level 3`: 代码硬编码安全值 (7 Days).
+- **交互舱状态机**: 采用单选监听模式。当且仅当账户列表的勾选位（Checked State）为 1 时，激活 `Individual Cabin` 容器。该容器通过 `revoke_user_sessions` 接口与 `SessionStore` 直接通信，实现“手术刀式”的会话切断。
+
+### 2. 全能资源合规扫描引擎 (Compliance Scanning Engine)
+- **物理指纹深度探测**:
+    - **损坏判定**: 校验物理路径下是否存在 `manifest.json` 与 `docstore.json` 的闭环。
+    - **容量水位线**: 引入 500MB 软限制。引擎通过递归扫描 `os.walk` 计算文件夹物理总量，触发容量预警状态。
+    - **休眠状态监测**: 比较 `time.time()` 与文件系统 `st_mtime` 的 delta 值，判定资源是否进入 30 天冷数据期。
+- **治理指令流水线**: 整合 `KBManager.rename`、`shutil.rmtree` 和 `set_kb_public` 接口，形成统一的资产决策输出端。
+
+---
+
+## 🎨 视觉对齐架构 (v6.8.8)
+
+在 v6.8.8 中，我们通过样式重力模拟技术优化了登录页：
+- **重心偏移算法**: 采用 `translateY(-85px)` 取代原本的 `-130px`。该偏移量是基于 16:9 与 21:9 屏幕比例的交集计算得出的，确保在不同分辨率下，主标题均能处于视觉“黄金安全区”。
+- **留白缓冲 (Gutter Architecture)**: 增加了顶部 45px 的透明 padding 区块，有效吸收了大屏设备带来的视觉空旷感。
 
 ## 🛡️ 安全审计指挥中心架构 (v6.8.6)
 
