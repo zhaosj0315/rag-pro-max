@@ -1,36 +1,30 @@
-# RAG Pro Max v8.0.0 企业级系统架构文档
+# RAG Pro Max v8.1.0 企业级系统架构文档
 
-**版本**: v8.0.0 (Flagship Dual-Core Edition)  
-**更新日期**: 2026-01-19  
-**核心特性**: Dual-Core Modular Assembly, Semantic Foundation + Logical Enhancer
-
----
-
-## 🧬 双核组装架构 (v8.0.0)
-
-在 v8.0.0 迭代中，系统完成了历史上最重要的架构进化：将两个高度成熟的子系统（RAG 与 数据分析）通过“插件化”方式完美组装。
-
-### 1. 语义先行：RAG 标配底座 (Standard Semantic Base)
-- **物理准则**：所有非结构化与半结构化数据（本地/爬虫/粘贴/搜索）**100% 经过 RAG 处理**。
-- **逻辑优势**：确保了系统具备“全量模糊检索”能力。即使是 CSV 表格，其表头描述和文本内容也会被向量化，保证定性询问（“这是什么表？”）永远有答案。
-
-### 2. 结构增强：SQL 高级插件 (Advanced Logical Enhancer)
-- **触发机制**：通过 UI 层“💎 智能数据分析”复选框按需开启。
-- **双向映射**：
-    - **探测**：调用「硬核数据验证网关」判定文件是否具备“真数据”计算价值（数值密度 > Threshold）。
-    - **建模**：复用成熟的 Strategic Workshop 3.0 逻辑，将符合条件的材料物理化为 `business_data.db`。
-- **协同效应**：同一个知识库 ID 目录下，向量索引与 SQLite 数据库**物理并存**。
+**版本**: v8.1.0 (Flagship Dual-Core Edition)  
+**更新日期**: 2026-01-20  
+**核心特性**: Iron-Gate Routing, Dual-Core Co-existence, Standard Ingestion Invariants
 
 ---
 
-## 🧼 架构净化与逻辑唯一化 (v6.9.5)
-... (此处保留之前的净化逻辑详述，作为底层稳定性参考) ...
+## 🧬 双核组装与严选路由 (v8.1.0)
+
+在 v8.1.0 迭代中，系统确立了“能力预装 (Provisioning)”与“实时激活 (Activation)”相分离的顶层架构模式。
+
+### 1. 意图严选路由 (Iron-Gate Routing)
+为了防止 SQL 引擎对定性查询的“逻辑干扰”，系统在提问主循环中实施了防御式网关：
+- **物理判定 (`is_data_kb`)**: 检查 KB 目录是否存在 `business_schema.json`。
+- **意图判定 (`manual_da_on`)**: 实时监听 Session State 中的数据分析开关。
+- **铁闸决策**: 只有当 `is_data_kb AND manual_da_on` 为真时，流量才允许流向逻辑核（SQL 推演）。否则，一律默认路由至语义核（RAG 检索）。
+
+### 2. 归一化摄入不变式 (Normalized Invariants)
+不论摄入源头如何变化，构建管线必须满足以下物理闭环：
+- **RAG 基准**: 必须生成 `docstore.json` 与 `index_store.json`。
+- **影子库可选**: 仅在用户勾选增强项时生成 `.db` 物理库。
+- **元数据归口**: 所有者与处理指纹必须统一写入 `manifest.json`。
 
 ---
 
 ## 🏗️ 归一化摄入管线 (Normalized Ingestion Pipeline)
-
-系统通过一套逻辑覆盖五大入口，实现了极高的维护效率：
 
 ```mermaid
 graph TD
@@ -39,16 +33,16 @@ graph TD
     C[粘贴文本] --> N
     D[智能搜索] --> N
     
-    N --> R[<b>RAG 核心管线 (必经)</b><br/>向量化 / 摘要 / 元数据]
-    R --> S{高级选项: 数据分析?}
-    S -- "勾选" --> DA[<b>SQL 核心管线 (增强)</b><br/>物理建表 / 逻辑仿真]
-    S -- "未勾选" --> SKIP[跳过 SQL 建模]
+    N --> R[<b>RAG 核心管线 (必经)</b><br/>向量化固化]
+    R --> S{勾选: 智能分析?}
+    S -- "True" --> DA[<b>SQL 核心管线 (增强)</b><br/>物理建表 / 影子映射]
+    S -- "False" --> SKIP[跳过建模]
     
     DA --> G[🛡️ 旗舰治理中心]
     R --> G
 ```
 
-### 1. 技术先进性审查结论
-- **低耦合**：RAG 与 SQL 子逻辑保持独立，通过 `process_knowledge_base_logic` 进行流程编排。
-- **数文对照**：物理层的并存为未来的“结构化结论 + 语义化原文证据”双重应答提供了数据底座。
-- **治理闭环**：治理中心通过扫描 KBID 文件夹，可同时管理两类不同性质的数字资产。
+### 1. 技术先进性结论
+- **高内聚**: RAG 逻辑与 SQL 逻辑物理独立，互不污染。
+- **可审计**: 通过 `Route Discovery` 日志，实现了系统决策的透明化。
+- **稳定性**: 架构极大地减少了由于“自作聪明”引发的逻辑死锁。

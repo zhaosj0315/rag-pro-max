@@ -6408,6 +6408,8 @@ if st.session_state.get('is_processing') and final_prompt:
                 try:
                     # --- 核心增强：数据分析 5.0 (业务语义模式) ---
                     manual_da_on = st.session_state.get('is_data_analysis_mode', False)
+                    # [v8.1.0] 实时路由审计
+                    logger.info(f"🔍 [Route Discovery] manual_da_on={manual_da_on}", stage="路由判断")
                     
                     if active_kb_name and active_kb_name not in ["pure_chat", "multi_kb_mode"]:
                         db_path = os.path.join(output_base, active_kb_name)
@@ -6442,9 +6444,10 @@ if st.session_state.get('is_processing') and final_prompt:
                                     except Exception as e:
                                         logger.warning(f"⚠️ 引擎按需唤醒异常: {e}")
 
-                        # B. 战略推演工作坊逻辑
+                        # B. 战略推演工作坊逻辑 (v8.1.0：意图严选路由)
                         is_data_kb = os.path.exists(schema_path)
-                        if is_data_kb and (manual_da_on or "is_data_kb" in locals()):
+                        # 核心隔离：必须满足【物理就绪】且【手动授权开关开启】
+                        if is_data_kb and manual_da_on:
                             from src.auth.audit_logger import AuditLogger
                             from src.common.utils import get_client_ip
                             AuditLogger.log(
