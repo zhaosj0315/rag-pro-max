@@ -1573,30 +1573,16 @@ with st.sidebar:
             </style>
             """, unsafe_allow_html=True)
 
-            # 5x1 水平数据源选择
+            # 4x1 水平数据源选择 (v8.1.1：数据分析已深度融入高级选项)
             source_mode = st.radio(
                 "数据源", 
-                ["📂 文件上传", "📝 粘贴文本", "🔗 网址抓取", "📊 数据分析", "🔍 智能搜索"], 
+                ["📂 文件上传", "📝 粘贴文本", "🔗 网址抓取", "🔍 智能搜索"], 
                 horizontal=True,
                 label_visibility="collapsed",
                 key="data_source_selector"
             )
             
-            if source_mode == "📊 数据分析":
-                st.info("💡 **数据分析模式**: 适合上传 CSV、Excel 或包含报表的文档。系统将自动提取表格结构并支持复杂的 SQL 统计查询。")
-                da_files = st.file_uploader(
-                    "上传业务表单或数据字典", 
-                    accept_multiple_files=True, 
-                    type=['csv', 'xlsx', 'xls', 'md', 'markdown', 'docx', 'doc'],
-                    key="da_uploader",
-                    label_visibility="collapsed"
-                )
-                if da_files:
-                    st.session_state.is_data_analysis_mode = True
-                    # 关键：立即同步给全局变量供下文统一处理
-                    uploaded_files = da_files
-            
-            elif source_mode == "📂 文件上传":
+            if source_mode == "📂 文件上传":
                 # 权限拦截 (实时校验)
                 from src.auth.permission_manager import permission_manager
                 current_user = st.session_state.get('user', 'guest_user')
