@@ -1,7 +1,7 @@
 import os
 import json
 import base64
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from sqlalchemy import create_engine, text
 
 class ConnectionManager:
@@ -90,13 +90,36 @@ class ConnectionManager:
     def get_connection_url(self, config: Dict, db_override: str = None) -> str:
         """生成 SQLAlchemy 连接字符串"""
         t = config.get('type', 'mysql').lower()
-        db_target = db_override if db_override else config['database']
+        db_target = db_override if db_override else config.get('database', '')
         
+        user = config.get('user', '')
+        pw = config.get('password', '')
+        host = config.get('host', 'localhost')
+        port = config.get('port', '')
+
         if t == 'mysql':
-            return f"mysql+pymysql://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{db_target}"
+            return f"mysql+pymysql://{user}:{pw}@{host}:{port}/{db_target}"
         elif t == 'postgresql':
-            return f"postgresql://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{db_target}"
-        # 可扩展其他类型
+            return f"postgresql://{user}:{pw}@{host}:{port}/{db_target}"
+        elif t == 'mssql':
+            return f"mssql+pyodbc://{user}:{pw}@{host}:{port}/{db_target}?driver=ODBC+Driver+17+for+SQL+Server"
+        elif t == 'clickhouse':
+            return f"clickhouse://{user}:{pw}@{host}:{port}/{db_target}"
+        elif t == 'sqlite':
+            # 对于 SQLite，host 字段存储的是本地路径
+            return f"sqlite:///{host}"
+        elif t == 'maxcompute':
+            return f"odps://{user}:{pw}@{db_target}/?endpoint={host}"
+        elif t == 'oracle':
+            # 使用 oracledb 瘦模式，格式: oracle+oracledb://user:pass@host:port/?service_name=base
+            return f"oracle+oracledb://{user}:{pw}@{host}:{port}/?service_name={db_target}"
+        elif t == 'duckdb':
+            # 与 SQLite 类似，host 存储路径
+            return f"duckdb:///{host}"
+        elif t == 'snowflake':
+            # 格式: snowflake://<user_login_name>:<password>@<account_identifier>/<database_name>/<schema_name>?warehouse=<warehouse_name>&role=<role_name>
+            return f"snowflake://{user}:{pw}@{host}/{db_target}"
+        
         return ""
 
     def test_connection(self, config: Dict) -> tuple[bool, str]:
@@ -105,7 +128,12 @@ class ConnectionManager:
             url = self.get_connection_url(config)
             if not url: return False, "不支持的数据库类型"
             
-            engine = create_engine(url, connect_args={'connect_timeout': 5})
+            # 特殊处理 SQLite，确保路径存在
+            if config.get('type') == 'SQLite':
+                if not os.path.exists(config.get('host', '')):
+                    return False, "SQLite 数据库文件不存在"
+
+            engine = create_engine(url, connect_args={'connect_timeout': 5} if config.get('type') != 'SQLite' else {})
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
             return True, "连接成功"
@@ -119,7 +147,8 @@ class ConnectionManager:
             if alias not in conns: return []
             config = conns[alias]
             
-            # 连接到默认库或系统库以查询列表
+            if config['type'] == 'SQLite': return ["main"]
+
             url = self.get_connection_url(config)
             engine = create_engine(url)
             
@@ -131,13 +160,18 @@ class ConnectionManager:
                 elif config['type'] == 'PostgreSQL':
                     res = conn.execute(text("SELECT datname FROM pg_database WHERE datistemplate = false"))
                     dbs = [row[0] for row in res]
+                elif config['type'] == 'ClickHouse':
+                    res = conn.execute(text("SHOW DATABASES"))
+                    dbs = [row[0] for row in res]
+                else:
+                    dbs = [config.get('database', 'default')]
             
             # 过滤系统库
-            exclude = {'information_schema', 'mysql', 'performance_schema', 'sys', 'postgres'}
-            return [d for d in dbs if d.lower() not in exclude]
+            exclude = {'information_schema', 'mysql', 'performance_schema', 'sys', 'postgres', 'system'}
+            return [d for d in dbs if str(d).lower() not in exclude]
         except Exception as e:
             print(f"List DB error: {e}")
-            return [config['database']] # 降级：仅返回配置的默认库
+            return [conns[alias].get('database', 'main')]
 
     def get_table_list(self, alias: str, db_override: str = None) -> List[str]:
         """获取指定连接(及库)的所有表名"""
@@ -154,7 +188,7 @@ class ConnectionManager:
             return []
 
     def get_table_schema(self, alias: str, table_name: str, db_override: str = None) -> List[Dict]:
-        """获取指定表的字段结构"""
+        """[v8.6.0 增强] 获取详细字段结构（含主键识别）"""
         try:
             conns = self.load_connections()
             if alias not in conns: return []
@@ -163,23 +197,25 @@ class ConnectionManager:
             engine = create_engine(url)
             from sqlalchemy import inspect
             inspector = inspect(engine)
-            cols = inspector.get_columns(table_name)
             
-            # 格式化输出
+            cols = inspector.get_columns(table_name)
+            pk = inspector.get_pk_constraint(table_name).get('constrained_columns', [])
+            
             result = []
             for c in cols:
                 result.append({
-                    "name": c['name'],
-                    "type": str(c['type']),
-                    "nullable": c.get('nullable', True),
-                    "default": str(c.get('default', ''))
+                    "字段名": c['name'],
+                    "类型": str(c['type']),
+                    "主键": "🔑" if c['name'] in pk else "",
+                    "允许为空": "YES" if c.get('nullable', True) else "NO",
+                    "默认值": str(c.get('default', '')) if c.get('default') else "-"
                 })
             return result
         except:
             return []
 
-    def get_table_sample(self, alias: str, table_name: str, db_override: str = None, limit: int = 10) -> List[Dict]:
-        """[v8.3.1] 获取指定表的数据采样"""
+    def get_table_sample(self, alias: str, table_name: str, db_override: str = None, limit: int = 50) -> List[Dict]:
+        """获取数据采样 (增加至 50 行)"""
         try:
             conns = self.load_connections()
             if alias not in conns: return []
@@ -188,17 +224,53 @@ class ConnectionManager:
             engine = create_engine(url)
             
             with engine.connect() as conn:
-                # 简单查询采样
-                query = text(f'SELECT * FROM "{table_name}" LIMIT {limit}')
-                # 兼容不同数据库的方言 (PostgreSQL 需要引号，MySQL 也可以带)
+                # 兼容不同数据库的采样语法
+                if conns[alias]['type'] == 'SQL Server':
+                    query = text(f"SELECT TOP {limit} * FROM {table_name}")
+                else:
+                    query = text(f'SELECT * FROM "{table_name}" LIMIT {limit}')
+                
                 try:
                     res = conn.execute(query)
                 except:
-                    # 备用方案：不带引号的表名
                     res = conn.execute(text(f"SELECT * FROM {table_name} LIMIT {limit}"))
                 
                 rows = [dict(row._mapping) for row in res]
                 return rows
-        except Exception as e:
-            print(f"Sample data error: {e}")
+        except:
             return []
+
+    def get_table_insights(self, alias: str, table_name: str, db_override: str = None) -> Dict[str, Any]:
+        """[v8.6.0] 获取深度业务洞察 (行数、外键、统计)"""
+        try:
+            conns = self.load_connections()
+            if alias not in conns: return {}
+            
+            url = self.get_connection_url(conns[alias], db_override)
+            engine = create_engine(url)
+            from sqlalchemy import inspect
+            inspector = inspect(engine)
+            
+            # 1. 基础统计
+            row_count = 0
+            with engine.connect() as conn:
+                res = conn.execute(text(f"SELECT count(*) FROM {table_name}"))
+                row_count = res.fetchone()[0]
+            
+            # 2. 关联血缘 (外键)
+            fks = inspector.get_foreign_keys(table_name)
+            fk_list = []
+            for fk in fks:
+                fk_list.append({
+                    "本地字段": ",".join(fk['constrained_columns']),
+                    "目标表": fk['referred_table'],
+                    "目标字段": ",".join(fk['referred_columns'])
+                })
+                
+            return {
+                "row_count": row_count,
+                "foreign_keys": fk_list,
+                "engine": getattr(engine.dialect, 'name', 'unknown')
+            }
+        except:
+            return {}
