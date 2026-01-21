@@ -3034,6 +3034,13 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
                 shutil.copy2(db_file, os.path.join(persist_dir, "business_data.db"))
             if os.path.exists(schema_file):
                 shutil.copy2(schema_file, os.path.join(persist_dir, "business_schema.json"))
+            
+            # [v8.3.1] 强制触发图谱增强，将镜像转化为可计算底座
+            if os.path.exists(db_file) and os.path.exists(schema_file):
+                from src.processors.schema_enhancer import SchemaEnhancer
+                status_container.write("🧠 正在执行图谱深度画像 (自动识别主键与枚举)...")
+                enhancer = SchemaEnhancer(os.path.join(persist_dir, "business_data.db"), os.path.join(persist_dir, "business_schema.json"), logger)
+                enhancer.enhance(model_client=None) # 构建时先做物理画像，暂不调用LLM以提升速度
 
             if os.path.isdir(current_target_path):
                 # 递归拷贝整个上传目录到 raw_sources

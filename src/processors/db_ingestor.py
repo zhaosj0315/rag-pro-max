@@ -66,10 +66,19 @@ class DBIngestor:
                     # B. 写入本地 SQLite
                     df.to_sql(table, local_conn, index=False, if_exists='replace')
                     
-                    # C. 提取基础元数据
+                    # C. 提取基础元数据 (v8.3.1 类型对齐)
+                    cols = []
+                    for col in df.columns:
+                        dtype = str(df[col].dtype)
+                        sql_type = "TEXT"
+                        if "int" in dtype: sql_type = "INTEGER"
+                        elif "float" in dtype or "decimal" in dtype: sql_type = "REAL"
+                        cols.append({"name": col, "type": sql_type, "comment": f"数据库字段: {col}"})
+
                     base_schema["tables"][table] = {
-                        "desc": f"同步自远程库的表: {table}",
-                        "cols": [{"name": col, "type": str(df[col].dtype)} for col in df.columns]
+                        "table_name": table,
+                        "desc": f"从数据库同步的业务表: {table}",
+                        "cols": cols
                     }
                     
                     success_count += 1
