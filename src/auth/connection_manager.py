@@ -87,13 +87,15 @@ class ConnectionManager:
         except:
             return False
 
-    def get_connection_url(self, config: Dict) -> str:
+    def get_connection_url(self, config: Dict, db_override: str = None) -> str:
         """生成 SQLAlchemy 连接字符串"""
         t = config.get('type', 'mysql').lower()
+        db_target = db_override if db_override else config['database']
+        
         if t == 'mysql':
-            return f"mysql+pymysql://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{config['database']}"
+            return f"mysql+pymysql://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{db_target}"
         elif t == 'postgresql':
-            return f"postgresql://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{config['database']}"
+            return f"postgresql://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{db_target}"
         # 可扩展其他类型
         return ""
 
@@ -110,13 +112,40 @@ class ConnectionManager:
         except Exception as e:
             return False, str(e)
 
-    def get_table_list(self, alias: str) -> List[str]:
-        """获取指定连接的所有表名"""
+    def get_database_list(self, alias: str) -> List[str]:
+        """[v8.3.1] 获取实例下的所有数据库列表"""
+        try:
+            conns = self.load_connections()
+            if alias not in conns: return []
+            config = conns[alias]
+            
+            # 连接到默认库或系统库以查询列表
+            url = self.get_connection_url(config)
+            engine = create_engine(url)
+            
+            dbs = []
+            with engine.connect() as conn:
+                if config['type'] == 'MySQL':
+                    res = conn.execute(text("SHOW DATABASES"))
+                    dbs = [row[0] for row in res]
+                elif config['type'] == 'PostgreSQL':
+                    res = conn.execute(text("SELECT datname FROM pg_database WHERE datistemplate = false"))
+                    dbs = [row[0] for row in res]
+            
+            # 过滤系统库
+            exclude = {'information_schema', 'mysql', 'performance_schema', 'sys', 'postgres'}
+            return [d for d in dbs if d.lower() not in exclude]
+        except Exception as e:
+            print(f"List DB error: {e}")
+            return [config['database']] # 降级：仅返回配置的默认库
+
+    def get_table_list(self, alias: str, db_override: str = None) -> List[str]:
+        """获取指定连接(及库)的所有表名"""
         try:
             conns = self.load_connections()
             if alias not in conns: return []
             
-            url = self.get_connection_url(conns[alias])
+            url = self.get_connection_url(conns[alias], db_override)
             engine = create_engine(url)
             from sqlalchemy import inspect
             inspector = inspect(engine)
@@ -124,13 +153,13 @@ class ConnectionManager:
         except:
             return []
 
-    def get_table_schema(self, alias: str, table_name: str) -> List[Dict]:
+    def get_table_schema(self, alias: str, table_name: str, db_override: str = None) -> List[Dict]:
         """获取指定表的字段结构"""
         try:
             conns = self.load_connections()
             if alias not in conns: return []
             
-            url = self.get_connection_url(conns[alias])
+            url = self.get_connection_url(conns[alias], db_override)
             engine = create_engine(url)
             from sqlalchemy import inspect
             inspector = inspect(engine)

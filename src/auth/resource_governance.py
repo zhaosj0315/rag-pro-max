@@ -331,18 +331,34 @@ def render_resource_governance_v19():
                     # 预览区域
                     if show_struct:
                         with st.container(border=True):
-                            st.caption(f"🗄️ {alias} 数据表结构")
-                            tables = conn_manager.get_table_list(alias)
-                            if not tables:
-                                st.warning("未发现可读表或连接失败")
-                            else:
-                                sel_t = st.selectbox("选择表以查看详情", [""] + tables, key=f"sel_t_{alias}")
-                                if sel_t:
-                                    schema_data = conn_manager.get_table_schema(alias, sel_t)
-                                    if schema_data:
-                                        st.dataframe(pd.DataFrame(schema_data), use_container_width=True, hide_index=True)
-                                    else:
-                                        st.info("无法获取表详情")
+                            st.caption(f"🗄️ {alias} 数据透视")
+                            
+                            # Level 1: 数据库选择 (v8.3.1 新增)
+                            dbs = conn_manager.get_database_list(alias)
+                            current_db = info['database']
+                            
+                            # 尝试定位默认库的索引
+                            default_idx = 0
+                            if current_db in dbs:
+                                default_idx = dbs.index(current_db)
+                                
+                            sel_db = st.selectbox("选择数据库 (Schema)", dbs, index=default_idx, key=f"sel_db_{alias}")
+                            
+                            if sel_db:
+                                # Level 2: 表选择
+                                tables = conn_manager.get_table_list(alias, db_override=sel_db)
+                                if not tables:
+                                    st.info(f"数据库 '{sel_db}' 中没有发现可读表")
+                                else:
+                                    sel_t = st.selectbox(f"选择表 ({len(tables)})", [""] + tables, key=f"sel_t_{alias}")
+                                    
+                                    # Level 3: 字段详情
+                                    if sel_t:
+                                        schema_data = conn_manager.get_table_schema(alias, sel_t, db_override=sel_db)
+                                        if schema_data:
+                                            st.dataframe(pd.DataFrame(schema_data), use_container_width=True, hide_index=True)
+                                        else:
+                                            st.info("无法获取表详情")
 
     # --- Tab 5: 行为审计 (全功能回归融合版) ---
     with tab_audit:
