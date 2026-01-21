@@ -358,13 +358,23 @@ def render_resource_governance_v19():
                                 else:
                                     sel_t = st.selectbox(f"选择表 ({len(tables)})", [""] + tables, key=f"sel_t_{alias}")
                                     
-                                    # Level 3: 字段详情
+                                    # Level 3: 详细信息 (v8.3.1 深度透视版)
                                     if sel_t:
-                                        schema_data = conn_manager.get_table_schema(alias, sel_t, db_override=sel_db)
-                                        if schema_data:
-                                            st.dataframe(pd.DataFrame(schema_data), use_container_width=True, hide_index=True)
-                                        else:
-                                            st.info("无法获取表详情")
+                                        t_tab1, t_tab2 = st.tabs(["📋 字段结构", "📊 数据采样"])
+                                        
+                                        with t_tab1:
+                                            schema_data = conn_manager.get_table_schema(alias, sel_t, db_override=sel_db)
+                                            if schema_data:
+                                                st.dataframe(pd.DataFrame(schema_data), use_container_width=True, hide_index=True)
+                                            else:
+                                                st.info("无法获取表详情")
+                                                
+                                        with t_tab2:
+                                            sample_data = conn_manager.get_table_sample(alias, sel_t, db_override=sel_db)
+                                            if sample_data:
+                                                st.dataframe(pd.DataFrame(sample_data), use_container_width=True)
+                                            else:
+                                                st.warning("暂无数据或无法读取内容")
 
     # --- Tab 5: 行为审计 (全功能回归融合版) ---
     with tab_audit:

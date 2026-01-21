@@ -177,3 +177,28 @@ class ConnectionManager:
             return result
         except:
             return []
+
+    def get_table_sample(self, alias: str, table_name: str, db_override: str = None, limit: int = 10) -> List[Dict]:
+        """[v8.3.1] 获取指定表的数据采样"""
+        try:
+            conns = self.load_connections()
+            if alias not in conns: return []
+            
+            url = self.get_connection_url(conns[alias], db_override)
+            engine = create_engine(url)
+            
+            with engine.connect() as conn:
+                # 简单查询采样
+                query = text(f'SELECT * FROM "{table_name}" LIMIT {limit}')
+                # 兼容不同数据库的方言 (PostgreSQL 需要引号，MySQL 也可以带)
+                try:
+                    res = conn.execute(query)
+                except:
+                    # 备用方案：不带引号的表名
+                    res = conn.execute(text(f"SELECT * FROM {table_name} LIMIT {limit}"))
+                
+                rows = [dict(row._mapping) for row in res]
+                return rows
+        except Exception as e:
+            print(f"Sample data error: {e}")
+            return []
