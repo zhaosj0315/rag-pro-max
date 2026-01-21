@@ -16,7 +16,9 @@
 - **智能命名建议**: 实现了跨模式的命名种子注入。数据库模式下会自动建议 `DB_源_库` 格式名称，并支持 💡 一键追加日期优化。
 
 ### 🛡️ 架构鲁棒性加固 (Stability & Hotfix)
-- **缓存爆破机制**: 引入物理结构级函数重组，彻底解决了 Streamlit 热重载引发的 `NameError` 和 `AttributeError` 顽疾。
+- **旗舰资源矩阵 v8 (Governance Matrix v8)**: 深度重构了资源管理 UI，引入了 **“全选/反选”** 逻辑与 **物理删除防护**。解决了在大规模知识库场景下的列表滚动抖动与勾选状态丢失问题。
+- **缓存爆破机制**: 引入物理结构级函数重组（升级至 `v8` 版本号），彻底解决了 Streamlit 热重载引发的 `NameError` 和 `AttributeError` 顽疾。
+- **命名空间纠偏**: 修复了由于 `datetime` 模块被同名局部变量遮蔽导致的 `AttributeError: module 'datetime' has no attribute 'now'` 严重缺陷。
 - **按需加载 (On-Demand)**: 管理员面板改为按需加载模式，提升了非管理用户的启动响应速度。
 - **状态冲突解决**: 修复了 `st.session_state` 修改冲突，确保数据库模式下的“自动开启分析”逻辑物理闭环。
 

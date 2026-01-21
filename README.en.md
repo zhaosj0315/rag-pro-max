@@ -1,22 +1,37 @@
 # RAG Pro Max - Enterprise AI Document QA & Data Analysis System
 
-**Current Version**: v8.1.0 (Flagship Dual-Core Edition)  
-![Version](https://img.shields.io/badge/version-v8.1.0-purple)
+**Current Version**: v8.6.9 (Omni-Source Edition)  
+![Version](https://img.shields.io/badge/version-v8.6.9-purple)
 
-RAG Pro Max v8.1.0 completes the "human-centric" puzzle of the assembly architecture. Through **"Iron-Gate Routing,"** the system now achieves precision-controlled activation of data analysis capabilities.
+RAG Pro Max v8.6.9 marks the ultimate evolution of the **"Omni-Source"** architecture. By supporting 9+ heterogeneous database integrations and a complete overhaul of the sidebar UX, the system now serves as an enterprise-grade data hub, capable of ingesting and analyzing data from any source in a unified manner.
 
 ---
 
-## 🚀 v8.1.0 Core Features
+## 🚀 v8.6.9 Core Features
 
-### 🛡️ Iron-Gate Routing
-- **Absolute Control**: Eliminates the risk of spontaneous SQL engine activation found in v8.0.0. Strategic推演 workshops are now triggered only when both the "physical shadow database is ready" and the "user manually flips the switch."
-- **Real-time Auditing**: Backend logs now track routing decisions (Route Discovery), ensuring the logic behind every answer is fully traceable.
+### 🔌 Heterogeneous Database Integration (9+ DB Support)
+- **Wide Adaptation**: Native support for **MySQL, PostgreSQL, SQLite, DuckDB, ClickHouse, SQL Server, Oracle, Alibaba MaxCompute (DataWorks), and Snowflake**.
+- **Four-Dimensional Perspective**: Deep preview of schema definitions, 50-row data samples, physical foreign key relations, and business insight statistics.
 
-### 🧬 Dual-Core Assembly (RAG + SQL)
-- **Mandatory Semantic Base**: Regardless of the source (Upload/Crawl/Paste/Search), 100% of materials undergo RAG processing, ensuring constant access to descriptive knowledge.
-- **Shadow Logical Augmentation**: Automatically generates shadow databases for "true data," enabling precise SQL calculations and visualization on demand.
+### 🎨 Sidebar Interaction Revolution (One-Click Ingestion)
+- **One-Click Build**: Direct ingestion from checkbox selection, eliminating redundant pre-fetch steps.
+- **Universal Attachment**: Unified entry for File Upload, Paste Text, and OCR with a minimalist UI.
+- **Instant Peek**: Click the **`👁️`** icon to instantly view table/file contents in a popover bubble without leaving the sidebar.
+- **Omni-Source Coverage**: Five core modes: **Files, Text, URLs, Smart Search, and DB Sync**.
 
-### 🛡️ Architectural Robustness
-- **Global Singleton Executors**: Resolves scope conflicts in large Streamlit applications, ensuring 100% success rates for multi-core inference.
-- **Self-Healing Dashboard**: Eliminates TypeError risks during Pandas hot-reloads, supporting mandatory code refreshes.
+### ⚡ Smart Linkage (Mode-Sensing)
+- **Detect & Activate**: Automatically senses KB capabilities and toggles the "Data Analysis" switch for the user.
+- **Unified Naming**: Global KB name component with 💡 smart naming suggestions across all ingestion modes.
+
+### 🕸️ Smart Schema Graph Builder
+- **Deep Profiling**: Automatically identifies Primary Keys (PK), Enums, and infers relational join graphs for complex SQL inference.
+
+## 🛠️ Installation & Launch
+
+1. **Prerequisites**: Python 3.10+ / macOS (Recommended) or Linux
+2. **Install Dependencies**: `pip install -r requirements.txt`
+3. **Start System**: `streamlit run src/apppro.py`
+
+---
+
+**🎯 Goal**: To provide enterprise users with the most professional, high-performance, and stable Smart Dual-Core Analysis and RAG solution!
