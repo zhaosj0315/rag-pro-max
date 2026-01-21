@@ -6,6 +6,7 @@ import re
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import hashlib
+from src.processors.schema_enhancer import SchemaEnhancer
 
 class DataAnalystEngine:
     def __init__(self, kb_path: str, logger=None):
@@ -1355,6 +1356,18 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             with open(self.schema_path, 'w', encoding='utf-8') as f: 
                 json.dump(unified_schema, f, indent=4, ensure_ascii=False)
             print(f"💾 [固化] 业务蓝图已保存至: {os.path.basename(self.schema_path)}")
+            
+            # [v8.2.0] 调用 Schema 增强引擎 (Schema Enrichment)
+            try:
+                if status_callback: status_callback("🧠 正在执行Schema深度增强 (物理画像 + 血缘推演)...")
+                print("🚀 [Schema Enhancer] 启动深度增强流程...")
+                if self.logger: self.logger.info("🚀 [Schema Enhancer] 启动深度增强流程...")
+                
+                enhancer = SchemaEnhancer(self.db_path, self.schema_path, self.logger)
+                enhancer.enhance(model_client)
+            except Exception as e:
+                print(f"⚠️ [Schema Enhancer] 增强失败: {e}")
+                if self.logger: self.logger.warning(f"⚠️ [Schema Enhancer] 增强失败: {e}")
             
             # 延迟构建策略：构建阶段仅完成 Schema 固化，不生成数据
             # 数据生成将在 execute_analysis -> _ensure_sandbox_ready 中按需触发 (JIT)
