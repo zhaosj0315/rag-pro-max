@@ -1030,9 +1030,11 @@ if not st.session_state.get("logged_in"):
 # Force refresh
 from src.auth.login_page import render_login_page
 import importlib
-import src.auth.resource_governance
-importlib.reload(src.auth.resource_governance)
-from src.auth.resource_governance import render_resource_governance_v19
+    # [v6.7.0] 强制刷新治理模块
+    from src.auth import resource_governance
+    importlib.reload(resource_governance)
+    from src.auth.resource_governance import render_resource_governance_v19 as render_rg
+
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     render_login_page()
     st.stop()
@@ -2038,35 +2040,46 @@ with st.sidebar:
                         db_idx = dbs.index(default_db) if default_db in dbs else 0
                         selected_db = st.selectbox("选择数据库", dbs, index=db_idx, key="db_sync_db")
                         
-                        # 3. 选择表
+                        # 3. 选择表 (v8.6.3 交互增强版)
                         tables = conn_mgr.get_table_list(selected_alias, db_override=selected_db)
-                        selected_tables = st.multiselect(f"选择同步表 ({len(tables)})", tables, key="db_sync_tables")
                         
-                        # 4. 同步模式
-                        sync_mode = st.radio("同步策略", ["🧪 结构+采样 (推荐)", "⚡ 仅同步结构"], horizontal=True, key="db_sync_mode")
+                        if not tables:
+                            st.info(f"数据库 '{selected_db}' 中没有发现可读表")
+                            selected_tables = []
+                        else:
+                            # 全选控制
+                            select_all = st.checkbox(f"全选所有表 ({len(tables)})", key="db_sync_select_all")
+                            
+                            selected_tables = []
+                            # 限高滚动区域 (v8.6.4 智能预览版)
+                            with st.container(height=250, border=True):
+                                for t in tables:
+                                    col_t1, col_t2 = st.columns([0.8, 0.2])
+                                    with col_t1:
+                                        if st.checkbox(t, value=select_all, key=f"db_sync_chk_{t}"):
+                                            selected_tables.append(t)
+                                    with col_t2:
+                                        # 侧边栏即时预览
+                                        with st.popover("👁️", help=f"预览表 {t} 的数据"):
+                                            st.caption(f"📊 {t} 数据采样 (前5行)")
+                                            sample = conn_mgr.get_table_sample(selected_alias, t, db_override=selected_db, limit=5)
+                                            if sample:
+                                                st.dataframe(pd.DataFrame(sample), hide_index=True)
+                                            else:
+                                                st.info("无法获取预览数据")
+                            
+                            if selected_tables:
+                                st.caption(f"✅ 已选择 {len(selected_tables)} 张业务表")
+                                # 物理存储到 session_state 供底部主按钮调用
+                                st.session_state.db_sync_pending = {
+                                    "alias": selected_alias,
+                                    "db": selected_db,
+                                    "tables": selected_tables,
+                                    "mode": "SAMPLE" if "采样" in st.session_state.get('db_sync_mode_ui', '推荐') else "SCHEMA_ONLY"
+                                }
                         
-                        if st.button("📥 预取数据结构并对齐", type="primary", use_container_width=True, disabled=not selected_tables):
-                            with st.status("📡 正在跨源拉取元数据...", expanded=True) as status:
-                                # 创建临时构建目录
-                                import tempfile
-                                import time
-                                batch_id = f"db_sync_{int(time.time())}"
-                                temp_dir = os.path.join(UPLOAD_DIR, batch_id)
-                                
-                                ingestor = DBIngestor(temp_dir, logger)
-                                mode_code = "SAMPLE" if "采样" in sync_mode else "SCHEMA_ONLY"
-                                
-                                success = ingestor.ingest(selected_alias, selected_db, selected_tables, mode_code)
-                                
-                                if success:
-                                    st.session_state.uploaded_path = temp_dir
-                                    st.session_state.upload_auto_name = f"DB_{selected_alias}_{selected_db}"
-                                    # [v8.3.1] 自动激活高级选项中的数据分析
-                                    st.session_state.kb_enable_data_analysis = True
-                                    status.update(label="✅ 元数据镜像对齐成功！", state="complete")
-                                    st.success("数据底座已就绪，请点击下方 [🚀 立即创建]")
-                                else:
-                                    status.update(label="❌ 同步失败", state="error")
+                        # 4. 同步模式 (改为 UI 专用 key)
+                        st.radio("同步策略", ["🧪 结构+采样 (推荐)", "⚡ 仅同步结构"], horizontal=True, key="db_sync_mode_ui")
 
             # 排除配置 (通用)
             if source_mode in ["🔗 网址抓取", "🔍 智能搜索"]:
@@ -3856,6 +3869,32 @@ if btn_start:
                 from src.common.utils import save_uploaded_files
                 st.session_state.uploaded_path = save_uploaded_files(uploaded_files, "temp_uploads")
                 logger.info(f"📂 [修正] 拖拽上传路径已锚定: {st.session_state.uploaded_path}")
+
+            # [v8.6.4] 数据库模式：主按钮透明执行同步
+            if source_mode == "🔌 数据库同步":
+                pending = st.session_state.get('db_sync_pending')
+                if not pending:
+                    st.error("❌ 请先勾选需要同步的数据库表")
+                    st.stop()
+                
+                with st.status("📡 正在跨源拉取数据库镜像与元数据...", expanded=True) as status:
+                    import time
+                    batch_id = f"db_sync_{int(time.time())}"
+                    temp_dir = os.path.join(UPLOAD_DIR, batch_id)
+                    
+                    from src.processors.db_ingestor import DBIngestor
+                    ingestor = DBIngestor(temp_dir, logger)
+                    
+                    success = ingestor.ingest(pending['alias'], pending['db'], pending['tables'], pending['mode'])
+                    
+                    if success:
+                        st.session_state.uploaded_path = temp_dir
+                        # 确保勾选了分析
+                        st.session_state.kb_enable_data_analysis = True
+                        status.update(label="✅ 数据库镜像拉取成功，开始构建知识库...", state="complete")
+                    else:
+                        st.error("❌ 数据库同步失败，请检查连接或表权限")
+                        st.stop()
 
             process_knowledge_base_logic(
                 kb_name=final_kb_name,

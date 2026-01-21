@@ -39,8 +39,8 @@ class V23Integration:
     def render_monitoring_tab(self):
         """渲染监控标签页"""
         import importlib
-        import src.ui.monitoring_dashboard
-        importlib.reload(src.ui.monitoring_dashboard)
+        from src.ui import monitoring_dashboard
+        importlib.reload(monitoring_dashboard)
         from src.ui.monitoring_dashboard import render_monitoring_dashboard
         
         tab1, tab2, tab3, tab4 = st.tabs(["📊 系统监控", "📈 进度追踪", "⚙️ 智能调度", "📋 终端日志"])

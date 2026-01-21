@@ -30,7 +30,8 @@ ALL_PERMISSIONS_MAP = {
 
 def render_resource_governance_v19():
     # [Fix] 强制热重载连接管理器，防止 AttributeError
-    importlib.reload(src.auth.connection_manager)
+    from src.auth import connection_manager
+    importlib.reload(connection_manager)
     from src.auth.connection_manager import ConnectionManager
     
     st.toast("💎 旗舰治理 v19 (深度资源 + 精准账户) 已上线", icon="🛡️")
@@ -283,31 +284,50 @@ def render_resource_governance_v19():
         conns = conn_manager.load_connections()
         
         # 新增/编辑区域
-        with st.expander("➕ 新增/编辑连接", expanded=True):
+        with st.expander("➕ 新增/编辑连接", expanded=not bool(conns)):
             c1, c2 = st.columns(2)
             alias = c1.text_input("连接名称 (Alias)", placeholder="e.g. 生产订单库")
-            db_type = c2.selectbox("数据库类型", ["MySQL", "PostgreSQL"])
+            db_type = c2.selectbox("数据库类型", ["MySQL", "PostgreSQL", "SQLite", "DuckDB", "ClickHouse", "SQL Server", "Oracle", "MaxCompute", "Snowflake"])
             
             c3, c4 = st.columns([3, 1])
-            host = c3.text_input("主机地址 (Host)", value="localhost")
-            port = c4.number_input("端口", value=3306 if db_type=="MySQL" else 5432)
+            if db_type in ["SQLite", "DuckDB"]:
+                host = c3.text_input("本地文件路径", placeholder="e.g. /Users/data/mydb.db")
+                port = 0
+            elif db_type == "MaxCompute":
+                host = c3.text_input("Endpoint", placeholder="e.g. http://service.cn-shanghai.maxcompute.aliyun.com/api")
+                port = 0
+            elif db_type == "Snowflake":
+                host = c3.text_input("Account Identifier", placeholder="e.g. xy12345.east-us-2.azure")
+                port = 0
+            else:
+                host = c3.text_input("主机地址 (Host)", value="localhost")
+                port = c4.number_input("端口", value={"MySQL": 3306, "PostgreSQL": 5432, "ClickHouse": 8123, "SQL Server": 1433, "Oracle": 1521}.get(db_type, 3306))
             
             c5, c6, c7 = st.columns(3)
-            user = c5.text_input("用户名")
-            password = c6.text_input("密码", type="password")
-            db_name = c7.text_input("数据库名")
+            # 动态标签逻辑
+            no_auth = db_type in ["SQLite", "DuckDB"]
+            user_label = "AccessKey ID" if db_type == "MaxCompute" else "用户名"
+            pass_label = "AccessKey Secret" if db_type == "MaxCompute" else "密码"
+            
+            db_placeholder = "数据库/Schema"
+            if db_type == "MaxCompute": db_placeholder = "Project Name"
+            elif db_type == "Oracle": db_placeholder = "Service Name"
+            
+            user = c5.text_input(user_label, disabled=no_auth)
+            password = c6.text_input(pass_label, type="password", disabled=no_auth)
+            db_name = c7.text_input("目标库名", placeholder=db_placeholder, value="default" if db_type=="ClickHouse" else "", disabled=no_auth)
             
             b1, b2 = st.columns([1, 1])
             if b1.button("📡 测试连通性", use_container_width=True):
                 if not alias: st.error("请填写连接名称")
                 else:
-                    conf = {"type": db_type, "host": host, "port": port, "user": user, "password": password, "database": db_name}
+                    conf = {"type": db_type.lower().replace(" ",""), "host": host, "port": port, "user": user, "password": password, "database": db_name}
                     s, m = conn_manager.test_connection(conf)
                     if s: st.success(f"✅ {m}")
                     else: st.error(f"❌ {m}")
             
             if b2.button("💾 保存连接", use_container_width=True, type="primary"):
-                if not alias or not host or not user or not db_name:
+                if not alias or not host:
                     st.error("请填写完整信息")
                 else:
                     if conn_manager.save_connection(alias, db_type, host, port, user, password, db_name):
@@ -318,13 +338,17 @@ def render_resource_governance_v19():
         # 列表展示
         if conns:
             st.divider()
-            st.caption("已保存的连接")
+            st.caption("已保存的连接清单")
             for alias, info in conns.items():
                 with st.container(border=True):
-                    ic1, ic2, ic3 = st.columns([3, 2, 1])
-                    ic1.markdown(f"**🔌 {alias}**")
-                    ic1.caption(f"{info['type']}://{info['user']}@{info['host']}:{info['port']}/{info['database']}")
-                    ic2.caption(f"更新时间: {datetime.fromtimestamp(float(info.get('updated_at', 0))).strftime('%Y-%m-%d %H:%M') if info.get('updated_at') else '-'}")
+                    ic1, ic2, ic3 = st.columns([3, 2, 1.5])
+                    ic1.markdown(f"**🔌 {alias}** ({info['type']})")
+                    if info['type'] == 'SQLite':
+                        ic1.caption(f"路径: {info['host']}")
+                    else:
+                        ic1.caption(f"{info['user']}@{info['host']}:{info['port']}/{info['database']}")
+                    
+                    ic2.caption(f"更新: {datetime.fromtimestamp(float(info.get('updated_at', 0))).strftime('%m-%d %H:%M') if info.get('updated_at') else '-'}")
                     
                     ic_btn_col1, ic_btn_col2 = ic3.columns(2)
                     with ic_btn_col1:
@@ -334,20 +358,15 @@ def render_resource_governance_v19():
                             if conn_manager.delete_connection(alias):
                                 st.toast("已删除"); time.sleep(0.5); st.rerun()
                     
-                    # 预览区域
+                    # 预览区域 (v8.6.0 深度透视版)
                     if show_struct:
                         with st.container(border=True):
-                            st.caption(f"🗄️ {alias} 数据透视")
+                            st.caption(f"🌐 数据库透视看板: {alias}")
                             
-                            # Level 1: 数据库选择 (v8.3.1 新增)
+                            # Level 1: 数据库选择
                             dbs = conn_manager.get_database_list(alias)
-                            current_db = info['database']
-                            
-                            # 尝试定位默认库的索引
-                            default_idx = 0
-                            if current_db in dbs:
-                                default_idx = dbs.index(current_db)
-                                
+                            current_db = info.get('database', '')
+                            default_idx = dbs.index(current_db) if current_db in dbs else 0
                             sel_db = st.selectbox("选择数据库 (Schema)", dbs, index=default_idx, key=f"sel_db_{alias}")
                             
                             if sel_db:
@@ -358,9 +377,9 @@ def render_resource_governance_v19():
                                 else:
                                     sel_t = st.selectbox(f"选择表 ({len(tables)})", [""] + tables, key=f"sel_t_{alias}")
                                     
-                                    # Level 3: 详细信息 (v8.3.1 深度透视版)
+                                    # Level 3: 四维全景详情 (v8.6.0)
                                     if sel_t:
-                                        t_tab1, t_tab2 = st.tabs(["📋 字段结构", "📊 数据采样"])
+                                        t_tab1, t_tab2, t_tab3, t_tab4 = st.tabs(["📋 字段结构", "📊 数据采样", "🕸️ 关联血缘", "📈 业务洞察"])
                                         
                                         with t_tab1:
                                             schema_data = conn_manager.get_table_schema(alias, sel_t, db_override=sel_db)
@@ -374,7 +393,23 @@ def render_resource_governance_v19():
                                             if sample_data:
                                                 st.dataframe(pd.DataFrame(sample_data), use_container_width=True)
                                             else:
-                                                st.warning("暂无数据或无法读取内容")
+                                                st.warning("暂无数据记录")
+
+                                        with t_tab3:
+                                            insights = conn_manager.get_table_insights(alias, sel_t, db_override=sel_db)
+                                            fks = insights.get('foreign_keys', [])
+                                            if fks:
+                                                st.markdown("**🔗 外键关联关系**")
+                                                st.table(pd.DataFrame(fks))
+                                            else:
+                                                st.info("该表未定义显式外键关系")
+
+                                        with t_tab4:
+                                            insights = conn_manager.get_table_insights(alias, sel_t, db_override=sel_db)
+                                            col_i1, col_i2 = st.columns(2)
+                                            col_i1.metric("预估行数", f"{insights.get('row_count', 0):,}")
+                                            col_i2.metric("数据库引擎", insights.get('engine', 'unknown').upper())
+                                            st.caption("💡 此数据由 SQLAlchemy Inspector 实时抓取")
 
     # --- Tab 5: 行为审计 (全功能回归融合版) ---
     with tab_audit:
