@@ -1030,10 +1030,6 @@ if not st.session_state.get("logged_in"):
 # Force refresh
 from src.auth.login_page import render_login_page
 import importlib
-# [v6.7.0] 强制刷新治理模块
-from src.auth import resource_governance
-importlib.reload(resource_governance)
-from src.auth.resource_governance import render_resource_governance_v19 as render_rg
 
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     render_login_page()
@@ -1078,7 +1074,11 @@ with st.sidebar:
     # 渲染 Admin 专用 Tab (物理对齐)
     if is_admin and len(tabs) > 5:
         with tabs[5]:
-            render_rg()
+            # [v8.6.5] 按需加载机制：解决 NameError 并支持热更新
+            from src.auth import resource_governance
+            importlib.reload(resource_governance)
+            from src.auth.resource_governance import render_resource_governance_v19
+            render_resource_governance_v19()
 
     # --- 退出登录按钮 ---
     st.sidebar.markdown("---")
