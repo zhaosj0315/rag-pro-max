@@ -1,33 +1,34 @@
 # 数据分析：双核联动开发流程与架构设计规范 (Data Analysis Workflow)
 
-**版本**: v8.3.3 (Flagship Dual-Core Edition)
+**版本**: v8.6.9 (Flagship Dual-Core Edition)
 **核心原则**: 语义底座 + 结构化增强 (Shadow Mapping)，物理必闭环。
 
 ---
 
 ## 一、 业务架构 (Business Architecture)
 
-在 v8.3.3 架构下，数据分析能力已进化为 **“全源归一化 (Source-Agnostic)”** 的智能引擎。
+在 v8.6.9 架构下，数据分析能力已进化为 **“全域全源归一化 (Omni-Source Agnostic)”** 的智能引擎。
 
 ### 1. 场景双核联动
 - **语义层 (Base Layer)**: 100% 的材料经过 RAG 切片与向量化。
 - **逻辑层 (Augmented Layer)**:
   - **物理底座**: SQLite 影子库。
-  - **知识图谱**: 增强版 `business_schema.json`，支持外部 DB 镜像导入。
+  - **知识图谱**: 增强版 `business_schema.json`，支持 9 种以上异构数据库镜像导入。
 
 ---
 
-## 三、 开发与构建流程 (v8.3.3 全源版)
+## 三、 开发与构建流程 (v8.6.9 全源版)
 
 ### 阶段 1：归一化摄入 (Normalized Ingestion)
 1. **源头分流**:
-    - **文件/文本/网页**: 物理归档至 `raw_sources/`。
-    - **外部数据库**: 通过 `DBIngestor` 镜像表数据至本地 `.csv` 文件。
-2. **底座先行**: 首先触发全量 RAG 构建流程。
-3. **配置审计**: 系统自动记录 `[Build Config]`。
+    - **常规材料**: 归档至 `raw_sources/`。
+    - **全源数据库**: 通过 `DBIngestor` 镜像表数据至本地 `.csv`。
+2. **即时校验 (NEW)**: 支持侧边栏选表时的 **“即时预览 (Instant Peek)”**，确保入库材料质量。
+3. **底座先行**: 首先触发全量 RAG 构建流程。
+4. **配置审计**: 系统自动记录 `[Build Config]`。
 
 ### 阶段 2：智能探测与分流 (Detection & Branching)
-1. **意图检查**: 读取 `st.session_state.kb_enable_data_analysis` 或 **自动触发开关**。
+1. **意图检查**: 系统自动探测能力并强制开启分析开关。
 2. **真数据判定**: 扫描 `raw_sources/`，计算数值密度。
 
 ### 阶段 3：结构化影子映射 (Shadow Solidification)

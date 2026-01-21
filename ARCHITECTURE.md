@@ -1,23 +1,28 @@
-# RAG Pro Max v8.3.3 企业级系统架构文档
+# RAG Pro Max v8.6.9 企业级系统架构文档
 
-**版本**: v8.3.3 (Flagship Dual-Core Edition)  
+**版本**: v8.6.9 (Flagship Dual-Core Edition)  
 **更新日期**: 2026-01-21  
-**核心特性**: Multi-Source DB Integration, Smart Linkage, Schema Graph Builder
+**核心特性**: Omni-Source DB Integration, Cache-Busting Structural Movement, Smart Linkage
 
 ---
 
 ## 🏗️ 业务层内核加固 (Service Layer Hardening)
 
-### 1. 归一化数据库摄入 (Normalized DB Ingestion)
-在 v8.3.3 中，系统通过 **“适配器镜像 (Adapter Mirroring)”** 实现了对外部数据库的透明支持：
-- **DBIngestor**: 负责从异构源（MySQL/PG）按需拉取结构与采样数据，并物理转化为标准的 `.csv` 材料。
-- **100% 逻辑复用**: 由于材料已归一化，后续的 RAG 索引构建、Schema 图片增强以及 SQL 生成逻辑完全复用主干管线，消除了异构源带来的算法偏差。
+### 1. 全源归一化数据库摄入 (Omni-Source DB Ingestion)
+在 v8.6.9 中，系统通过 **“全能适配器 (Omni-Adapter)”** 实现了对 9 种异构数据源的物理归一化：
+- **Heterogeneous Drivers**: 封装了从 MySQL, Oracle 到 MaxCompute 的全量驱动逻辑。
+- **Source-Agnostic Mirroring**: 所有的远程表在摄入阶段均会被转化为标准 `.csv` 片段，确保下游的 RAG 向量化与 SQL 影子库构建逻辑 **100% 复用**。
 
-### 2. 模式感应联动 (Mode-Sensing Linkage)
-- **Smart Switch**: 通过 Session State 监听知识库元数据，动态激活 UI 层的分析开关。
-- **Force Routing**: 在提问主循环中，针对 DB 源优化了关键词引导与路由权重。
+### 2. 架构鲁棒性模式 (Robustness Patterns)
+- **Cache Buster (结构位移修复)**: 针对 Streamlit 热重载引发的内存陈旧问题，实施了“局部函数封装”策略，通过改变代码物理位置强制解释器重刷符号表。
+- **On-Demand Loading (按需加载)**: 实现了 Admin 治理模块的延迟加载，物理隔离了认证拦截与管理逻辑的命名空间冲突。
 
-### 3. Schema Graph Builder (v8.2.0)
+### 3. 模式感应联动 (Mode-Sensing Linkage)
+- **Capability Sensing**: 实时探测 `business_schema.json` 指纹，自动注入 Session State 以激活 UI 层分析开关。
+
+---
+
+## 🧬 归一化摄入管线 (Normalized Ingestion Pipeline)
 
 在 v8.1.1 中，表现层（Presentation Layer）经历了深度重构，实现了**入口逻辑的归一化**。
 
