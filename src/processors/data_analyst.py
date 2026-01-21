@@ -50,45 +50,26 @@ class DataAnalystEngine:
                     
                     table_summaries.append(f"- {t} ({info.get('desc', '')}): 关键字段 [{', '.join(display_cols[:8])}]")
                 
-                                table_str = "\n".join(table_summaries)
+                table_str = "\n".join(table_summaries)
+                prompt = f"""你是一个资深业务架构师。请分析用户的问题，从【物理表清单】中选出最适合回答该问题的 1-2 张表。
+
+用户问题: {query}
+
+物理表清单:
+{table_str}
+
+【决策优先级 - 必须严守】:
+1. 事实优先：如果问题涉及“多少”、“金额”、“次数”、“趋势”等统计量，优先选择包含流水、明细、交易特征的事实表。
+2. 属性补充：如果问题涉及“名称”、“地址”、“类别”等描述性信息，且事实表中缺失，则关联相应的维度/档案表。
+3. 时间对齐：如果问题包含时间范围，优先选择带有日期或时间戳字段的表。
+4. 消歧义：若多个表都有同名字段（如 amount），分析表名含义，选择业务语义最契合的那张（例如：查收入选销售表，不选退款表）。
+
+要求:
+1. 只返回表名，用逗号分隔。
+2. 不要包含任何解释。
+3. 必须精准，不要多选。"""
                 
-                                prompt = f"""你是一个资深业务架构师。请分析用户的问题，从【物理表清单】中选出最适合回答该问题的 1-2 张表。
-                
-                
-                
-                用户问题: {query}
-                
-                
-                
-                物理表清单:
-                
-                {table_str}
-                
-                
-                
-                【决策优先级 - 必须严守】:
-                
-                1. 事实优先：如果问题涉及“多少”、“金额”、“次数”、“趋势”等统计量，优先选择包含流水、明细、交易特征的事实表。
-                
-                2. 属性补充：如果问题涉及“名称”、“地址”、“类别”等描述性信息，且事实表中缺失，则关联相应的维度/档案表。
-                
-                3. 时间对齐：如果问题包含时间范围，优先选择带有日期或时间戳字段的表。
-                
-                4. 消歧义：若多个表都有同名字段（如 amount），分析表名含义，选择业务语义最契合的那张（例如：查收入选销售表，不选退款表）。
-                
-                
-                
-                要求:
-                
-                1. 只返回表名，用逗号分隔。
-                
-                2. 不要包含任何解释。
-                
-                3. 必须精准，不要多选。"""
-                
-                                
-                
-                                print(f"🧠 [精准识别] 正在为问题 '{query}' 执行语义对齐与消歧义选表...")
+                print(f"🧠 [精准识别] 正在为问题 '{query}' 执行语义对齐与消歧义选表...")
                 res = model_client.complete(prompt).text.strip()
                 
                 # [v7.0.1 Fix] 鲁棒解析：从整段文字中提取合法的物理表名
@@ -588,13 +569,14 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         return {}
 
     def execute_analysis(self, query: str, model_client, context_text: str = "", status_callback=None) -> Dict[str, Any]:
+        now = datetime.now().strftime("%H:%M:%S")
         # --- 终端强制输出: 任务启动 ---
         print("\n" + "="*60)
-        print(f"🚀 [Strategic Workshop] 接收到分析请求: {query}")
+        print(f"[{now}] 🚀 [Strategic Workshop] 接收到分析请求: {query}")
         print("="*60)
         
         if not os.path.exists(self.schema_path): 
-            print("❌ [错误] 架构文件不存在，尝试创建默认架构...")
+            print(f"[{now}] ❌ [错误] 架构文件不存在，尝试创建默认架构...")
             # 创建一个最小的默认架构
             default_schema = {
                 "macro_context": "业务数据分析系统",
@@ -772,13 +754,14 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                         
                 for s in stages_meta:
                     print(f"   📍 Stage {s['stage_id']}: {s['title']} | 目标: {s['goal']}")
+                
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 📊 [规划结论] 任务拆解完成，共计 {len(stages_meta)} 个原子执行阶段。")
             except: 
                 stages_meta = [{"stage_id": 1, "title": "数据透视", "transformation": "执行分析"}]
 
-            final_data = []
-            analysis_context = ""
             for i, meta in enumerate(stages_meta):
-                print(f"\n--- ⏳ 执行阶段 {i+1}: {meta.get('title')} ---")
+                st_now = datetime.now().strftime("%H:%M:%S")
+                print(f"\n--- ⏳ [{st_now}] 开始执行阶段 {i+1}: {meta.get('title')} ---")
                 if status_callback: status_callback(f"⚙️ [Stage {i+1}] 正在精准对齐数据...")
                 
                 t_context = {}
@@ -931,11 +914,10 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                 print(f"📦 [Stage Data] Meta: {meta.get('title')}, SQLs: {list(sqls.keys())}, Data: {len(exec_res['data'])} rows, Samples: {list(stage_data['source_samples'].keys())}")
                 final_data.append(stage_data)
 
-            print("\n" + "-"*60)
-            print("🧠 [总结] 正在合成最终战略洞察报告...")
-            print("-"*60 + "\n")
+            print(f"\n[{datetime.now().strftime('%H:%M:%S')}] 🧠 [总结结论] 最终战略洞察报告合成完毕，正在推送至 UI...")
             
-            def report_gen():
+            # 归一化与安全化处理 (Normalization & Serialization Safety)
+            def sanitize_stage(s):
                 p = f"撰写战略报告。需求: {query}\n结论: {analysis_context}\n要求: SCQA 架构，结论先行。"
                 if hasattr(model_client, 'stream_chat'):
                     from llama_index.core.base.llms.types import ChatMessage, MessageRole
