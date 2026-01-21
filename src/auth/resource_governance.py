@@ -143,20 +143,30 @@ def render_resource_governance_v19():
                         (f_status == "全部状态" or d['治理状态'] == f_status)]
         
         # 表格还原
-        edited_res = st.data_editor(
-            pd.DataFrame(filtered), 
-            use_container_width=True, 
-            hide_index=True, 
-            column_config={
-                "☑️": st.column_config.CheckboxColumn(label="", width="small"),
-                "物理规模": None,
-                "治理状态": st.column_config.TextColumn("状态", width="small"),
-                "最后活跃": st.column_config.TextColumn("活跃日期", width="small")
-            }, 
-            key="rg_v19_res_editor"
-        )
+        df_filtered = pd.DataFrame(filtered)
+        if df_filtered.empty:
+            st.info("ℹ️ 系统中暂无符合条件的资源资产。")
+            selected_kbs = []
+        else:
+            edited_res = st.data_editor(
+                df_filtered, 
+                use_container_width=True, 
+                hide_index=True, 
+                column_config={
+                    "☑️": st.column_config.CheckboxColumn(label="", width="small"),
+                    "物理规模": None,
+                    "治理状态": st.column_config.TextColumn("状态", width="small"),
+                    "最后活跃": st.column_config.TextColumn("活跃日期", width="small")
+                }, 
+                key="rg_v19_res_editor"
+            )
+            
+            # 确保列存在再过滤
+            if "☑️" in edited_res.columns:
+                selected_kbs = edited_res[edited_res["☑️"] == True]["资源标识"].tolist()
+            else:
+                selected_kbs = []
         
-        selected_kbs = edited_res[edited_res["☑️"] == True]["资源标识"].tolist()
         if selected_kbs:
             with st.container(border=True):
                 st.markdown(f"**⚡ 资产治理决策引擎 (已选 {len(selected_kbs)} 项)**")
