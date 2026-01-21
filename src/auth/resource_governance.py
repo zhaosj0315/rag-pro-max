@@ -6,12 +6,14 @@ import time
 import pandas as pd
 import hashlib
 import subprocess
+import importlib # [Fix] Hot reload support
 from datetime import datetime, timedelta
 from src.auth.user_auth import load_users, save_users
 from src.auth.session_manager import load_sharing_config, save_sharing_config, set_kb_public, revoke_user_sessions
 from src.kb.kb_manager import KBManager
 from src.config.manifest_manager import ManifestManager
-from src.auth.connection_manager import ConnectionManager  # [v8.3.0] 新增
+import src.auth.connection_manager # [Fix] Import module for reloading
+from src.auth.connection_manager import ConnectionManager
 
 USER_CONFIG_PATH = "config/users.json"
 ROLE_TEMPLATE_PATH = "config/role_templates.json"
@@ -27,6 +29,10 @@ ALL_PERMISSIONS_MAP = {
 }
 
 def render_resource_governance_v19():
+    # [Fix] 强制热重载连接管理器，防止 AttributeError
+    importlib.reload(src.auth.connection_manager)
+    from src.auth.connection_manager import ConnectionManager
+    
     st.toast("💎 旗舰治理 v19 (深度资源 + 精准账户) 已上线", icon="🛡️")
     from src.auth.audit_logger import AuditLogger
     from src.auth.session_manager import get_session_settings, set_session_setting, revoke_user_sessions, load_session_store, save_session_store
