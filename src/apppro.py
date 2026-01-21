@@ -3913,12 +3913,15 @@ if btn_start:
                     
                     if success:
                         st.session_state.uploaded_path = temp_dir
-                        # 确保勾选了分析
-                        st.session_state.kb_enable_data_analysis = True
+                        # [Fix] 不再修改 session_state 以免报错，改为在下方函数调用时强制传参
                         status.update(label="✅ 数据库镜像拉取成功，开始构建知识库...", state="complete")
                     else:
                         st.error("❌ 数据库同步失败，请检查连接或表权限")
                         st.stop()
+
+            # [v8.6.9 修补] 计算最终的数据分析开启状态
+            is_da_effective = st.session_state.get('kb_enable_data_analysis', False)
+            if source_mode == "🔌 数据库同步": is_da_effective = True # 数据库模式强制开启
 
             process_knowledge_base_logic(
                 kb_name=final_kb_name,
@@ -3928,7 +3931,7 @@ if btn_start:
                 generate_summary=current_generate_summary,
                 force_reindex=current_force_reindex,
                 owner=current_user, # 明确传递所有者
-                enable_data_analysis=st.session_state.get('kb_enable_data_analysis', False)
+                enable_data_analysis=is_da_effective
             )
             # st.session_state.current_nav 等跳转逻辑已移至 process_knowledge_base_logic 内部的 jump_to_knowledge_base
             
