@@ -762,6 +762,8 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                 stages_meta = [{"stage_id": 1, "title": "数据透视", "transformation": "执行分析"}]
                 if self.logger: self.logger.warning("⚠️ [Plan Fail] 规划拆解失败，降级为单步执行")
 
+            final_data = []
+            analysis_context = ""
             for i, meta in enumerate(stages_meta):
                 st_now = datetime.now().strftime("%H:%M:%S")
                 print(f"\n--- ⏳ [{st_now}] 开始执行阶段 {i+1}: {meta.get('title')} ---")
