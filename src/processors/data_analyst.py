@@ -688,6 +688,9 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         # 2. 识别与对齐
         rel_tables = self._get_relevant_tables(query, full_schemas, model_client)
         
+        # [v8.1.3 Fix] 预定义 report_gen 以防止 UnboundLocalError
+        def report_gen(): yield "正在分析中..."
+        
         print(f"📁 [建模] 锁定业务范围: {rel_tables}")
         
         # [v6.7.0 Fix] 判定是否为仿真模式：只要涉及的表中有一个是虚拟表，整体判定为仿真模式
