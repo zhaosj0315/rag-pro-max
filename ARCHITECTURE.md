@@ -1,8 +1,18 @@
-# RAG Pro Max v8.1.0 企业级系统架构文档
+# RAG Pro Max v8.1.1 企业级系统架构文档
 
-**版本**: v8.1.0 (Flagship Dual-Core Edition)  
+**版本**: v8.1.1 (Flagship Dual-Core Edition)  
 **更新日期**: 2026-01-20  
-**核心特性**: Iron-Gate Routing, Dual-Core Co-existence, Standard Ingestion Invariants
+**核心特性**: Minimalist UI Fusion, Iron-Gate Routing, Dual-Core Co-existence
+
+---
+
+## 🏗️ 表现层架构融合 (v8.1.1)
+
+在 v8.1.1 中，表现层（Presentation Layer）经历了深度重构，实现了**入口逻辑的归一化**。
+
+- **单一入口原则**: 废弃了基于 `main_mode` 的多页面分发逻辑（Legacy）。
+- **配置下沉**: 将“数据分析”从顶级导航下沉为 `IndexBuilder` 的配置参数 `enable_data_analysis`。
+- **状态流转**: 侧边栏不再负责复杂的模式切换，仅负责参数收集与任务触发。
 
 ---
 

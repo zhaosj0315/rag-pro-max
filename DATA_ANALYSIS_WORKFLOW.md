@@ -1,19 +1,17 @@
 # 数据分析：双核联动开发流程与架构设计规范 (Data Analysis Workflow)
 
-**版本**: v8.0.0 (Flagship Dual-Core Edition)
+**版本**: v8.1.1 (Flagship Dual-Core Edition)
 **核心原则**: 语义底座 + 结构化增强 (Shadow Mapping)，物理必闭环。
 
 ---
 
 ## 一、 业务架构 (Business Architecture)
 
-在 v8.0.0 架构下，数据分析不再是一个独立的模式，而是作为 RAG 知识库的**“高级逻辑插件”**存在。系统提供“从语义检索到结构化计算”的无缝切换体验。
+在 v8.1.1 架构下，数据分析能力已完全**内化**为知识库的一项基础属性。
 
 ### 1. 场景双核联动
-- **语义层 (Base Layer)**: 100% 的材料经过 RAG 切片与向量化，保证定性问题的准确回答。
-- **逻辑层 (Augmented Layer)**:
-  - **有数映射**: 探测归档目录中的 CSV/XLSX，物理固化为影子表。
-  - **定义赋能**: 如果物理表缺乏字段说明，引擎反向检索 RAG 索引中的“业务文档”，提取字段释义（Comments）。
+- **语义层 (Base Layer)**: 100% 的材料经过 RAG 切片与向量化。
+- **逻辑层 (Augmented Layer)**: 仅当用户在构建时勾选 **「💎 智能数据分析」** 时生成。
 
 ---
 
@@ -26,14 +24,14 @@
 
 ---
 
-## 三、 开发与构建流程 (v8.0 联动版)
+## 三、 开发与构建流程 (v8.1.1 融合版)
 
 ### 阶段 1：归一化摄入 (Normalized Ingestion)
 1. **统一路径**: 无论是爬虫还是上传，文件统一归档至 `raw_sources/`。
 2. **底座先行**: 首先触发全量 RAG 构建流程。
 
 ### 阶段 2：智能探测与分流 (Detection & Branching)
-1. **意图检查**: 读取 `enable_data_analysis` 标志位。
+1. **意图检查**: 读取 `st.session_state.kb_enable_data_analysis` 标志位（来自高级选项）。
 2. **真数据判定 (Validator)**: 扫描 `raw_sources/`，计算数值密度。
 3. **分流**: 
    - 勾选且为真数据 ➡ 进入「结构化建模」。
