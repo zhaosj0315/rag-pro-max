@@ -108,6 +108,7 @@ aliyun_adb_mysql_docs_*/
 monitoring_alerts/
 config/sessions.json
 config/users.json
+config/db_connections.json
 config/kb_sharing.json
 temp_uploads/
 .env
