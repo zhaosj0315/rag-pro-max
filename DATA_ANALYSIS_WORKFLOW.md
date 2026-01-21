@@ -1,6 +1,6 @@
 # 数据分析：双核联动开发流程与架构设计规范 (Data Analysis Workflow)
 
-**版本**: v8.1.1 (Flagship Dual-Core Edition)
+**版本**: v8.1.2 (Flagship Dual-Core Edition)
 **核心原则**: 语义底座 + 结构化增强 (Shadow Mapping)，物理必闭环。
 
 ---
@@ -24,7 +24,7 @@
 
 ---
 
-## 三、 开发与构建流程 (v8.1.1 融合版)
+## 三、 开发与构建流程 (v8.1.2 加固版)
 
 ### 阶段 1：归一化摄入 (Normalized Ingestion)
 1. **统一路径**: 无论是爬虫还是上传，文件统一归档至 `raw_sources/`。
@@ -43,7 +43,11 @@
 
 ### 阶段 4：双核协同响应 (Dual-Core Inference)
 1. **路由判断**: 识别用户提问是定性（RAG）还是定量（SQL）。
-2. **数文对照**: 
+2. **逻辑推演 (v8.1.2)**:
+   - **原子拆解**: Planner 强制执行 Filter -> Join -> Aggregation 路径。
+   - **精准选表**: 应用 Fact-First 策略消除字段歧义。
+   - **质量诊断**: 若 SQL 结果为空，自动触发 JOIN Key 幻觉排查。
+3. **数文对照**: 
    - 输出 SQL 计算结论。
    - 输出 RAG 文本证据（支持跳转至原文对应页码）。
 

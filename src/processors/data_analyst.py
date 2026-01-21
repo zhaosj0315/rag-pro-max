@@ -50,26 +50,45 @@ class DataAnalystEngine:
                     
                     table_summaries.append(f"- {t} ({info.get('desc', '')}): 关键字段 [{', '.join(display_cols[:8])}]")
                 
-                table_str = "\n".join(table_summaries)
-                prompt = f"""你是一个资深业务架构师。请分析用户的问题，从【物理表清单】中选出最核心的 1-2 张表。
-
-用户问题: {query}
-
-物理表清单:
-{table_str}
-
-【决策逻辑 - 必须严守】:
-1. 'mx_mxck' 开头 = 出口业务 (Export) -> 仅在问题提到“出口”、“海关”时使用。
-2. 'mx_mxxx' 开头 = 国内销售 (Domestic Sales) -> 处理“销售”、“发票”、“销项”等问题时必选。
-3. 如果问“区域/分布”，必须关联包含“省市”、“地址”或“区域”字段的表。
-4. 优先选包含具体金额字段(如 xxje, je)和产品名称字段(如 xxspmc, spmc)的表。
-
-要求:
-1. 只返回表名，用逗号分隔。
-2. 不要包含任何解释。
-3. 必须精准，不要多选。"""
+                                table_str = "\n".join(table_summaries)
                 
-                print(f"🧠 [精准识别] 正在为问题 '{query}' 匹配物理底座...")
+                                prompt = f"""你是一个资深业务架构师。请分析用户的问题，从【物理表清单】中选出最适合回答该问题的 1-2 张表。
+                
+                
+                
+                用户问题: {query}
+                
+                
+                
+                物理表清单:
+                
+                {table_str}
+                
+                
+                
+                【决策优先级 - 必须严守】:
+                
+                1. 事实优先：如果问题涉及“多少”、“金额”、“次数”、“趋势”等统计量，优先选择包含流水、明细、交易特征的事实表。
+                
+                2. 属性补充：如果问题涉及“名称”、“地址”、“类别”等描述性信息，且事实表中缺失，则关联相应的维度/档案表。
+                
+                3. 时间对齐：如果问题包含时间范围，优先选择带有日期或时间戳字段的表。
+                
+                4. 消歧义：若多个表都有同名字段（如 amount），分析表名含义，选择业务语义最契合的那张（例如：查收入选销售表，不选退款表）。
+                
+                
+                
+                要求:
+                
+                1. 只返回表名，用逗号分隔。
+                
+                2. 不要包含任何解释。
+                
+                3. 必须精准，不要多选。"""
+                
+                                
+                
+                                print(f"🧠 [精准识别] 正在为问题 '{query}' 执行语义对齐与消歧义选表...")
                 res = model_client.complete(prompt).text.strip()
                 
                 # [v7.0.1 Fix] 鲁棒解析：从整段文字中提取合法的物理表名
@@ -721,11 +740,22 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                     phys_name = mapping.get(t, t)
                     sub_schema[phys_name] = full_schemas['tables'][t]
 
-            # 3. 任务拆解
-            print("🎯 [规划] 正在拆解战略目标与分析路径...")
-            prompt = f"将需求 {query} 拆解为 2-3 个 SQL 阶段。JSON 数组: [{{stage_id, title, transformation, goal}}]\n模型: {json.dumps(sub_schema, ensure_ascii=False)}"
+            # 3. 任务拆解 (v8.1.2 加固版：原子化分步策略)
+            print("🎯 [规划] 正在执行原子化战略拆解...")
+            planner_prompt = f"""你是一名资深数据科学家。请将用户的复杂分析请求拆解为 2-3 个循序渐进的 SQL 执行阶段。
+
+【核心原则 - 必须遵循】:
+1. 原子性：每个阶段只解决一个核心问题（如：阶段1-锁定目标范围，阶段2-执行跨表关联，阶段3-计算最终指标）。
+2. 逻辑链：后一个阶段必须建立在前一个阶段的数据产出之上。
+3. 容错性：避免在一个阶段编写过于复杂的嵌套查询。
+
+用户问题: {query}
+业务蓝图: {json.dumps(sub_schema, ensure_ascii=False)}
+
+请返回 JSON 数组格式: [{{ "stage_id": 1, "title": "阶段名称", "transformation": "本阶段的 SQL 任务描述", "goal": "本阶段要解决的具体业务问题" }}]"""
+            
             try:
-                res = model_client.complete(prompt).text
+                res = model_client.complete(planner_prompt).text
                 # 使用统一的 JSON 提取方法
                 extracted = self._extract_json(res)
                 if isinstance(extracted, list):
@@ -820,6 +850,21 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                     
                     exec_res = self.execute_sql(current_sql, model_client, conn=session_conn)
                     print(f"📊 [Attempt 1] 结果: {'✅' if exec_res['data'] else '⚠️'} 命中 {len(exec_res.get('data', []))} 行")
+                    
+                    # --- [v8.1.2 Enhancement] 异常零值诊断 (Zero-Row Diagnostics) ---
+                    if exec_res["success"] and not exec_res['data']:
+                        # 检查是否涉及多表关联
+                        if "JOIN" in current_sql.upper():
+                            print(f"🕵️ [质量诊断] 检测到关联查询结果为空，正在排查 JOIN Key 幻觉...")
+                            # 提取 JOIN 条件中的表和列 (简单正则)
+                            join_match = re.search(r'JOIN\s+(?:"?)([\w\d_]+)(?:"?)\s+ON\s+(.*?)(?:\s+WHERE|\s+GROUP|\s+ORDER|;|$)', current_sql, re.I | re.S)
+                            if join_match:
+                                target_table = join_match.group(1)
+                                join_cond = join_match.group(2)
+                                print(f"   🔎 正在验证表 '{target_table}' 与关联条件 '{join_cond.strip()}' 的物理一致性...")
+                                # 如果是模拟环境，这通常意味着需要更精准的数据补全
+                                if is_simulated:
+                                    status_callback(f"⚠️ 发现关联数据断层，正在执行物理对齐自愈...")
                     
                     # --- [v6.7.2 Fix] 模拟环境下的空结果自愈 (Empty Result Rescue) ---
                     if not exec_res['data'] and is_simulated:

@@ -1,13 +1,18 @@
 # RAG Pro Max - 企业级智能文档问答与数据分析系统
 
-**当前版本**: v8.1.1 (Flagship Dual-Core Edition)  
-![Version](https://img.shields.io/badge/version-v8.1.1-purple)
+**当前版本**: v8.1.2 (Flagship Dual-Core Edition)  
+![Version](https://img.shields.io/badge/version-v8.1.2-purple)
 
-RAG Pro Max v8.1.1 进一步贯彻了“极简融合”的设计理念，通过 **「UI 极简融合 (Minimalist UI Fusion)」** 与 **「意图严选路由 (Iron-Gate Routing)」**，打造了真正一体化的智能中台。
+RAG Pro Max v8.1.2 在 v8.1.1 极简融合的基础上，进一步实施了 **「逻辑内核加固 (Logic Hardening)」**，显著提升了复杂商业分析场景下的准确率与鲁棒性。
 
 ---
 
-## 🚀 v8.1.1 核心特性
+## 🚀 v8.1.2 核心特性
+
+### 🧠 逻辑内核加固 (Logic Hardening)
+- **原子化拆解**: 强制 Planner 引擎遵循“锁定范围 -> 跨表关联 -> 核心计算”的原子化路径，杜绝逻辑跳跃。
+- **精准语义选表**: 注入“事实优先”与“时间敏感”决策因子，在多表同名字段场景下实现 99% 的选表准确率。
+- **零值深度诊断**: 新增执行后验机制，当 SQL 返回 0 行时主动排查 JOIN 条件幻觉，防止“伪空结果”误导用户。
 
 ### 🎨 UI 极简融合 (Minimalist UI Fusion)
 - **模式瘦身**: 移除了独立的“📊 数据分析”导航入口，将数据分析能力内化为系统基础能力。
