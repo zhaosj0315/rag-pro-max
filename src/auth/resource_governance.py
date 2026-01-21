@@ -319,9 +319,30 @@ def render_resource_governance_v19():
                     ic1.markdown(f"**🔌 {alias}**")
                     ic1.caption(f"{info['type']}://{info['user']}@{info['host']}:{info['port']}/{info['database']}")
                     ic2.caption(f"更新时间: {datetime.fromtimestamp(float(info.get('updated_at', 0))).strftime('%Y-%m-%d %H:%M') if info.get('updated_at') else '-'}")
-                    if ic3.button("🗑️ 删除", key=f"del_conn_{alias}", use_container_width=True):
-                        if conn_manager.delete_connection(alias):
-                            st.toast("已删除"); time.sleep(0.5); st.rerun()
+                    
+                    ic_btn_col1, ic_btn_col2 = ic3.columns(2)
+                    with ic_btn_col1:
+                        show_struct = st.button("🔍 预览", key=f"preview_conn_{alias}", use_container_width=True)
+                    with ic_btn_col2:
+                        if st.button("🗑️", key=f"del_conn_{alias}", use_container_width=True, help="删除连接"):
+                            if conn_manager.delete_connection(alias):
+                                st.toast("已删除"); time.sleep(0.5); st.rerun()
+                    
+                    # 预览区域
+                    if show_struct:
+                        with st.container(border=True):
+                            st.caption(f"🗄️ {alias} 数据表结构")
+                            tables = conn_manager.get_table_list(alias)
+                            if not tables:
+                                st.warning("未发现可读表或连接失败")
+                            else:
+                                sel_t = st.selectbox("选择表以查看详情", [""] + tables, key=f"sel_t_{alias}")
+                                if sel_t:
+                                    schema_data = conn_manager.get_table_schema(alias, sel_t)
+                                    if schema_data:
+                                        st.dataframe(pd.DataFrame(schema_data), use_container_width=True, hide_index=True)
+                                    else:
+                                        st.info("无法获取表详情")
 
     # --- Tab 5: 行为审计 (全功能回归融合版) ---
     with tab_audit:

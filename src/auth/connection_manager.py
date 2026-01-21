@@ -109,3 +109,42 @@ class ConnectionManager:
             return True, "连接成功"
         except Exception as e:
             return False, str(e)
+
+    def get_table_list(self, alias: str) -> List[str]:
+        """获取指定连接的所有表名"""
+        try:
+            conns = self.load_connections()
+            if alias not in conns: return []
+            
+            url = self.get_connection_url(conns[alias])
+            engine = create_engine(url)
+            from sqlalchemy import inspect
+            inspector = inspect(engine)
+            return inspector.get_table_names()
+        except:
+            return []
+
+    def get_table_schema(self, alias: str, table_name: str) -> List[Dict]:
+        """获取指定表的字段结构"""
+        try:
+            conns = self.load_connections()
+            if alias not in conns: return []
+            
+            url = self.get_connection_url(conns[alias])
+            engine = create_engine(url)
+            from sqlalchemy import inspect
+            inspector = inspect(engine)
+            cols = inspector.get_columns(table_name)
+            
+            # 格式化输出
+            result = []
+            for c in cols:
+                result.append({
+                    "name": c['name'],
+                    "type": str(c['type']),
+                    "nullable": c.get('nullable', True),
+                    "default": str(c.get('default', ''))
+                })
+            return result
+        except:
+            return []
