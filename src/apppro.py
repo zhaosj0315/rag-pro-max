@@ -2367,11 +2367,12 @@ with st.sidebar:
                 with opt_col2:
                     # [v8.6.9 修复] 一键全选现在包含数据分析
                     enable_data_analysis = st.checkbox("💎 智能数据分析", value=default_val, key="kb_enable_data_analysis", help="自动识别真数据，构建物理库，启用SQL决策")
-                                        generate_summary = st.checkbox("📝 自动摘要生成", value=default_val, key="kb_generate_summary", help="为每份文件生成AI摘要")
-                                    
-                                    # 保存到session state
-                                    st.session_state.use_ocr = use_ocr
-                                    st.session_state.generate_summary = generate_summary
+                    generate_summary = st.checkbox("📝 自动摘要生成", value=default_val, key="kb_generate_summary", help="为每份文件生成AI摘要")
+                
+                # 保存到session state
+                st.session_state.use_ocr = use_ocr
+                st.session_state.generate_summary = generate_summary
+
                                     
                 # 更新状态提示
                 options = []
