@@ -2083,14 +2083,43 @@ with st.sidebar:
                         
                         # 4. 同步模式 (改为 UI 专用 key)
                         st.radio("同步策略", ["🧪 结构+采样 (推荐)", "⚡ 仅同步结构"], horizontal=True, key="db_sync_mode_ui")
+                        
+                        # [v8.6.9] 数据库模式专用命名种子
+                        if selected_tables:
+                            db_seed = f"DB_{selected_alias}_{selected_db}"
+                            if st.session_state.get('last_db_seed') != db_seed:
+                                st.session_state.upload_auto_name = db_seed
+                                st.session_state.last_db_seed = db_seed
 
             # 排除配置 (通用)
             if source_mode in ["🔗 网址抓取", "🔍 智能搜索"]:
                 with st.expander("🚫 排除链接", expanded=False):
                     exclude_text = st.text_area("每行一个", height=68, placeholder="*/admin/*")
                     exclude_patterns = [line.strip() for line in exclude_text.split('\n') if line.strip()] if exclude_text else []
-                
-                # 抓取按钮 (已移除，功能合并至侧边栏按钮)
+
+            # --- [v8.6.9] 归一化名称录入与建议区 (全模式共享) ---
+            st.markdown("---")
+            kb_name_col1, kb_name_col2 = st.columns([4, 1])
+            with kb_name_col1:
+                # 获取建议值 (优先级：手动输入 > 自动建议)
+                current_name_val = st.session_state.get('upload_auto_name', "")
+                kb_name_input = st.text_input(
+                    "知识库名称", 
+                    value=current_name_val,
+                    placeholder="给您的知识资产起个名字...",
+                    key="kb_name_input_main"
+                )
+            with kb_name_col2:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                if st.button("💡", help="智能建议名称", key="smart_name_btn_main"):
+                    if kb_name_input:
+                        from src.utils.kb_utils import generate_smart_kb_name
+                        # 简单优化：追加日期
+                        optimized = f"{kb_name_input}_{datetime.now().strftime('%m%d')}"
+                        st.session_state.upload_auto_name = optimized
+                        st.rerun()
+                    else:
+                        st.toast("请先配置数据源或输入初步名称")
 
             # 处理上传 (Stage 4.1 - 使用 UploadHandler)
             if uploaded_files:
@@ -2271,18 +2300,11 @@ with st.sidebar:
                             unsafe_allow_html=True
                         )
                     
-                    with input_col:
-                        if is_create_mode:
-                            final_kb_name = st.text_input(
-                                "知识库名称", 
-                                value=sanitize_filename(auto_name) if auto_name else "", 
-                                placeholder="输入库名",
-                                label_visibility="collapsed",
-                                key="kb_name_inline_input"
-                            )
-                        else:
-                            final_kb_name = current_kb_name
-                            st.markdown(f"<div style='padding-top: 6px;'><b>{final_kb_name}</b></div>", unsafe_allow_html=True)
+                    # [v8.6.9] 移除旧的名称输入，已统一移至上方
+                    if is_create_mode:
+                        st.caption("ℹ️ 请在上方输入框设置知识库名称")
+                    else:
+                        st.markdown(f"<div style='padding-top: 6px;'><b>{current_kb_name}</b></div>", unsafe_allow_html=True)
 
                     # 类型分布（紧凑化）
                     if file_types:
@@ -3812,12 +3834,11 @@ if btn_start:
     existing_config.update(config_update)
     ConfigLoader.save(existing_config)
 
-    # Ensure final_kb_name is defined (crucial for APPEND mode where sidebar logic might differ)
-    if 'final_kb_name' not in locals():
-        if is_create_mode:
-            final_kb_name = st.session_state.get('new_kb_name', '') # Try session state or empty
-        else:
-            final_kb_name = current_kb_name
+    # [v8.6.9] 核心：从统一录入框捕获名称 (归一化逻辑)
+    if is_create_mode:
+        final_kb_name = st.session_state.get('kb_name_input_main', '').strip()
+    else:
+        final_kb_name = current_kb_name
 
     if not final_kb_name:
         st.error("请输入知识库名称")
