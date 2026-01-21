@@ -1,26 +1,23 @@
-# RAG Pro Max v8.2.0 企业级系统架构文档
+# RAG Pro Max v8.3.3 企业级系统架构文档
 
-**版本**: v8.2.0 (Flagship Dual-Core Edition)  
-**更新日期**: 2026-01-20  
-**核心特性**: Schema Graph Builder, Full-Link Audit, Logic Core Hardening
-
----
-
-## 🧠 业务层内核加固 (Service Layer Hardening)
-
-在 v8.2.0 中，数据分析引擎引入了图谱化构建能力 (`src/processors/schema_enhancer.py`)：
-
-- **Schema Graph Builder**: 在物理建表后，启动深度画像引擎，将 `business_schema.json` 升级为实体关系图谱。
-    - **Physical Profiler**: 计算基数与空值率，识别 Primary Keys 和 Enums。
-    - **Lineage Inferencer**: 基于物理碰撞与语义规则，推演 Table Joins。
-    - **Semantic Fallback**: 针对无数据的空壳 Schema，提供纯语义特征推测的兜底机制。
-
-- **Dual-Logging Architecture**: 实现了终端标准输出与文件结构化日志的“双写同步”，确保每一行执行逻辑都可被审计。
-- **Atomic Decomposition**: 引入原子化拆解 Prompt，强制 Planner 遵循 DAG（有向无环图）执行逻辑。
+**版本**: v8.3.3 (Flagship Dual-Core Edition)  
+**更新日期**: 2026-01-21  
+**核心特性**: Multi-Source DB Integration, Smart Linkage, Schema Graph Builder
 
 ---
 
-## 🏗️ 表现层架构融合 (v8.1.1)
+## 🏗️ 业务层内核加固 (Service Layer Hardening)
+
+### 1. 归一化数据库摄入 (Normalized DB Ingestion)
+在 v8.3.3 中，系统通过 **“适配器镜像 (Adapter Mirroring)”** 实现了对外部数据库的透明支持：
+- **DBIngestor**: 负责从异构源（MySQL/PG）按需拉取结构与采样数据，并物理转化为标准的 `.csv` 材料。
+- **100% 逻辑复用**: 由于材料已归一化，后续的 RAG 索引构建、Schema 图片增强以及 SQL 生成逻辑完全复用主干管线，消除了异构源带来的算法偏差。
+
+### 2. 模式感应联动 (Mode-Sensing Linkage)
+- **Smart Switch**: 通过 Session State 监听知识库元数据，动态激活 UI 层的分析开关。
+- **Force Routing**: 在提问主循环中，针对 DB 源优化了关键词引导与路由权重。
+
+### 3. Schema Graph Builder (v8.2.0)
 
 在 v8.1.1 中，表现层（Presentation Layer）经历了深度重构，实现了**入口逻辑的归一化**。
 
