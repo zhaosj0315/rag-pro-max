@@ -1074,10 +1074,13 @@ with st.sidebar:
     # 渲染 Admin 专用 Tab (物理对齐)
     if is_admin and len(tabs) > 5:
         with tabs[5]:
-            # [v8.6.6] 极致加固：模块级显式调用，杜绝 NameError
-            import src.auth.resource_governance as rg_mod
-            importlib.reload(rg_mod)
-            rg_mod.render_resource_governance_v19()
+            # [v8.6.7] 缓存爆破机制：通过局部函数定义强制刷新语法树
+            def force_render_admin_v867():
+                import src.auth.resource_governance as rg_mod
+                importlib.reload(rg_mod)
+                rg_mod.render_resource_governance_v19()
+            
+            force_render_admin_v867()
 
     # --- 退出登录按钮 ---
     st.sidebar.markdown("---")
