@@ -1030,10 +1030,10 @@ if not st.session_state.get("logged_in"):
 # Force refresh
 from src.auth.login_page import render_login_page
 import importlib
-    # [v6.7.0] 强制刷新治理模块
-    from src.auth import resource_governance
-    importlib.reload(resource_governance)
-    from src.auth.resource_governance import render_resource_governance_v19 as render_rg
+# [v6.7.0] 强制刷新治理模块
+from src.auth import resource_governance
+importlib.reload(resource_governance)
+from src.auth.resource_governance import render_resource_governance_v19 as render_rg
 
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     render_login_page()
