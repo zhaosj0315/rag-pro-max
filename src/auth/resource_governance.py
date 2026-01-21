@@ -11,6 +11,7 @@ from src.auth.user_auth import load_users, save_users
 from src.auth.session_manager import load_sharing_config, save_sharing_config, set_kb_public, revoke_user_sessions
 from src.kb.kb_manager import KBManager
 from src.config.manifest_manager import ManifestManager
+from src.auth.connection_manager import ConnectionManager  # [v8.3.0] 新增
 
 USER_CONFIG_PATH = "config/users.json"
 ROLE_TEMPLATE_PATH = "config/role_templates.json"
@@ -43,6 +44,7 @@ def render_resource_governance_v19():
     users = load_users(); sharing_config = load_sharing_config()
     session_settings = get_session_settings()
     global_ttl = int(session_settings.get("global_default", 7))
+    conn_manager = ConnectionManager() # [v8.3.0] 初始化连接管理器
     
     if os.path.exists(ROLE_TEMPLATE_PATH):
         with open(ROLE_TEMPLATE_PATH, 'r', encoding='utf-8') as f: roles_config = json.load(f)
@@ -105,8 +107,8 @@ def render_resource_governance_v19():
         })
 
     st.markdown("### 💎 全域资源与账户访问安全治理 (旗舰版)")
-    tab_dist, tab_users, tab_roles, tab_audit, tab_term = st.tabs([
-        "🛡️ 资源深度治理", "👤 账户与访问安全", "🎭 权限矩阵定义", "📜 系统行为审计", "💻 全能终端控制"
+    tab_dist, tab_users, tab_roles, tab_conns, tab_audit, tab_term = st.tabs([
+        "🛡️ 资源深度治理", "👤 账户与访问安全", "🎭 权限矩阵定义", "🔌 数据源连接", "📜 系统行为审计", "💻 全能终端控制"
     ])
 
     # --- Tab 1: 资源深度治理 (功能完全找回版) ---
@@ -267,7 +269,61 @@ def render_resource_governance_v19():
             roles_config[sel_rid]['permissions'] = new_p
             with open(ROLE_TEMPLATE_PATH, 'w') as f: json.dump(roles_config, f, indent=4); st.rerun()
 
-    # --- Tab 4: 行为审计 (全功能回归融合版) ---
+    # --- Tab 4: 数据源连接 (New in v8.3.0) ---
+    with tab_conns:
+        st.markdown("**🔌 数据源连接管理** (支持多源异构数据库接入)")
+        
+        # 加载现有连接
+        conns = conn_manager.load_connections()
+        
+        # 新增/编辑区域
+        with st.expander("➕ 新增/编辑连接", expanded=True):
+            c1, c2 = st.columns(2)
+            alias = c1.text_input("连接名称 (Alias)", placeholder="e.g. 生产订单库")
+            db_type = c2.selectbox("数据库类型", ["MySQL", "PostgreSQL"])
+            
+            c3, c4 = st.columns([3, 1])
+            host = c3.text_input("主机地址 (Host)", value="localhost")
+            port = c4.number_input("端口", value=3306 if db_type=="MySQL" else 5432)
+            
+            c5, c6, c7 = st.columns(3)
+            user = c5.text_input("用户名")
+            password = c6.text_input("密码", type="password")
+            db_name = c7.text_input("数据库名")
+            
+            b1, b2 = st.columns([1, 1])
+            if b1.button("📡 测试连通性", use_container_width=True):
+                if not alias: st.error("请填写连接名称")
+                else:
+                    conf = {"type": db_type, "host": host, "port": port, "user": user, "password": password, "database": db_name}
+                    s, m = conn_manager.test_connection(conf)
+                    if s: st.success(f"✅ {m}")
+                    else: st.error(f"❌ {m}")
+            
+            if b2.button("💾 保存连接", use_container_width=True, type="primary"):
+                if not alias or not host or not user or not db_name:
+                    st.error("请填写完整信息")
+                else:
+                    if conn_manager.save_connection(alias, db_type, host, port, user, password, db_name):
+                        st.success(f"✅ 连接 '{alias}' 已保存"); time.sleep(0.5); st.rerun()
+                    else:
+                        st.error("保存失败")
+
+        # 列表展示
+        if conns:
+            st.divider()
+            st.caption("已保存的连接")
+            for alias, info in conns.items():
+                with st.container(border=True):
+                    ic1, ic2, ic3 = st.columns([3, 2, 1])
+                    ic1.markdown(f"**🔌 {alias}**")
+                    ic1.caption(f"{info['type']}://{info['user']}@{info['host']}:{info['port']}/{info['database']}")
+                    ic2.caption(f"更新时间: {datetime.fromtimestamp(float(info.get('updated_at', 0))).strftime('%Y-%m-%d %H:%M') if info.get('updated_at') else '-'}")
+                    if ic3.button("🗑️ 删除", key=f"del_conn_{alias}", use_container_width=True):
+                        if conn_manager.delete_connection(alias):
+                            st.toast("已删除"); time.sleep(0.5); st.rerun()
+
+    # --- Tab 5: 行为审计 (全功能回归融合版) ---
     with tab_audit:
         st.caption("全量行为链路追踪：支持高性能分页查询与多维逻辑穿透")
         raw_logs = AuditLogger.get_logs(limit=5000)
@@ -333,7 +389,7 @@ def render_resource_governance_v19():
             csv = f_df.to_csv(index=False).encode('utf-8-sig')
             st.download_button("📥 导出全量审计流水 (CSV)", data=csv, file_name=f"audit_{datetime.now().strftime('%Y%m%d')}.csv", key="v12_csv")
 
-    # --- Tab 5: 终端控制 ---
+    # --- Tab 6: 终端控制 ---
     with tab_term:
         st.caption("🚀 本地 SSH 终端 (WebSSH) - 全能指挥通道")
         c_svc, c_h, c_ext = st.columns([1.5, 3, 1])
