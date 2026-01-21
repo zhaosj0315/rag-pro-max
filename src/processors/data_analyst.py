@@ -1251,22 +1251,10 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             print("\n" + "🏗️  [Data Base Construction] 启动知识库逻辑底座构建 (Metadata First)..." + "\n" + "="*60)
             if self.logger: self.logger.info(f"🏗️ [Data Base Construction] 启动知识库逻辑底座构建 (files: {len(file_paths)})...")
             
-            # [v8.3.1] 镜像保护机制：如果数据库文件已经由摄入器生成，不再执行物理删除
-            if os.path.exists(self.local_db_path if hasattr(self, 'local_db_path') else self.db_path):
-                # 检查表数量，判断是否是真的有内容
-                try:
-                    conn_check = sqlite3.connect(self.db_path)
-                    table_count = conn_check.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0]
-                    conn_check.close()
-                    if table_count > 1: # 排除 dual 表
-                        print(f"🛡️ [镜像保护] 检测到预置数据库镜像 (Tables: {table_count})，跳过初始化删除。")
-                        if self.logger: self.logger.info(f"🛡️ [Image Protection] 保留预置数据库镜像 (Tables: {table_count})")
-                    else:
-                        os.remove(self.db_path)
-                        print("🧹 [清理] 移除旧数据库文件，准备重新建模")
-                except:
-                    pass
-            
+            if os.path.exists(self.db_path): 
+                os.remove(self.db_path)
+                print("🧹 [清理] 移除旧数据库文件，准备重新建模")
+                
             conn = sqlite3.connect(self.db_path)
             physical_tables = {}
             semantic_docs = []

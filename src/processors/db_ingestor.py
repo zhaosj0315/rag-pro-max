@@ -25,8 +25,8 @@ class DBIngestor:
 
     def ingest(self, connection_alias: str, db_name: str, table_names: List[str], sync_mode: str = "SAMPLE") -> bool:
         """
-        执行摄入流程
-        :param sync_mode: "SCHEMA_ONLY" (仅结构) | "SAMPLE" (结构+采样)
+        [v8.3.2 重构] 数据库镜像模式
+        将远程表镜像为本地 CSV 文件，从而 100% 复用后续的“文件构建”逻辑。
         """
         try:
             # 1. 获取连接配置
@@ -40,63 +40,41 @@ class DBIngestor:
             url = self.conn_manager.get_connection_url(config, db_override=db_name)
             remote_engine = create_engine(url)
             
-            # 3. 建立本地连接
-            local_conn = sqlite3.connect(self.local_db_path)
-            
             if self.logger:
-                self.logger.info(f"🔌 [DB Ingest] 开始从 {connection_alias}.{db_name} 同步 {len(table_names)} 张表 (模式: {sync_mode})")
+                self.logger.info(f"🔌 [DB Ingest] 镜像下载模式启动: {connection_alias}.{db_name} (Tables: {len(table_names)})")
             
             success_count = 0
-            # [v8.3.1] 准备基础 Schema 结构，供后续增强引擎使用
-            base_schema = {
-                "macro_context": f"从数据库 {connection_alias}.{db_name} 同步的数据资产",
-                "tables": {}
-            }
             
             for table in table_names:
                 try:
-                    # A. 读取结构与数据
-                    # ... (省略中间查询逻辑)
+                    # A. 拉取数据 (采样或全量结构)
                     limit_clause = "LIMIT 1000" if sync_mode == "SAMPLE" else "LIMIT 0"
-                    if config['type'] == 'SQL Server': limit_clause = "TOP 1000 *" if sync_mode == "SAMPLE" else "TOP 0 *"
-                    
                     query = f"SELECT * FROM {table} {limit_clause}"
+                    
                     df = pd.read_sql(query, remote_engine)
                     
-                    # B. 写入本地 SQLite
-                    df.to_sql(table, local_conn, index=False, if_exists='replace')
-                    
-                    # C. 提取基础元数据 (v8.3.1 类型对齐)
-                    cols = []
-                    for col in df.columns:
-                        dtype = str(df[col].dtype)
-                        sql_type = "TEXT"
-                        if "int" in dtype: sql_type = "INTEGER"
-                        elif "float" in dtype or "decimal" in dtype: sql_type = "REAL"
-                        cols.append({"name": col, "type": sql_type, "comment": f"数据库字段: {col}"})
-
-                    base_schema["tables"][table] = {
-                        "table_name": table,
-                        "desc": f"从数据库同步的业务表: {table}",
-                        "cols": cols
-                    }
+                    # B. 落地为 CSV 材料 (归一化入口)
+                    # 我们将表存为 csv，存放在 persist_dir 下
+                    csv_path = os.path.join(self.persist_dir, f"{table}.csv")
+                    df.to_csv(csv_path, index=False, encoding='utf-8-sig')
                     
                     success_count += 1
                     if self.logger:
-                        self.logger.info(f"   ✅ 同步表: {table} ({len(df)} rows)")
+                        self.logger.info(f"   📥 已导出镜像文件: {table}.csv ({len(df)} rows)")
                         
                 except Exception as e:
                     if self.logger:
-                        self.logger.warning(f"   ⚠️ 同步表 {table} 失败: {e}")
+                        self.logger.warning(f"   ⚠️ 镜像导出 {table} 失败: {e}")
             
-            local_conn.close()
+            # 💡 这里不再生成 business_data.db 或 business_schema.json
+            # 后续调用标准构建流程时，系统会识别这些 CSV 并自动完成所有高级工作
             
-            # D. 固化基础 Schema 文件
-            schema_path = os.path.join(self.persist_dir, "business_schema.json")
-            with open(schema_path, 'w', encoding='utf-8') as f:
-                json.dump(base_schema, f, indent=4, ensure_ascii=False)
+            return success_count > 0
             
-            # 4. 生成元数据文件 (标记这是一个 DB 来源的 KB)
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"❌ [DB Ingest Fatal] 镜像准备失败: {e}")
+            return False
             meta = {
                 "source_type": "database",
                 "connection": connection_alias,

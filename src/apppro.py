@@ -3025,29 +3025,11 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
             import shutil
             status_container.write("📦 正在执行原始文献的物理归档与持久化...")
             
-            # [v8.3.1] 数据库资产专用搬运逻辑
-            db_file = os.path.join(current_target_path, "business_data.db")
-            schema_file = os.path.join(current_target_path, "business_schema.json")
-            
-            if os.path.exists(db_file):
-                status_container.write("🔌 检测到数据库镜像，正在执行底座对齐...")
-                shutil.copy2(db_file, os.path.join(persist_dir, "business_data.db"))
-            if os.path.exists(schema_file):
-                shutil.copy2(schema_file, os.path.join(persist_dir, "business_schema.json"))
-            
-            # [v8.3.1] 强制触发图谱增强，将镜像转化为可计算底座
-            if os.path.exists(db_file) and os.path.exists(schema_file):
-                from src.processors.schema_enhancer import SchemaEnhancer
-                status_container.write("🧠 正在执行图谱深度画像 (自动识别主键与枚举)...")
-                enhancer = SchemaEnhancer(os.path.join(persist_dir, "business_data.db"), os.path.join(persist_dir, "business_schema.json"), logger)
-                enhancer.enhance(model_client=None) # 构建时先做物理画像，暂不调用LLM以提升速度
-
             if os.path.isdir(current_target_path):
-                # 递归拷贝整个上传目录到 raw_sources
+                # 递归拷贝整个上传目录
                 for root, dirs, files in os.walk(current_target_path):
                     for file in files:
                         if file.startswith('.'): continue
-                        if file in ["business_data.db", "business_schema.json"]: continue # 已搬运至根目录
                         src_file = os.path.join(root, file)
                         shutil.copy2(src_file, os.path.join(raw_sources_dir, file))
             else:
