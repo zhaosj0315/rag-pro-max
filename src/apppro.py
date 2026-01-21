@@ -2794,6 +2794,7 @@ if st.session_state.get('main_mode', 'rag') == 'sql':
 
 def jump_to_knowledge_base(kb_name: str, output_base: str):
     """统一的知识库跳转逻辑"""
+    global logger
     logger.log("知识库跳转", "start", f"🚀 跳转函数开始执行: {kb_name}")
     logger.log("知识库跳转", "info", f"🔄 准备跳转到知识库: {kb_name}")
     logger.log("知识库跳转", "info", f"📁 输出路径: {output_base}")
