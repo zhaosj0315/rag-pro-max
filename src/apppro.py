@@ -2853,6 +2853,16 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
     except:
         logger.success(f"✅ 嵌入模型已设置: {embed_model}")
 
+    # [v8.1.3] 完整配置清单审计
+    build_config = {
+        "OCR": use_ocr,
+        "Metadata": extract_metadata,
+        "Summary": generate_summary,
+        "Reindex": force_reindex,
+        "DataAnalysis": enable_data_analysis or st.session_state.get('kb_enable_data_analysis', False)
+    }
+    logger.info(f"📋 [Build Config] 构建配置清单: {json.dumps(build_config, ensure_ascii=False)}")
+
     logger.log("INFO", f"开始处理知识库: {kb_name}", stage="知识库处理")
     
     # UI 状态容器

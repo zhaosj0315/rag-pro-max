@@ -574,6 +574,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         print("\n" + "="*60)
         print(f"[{now}] 🚀 [Strategic Workshop] 接收到分析请求: {query}")
         print("="*60)
+        if self.logger: self.logger.info(f"🚀 [Strategic Workshop] 接收到分析请求: {query}")
         
         if not os.path.exists(self.schema_path): 
             print(f"[{now}] ❌ [错误] 架构文件不存在，尝试创建默认架构...")
@@ -756,8 +757,10 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                     print(f"   📍 Stage {s['stage_id']}: {s['title']} | 目标: {s['goal']}")
                 
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] 📊 [规划结论] 任务拆解完成，共计 {len(stages_meta)} 个原子执行阶段。")
+                if self.logger: self.logger.info(f"📊 [Plan Result] 拆解完成，共 {len(stages_meta)} 个阶段")
             except: 
                 stages_meta = [{"stage_id": 1, "title": "数据透视", "transformation": "执行分析"}]
+                if self.logger: self.logger.warning("⚠️ [Plan Fail] 规划拆解失败，降级为单步执行")
 
             for i, meta in enumerate(stages_meta):
                 st_now = datetime.now().strftime("%H:%M:%S")
@@ -915,6 +918,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                 final_data.append(stage_data)
 
             print(f"\n[{datetime.now().strftime('%H:%M:%S')}] 🧠 [总结结论] 最终战略洞察报告合成完毕，正在推送至 UI...")
+            if self.logger: self.logger.success(f"🧠 [Summary] 战略推演完成，包含 {len(final_data)} 个有效阶段")
             
             # 归一化与安全化处理 (Normalization & Serialization Safety)
             def sanitize_stage(s):
@@ -1239,6 +1243,8 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
     def process_files(self, file_paths: List[str], model_client=None, status_callback=None) -> Dict[str, Any]:
         try:
             print("\n" + "🏗️  [Data Base Construction] 启动知识库逻辑底座构建 (Metadata First)..." + "\n" + "="*60)
+            if self.logger: self.logger.info("🏗️ [Data Base Construction] 启动知识库逻辑底座构建...", extra={"files": len(file_paths)})
+            
             if os.path.exists(self.db_path): 
                 os.remove(self.db_path)
                 print("🧹 [清理] 移除旧数据库文件，准备重新建模")
@@ -1264,12 +1270,14 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                     table_meta = self.smart_ingest_file(path, conn, model_client)
                     if table_meta:
                         physical_tables.update(table_meta)
+                        if self.logger: self.logger.info(f"✅ [Smart Ingest] 成功解析表格文件: {name}", extra={"tables": list(table_meta.keys())})
                     
             conn.close()
             
             modeling_summary = "多维业务分析"
             if model_client and physical_tables:
                 print("\n🧬 [血缘] 正在推演表与表之间的逻辑关联 (Bloodline Inference)...")
+                if self.logger: self.logger.info("🧬 [Bloodline] 正在推演表与表之间的逻辑关联...")
                 # 升级 Prompt：专注于关系和业务流转
                 prompt_lineage = f"""分析以下数据表的定义，推导它们之间的“业务血缘关系”。
 
@@ -1324,6 +1332,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                         extracted_tables = semantic.get('tables', {})
                         if extracted_tables:
                             print(f"✅ [成功] 从文档提取了 {len(extracted_tables)} 个逻辑表结构")
+                            if self.logger: self.logger.success(f"✅ [Semantic Schema] 从文档提取了 {len(extracted_tables)} 个逻辑表结构")
                             for t, info in extracted_tables.items():
                                 if t in unified_schema['tables']: 
                                     unified_schema['tables'][t].update(info)
@@ -1335,6 +1344,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                             unified_schema['macro_context'] = semantic.get('macro_context', modeling_summary)
                 except Exception as e:
                     print(f"❌ [建模失败] 无法从文档提取 Schema: {e}")
+                    if self.logger: self.logger.error(f"❌ [Schema Error] 建模失败: {e}")
                 
             # 保存 Schema
             with open(self.schema_path, 'w', encoding='utf-8') as f: 
@@ -1346,9 +1356,12 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             print("\n" + "💤 [延迟] 物理底座数据生成已挂起。等待首次查询触发即时造数 (JIT)...")
                 
             if status_callback: status_callback(f"✅ 全域建模完成，DB 底座已就绪 (结构化)")
+            if self.logger: self.logger.success(f"✅ [Build Complete] 全域建模完成，DB 底座已就绪。Tables: {list(unified_schema['tables'].keys())}")
             print("="*60 + "\n" + "✨ [Success] 数据分析物理底座构建完成，business_data.db 已就绪" + "\n")
             return {"success": True, "tables": list(unified_schema['tables'].keys())}
-        except Exception as e: return {"success": False, "error": str(e)}
+        except Exception as e: 
+            if self.logger: self.logger.error(f"❌ [Build Fatal] 构建失败: {e}")
+            return {"success": False, "error": str(e)}
 
     def execute_sql(self, sql: str, model_client=None, conn=None) -> Dict[str, Any]:
         should_close = False
@@ -1395,7 +1408,10 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                                     has_result = True
                         except: pass
             conn.commit()
+            if self.logger: self.logger.info(f"💾 [SQL Exec] 成功执行，返回 {len(final_rows)} 行数据")
             return {"success": True, "data": final_rows}
-        except Exception as e: return {"success": False, "error": str(e), "data": []}
+        except Exception as e: 
+            if self.logger: self.logger.error(f"❌ [SQL Fail] 执行失败: {e}")
+            return {"success": False, "error": str(e), "data": []}
         finally:
             if should_close: conn.close()
