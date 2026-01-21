@@ -923,7 +923,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             if self.logger: self.logger.success(f"🧠 [Summary] 战略推演完成，包含 {len(final_data)} 个有效阶段")
             
             # 归一化与安全化处理 (Normalization & Serialization Safety)
-            def sanitize_stage(s):
+            def report_gen():
                 p = f"撰写战略报告。需求: {query}\n结论: {analysis_context}\n要求: SCQA 架构，结论先行。"
                 if hasattr(model_client, 'stream_chat'):
                     from llama_index.core.base.llms.types import ChatMessage, MessageRole
