@@ -1078,7 +1078,7 @@ with st.sidebar:
     # 渲染 Admin 专用 Tab (物理对齐)
     if is_admin and len(tabs) > 5:
         with tabs[5]:
-            render_resource_governance_v19()
+            render_rg()
 
     # --- 退出登录按钮 ---
     st.sidebar.markdown("---")
