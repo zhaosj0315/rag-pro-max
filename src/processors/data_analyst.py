@@ -1245,7 +1245,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
     def process_files(self, file_paths: List[str], model_client=None, status_callback=None) -> Dict[str, Any]:
         try:
             print("\n" + "🏗️  [Data Base Construction] 启动知识库逻辑底座构建 (Metadata First)..." + "\n" + "="*60)
-            if self.logger: self.logger.info("🏗️ [Data Base Construction] 启动知识库逻辑底座构建...", extra={"files": len(file_paths)})
+            if self.logger: self.logger.info(f"🏗️ [Data Base Construction] 启动知识库逻辑底座构建 (files: {len(file_paths)})...")
             
             if os.path.exists(self.db_path): 
                 os.remove(self.db_path)
@@ -1272,7 +1272,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                     table_meta = self.smart_ingest_file(path, conn, model_client)
                     if table_meta:
                         physical_tables.update(table_meta)
-                        if self.logger: self.logger.info(f"✅ [Smart Ingest] 成功解析表格文件: {name}", extra={"tables": list(table_meta.keys())})
+                        if self.logger: self.logger.info(f"✅ [Smart Ingest] 成功解析表格文件: {name} (tables: {list(table_meta.keys())})")
                     
             conn.close()
             
