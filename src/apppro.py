@@ -117,10 +117,10 @@ os.environ['GLOG_v'] = '0'  # 禁用GLOG详细日志
 os.environ['OMP_NUM_THREADS'] = '1'  # 每个进程只用1个线程
 os.environ['MKL_NUM_THREADS'] = '1'  # Intel MKL只用1个线程
 os.environ['OPENBLAS_NUM_THREADS'] = '1'  # OpenBLAS只用1个线程
-os.environ['VECLIB_MAXIMUM_THREADS'] = '1'  # Apple Accelerate只用1个线程
-
 import streamlit as st
-
+import pandas as pd
+from datetime import datetime
+import time
 # --- [逻辑对齐] 处理分享链接 (Session Sharing) ---
 if "share" in st.query_params:
     share_id = st.query_params["share"]
@@ -2063,6 +2063,7 @@ with st.sidebar:
                                     with col_t2:
                                         # 侧边栏即时预览
                                         with st.popover("👁️", help=f"预览表 {t} 的数据"):
+                                            import pandas as pd # [v8.6.8] 局部导入加固
                                             st.caption(f"📊 {t} 数据采样 (前5行)")
                                             sample = conn_mgr.get_table_sample(selected_alias, t, db_override=selected_db, limit=5)
                                             if sample:
