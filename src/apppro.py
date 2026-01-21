@@ -1576,7 +1576,7 @@ with st.sidebar:
             # 4x1 水平数据源选择 (v8.1.1：数据分析已深度融入高级选项)
             source_mode = st.radio(
                 "数据源", 
-                ["📂 文件上传", "📝 粘贴文本", "🔗 网址抓取", "🔍 智能搜索"], 
+                ["📂 文件上传", "📝 粘贴文本", "🔗 网址抓取", "🔍 智能搜索", "🔌 数据库同步"], 
                 horizontal=True,
                 label_visibility="collapsed",
                 key="data_source_selector"
@@ -2012,6 +2012,61 @@ with st.sidebar:
                 if est_pages > 100: st.caption(f"ℹ️ 预估抓取: {est_pages} 页")
                 
                 selected_industry = sel_ind # 传递变量
+
+            elif source_mode == "🔌 数据库同步":
+                # --- 数据库同步模式 (v8.3.0) ---
+                from src.auth.connection_manager import ConnectionManager
+                from src.processors.db_ingestor import DBIngestor
+                
+                conn_mgr = ConnectionManager()
+                saved_conns = conn_mgr.load_connections()
+                
+                if not saved_conns:
+                    st.warning("⚠️ 尚未配置任何数据库连接。")
+                    if st.button("前往配置", use_container_width=True):
+                        st.session_state.admin_active_tab = "🔌 数据源连接"
+                        st.session_state.current_nav = "🔐 资源治理"
+                        st.rerun()
+                else:
+                    # 1. 选择连接
+                    selected_alias = st.selectbox("选择数据源", list(saved_conns.keys()), key="db_sync_alias")
+                    
+                    if selected_alias:
+                        # 2. 选择数据库
+                        dbs = conn_mgr.get_database_list(selected_alias)
+                        default_db = saved_conns[selected_alias].get('database')
+                        db_idx = dbs.index(default_db) if default_db in dbs else 0
+                        selected_db = st.selectbox("选择数据库", dbs, index=db_idx, key="db_sync_db")
+                        
+                        # 3. 选择表
+                        tables = conn_mgr.get_table_list(selected_alias, db_override=selected_db)
+                        selected_tables = st.multiselect(f"选择同步表 ({len(tables)})", tables, key="db_sync_tables")
+                        
+                        # 4. 同步模式
+                        sync_mode = st.radio("同步策略", ["🧪 结构+采样 (推荐)", "⚡ 仅同步结构"], horizontal=True, key="db_sync_mode")
+                        
+                        if st.button("📥 预取数据结构并对齐", type="primary", use_container_width=True, disabled=not selected_tables):
+                            with st.status("📡 正在跨源拉取元数据...", expanded=True) as status:
+                                # 创建临时构建目录
+                                import tempfile
+                                import time
+                                batch_id = f"db_sync_{int(time.time())}"
+                                temp_dir = os.path.join(UPLOAD_DIR, batch_id)
+                                
+                                ingestor = DBIngestor(temp_dir, logger)
+                                mode_code = "SAMPLE" if "采样" in sync_mode else "SCHEMA_ONLY"
+                                
+                                success = ingestor.ingest(selected_alias, selected_db, selected_tables, mode_code)
+                                
+                                if success:
+                                    st.session_state.uploaded_path = temp_dir
+                                    st.session_state.upload_auto_name = f"DB_{selected_alias}_{selected_db}"
+                                    # [v8.3.1] 自动激活高级选项中的数据分析
+                                    st.session_state.kb_enable_data_analysis = True
+                                    status.update(label="✅ 元数据镜像对齐成功！", state="complete")
+                                    st.success("数据底座已就绪，请点击下方 [🚀 立即创建]")
+                                else:
+                                    status.update(label="❌ 同步失败", state="error")
 
             # 排除配置 (通用)
             if source_mode in ["🔗 网址抓取", "🔍 智能搜索"]:
@@ -2969,11 +3024,23 @@ def process_knowledge_base_logic(kb_name, action_mode="NEW", use_ocr=False, extr
         if current_target_path and os.path.exists(current_target_path):
             import shutil
             status_container.write("📦 正在执行原始文献的物理归档与持久化...")
+            
+            # [v8.3.1] 数据库资产专用搬运逻辑
+            db_file = os.path.join(current_target_path, "business_data.db")
+            schema_file = os.path.join(current_target_path, "business_schema.json")
+            
+            if os.path.exists(db_file):
+                status_container.write("🔌 检测到数据库镜像，正在执行底座对齐...")
+                shutil.copy2(db_file, os.path.join(persist_dir, "business_data.db"))
+            if os.path.exists(schema_file):
+                shutil.copy2(schema_file, os.path.join(persist_dir, "business_schema.json"))
+
             if os.path.isdir(current_target_path):
-                # 递归拷贝整个上传目录
+                # 递归拷贝整个上传目录到 raw_sources
                 for root, dirs, files in os.walk(current_target_path):
                     for file in files:
                         if file.startswith('.'): continue
+                        if file in ["business_data.db", "business_schema.json"]: continue # 已搬运至根目录
                         src_file = os.path.join(root, file)
                         shutil.copy2(src_file, os.path.join(raw_sources_dir, file))
             else:
