@@ -2842,6 +2842,13 @@ def jump_to_knowledge_base(kb_name: str, output_base: str):
 
     # 核心修复：在清理完所有状态后，再设置目标知识库的选中状态
     st.session_state[f"kb_check_{kb_name}"] = True
+    
+    # [v8.3.3] 智能跳转：如果进入具备分析能力的库，自动开启分析模式
+    schema_p = os.path.join(output_base, kb_name, "business_schema.json")
+    if os.path.exists(schema_p):
+        st.session_state.is_data_analysis_mode = True
+        logger.info(f"✨ [Auto-Activate] 已自动开启知识库 '{kb_name}' 的数据分析模式")
+    
     # 使用计算出的 display_name 设置 current_nav
     st.session_state.current_nav = f"☑️ 📂 {display_name}"
     st.session_state.current_kb_id = kb_name
@@ -5712,7 +5719,13 @@ with st.container():
             st.toggle("数据分析 (🔒)", value=False, disabled=True, help="请联系管理员开启数据分析权限")
             st.session_state.is_data_analysis_mode = False
         else:
-            da_on = st.toggle("数据分析", value=st.session_state.get('is_data_analysis_mode', False), help="手动触发宏观数据分析与推演 (v4.5)")
+            # [v8.3.3] 智能默认：如果具备分析底座且未手动设置过，则默认开启
+            current_da_state = st.session_state.get('is_data_analysis_mode')
+            if current_da_state is None and active_kb_name and active_kb_name not in ["pure_chat", "multi_kb_mode"]:
+                schema_p = os.path.join(output_base, active_kb_name, "business_schema.json")
+                current_da_state = os.path.exists(schema_p)
+            
+            da_on = st.toggle("数据分析", value=current_da_state if current_da_state is not None else False, key="da_toggle_main", help="手动触发宏观数据分析与推演 (v4.5)")
             st.session_state.is_data_analysis_mode = da_on
 
     # --- 4. 操作按钮 (Popover/Button) ---
