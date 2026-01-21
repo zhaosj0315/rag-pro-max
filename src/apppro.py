@@ -2346,40 +2346,32 @@ with st.sidebar:
                 # 根据一键全选状态设置默认值
                 default_val = select_all
 
-                # 选项布局：如果非新建模式，显示强制重建索引
-                # 新建模式下隐藏强制重建（本身就是新建）
-                if not is_create_mode:
-                    # 权限检查
-                    from src.auth.permission_manager import permission_manager
-                    current_user = st.session_state.get('user', 'guest_user')
-                    can_rebuild = permission_manager.has_permission(current_user, "kb_rebuild_index")
-                    
+                # [v8.6.9 重构] 五大核心高级选项：全对齐、全透明、全全选
+                from src.auth.permission_manager import permission_manager
+                current_user = st.session_state.get('user', 'guest_user')
+                can_rebuild = permission_manager.has_permission(current_user, "kb_rebuild_index")
+
+                # 布局优化：采用 3x2 紧凑矩阵
+                opt_col1, opt_col2 = st.columns(2)
+                
+                with opt_col1:
+                    use_ocr = st.checkbox("🔍 OCR文字识别", value=default_val, key="kb_use_ocr", help="识别图片或PDF中的文字")
+                    extract_metadata = st.checkbox("📊 元数据提取", value=default_val, key="kb_extract_metadata", help="自动提取文件分类、关键词")
+                    # 维护项紧跟其后，移除横杠
                     if can_rebuild:
-                        force_reindex = st.checkbox("🔄 强制重建索引", value=default_val, key="kb_force_reindex", help="删除现有索引，重新构建")
+                        force_reindex = st.checkbox("🔄 强制重建索引", value=default_val, key="kb_force_reindex", help="物理删除旧索引，触发全量重建（慎用）")
                     else:
                         st.checkbox("🔄 强制重建索引 (🔒)", value=False, disabled=True, help="无重建索引权限")
                         force_reindex = False
-                else:
-                    force_reindex = False
 
-                # [v8.0] 选项布局重构：增加智能数据分析
-                opt_row1_col1, opt_row1_col2 = st.columns(2)
-                with opt_row1_col1:
-                    use_ocr = st.checkbox("🔍 OCR文字识别", value=default_val, key="kb_use_ocr", help="识别图片或PDF中的文字")
-                with opt_row1_col2:
-                    enable_data_analysis = st.checkbox("💎 智能数据分析", value=False, key="kb_enable_data_analysis", help="自动识别真数据，构建物理库，启用SQL决策")
-
-                opt_row2_col1, opt_row2_col2 = st.columns(2)
-                with opt_row2_col1:
-                    extract_metadata = st.checkbox("📊 元数据提取", value=default_val, key="kb_extract_metadata", help="自动提取文件分类、关键词")
-                with opt_row2_col2:
+                with opt_col2:
+                    # [v8.6.9 修复] 一键全选现在包含数据分析
+                    enable_data_analysis = st.checkbox("💎 智能数据分析", value=default_val, key="kb_enable_data_analysis", help="自动识别真数据，构建物理库，启用SQL决策")
                     generate_summary = st.checkbox("📝 自动摘要生成", value=default_val, key="kb_generate_summary", help="为每份文件生成AI摘要")
-                
-                # 保存到session state
-                st.session_state.use_ocr = use_ocr
-                st.session_state.generate_summary = generate_summary
-                st.session_state.enable_data_analysis = enable_data_analysis
-                
+                                
+                                # 保存到session state
+                                st.session_state.use_ocr = use_ocr
+                                st.session_state.generate_summary = generate_summary                
                 # 更新状态提示
                 options = []
                 if force_reindex: options.append("重建")
