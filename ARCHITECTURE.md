@@ -1,15 +1,16 @@
-# RAG Pro Max v8.1.2 企业级系统架构文档
+# RAG Pro Max v8.1.3 企业级系统架构文档
 
-**版本**: v8.1.2 (Flagship Dual-Core Edition)  
+**版本**: v8.1.3 (Flagship Dual-Core Edition)  
 **更新日期**: 2026-01-20  
-**核心特性**: Logic Core Hardening, Minimalist UI Fusion, Iron-Gate Routing
+**核心特性**: Full-Link Audit, Logic Core Hardening, Minimalist UI Fusion
 
 ---
 
 ## 🧠 业务层内核加固 (Service Layer Hardening)
 
-在 v8.1.2 中，数据分析引擎 (`src/processors/data_analyst.py`) 经历了深度逻辑增强：
+在 v8.1.2/v8.1.3 中，数据分析引擎 (`src/processors/data_analyst.py`) 经历了深度逻辑增强：
 
+- **Dual-Logging Architecture**: 实现了终端标准输出与文件结构化日志的“双写同步”，确保每一行执行逻辑都可被审计。
 - **Atomic Decomposition**: 引入原子化拆解 Prompt，强制 Planner 遵循 DAG（有向无环图）执行逻辑。
 - **Precision Schema Linking**: 在选表阶段注入 "Fact-First" 与 "Time-Aligned" 决策权重。
 - **Zero-Row Diagnostics**: 建立执行后验回路，自动识别并诊断 `JOIN` 关联失效导致的空结果集。

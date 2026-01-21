@@ -1,6 +1,6 @@
 # 数据分析：双核联动开发流程与架构设计规范 (Data Analysis Workflow)
 
-**版本**: v8.1.2 (Flagship Dual-Core Edition)
+**版本**: v8.1.3 (Flagship Dual-Core Edition)
 **核心原则**: 语义底座 + 结构化增强 (Shadow Mapping)，物理必闭环。
 
 ---
@@ -24,11 +24,12 @@
 
 ---
 
-## 三、 开发与构建流程 (v8.1.2 加固版)
+## 三、 开发与构建流程 (v8.1.3 审计版)
 
 ### 阶段 1：归一化摄入 (Normalized Ingestion)
 1. **统一路径**: 无论是爬虫还是上传，文件统一归档至 `raw_sources/`。
 2. **底座先行**: 首先触发全量 RAG 构建流程。
+3. **配置审计**: 系统自动记录 `[Build Config]`，锁定本次构建是否开启了数据分析。
 
 ### 阶段 2：智能探测与分流 (Detection & Branching)
 1. **意图检查**: 读取 `st.session_state.kb_enable_data_analysis` 标志位（来自高级选项）。
@@ -40,6 +41,7 @@
 ### 阶段 3：结构化影子映射 (Shadow Solidification)
 1. **建模固化**: `df.to_sql()` 生成物理影子表。
 2. **自愈仿真**: 针对只有逻辑定义（需求文档）的表，启动 AI 仿真注入。
+3. **过程双写**: 所有 Schema 提取日志同步写入 `.jsonl` 文件。
 
 ### 阶段 4：双核协同响应 (Dual-Core Inference)
 1. **路由判断**: 识别用户提问是定性（RAG）还是定量（SQL）。
