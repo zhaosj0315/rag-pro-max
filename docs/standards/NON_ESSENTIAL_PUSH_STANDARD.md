@@ -1,10 +1,10 @@
 # 非必要不推送原则维护标准
-**版本**: v5.5.8  
-**更新日期**: 2025-12-30
+**版本**: v9.0.0 (Flagship Evolution)  
+**更新日期**: 2026-01-22
 
 
 ## 🎯 核心原则
-**本地保留所有，远程只推核心代码**
+**本地保留所有，远程只推核心代码与里程碑资产**
 
 ---
 
@@ -17,7 +17,16 @@
 - [ ] **作用**: 自动防止私有文件推送
 - [ ] **检查**: 确保包含所有私有文件类型
 
-#### 2. 私有数据目录检查
+#### 2. 公共里程碑资产 (Whitelist)
+以下 v9.0.0 新增资产**允许且必须**随版本推送：
+- `RAG_PRO_MAX_WHITEPAPER_*.md` : 宣传白皮书。
+- `ADR_*.md` : 架构决策备忘录。
+- `PROJECT_AUDIT_STANDARD.md` : 全量审计标准。
+- `UI_UX_DESIGN_LANGUAGE.md` : 交互设计指南。
+- `PERFORMANCE_ACCELERATION_WHITEPAPER.md` : 性能白皮书。
+- `ROBUSTNESS_SELF_HEALING_SPEC.md` : 鲁棒性规范。
+
+#### 3. 私有数据目录检查 (Blacklist)
 ```bash
 # 检查这些目录是否被忽略
 vector_db_storage/     # 用户知识库数据

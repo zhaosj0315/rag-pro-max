@@ -1,17 +1,22 @@
-# RAG Pro Max - Enterprise AI Document QA & Data Analysis System
+# RAG Pro Max - Enterprise Intelligent Document Q&A and Data Analysis System
 
-**Current Version**: v8.8.0 (Flagship Unified Edition)  
-![Version](https://img.shields.io/badge/version-v8.8.0-purple)
+**Current Version**: v9.0.0 (Flagship Evolution)  
+![Version](https://img.shields.io/badge/version-v9.0.0-purple)
 
-RAG Pro Max v8.8.0 represents the ultimate evolution of **"Minimalist Unified Architecture"**. By consolidating data ingestion into three all-encompassing entry points and integrating with 9+ heterogeneous databases, the system serves as an enterprise-grade data hub, capable of ingesting and analyzing global data in one stop.
+RAG Pro Max v9.0.0 inaugurates the **"Omni-Ingestion"** era. By introducing a physical Staging Area mechanism, the system enables "AND logic" aggregation across files, directories, and pasted text, significantly enhancing information integration efficiency.
 
 ---
 
-## 🚀 v8.8.0 Core Features
+## 🚀 v9.0.0 Key Features
 
-### 🔌 Omni-Source Database Integration (9+ DB Support)
-- **Wide Adaptation**: Native support for MySQL, PostgreSQL, SQLite, DuckDB, ClickHouse, SQL Server, Oracle, MaxCompute (DataWorks), Snowflake.
-- **4D Panoramic View**: Provides field definitions, 50-row sampling, physical foreign key associations, and business insights statistics in the admin panel.
+### 📥 Omni-Ingestion (AND Logic)
+- **Multi-Source Aggregation**: No more "OR" choices. Simultaneously upload files, add local paths, and paste text to build a comprehensive knowledge base.
+- **Physical Staging Area**: Integrated `task_staging_dir` mechanism with real-time file counting and manual clearing.
+- **Admin Quota Exemption**: Administrators enjoy unlimited storage, with fine-grained control to allocate space via the "Individual Security Cabin" UI.
+
+### 🕷️ Crawler Precision Upgrade
+- **Seed Isolation**: Seed URLs act as Level 0, freeing up quotas for descendants.
+- **Exponential Diffusion**: Strict adherence to $n^1 + n^2$ layer distribution (e.g., 5+25 crawl pattern).
 
 ### 🎨 Sidebar Interaction Revolution (Unified Ingestion)
 - **Three Core Pillars**: Interface refactored into **📂 File Upload (incl. Paste/Path), 🌐 Internet Extraction (incl. Crawler/Search), 🔌 Database Sync**.
