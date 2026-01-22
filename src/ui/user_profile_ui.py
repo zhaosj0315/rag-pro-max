@@ -109,10 +109,8 @@ class UserProfileUI:
     def _render_my_connections(username):
         """渲染个人数据库连接配置"""
         conn_mgr = ConnectionManager()
-        all_conns = conn_mgr.load_connections()
-        
-        # 筛选：仅显示自己创建的，或标记为 public 的 (暂未实现 public，仅 owner)
-        my_conns = {k: v for k, v in all_conns.items() if v.get('owner') == username}
+        # [v8.7.1] 使用统一的安全过滤接口
+        my_conns = conn_mgr.get_connections_for_user(username)
         
         col_list, col_form = st.columns([1, 2])
         

@@ -39,6 +39,28 @@ class ConnectionManager:
         except Exception as e:
             return {}
 
+    def get_connections_for_user(self, username: str) -> Dict[str, Dict]:
+        """获取特定用户的连接配置 (支持权限隔离)"""
+        all_conns = self.load_connections()
+        
+        # 管理员可以看到所有连接
+        # 注意: 这里假设调用方已确认用户角色，或者我们在内部再次检查角色
+        # 为了安全起见，这里仅基于用户名过滤。如果用户名是 'admin'，返回所有。
+        # 实际生产中应结合 Role 检查，但此处保持简单约定 'admin' 为超级用户。
+        if username == 'admin':
+            return all_conns
+            
+        # 普通用户只能看到自己的连接
+        user_conns = {}
+        for alias, conf in all_conns.items():
+            owner = conf.get('owner')
+            # 只有当 owner 明确等于当前用户时才显示
+            # Legacy (owner=None) 视为 Admin 所有，普通用户不可见
+            if owner == username:
+                user_conns[alias] = conf
+                
+        return user_conns
+
     def save_connection(self, alias: str, db_type: str, host: str, port: int, 
                        user: str, password: str, db_name: str, owner: str = None) -> bool:
         """保存或更新连接配置 (支持所有者隔离)"""

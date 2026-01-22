@@ -2030,7 +2030,14 @@ with st.sidebar:
                 from src.processors.db_ingestor import DBIngestor
                 
                 conn_mgr = ConnectionManager()
-                saved_conns = conn_mgr.load_connections()
+                # [v8.7.1] 修复普通用户可见所有连接的安全漏洞
+                current_user = st.session_state.get('user', 'guest_user')
+                current_role = st.session_state.get('role', 'guest')
+                
+                if current_role == 'admin':
+                    saved_conns = conn_mgr.load_connections()
+                else:
+                    saved_conns = conn_mgr.get_connections_for_user(current_user)
                 
                 if not saved_conns:
                     st.warning("⚠️ 尚未配置任何数据库连接。")
