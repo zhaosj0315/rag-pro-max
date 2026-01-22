@@ -1587,7 +1587,7 @@ with st.sidebar:
             # 4x1 水平数据源选择 (v8.1.1：数据分析已深度融入高级选项)
             source_mode = st.radio(
                 "数据源", 
-                ["📂 文件上传", "🔗 网址抓取", "🔍 智能搜索", "🔌 数据库同步"], 
+                ["📂 文件上传", "🌐 互联网提取", "🔌 数据库同步"], 
                 horizontal=True,
                 label_visibility="collapsed",
                 key="data_source_selector"
@@ -1913,111 +1913,89 @@ with st.sidebar:
         # btn_start already initialized above
         
         if is_create_mode:
-            if source_mode == "🔗 网址抓取":
+            if source_mode == "🌐 互联网提取":
                 # 权限拦截 (实时校验)
                 from src.auth.permission_manager import permission_manager
                 current_user = st.session_state.get('user', 'guest_user')
                 can_crawl = permission_manager.has_permission(current_user, "use_crawler")
                 
                 if not can_crawl:
-                    st.warning("🔒 权限不足：您当前的角色没有抓取网页的权限。")
+                    st.warning("🔒 权限不足：您当前的角色没有使用互联网提取的权限。")
                 
-                # --- 网址抓取模式 ---
-                # 设置同步状态
-                st.session_state.crawl_input_mode = "url"
-                
-                # 加载优化器
-                try:
-                    from src.processors.crawl_optimizer import CrawlOptimizer
-                    if 'crawl_optimizer' not in st.session_state:
-                        st.session_state.crawl_optimizer = CrawlOptimizer()
-                    optimizer = st.session_state.crawl_optimizer
-                except ImportError:
-                    optimizer = None
-
-                c_url, c_btn = st.columns([7, 1])
-                with c_url:
-                    crawl_url = st.text_input("网址", placeholder="https://example.com", label_visibility="collapsed")
-                    st.session_state.crawl_url = crawl_url
-                with c_btn:
-                    if st.button("🧠", help="AI分析", key="smart_analyze_url", use_container_width=True):
-                        if crawl_url:
-                            with st.spinner("🔍"):
-                                test_url = crawl_url if crawl_url.startswith(('http://', 'https://')) else f"https://{crawl_url}"
-                                analysis = optimizer.analyze_website(test_url) if optimizer else None
-                                if analysis: st.session_state.crawl_analysis = analysis
-                        else:
-                            st.toast("请先输入网址", icon="⚠️")
-                
-                # 分析结果
-                if 'crawl_analysis' in st.session_state:
-                    analysis = st.session_state.crawl_analysis
-                    with st.expander("🎯 推荐: " + analysis['site_type'].title(), expanded=True):
-                        st.caption(f"💡 {analysis['description']}")
-
-                # 参数行 (紧凑 4列布局)
-                c_p1, c_p2, c_p3, c_p4 = st.columns(4)
-                with c_p1:
-                    default_depth = st.session_state.crawl_analysis['recommended_depth'] if 'crawl_analysis' in st.session_state else 2
-                    crawl_depth = st.number_input("递归深度", 1, 10, default_depth)
-                    st.session_state.crawl_depth = crawl_depth
-                with c_p2:
-                    default_pages = st.session_state.crawl_analysis['recommended_pages'] if 'crawl_analysis' in st.session_state else 5
-                    max_pages = st.number_input("最大页数", 1, 1000, default_pages)
-                    st.session_state.max_pages = max_pages
-                with c_p3:
-                    parser_type = st.selectbox("解析器", ["default", "article", "documentation"], label_visibility="visible")
-                    st.session_state.parser_type = parser_type
-                with c_p4:
-                    # 质量筛选 (简化为数字输入，0表示关闭)
-                    url_quality_threshold = st.number_input("质量阈值 (0=关)", 0.0, 100.0, 45.0, 5.0, help="内容质量评分阈值，低于此分数的页面将被丢弃")
-                    st.session_state.url_quality_threshold = url_quality_threshold
-                    enable_url_filter = (url_quality_threshold > 0)
-                
-                search_keyword = None # 互斥
-
-            elif source_mode == "🔍 智能搜索":
-                # --- 智能搜索模式 ---
-                # 设置同步状态
-                st.session_state.crawl_input_mode = "search"
-                crawl_url = None # 互斥
-                
-                # 行业选择 (紧凑)
+                # --- 互联网提取模式 (融合 URL 与 搜索) ---
+                # 行业选择 (作为上下文，主要用于搜索，也作为 URL 抓取的元数据)
                 try:
                     from src.config.unified_sites import get_industry_list
                     industries = get_industry_list()
-                    sel_ind = st.selectbox("行业", industries, label_visibility="collapsed")
+                    # 使用 expander 收纳非核心选项，保持界面简洁
+                    with st.expander("⚙️ 行业上下文 (影响搜索结果)", expanded=False):
+                        sel_ind = st.selectbox("行业领域", industries, label_visibility="collapsed")
                 except:
                     sel_ind = "🔧 技术开发"
-                
-                c_kw, c_btn = st.columns([7, 1])
-                with c_kw:
-                    search_keyword = st.text_input("关键词", placeholder="输入搜索内容...", label_visibility="collapsed")
-                    st.session_state.search_keyword = search_keyword
-                with c_btn:
-                    st.button("🧠", help="AI推荐", key="smart_analyze_search", use_container_width=True)
+                selected_industry = sel_ind
 
-                # 参数行 (紧凑 4列布局)
-                c_s1, c_s2, c_s3, c_s4 = st.columns(4)
-                with c_s1:
-                    crawl_depth = st.number_input("深度", 1, 5, 2)
-                    st.session_state.search_crawl_depth = crawl_depth
-                with c_s2:
-                    max_pages = st.number_input("总页数", 1, 500, 5)
-                    st.session_state.search_max_pages = max_pages
-                with c_s3:
-                    parser_type = st.selectbox("解析器", ["default", "article", "documentation"], key="parser_search")
-                    st.session_state.search_parser_type = parser_type
-                with c_s4:
-                    # 质量筛选 (简化为数字输入，0表示关闭)
-                    quality_threshold = st.number_input("质量阈值 (0=关)", 0.0, 100.0, 0.0, 5.0, key="search_quality_threshold", help="内容质量评分阈值")
-                    st.session_state.quality_threshold = quality_threshold
+                # 统一输入框
+                c_input, c_btn = st.columns([7, 1])
+                with c_input:
+                    user_input = st.text_input("网址或关键词", placeholder="输入 URL (https://...) 或 搜索关键词", label_visibility="collapsed")
+                with c_btn:
+                    st.button("🧠", help="AI 智能分析", key="smart_analyze_unified", use_container_width=True)
+
+                # 智能识别逻辑
+                crawl_url = None
+                search_keyword = None
+                
+                if user_input:
+                    # 简单规则：包含 http 视为网址，否则视为关键词
+                    if user_input.strip().lower().startswith(('http://', 'https://')):
+                        crawl_url = user_input.strip()
+                        st.session_state.crawl_input_mode = "url"
+                        st.session_state.crawl_url = crawl_url
+                        st.caption(f"🔗 已识别为网址")
+                        
+                        # URL 分析逻辑 (复用原有优化器)
+                        try:
+                            from src.processors.crawl_optimizer import CrawlOptimizer
+                            if 'crawl_optimizer' not in st.session_state:
+                                st.session_state.crawl_optimizer = CrawlOptimizer()
+                            optimizer = st.session_state.crawl_optimizer
+                            # 简单的自动分析触发（如果有分析按钮被点击）
+                            if st.session_state.get('smart_analyze_unified'):
+                                with st.spinner("🔍 分析网页结构..."):
+                                    analysis = optimizer.analyze_website(crawl_url)
+                                    if analysis: st.session_state.crawl_analysis = analysis
+                        except Exception:
+                            pass
+                    else:
+                        search_keyword = user_input.strip()
+                        st.session_state.crawl_input_mode = "search"
+                        st.session_state.search_keyword = search_keyword
+                        st.caption(f"🔍 已识别为搜索关键词")
+
+                # 统一参数行 (紧凑 4列布局)
+                c_p1, c_p2, c_p3, c_p4 = st.columns(4)
+                with c_p1:
+                    crawl_depth = st.number_input("递归深度", 1, 10, 2, help="爬取链接的深度或搜索结果的深度")
+                    st.session_state.crawl_depth = crawl_depth
+                    st.session_state.search_crawl_depth = crawl_depth # 同步设置
+                with c_p2:
+                    max_pages = st.number_input("最大页数", 1, 1000, 5, help="限制获取的页面总数")
+                    st.session_state.max_pages = max_pages
+                    st.session_state.search_max_pages = max_pages # 同步设置
+                with c_p3:
+                    parser_type = st.selectbox("解析器", ["default", "article", "documentation"], label_visibility="visible")
+                    st.session_state.parser_type = parser_type
+                    st.session_state.search_parser_type = parser_type # 同步设置
+                with c_p4:
+                    # 质量筛选
+                    quality_threshold = st.number_input("质量阈值 (0=关)", 0.0, 100.0, 45.0, 5.0, help="低于此分数的页面将被丢弃")
+                    st.session_state.url_quality_threshold = quality_threshold
+                    st.session_state.quality_threshold = quality_threshold # 同步设置
+                    enable_url_filter = (quality_threshold > 0)
                 
                 # 预估提示
-                est_pages = max_pages ** crawl_depth
-                if est_pages > 100: st.caption(f"ℹ️ 预估抓取: {est_pages} 页")
-                
-                selected_industry = sel_ind # 传递变量
+                if max_pages > 50 or crawl_depth > 3:
+                    st.caption(f"ℹ️ 高负载任务: 预计最大处理 {max_pages} 个页面")
 
             elif source_mode == "🔌 数据库同步":
                 # --- 数据库同步模式 (v8.3.0) ---
@@ -3378,7 +3356,7 @@ if btn_start:
     elif search_keyword:
         auto_detected_mode = 'search'
     
-    is_web_crawl_mode = (is_create_mode and auto_detected_mode is not None)
+    is_web_crawl_mode = (is_create_mode and auto_detected_mode is not None and source_mode == "🌐 互联网提取")
     
     if is_web_crawl_mode:
         current_mode = auto_detected_mode
