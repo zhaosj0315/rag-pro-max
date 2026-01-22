@@ -1650,10 +1650,6 @@ with st.sidebar:
                 if not can_upload:
                     st.warning("🔒 权限不足：您当前的角色没有上传文件的权限。")
                 
-                # 添加上传引导
-                from src.utils.user_guidance import show_guidance
-                show_guidance("upload")
-                
                 # --- 暂存区统计与管理 ---
                 if not os.path.exists(st.session_state.task_staging_dir):
                     os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
@@ -1664,7 +1660,17 @@ with st.sidebar:
                 
                 stat_col1, stat_col2 = st.columns([3, 1])
                 with stat_col1:
-                    st.markdown(f"📦 **待处理暂存区**: `{staging_count}` 个文件")
+                    tips = "支持格式: PDF, DOCX, TXT, MD, XLSX, CSV, PPTX, JPG, PNG (支持OCR)。建议单文件 < 50MB。支持多源(上传+目录+粘贴)同时叠加。"
+                    # 优化：增加 padding 以扩大鼠标命中区域，并使用更醒目的蓝色
+                    st.markdown(
+                        f"""<div style='display: flex; align-items: center; gap: 5px; white-space: nowrap;'>
+                            <span style='font-weight: 600;'>📦 待处理暂存区:</span>
+                            <code style='background: #f0f2f6; padding: 2px 5px; border-radius: 3px;'>{staging_count}</code>
+                            <span>个文件</span>
+                            <span title="{tips}" style="cursor: help; color: #1f77b4; font-size: 1.1rem; padding: 0 8px; font-weight: bold;">❓</span>
+                        </div>""", 
+                        unsafe_allow_html=True
+                    )
                 with stat_col2:
                     if st.button("🧹 清空暂存", use_container_width=True, help="清空当前已收集的所有材料"):
                         import shutil
@@ -1673,16 +1679,31 @@ with st.sidebar:
                         st.session_state.uploaded_path = None
                         st.rerun()
 
-                # 1. 拖拽上传
-                uploaded_files = st.file_uploader(
-                    "拖入文件", 
-                    accept_multiple_files=True, 
-                    key="uploader",
-                    label_visibility="collapsed",
-                    help="支持格式: PDF, DOCX, TXT, MD, Excel, CSV, 图片",
-                    type=['pdf', 'docx', 'txt', 'md', 'markdown', 'xlsx', 'xls', 'csv', 'pptx', 'jpg', 'png', 'jpeg'],
-                    disabled=not can_upload
-                )
+                # 1. 拖拽上传 (一行化)
+                up_col1, up_col2 = st.columns([0.6, 5.4])
+                with up_col1:
+                    st.markdown("<div style='margin-top: 8px;'><b>上传:</b></div>", unsafe_allow_html=True)
+                with up_col2:
+                    # 使用 CSS 压缩上传组件高度
+                    st.markdown("""
+                        <style>
+                        /* 极致压缩上传组件 */
+                        div[data-testid="stFileUploader"] { padding-bottom: 0px !important; }
+                        div[data-testid="stFileUploaderDropzone"] { padding: 0.2rem !important; min-height: 40px !important; }
+                        div[data-testid="stFileUploaderDropzone"] label { display: none !important; }
+                        div[data-testid="stFileUploaderDropzone"] i { display: none !important; }
+                        /* 隐藏下方列表详情，仅保留计数 */
+                        div[data-testid="stFileUploader"] section { margin-top: 0px !important; }
+                        </style>
+                    """, unsafe_allow_html=True)
+                    uploaded_files = st.file_uploader(
+                        "拖入文件", 
+                        accept_multiple_files=True, 
+                        key="uploader",
+                        label_visibility="collapsed",
+                        type=['pdf', 'docx', 'txt', 'md', 'markdown', 'xlsx', 'xls', 'csv', 'pptx', 'jpg', 'png', 'jpeg'],
+                        disabled=not can_upload
+                    )
                 
                 # 即时同步上传的文件
                 if uploaded_files:
@@ -1693,21 +1714,22 @@ with st.sidebar:
                             sync_to_staging(batch_dir, is_file=False, source_label="文件上传")
                             st.session_state.uploaded_path = st.session_state.task_staging_dir
                 
-                # 2. 恢复路径输入
-                st.markdown("<div style='margin-top: -5px; margin-bottom: 5px;'><span style='font-size: 0.75rem; color: gray;'>或粘贴本地目录路径:</span></div>", unsafe_allow_html=True)
-                path_col1, path_col2 = st.columns([4, 1.2])
-                with path_col1:
+                # 2. 本地路径 (一行化)
+                path_label_col, path_input_col, path_btn_col = st.columns([0.6, 4.2, 1.2])
+                with path_label_col:
+                    st.markdown("<div style='margin-top: 8px;'><b>路径:</b></div>", unsafe_allow_html=True)
+                with path_input_col:
                     manual_path = st.text_input(
                         "本地路径",
-                        placeholder="例如: /Users/name/Documents/docs",
+                        placeholder="粘贴本地目录地址...",
                         key="manual_path_input",
                         label_visibility="collapsed",
                         disabled=not can_upload
                     )
-                with path_col2:
-                    if st.button("➕ 添加目录", use_container_width=True, disabled=not manual_path):
+                with path_btn_col:
+                    if st.button("➕ 添加", use_container_width=True, disabled=not manual_path, key="add_path_btn_compact"):
                         if os.path.exists(manual_path):
-                            with st.spinner("正在扫描并添加目录..."):
+                            with st.spinner("正在扫描..."):
                                 if sync_to_staging(manual_path, is_file=False, source_label="目录添加"):
                                     st.session_state.uploaded_path = st.session_state.task_staging_dir
                                     st.toast("✅ 目录内容已成功加入暂存区")
@@ -1715,90 +1737,91 @@ with st.sidebar:
                         else:
                             st.error("路径不存在")
 
-                if manual_path and not os.path.exists(manual_path):
-                    st.caption("❌ 路径不存在，请检查拼写")
-            
-                # --- [v8.8.0] 融合文本粘贴功能 ---
-                with st.expander("📝 或直接粘贴文本内容", expanded=False):
-                    if not can_upload:
-                        st.warning("🔒 权限不足")
-                    else:
-                        if 'paste_css_injected' not in st.session_state:
-                            st.markdown("""
-                            <style>
-                            .stTextArea textarea {
-                                border: 2px dashed rgba(49, 51, 63, 0.2) !important;
-                                background-color: rgba(240, 242, 246, 0.5) !important;
-                                border-radius: 0.5rem !important;
-                            }
-                            </style>
-                            """, unsafe_allow_html=True)
-                            st.session_state.paste_css_injected = True
-                        
-                        def auto_save_text():
-                            content = st.session_state.get('paste_text_display', '')
-                            if content and content.strip():
-                                try:
-                                    if "... [文本过长，已截断显示，完整内容已保存] ..." in content:
-                                        full_content = st.session_state.get('paste_text_content', content)
-                                    else:
-                                        full_content = content
-                                    
-                                    if not full_content or not full_content.strip():
-                                        return
+                # 3. 粘贴文本 (一行化，使用折叠标题作为交互)
+                paste_label_col, paste_content_col = st.columns([0.6, 5.4])
+                with paste_label_col:
+                    st.markdown("<div style='margin-top: 5px;'><b>粘贴:</b></div>", unsafe_allow_html=True)
+                with paste_content_col:
+                    with st.expander("📝 点击此处直接粘贴文本内容", expanded=False):
+                        if not can_upload:
+                            st.warning("🔒 权限不足")
+                        else:
+                            if 'paste_css_injected' not in st.session_state:
+                                st.markdown("""
+                                <style>
+                                .stTextArea textarea {
+                                    border: 2px dashed rgba(49, 51, 63, 0.2) !important;
+                                    background-color: rgba(240, 242, 246, 0.5) !important;
+                                    border-radius: 0.5rem !important;
+                                }
+                                </style>
+                                """, unsafe_allow_html=True)
+                                st.session_state.paste_css_injected = True
+                            
+                            def auto_save_text():
+                                content = st.session_state.get('paste_text_display', '')
+                                if content and content.strip():
+                                    try:
+                                        if "... [文本过长，已截断显示，完整内容已保存] ..." in content:
+                                            full_content = st.session_state.get('paste_text_content', content)
+                                        else:
+                                            full_content = content
                                         
-                                    # [v8.9.1] 投递到统一暂存区，文件名包含时间戳以支持叠加
-                                    safe_name = f"manual_pasted_{int(time.time())}.txt"
-                                    save_path = os.path.join(st.session_state.task_staging_dir, safe_name)
-                                    
-                                    with open(save_path, 'w', encoding='utf-8') as f:
-                                        f.write(full_content)
-                                    
-                                    logger.info(f"📝 [文本粘贴] 已生成 {safe_name} 并投递至暂存区 (长度: {len(full_content)})")
-                                    st.session_state.uploaded_path = st.session_state.task_staging_dir
-                                    
-                                    preview = "".join(c for c in full_content[:15] if c.isalnum() or c.isspace()).strip()
-                                    st.session_state.upload_auto_name = f"Mixed_{preview}"
-                                    
-                                    st.session_state.text_auto_saved = True
-                                    st.session_state.saved_text_length = len(full_content)
-                                    
-                                except Exception as e:
-                                    st.error(f"自动保存失败: {e}")
-                        
-                        current_text = st.session_state.get('paste_text_display', '')
-                        display_text = current_text
-                        is_truncated = False
-                        
-                        if current_text:
-                            st.session_state.paste_text_content = current_text
-                        
-                        if len(current_text) > 100000:
-                            display_text = current_text[:10000] + "\n\n... [文本过长，已截断显示，完整内容已保存] ..."
-                            is_truncated = True
-                        
-                        text_input_content = st.text_area(
-                            "文本内容", 
-                            value=display_text,
-                            height=200,
-                            placeholder="在此粘贴文本，失焦时自动保存...", 
-                            label_visibility="collapsed",
-                            key="paste_text_display",
-                            on_change=auto_save_text
-                        )
-                        
-                        if not is_truncated:
-                            st.session_state.paste_text_content = text_input_content
-                        
-                        if st.session_state.get('text_auto_saved'):
-                            saved_length = st.session_state.get('saved_text_length', 0)
-                            st.success(f"✅ 文本已自动保存 ({saved_length:,} 字符) - {st.session_state.get('upload_auto_name', '')}")
-                        elif current_text:
-                            char_count = len(current_text)
-                            if is_truncated:
-                                st.info(f"📊 大文本 ({char_count:,} 字符) - 前端仅显示前10,000字符，完整内容将自动保存")
-                            else:
-                                st.caption(f"📊 字符数: {char_count:,}")
+                                        if not full_content or not full_content.strip():
+                                            return
+                                            
+                                        # [v8.9.1] 投递到统一暂存区，文件名包含时间戳以支持叠加
+                                        safe_name = f"manual_pasted_{int(time.time())}.txt"
+                                        save_path = os.path.join(st.session_state.task_staging_dir, safe_name)
+                                        
+                                        with open(save_path, 'w', encoding='utf-8') as f:
+                                            f.write(full_content)
+                                        
+                                        logger.info(f"📝 [文本粘贴] 已生成 {safe_name} 并投递至暂存区 (长度: {len(full_content)})")
+                                        st.session_state.uploaded_path = st.session_state.task_staging_dir
+                                        
+                                        preview = "".join(c for c in full_content[:15] if c.isalnum() or c.isspace()).strip()
+                                        st.session_state.upload_auto_name = f"Mixed_{preview}"
+                                        
+                                        st.session_state.text_auto_saved = True
+                                        st.session_state.saved_text_length = len(full_content)
+                                        
+                                    except Exception as e:
+                                        st.error(f"自动保存失败: {e}")
+                            
+                            current_text = st.session_state.get('paste_text_display', '')
+                            display_text = current_text
+                            is_truncated = False
+                            
+                            if current_text:
+                                st.session_state.paste_text_content = current_text
+                            
+                            if len(current_text) > 100000:
+                                display_text = current_text[:10000] + "\n\n... [文本过长，已截断显示，完整内容已保存] ..."
+                                is_truncated = True
+                            
+                            text_input_content = st.text_area(
+                                "文本内容", 
+                                value=display_text,
+                                height=200,
+                                placeholder="在此粘贴文本，失焦时自动保存...", 
+                                label_visibility="collapsed",
+                                key="paste_text_display",
+                                on_change=auto_save_text
+                            )
+                            
+                            if not is_truncated:
+                                st.session_state.paste_text_content = text_input_content
+                            
+                            if st.session_state.get('text_auto_saved'):
+                                saved_length = st.session_state.get('saved_text_length', 0)
+                                st.success(f"✅ 文本已自动保存 ({saved_length:,} 字符) - {st.session_state.get('upload_auto_name', '')}")
+                            elif current_text:
+                                char_count = len(current_text)
+                                if is_truncated:
+                                    st.info(f"📊 大文本 ({char_count:,} 字符) - 前端仅显示前10,000字符，完整内容将自动保存")
+                                else:
+                                    st.caption(f"📊 字符数: {char_count:,}")
                 
 
                     
