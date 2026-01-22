@@ -230,13 +230,21 @@ def render_resource_governance_v19():
             if len(selected_users) == 1:
                 target = selected_users[0]
                 target_ttl = session_settings.get(target, global_ttl)
+                target_quota = users[target].get('storage_quota_mb', 100)
+                
                 st.markdown(f'<div class="individual-cabin">', unsafe_allow_html=True)
                 st.markdown(f"**👤 个体安全调节舱：{target}**")
                 c1, c2, c3 = st.columns(3)
                 with c1:
                     new_ttl = st.slider("专属有效期 (天)", 1, 30, int(target_ttl), key=f"v19_ttl_{target}")
+                    new_quota = st.number_input("存储配额 (MB, -1为无限)", value=int(target_quota), key=f"v19_quota_{target}")
+                    
                     if st.button("💾 保存专属策略", use_container_width=True, type="primary"):
-                        set_session_setting(target, new_ttl); st.rerun()
+                        set_session_setting(target, new_ttl)
+                        users[target]['storage_quota_mb'] = new_quota
+                        save_users(users)
+                        st.toast("✅ 策略与配额已保存")
+                        st.rerun()
                 with c2:
                     st.write("")
                     if st.button("🔄 恢复全局策略", use_container_width=True):

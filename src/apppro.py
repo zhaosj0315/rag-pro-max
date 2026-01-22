@@ -1556,6 +1556,53 @@ with st.sidebar:
 
         # 统一的数据源处理逻辑
         uploaded_files = st.session_state.get('uploader') # 优先从 uploader 获取，支持多模式
+        
+        # --- [v8.9.1] 暂存区初始化与同步逻辑 (AND 模式支持) ---
+        if is_create_mode:
+            if 'task_staging_dir' not in st.session_state:
+                import uuid
+                staging_id = f"task_staging_{int(time.time())}_{uuid.uuid4().hex[:4]}"
+                st.session_state.task_staging_dir = os.path.abspath(os.path.join(UPLOAD_DIR, staging_id))
+                os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
+                st.session_state.staging_files_count = 0
+            
+            # 辅助函数：同步文件到暂存区
+            def sync_to_staging(source_path, is_file=True, source_label="未知来源"):
+                import shutil
+                try:
+                    if is_file:
+                        dest = os.path.join(st.session_state.task_staging_dir, os.path.basename(source_path))
+                        if not os.path.exists(dest):
+                            shutil.copy2(source_path, dest)
+                            logger.info(f"📂 [{source_label}] 单文件同步成功: {os.path.basename(source_path)}")
+                    else:
+                        # 目录同步 (支持递归)
+                        added_count = 0
+                        for root, dirs, files in os.walk(source_path):
+                            # 计算相对路径，保持层级结构
+                            rel_path = os.path.relpath(root, source_path)
+                            if rel_path == ".":
+                                target_root = st.session_state.task_staging_dir
+                            else:
+                                target_root = os.path.join(st.session_state.task_staging_dir, rel_path)
+                            
+                            if not os.path.exists(target_root):
+                                os.makedirs(target_root)
+                                
+                            for file in files:
+                                if file.startswith('.'): continue
+                                s = os.path.join(root, file)
+                                d = os.path.join(target_root, file)
+                                if not os.path.exists(d):
+                                    shutil.copy2(s, d)
+                                    added_count += 1
+                        logger.info(f"📂 [{source_label}] 递归同步完成: 从 {source_path} 导入了 {added_count} 个文件")
+                    return True
+                except Exception as e:
+                    logger.error(f"❌ [{source_label}] 暂存同步失败: {e}")
+                    return False
+        # -----------------------------------------------------
+
         crawl_url = None
         search_keyword = None
         target_path = ""
@@ -1606,7 +1653,26 @@ with st.sidebar:
                 from src.utils.user_guidance import show_guidance
                 show_guidance("upload")
                 
-                # 双模式：支持上传和手动输入路径
+                # --- 暂存区统计与管理 ---
+                if not os.path.exists(st.session_state.task_staging_dir):
+                    os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
+                    logger.warning(f"⚠️ 暂存目录丢失，已自动重建: {st.session_state.task_staging_dir}")
+                
+                files_in_staging = os.listdir(st.session_state.task_staging_dir)
+                staging_count = len([f for f in files_in_staging if not f.startswith('.')])
+                
+                stat_col1, stat_col2 = st.columns([3, 1])
+                with stat_col1:
+                    st.markdown(f"📦 **待处理暂存区**: `{staging_count}` 个文件")
+                with stat_col2:
+                    if st.button("🧹 清空暂存", use_container_width=True, help="清空当前已收集的所有材料"):
+                        import shutil
+                        shutil.rmtree(st.session_state.task_staging_dir)
+                        os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
+                        st.session_state.uploaded_path = None
+                        st.rerun()
+
+                # 1. 拖拽上传
                 uploaded_files = st.file_uploader(
                     "拖入文件", 
                     accept_multiple_files=True, 
@@ -1617,27 +1683,39 @@ with st.sidebar:
                     disabled=not can_upload
                 )
                 
-                # 恢复路径输入
+                # 即时同步上传的文件
+                if uploaded_files:
+                    with st.spinner("⚡ 正在搬运至暂存区..."):
+                        from src.common.utils import save_uploaded_files
+                        batch_dir = save_uploaded_files(uploaded_files, "temp_uploads")
+                        if batch_dir:
+                            sync_to_staging(batch_dir, is_file=False, source_label="文件上传")
+                            st.session_state.uploaded_path = st.session_state.task_staging_dir
+                
+                # 2. 恢复路径输入
                 st.markdown("<div style='margin-top: -5px; margin-bottom: 5px;'><span style='font-size: 0.75rem; color: gray;'>或粘贴本地目录路径:</span></div>", unsafe_allow_html=True)
-                manual_path = st.text_input(
-                    "本地路径",
-                    placeholder="例如: /Users/name/Documents/docs",
-                    key="manual_path_input",
-                    label_visibility="collapsed",
-                    disabled=not can_upload
-                )
-                if manual_path:
-                    if os.path.exists(manual_path):
-                        st.session_state.uploaded_path = manual_path
-                        # [v8.8.2] 直接复用公共业务逻辑板，简化手动统计
-                        try:
-                            if not st.session_state.get('upload_auto_name'):
-                                from src.common.business import generate_smart_kb_name as gen_name
-                                st.session_state.upload_auto_name = gen_name(manual_path)
-                        except Exception as e:
-                            logger.warning(f"Auto-name failed: {e}")
-                    else:
-                        st.caption("❌ 路径不存在，请检查拼写")
+                path_col1, path_col2 = st.columns([4, 1.2])
+                with path_col1:
+                    manual_path = st.text_input(
+                        "本地路径",
+                        placeholder="例如: /Users/name/Documents/docs",
+                        key="manual_path_input",
+                        label_visibility="collapsed",
+                        disabled=not can_upload
+                    )
+                with path_col2:
+                    if st.button("➕ 添加目录", use_container_width=True, disabled=not manual_path):
+                        if os.path.exists(manual_path):
+                            with st.spinner("正在扫描并添加目录..."):
+                                if sync_to_staging(manual_path, is_file=False, source_label="目录添加"):
+                                    st.session_state.uploaded_path = st.session_state.task_staging_dir
+                                    st.toast("✅ 目录内容已成功加入暂存区")
+                                    time.sleep(0.5); st.rerun()
+                        else:
+                            st.error("路径不存在")
+
+                if manual_path and not os.path.exists(manual_path):
+                    st.caption("❌ 路径不存在，请检查拼写")
             
                 # --- [v8.8.0] 融合文本粘贴功能 ---
                 st.markdown("---")
@@ -1669,20 +1747,18 @@ with st.sidebar:
                                     if not full_content or not full_content.strip():
                                         return
                                         
-                                    save_dir = os.path.join(UPLOAD_DIR, f"text_{int(time.time())}")
-                                    if not os.path.exists(save_dir): 
-                                        os.makedirs(save_dir)
-                                    safe_name = "manual_input.txt"
+                                    # [v8.9.1] 投递到统一暂存区，文件名包含时间戳以支持叠加
+                                    safe_name = f"manual_pasted_{int(time.time())}.txt"
+                                    save_path = os.path.join(st.session_state.task_staging_dir, safe_name)
                                     
-                                    with open(os.path.join(save_dir, safe_name), 'w', encoding='utf-8') as f:
+                                    with open(save_path, 'w', encoding='utf-8') as f:
                                         f.write(full_content)
                                     
-                                    abs_path = os.path.abspath(save_dir)
-                                    st.session_state.uploaded_path = abs_path
-                                    st.session_state.path_input = abs_path
+                                    logger.info(f"📝 [文本粘贴] 已生成 {safe_name} 并投递至暂存区 (长度: {len(full_content)})")
+                                    st.session_state.uploaded_path = st.session_state.task_staging_dir
                                     
                                     preview = "".join(c for c in full_content[:15] if c.isalnum() or c.isspace()).strip()
-                                    st.session_state.upload_auto_name = f"Text_{preview}"
+                                    st.session_state.upload_auto_name = f"Mixed_{preview}"
                                     
                                     st.session_state.text_auto_saved = True
                                     st.session_state.saved_text_length = len(full_content)
@@ -3833,9 +3909,16 @@ if btn_start:
             from src.auth.user_auth import load_users
             
             curr_user = st.session_state.get('user', 'admin')
+            curr_role = st.session_state.get('role', 'standard_user')
             u_data = load_users().get(curr_user, {})
-            u_quota_mb = u_data.get("storage_quota_mb", 100)
             
+            # 管理员默认无限配额 (-1)，其他用户从配置读取，默认 100MB
+            if curr_role == 'admin':
+                u_quota_mb = -1
+            else:
+                u_quota_mb = u_data.get("storage_quota_mb", 100)
+            
+            # 只有配额不为 -1 时才执行检查
             if u_quota_mb != -1:
                 curr_usage_bytes = get_user_storage_usage(curr_user)
                 if curr_usage_bytes / (1024 * 1024) >= u_quota_mb:
@@ -3868,12 +3951,16 @@ if btn_start:
                 if not final_kb_name.startswith(f"{current_user}_"):
                     final_kb_name = f"{current_user}_{final_kb_name}"
             
-            # [v3.5.0 修复] 确保拖拽上传的临时路径被正确同步给处理引擎
-            # 如果 uploaded_files 有内容但 path 为空，立即调用保存函数获取路径
-            if 'uploaded_files' in locals() and uploaded_files and not st.session_state.get('uploaded_path'):
+            # --- [v8.9.1] 最终路径锚定逻辑 (AND 模式核心) ---
+            if is_create_mode and source_mode == "📂 文件上传":
+                # 在创建模式下，强制使用我们累加好的暂存文件夹
+                st.session_state.uploaded_path = st.session_state.task_staging_dir
+                logger.info(f"📦 [AND模式] 统一暂存区路径已锚定: {st.session_state.uploaded_path}")
+            elif 'uploaded_files' in locals() and uploaded_files and not st.session_state.get('uploaded_path'):
+                # 兜底逻辑：如果是追加模式且只有上传文件
                 from src.common.utils import save_uploaded_files
                 st.session_state.uploaded_path = save_uploaded_files(uploaded_files, "temp_uploads")
-                logger.info(f"📂 [修正] 拖拽上传路径已锚定: {st.session_state.uploaded_path}")
+                logger.info(f"📂 [修正] 临时路径已锚定: {st.session_state.uploaded_path}")
 
             # [v8.6.4] 数据库模式：主按钮透明执行同步
             if source_mode == "🔌 数据库同步":

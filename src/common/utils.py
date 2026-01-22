@@ -159,3 +159,16 @@ def get_client_ip():
     except:
         pass
     return "127.0.0.1" # 回退到本地回环
+
+def save_uploaded_files(uploaded_files, upload_dir="temp_uploads"):
+    """保存上传的文件到临时目录并返回目录路径"""
+    if not uploaded_files:
+        return None
+    batch_id = f"batch_{int(time.time())}"
+    save_dir = os.path.join(upload_dir, batch_id)
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    for uploaded_file in uploaded_files:
+        with open(os.path.join(save_dir, uploaded_file.name), "wb") as f:
+            f.write(uploaded_file.getbuffer())
+    return os.path.abspath(save_dir)
