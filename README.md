@@ -1,24 +1,23 @@
 # RAG Pro Max - 企业级智能文档问答与数据分析系统
 
-**当前版本**: v8.6.9 (Flagship Dual-Core Edition)  
-![Version](https://img.shields.io/badge/version-v8.6.9-purple)
+**当前版本**: v8.8.0 (Flagship Unified Edition)  
+![Version](https://img.shields.io/badge/version-v8.8.0-purple)
 
-RAG Pro Max v8.6.9 实现了 **「全源归一化 (Source-Agnostic)」** 架构的终极演进。通过支持 9 种异构数据库集成与极致的侧边栏交互重构，系统现在可以作为企业级数据中台，一站式吞噬并分析全域数据。
+RAG Pro Max v8.8.0 实现了 **「极简归一化 (Minimalist Unified)」** 架构的终极演进。通过将数据摄入收敛为三大全能入口，配合 9 种异构数据库集成，系统现在可以作为企业级数据中台，一站式吞噬并分析全域数据。
 
 ---
 
-## 🚀 v8.6.9 核心特性
+## 🚀 v8.8.0 核心特性
 
 ### 🔌 全异构数据库大满贯 (9+ DB Support)
 - **极广适配**: 原生支持 MySQL, PostgreSQL, SQLite, DuckDB, ClickHouse, SQL Server, Oracle, MaxCompute (DataWorks), Snowflake。
 - **四维全景透视**: 在管理端提供字段定义、50 行数据采样、物理外键关联及业务洞察统计。
 
-### 🎨 侧边栏交互革命 (One-Click Ingestion)
-- **万能附件 (Universal Attachment)**: 统一了文件上传、粘贴文本、图片 OCR 的入口逻辑，实现极简 UI。
-- **一键直达**: 勾选即构建，彻底消除中间预取步骤。
-- **五大摄入源**: 深度集成 **📂文件、📝文本、🔗网页、🔍搜索、🔌数据库**，满足全场景数据需求。
+### 🎨 侧边栏交互革命 (Unified Ingestion)
+- **三大全能入口**: 界面重构为 **📂文件上传 (含粘贴/路径)、🌐互联网提取 (含爬虫/搜索)、🔌数据库同步** 三大核心支柱。
+- **智能意图识别**: 互联网提取模式下，自动根据输入内容（URL 或关键词）路由至精准爬虫或全网搜索引擎。
+- **万能附件下沉**: “📝 粘贴文本”与“本地路径”深度融合至文件上传面板，支持失焦自动保存。
 - **即时预览 (Instant Peek)**: 选表时点击 **`👁️`** 图标，即可在侧边栏气泡中秒看表内容，告别盲选。
-- **滚动容器与全选**: 优化了大库同步体验，支持一键全选。
 
 ### ⚡ 问答模式智能联动 (Smart Linkage)
 - **探测即激活**: 自动感应知识库能力并开启分析开关。

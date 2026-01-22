@@ -1,13 +1,13 @@
 # 数据分析：双核联动开发流程与架构设计规范 (Data Analysis Workflow)
 
-**版本**: v8.6.9 (Flagship Dual-Core Edition)
+**版本**: v8.8.0 (Flagship Unified Edition)
 **核心原则**: 语义底座 + 结构化增强 (Shadow Mapping)，物理必闭环。
 
 ---
 
 ## 一、 业务架构 (Business Architecture)
 
-在 v8.6.9 架构下，数据分析能力已进化为 **“全域全源归一化 (Omni-Source Agnostic)”** 的智能引擎。
+在 v8.8.0 架构下，数据分析能力已进化为 **“全域全源归一化 (Omni-Source Agnostic)”** 的智能引擎。
 
 ### 1. 场景双核联动
 - **语义层 (Base Layer)**: 100% 的材料经过 RAG 切片与向量化。
@@ -17,12 +17,12 @@
 
 ---
 
-## 三、 开发与构建流程 (v8.6.9 全源版)
+## 三、 开发与构建流程 (v8.8.0 全源版)
 
 ### 阶段 1：归一化摄入 (Normalized Ingestion)
 1. **源头分流**:
-    - **常规材料**: 归档至 `raw_sources/`。
-    - **全源数据库**: 通过 `DBIngestor` 镜像表数据至本地 `.csv`。
+    - **非结构化 (File/Web)**: 归档至 `raw_sources/`。
+    - **全源数据库 (DB)**: 通过 `DBIngestor` 镜像表数据至本地 `.csv`。
 2. **即时校验 (NEW)**: 支持侧边栏选表时的 **“即时预览 (Instant Peek)”**，确保入库材料质量。
 3. **底座先行**: 首先触发全量 RAG 构建流程。
 4. **配置审计**: 系统自动记录 `[Build Config]`。

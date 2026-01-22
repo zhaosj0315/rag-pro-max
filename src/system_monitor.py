@@ -1,260 +1,384 @@
 #!/usr/bin/env python3
+"""
+RAG Pro Max 系统监控大屏 (System Monitor Dashboard)
+------------------------------------------------
+基于 Rich 库构建的终端监控仪表盘，专为 RAG 应用优化。
+提供 CPU/GPU/内存/磁盘/网络/电池 以及 关键进程(Streamlit/Ollama等) 的实时监控。
+
+Usage:
+    python3 src/system_monitor.py
+    sudo python3 src/system_monitor.py (推荐，以获取完整 GPU 功耗数据)
+"""
+
 import os
 import sys
+import time
+import psutil
+import subprocess
+import threading
+from datetime import datetime, timedelta
+from collections import deque
 
-# 自动处理路径，确保无论在哪里运行都能找到 src 模块
+# 自动处理路径
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+# 尝试导入 Rich，如果不存在则提示安装
+try:
+    from rich.console import Console
+    from rich.layout import Layout
+    from rich.panel import Panel
+    from rich.live import Live
+    from rich.table import Table
+    from rich.progress import Progress, BarColumn, TextColumn, SpinnerColumn
+    from rich.columns import Columns
+    from rich.text import Text
+    from rich.align import Align
+    from rich import box
+except ImportError:
+    print("❌ 错误: 缺少 'rich' 库。请运行: pip install rich")
+    sys.exit(1)
+
 from src.app_logging.log_manager import LogManager
 
-logger = LogManager()
+# 初始化日志 (仅用于后台记录，不干扰前台显示)
+logger = LogManager(enable_terminal=False)
 
-"""统一系统监控工具 - CPU/GPU/内存/磁盘/网络/电池"""
-import psutil
-import time
-import sys
-import subprocess
-from datetime import datetime, timedelta
+class SystemMonitor:
+    def __init__(self, history_len=60):
+        self.console = Console()
+        self.history_len = history_len
+        self.net_io_counters = psutil.net_io_counters()
+        self.disk_io_counters = psutil.disk_io_counters()
+        self.last_time = time.time()
+        
+        # 历史数据 (可用于绘制迷你图，暂留接口)
+        self.cpu_history = deque(maxlen=history_len)
+        self.mem_history = deque(maxlen=history_len)
+        
+        # RAG 相关进程关键词
+        self.rag_keywords = ['streamlit', 'ollama', 'chroma', 'python', 'node']
+        self.rag_exact_names = ['ollama_llama_server']
 
-def get_gpu_info():
-    """获取 Apple Silicon GPU 信息"""
-    try:
-        result = subprocess.run(
-            ['sudo', 'powermetrics', '--samplers', 'gpu_power', '-i', '500', '-n', '1'],
-            capture_output=True, text=True, timeout=3
+    def get_gpu_info(self):
+        """获取 Apple Silicon GPU 信息 (需要 sudo)"""
+        try:
+            # 使用 -n 1 只采样一次，降低延迟
+            result = subprocess.run(
+                ['sudo', 'powermetrics', '--samplers', 'gpu_power', '-i', '100', '-n', '1'],
+                capture_output=True, text=True, timeout=1
+            )
+            
+            if result.returncode != 0:
+                return {'usage': 0.0, 'freq': 'N/A', 'power': 'N/A', 'auth': False}
+            
+            lines = result.stdout.split('\n')
+            usage = 0.0
+            freq = '0 MHz'
+            power = '0 mW'
+            
+            for line in lines:
+                if 'GPU HW active residency:' in line:
+                    parts = line.split(':')
+                    if len(parts) >= 2:
+                        try:
+                            usage = float(parts[1].strip().split('%')[0].strip())
+                        except:
+                            pass
+                elif 'GPU HW active frequency:' in line:
+                    parts = line.split(':')
+                    if len(parts) >= 2:
+                        freq = parts[1].strip()
+                elif 'GPU Power:' in line:
+                    parts = line.split(':')
+                    if len(parts) >= 2:
+                        power = parts[1].strip()
+                            
+            return {'usage': usage, 'freq': freq, 'power': power, 'auth': True}
+        except Exception:
+            return {'usage': 0.0, 'freq': 'N/A', 'power': 'N/A', 'auth': False}
+
+    def get_rag_processes(self):
+        """获取 RAG 相关进程"""
+        rag_procs = []
+        try:
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'cpu_percent', 'memory_info', 'status']):
+                try:
+                    if proc.info['status'] == psutil.STATUS_ZOMBIE:
+                        continue
+                        
+                    name = proc.info['name'].lower()
+                    cmdline = ' '.join(proc.info['cmdline'] or []).lower()
+                    
+                    is_related = False
+                    # 检查精确匹配
+                    if name in self.rag_exact_names:
+                        is_related = True
+                    # 检查关键词匹配 (cmdline 更准确)
+                    elif any(k in cmdline for k in self.rag_keywords):
+                        # 过滤掉 system_monitor 自身
+                        if 'system_monitor.py' in cmdline:
+                            continue
+                        # Streamlit 特别检查
+                        if 'streamlit' in cmdline and 'apppro.py' in cmdline:
+                            name = "Streamlit (Main)"
+                            is_related = True
+                        elif 'ollama' in name or 'ollama' in cmdline:
+                            name = "Ollama Service"
+                            is_related = True
+                        elif 'python' in name and ('rag' in cmdline or 'src' in cmdline):
+                            name = "RAG Worker"
+                            is_related = True
+                            
+                    if is_related:
+                        rag_procs.append(proc)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+        except Exception:
+            pass
+            
+        # 按 CPU 使用率排序
+        return sorted(rag_procs, key=lambda p: p.info['cpu_percent'], reverse=True)
+
+    def get_metrics(self):
+        """收集所有监控指标"""
+        now = time.time()
+        delta = now - self.last_time
+        self.last_time = now
+        
+        # CPU
+        cpu_pct = psutil.cpu_percent(interval=None)
+        cpu_per_core = psutil.cpu_percent(interval=None, percpu=True)
+        load_avg = psutil.getloadavg() # (1, 5, 15 min)
+        
+        # Memory
+        mem = psutil.virtual_memory()
+        swap = psutil.swap_memory()
+        
+        # Disk
+        try:
+            disk = psutil.disk_usage('/System/Volumes/Data')
+        except:
+            disk = psutil.disk_usage('/')
+            
+        # Network Speed
+        net = psutil.net_io_counters()
+        up_speed = (net.bytes_sent - self.net_io_counters.bytes_sent) / delta
+        down_speed = (net.bytes_recv - self.net_io_counters.bytes_recv) / delta
+        self.net_io_counters = net
+        
+        # Disk IO Speed
+        disk_io = psutil.disk_io_counters()
+        read_speed = (disk_io.read_bytes - self.disk_io_counters.read_bytes) / delta
+        write_speed = (disk_io.write_bytes - self.disk_io_counters.write_bytes) / delta
+        self.disk_io_counters = disk_io
+        
+        # GPU
+        gpu = self.get_gpu_info()
+        
+        return {
+            "cpu": {"total": cpu_pct, "cores": cpu_per_core, "load": load_avg},
+            "mem": {"percent": mem.percent, "used": mem.used, "total": mem.total},
+            "swap": {"percent": swap.percent, "used": swap.used, "total": swap.total},
+            "disk": {"percent": disk.percent, "used": disk.used, "total": disk.total},
+            "net": {"up": up_speed, "down": down_speed},
+            "io": {"read": read_speed, "write": write_speed},
+            "gpu": gpu
+        }
+
+    def format_bytes(self, size):
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size < 1024:
+                return f"{size:.1f} {unit}"
+            size /= 1024
+        return f"{size:.1f} PB"
+
+    def _generate_cpu_table(self, metrics):
+        """生成 CPU/GPU 详情表"""
+        table = Table(box=box.SIMPLE, show_header=False, expand=True)
+        table.add_column("Item", style="cyan")
+        table.add_column("Value", style="white")
+        table.add_column("Bar", ratio=2)
+        
+        # CPU Total
+        cpu_color = "green" if metrics['cpu']['total'] < 60 else "yellow" if metrics['cpu']['total'] < 85 else "red"
+        table.add_row(
+            "💻 CPU 总计", 
+            f"{metrics['cpu']['total']:.1f}%", 
+            Text("█" * int(metrics['cpu']['total'] / 5), style=cpu_color)
         )
         
-        if result.returncode != 0:
-            return {'usage': 0.0, 'freq': 'N/A', 'power': 'N/A'}
+        # Load Avg
+        table.add_row(
+            "⚖️  平均负载", 
+            f"{metrics['cpu']['load'][0]:.2f} / {metrics['cpu']['load'][1]:.2f} / {metrics['cpu']['load'][2]:.2f}", 
+            ""
+        )
         
-        lines = result.stdout.split('\n')
-        
-        # 提取使用率（active residency）
-        usage = 0.0
-        for line in lines:
-            if 'GPU HW active residency:' in line:
-                # 提取百分比，格式: "GPU HW active residency: 100.00%"
-                parts = line.split(':')
-                if len(parts) >= 2:
-                    percent_str = parts[1].strip().split('%')[0].strip()
-                    try:
-                        usage = float(percent_str)
-                    except:
-                        pass
-                break
-        
-        # 提取频率
-        freq = 'N/A'
-        for line in lines:
-            if 'GPU HW active frequency:' in line:
-                parts = line.split(':')
-                if len(parts) >= 2:
-                    freq = parts[1].strip()
-                break
-        
-        # 提取功耗
-        power = 'N/A'
-        for line in lines:
-            if 'GPU Power:' in line:
-                parts = line.split(':')
-                if len(parts) >= 2:
-                    power = parts[1].strip()
-                break
-        
-        return {'usage': usage, 'freq': freq, 'power': power}
-    except Exception as e:
-        return {'usage': 0.0, 'freq': 'N/A', 'power': 'N/A'}
-
-def get_streamlit_process():
-    """获取 Streamlit 进程"""
-    for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'cpu_percent', 'memory_info', 'num_threads']):
-        try:
-            cmdline = ' '.join(proc.info['cmdline'] or [])
-            if 'streamlit run' in cmdline and 'apppro.py' in cmdline:
-                return proc
-        except:
-            continue
-    return None
-
-def format_bytes(bytes_value):
-    """格式化字节数"""
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-        if bytes_value < 1024.0:
-            return f"{bytes_value:.1f} {unit}"
-        bytes_value /= 1024.0
-    return f"{bytes_value:.1f} PB"
-
-def format_bar(percent, width=20, bar_type='cpu'):
-    """格式化进度条"""
-    filled = int(width * min(percent, 100) / 100)
-    bar = '█' * filled + '░' * (width - filled)
-    
-    # 根据类型和使用率着色
-    if bar_type == 'memory':
-        color = '\033[93m'  # 黄色
-    elif bar_type == 'disk':
-        color = '\033[96m'  # 青色
-    elif bar_type == 'gpu':
-        color = '\033[95m'  # 紫色
-    elif bar_type == 'swap':
-        color = '\033[91m' if percent > 50 else '\033[93m'  # 红色/黄色
-    elif bar_type == 'battery':
-        if percent > 50:
-            color = '\033[92m'  # 绿色
-        elif percent > 20:
-            color = '\033[93m'  # 黄色
+        # GPU
+        gpu = metrics['gpu']
+        if gpu['auth']:
+            gpu_color = "magenta"
+            table.add_row(
+                "🎮 GPU 使用", 
+                f"{gpu['usage']:.1f}%", 
+                Text("█" * int(gpu['usage'] / 5), style=gpu_color)
+            )
+            table.add_row("⚡ GPU 功耗", f"{gpu['power']}", "")
         else:
-            color = '\033[91m'  # 红色
-    elif percent >= 90:
-        color = '\033[91m'  # 红色
-    else:
-        color = '\033[92m'  # 绿色
-    
-    reset = '\033[0m'
-    return f"{color}{bar}{reset}"
+            table.add_row("🎮 GPU", "[dim]需要 sudo[/dim]", "")
+            
+        return Panel(table, title="计算资源 (Compute)", border_style="blue")
 
-def format_uptime(seconds):
-    """格式化运行时间"""
-    td = timedelta(seconds=int(seconds))
-    days = td.days
-    hours, remainder = divmod(td.seconds, 3600)
-    minutes, _ = divmod(remainder, 60)
-    
-    if days > 0:
-        return f"{days}天 {hours}小时 {minutes}分钟"
-    elif hours > 0:
-        return f"{hours}小时 {minutes}分钟"
-    else:
-        return f"{minutes}分钟"
+    def _generate_mem_table(self, metrics):
+        """生成内存/磁盘详情表"""
+        table = Table(box=box.SIMPLE, show_header=False, expand=True)
+        table.add_column("Item", style="cyan")
+        table.add_column("Value", style="white")
+        
+        # Memory
+        mem = metrics['mem']
+        mem_color = "green" if mem['percent'] < 80 else "yellow"
+        table.add_row(
+            "🧠 物理内存", 
+            f"{mem['percent']}% ({self.format_bytes(mem['used'])}/{self.format_bytes(mem['total'])})"
+        )
+        
+        # Swap
+        swap = metrics['swap']
+        if swap['total'] > 0:
+            table.add_row(
+                "💱 交换空间", 
+                f"{swap['percent']}% ({self.format_bytes(swap['used'])})"
+            )
+            
+        # Disk
+        disk = metrics['disk']
+        table.add_row(
+            "💿 磁盘空间", 
+            f"{disk['percent']}% ({self.format_bytes(disk['used'])})"
+        )
+        
+        return Panel(table, title="存储资源 (Storage)", border_style="green")
 
-def monitor():
-    """实时监控"""
-    last_net_io = psutil.net_io_counters()
-    last_disk_io = psutil.disk_io_counters()
-    last_time = time.time()
-    
-    try:
-        while True:
-            sys.stdout.write('\033[2J\033[H')  # 清屏
-            now = datetime.now().strftime('%H:%M:%S')
-            
-            # 系统运行时间
-            boot_time = psutil.boot_time()
-            uptime = time.time() - boot_time
-            uptime_str = format_uptime(uptime)
-            
-            logger.info("=" * 80)
-            logger.info(f"⏰ 时间: {now} | ⏱️  运行时间: {uptime_str}")
-            logger.info("=" * 80)
-            
-            # 电池状态（笔记本才有）
-            battery = psutil.sensors_battery()
-            if battery:
-                charging = "充电中" if battery.power_plugged else "使用电池"
-                secs_left = battery.secsleft
-                if secs_left > 0:
-                    time_left = format_uptime(secs_left)
-                    logger.info(f"\n🔋 电池: {battery.percent:.0f}% ({charging}) | 剩余: {time_left}")
-                else:
-                    logger.info(f"\n🔋 电池: {battery.percent:.0f}% ({charging})")
-                logger.info(f"   {format_bar(battery.percent, bar_type='battery')} {battery.percent:.0f}%")
-            
-            # CPU 信息
-            cpu_percent = psutil.cpu_percent(interval=1)
-            cpu_count = psutil.cpu_count()
-            cpu_per_core = psutil.cpu_percent(interval=0, percpu=True)
-            cores_used = cpu_percent / 100 * cpu_count
-            
-            logger.info(f"\n💻 CPU 使用率: {cpu_percent:5.1f}% ({cores_used:.1f}/{cpu_count} 核)")
-            logger.info(f"   {format_bar(cpu_percent)} {cpu_percent:.1f}%")
-            
-            # CPU 每核
-            logger.info(f"\n   各核心使用率:")
-            for i in range(0, len(cpu_per_core), 4):
-                cores = cpu_per_core[i:i+4]
-                line = "   "
-                for j, usage in enumerate(cores):
-                    bar = format_bar(usage, width=10)
-                    line += f"核{i+j:2d}: {bar} {usage:5.1f}%  "
-                logger.info(line)
-            
-            # GPU 信息
-            gpu = get_gpu_info()
-            if gpu['freq'] != 'N/A':
-                logger.info(f"\n🎮 GPU 使用率: {gpu['usage']:5.1f}% (32 核) | 频率: {gpu['freq']} | 功耗: {gpu['power']}")
-                logger.info(f"   {format_bar(gpu['usage'], bar_type='gpu')} {gpu['usage']:.1f}%")
-            else:
-                logger.info(f"\n🎮 GPU 使用率: 需要 sudo 权限获取详细信息")
-                logger.info(f"   提示: 使用 'sudo python3 system_monitor.py' 运行")
-            
-            # 内存信息
-            mem = psutil.virtual_memory()
-            logger.info(f"\n💾 内存使用: {mem.percent:5.1f}% ({format_bytes(mem.used)}/{format_bytes(mem.total)})")
-            logger.info(f"   {format_bar(mem.percent, bar_type='memory')} {mem.percent:.1f}%")
-            
-            # Swap 信息
-            swap = psutil.swap_memory()
-            if swap.total > 0:
-                logger.info(f"\n💱 交换内存: {swap.percent:5.1f}% ({format_bytes(swap.used)}/{format_bytes(swap.total)})")
-                logger.info(f"   {format_bar(swap.percent, bar_type='swap')} {swap.percent:.1f}%")
-            
-            # 磁盘信息（使用数据分区）
-            try:
-                disk = psutil.disk_usage('/System/Volumes/Data')
-            except:
-                disk = psutil.disk_usage('/')
-            logger.info(f"\n💿 磁盘使用: {disk.percent:5.1f}% ({format_bytes(disk.used)}/{format_bytes(disk.total)})")
-            logger.info(f"   {format_bar(disk.percent, bar_type='disk')} {disk.percent:.1f}%")
-            
-            # 磁盘 I/O 速度
-            current_disk_io = psutil.disk_io_counters()
-            current_time = time.time()
-            time_delta = current_time - last_time
-            
-            read_speed = (current_disk_io.read_bytes - last_disk_io.read_bytes) / time_delta / 1024 / 1024  # MB/s
-            write_speed = (current_disk_io.write_bytes - last_disk_io.write_bytes) / time_delta / 1024 / 1024  # MB/s
-            
-            logger.info(f"\n💿 磁盘 I/O: 读 {read_speed:.2f} MB/s | 写 {write_speed:.2f} MB/s")
-            
-            # 网络流量
-            current_net_io = psutil.net_io_counters()
-            
-            upload_speed = (current_net_io.bytes_sent - last_net_io.bytes_sent) / time_delta / 1024 / 1024  # MB/s
-            download_speed = (current_net_io.bytes_recv - last_net_io.bytes_recv) / time_delta / 1024 / 1024  # MB/s
-            
-            logger.info(f"\n🌐 网络流量: ↑ {upload_speed:.2f} MB/s | ↓ {download_speed:.2f} MB/s")
-            
-            last_net_io = current_net_io
-            last_disk_io = current_disk_io
-            last_time = current_time
-            
-            # Streamlit 进程
-            proc = get_streamlit_process()
-            if proc:
+    def _generate_io_table(self, metrics):
+        """生成网络/IO详情表"""
+        table = Table(box=box.SIMPLE, show_header=False, expand=True)
+        table.add_column("Item", style="cyan")
+        table.add_column("Value", style="white")
+        
+        net = metrics['net']
+        io = metrics['io']
+        
+        table.add_row("🌐 上传速度", f"↑ {self.format_bytes(net['up'])}/s")
+        table.add_row("🌐 下载速度", f"↓ {self.format_bytes(net['down'])}/s")
+        table.add_row("💿 读取速度", f"R: {self.format_bytes(io['read'])}/s")
+        table.add_row("💿 写入速度", f"W: {self.format_bytes(io['write'])}/s")
+        
+        return Panel(table, title="I/O 吞吐 (Throughput)", border_style="yellow")
+
+    def _generate_process_table(self):
+        """生成进程监控表"""
+        table = Table(expand=True, box=box.MINIMAL_HEAVY_HEAD, border_style="bright_black")
+        table.add_column("PID", width=6, style="dim")
+        table.add_column("Process Name", ratio=3)
+        table.add_column("CPU", width=8, justify="right")
+        table.add_column("MEM", width=10, justify="right")
+        table.add_column("Status", width=10)
+
+        rag_procs = self.get_rag_processes()
+        if not rag_procs:
+            table.add_row("-", "[dim]暂无 RAG 相关进程活跃[/dim]", "-", "-", "-")
+        else:
+            for p in rag_procs[:10]: # 只显示前10个
                 try:
-                    cpu = proc.cpu_percent()
-                    mem_rss = proc.memory_info().rss
-                    threads = proc.num_threads()
+                    cpu = p.info['cpu_percent']
+                    mem = p.memory_info().rss
                     
-                    logger.info(f"\n🔍 Streamlit 进程: PID {proc.pid} | CPU {cpu:.1f}% | 内存 {format_bytes(mem_rss)} | 线程 {threads}")
-                    if cpu > 100:
-                        logger.info(f"   🚀 多核运行: {cpu/100:.1f} 核并行")
+                    # 样式高亮
+                    name_style = "bold white"
+                    if "streamlit" in p.info['name'].lower():
+                        name_style = "bold red"
+                    elif "ollama" in p.info['name'].lower():
+                        name_style = "bold cyan"
+                        
+                    cpu_style = "green" if cpu < 50 else "red"
+                    
+                    table.add_row(
+                        str(p.info['pid']),
+                        Text(p.info['name'], style=name_style),
+                        Text(f"{cpu:.1f}%", style=cpu_style),
+                        self.format_bytes(mem),
+                        p.info['status']
+                    )
                 except:
-                    pass
-            
-            logger.info("\n" + "=" * 80)
-            if gpu['freq'] == 'N/A':
-                logger.info("💡 提示: 使用 'sudo python3 system_monitor.py' 获取 GPU 详细信息")
-            logger.info("按 Ctrl+C 退出监控")
-            
-            time.sleep(2)
-            
-    except KeyboardInterrupt:
-        logger.info("\n\n👋 监控已停止")
-        sys.exit(0)
+                    continue
+                
+        return Panel(table, title="🚀 核心服务监控 (RAG Core Services)", border_style="red")
+
+    def run(self):
+        """启动监控循环"""
+        # 初始化 CPU 计数 (第一次调用通常为 0)
+        psutil.cpu_percent()
+        
+        layout = Layout()
+        layout.split(
+            Layout(name="header", size=3),
+            Layout(name="body", ratio=1),
+            Layout(name="footer", size=3)
+        )
+        
+        layout["body"].split_column(
+            Layout(name="upper", size=10),
+            Layout(name="lower")
+        )
+        
+        layout["upper"].split_row(
+            Layout(name="cpu"),
+            Layout(name="mem"),
+            Layout(name="io")
+        )
+        
+        with Live(layout, refresh_per_second=1, screen=True) as live:
+            try:
+                while True:
+                    metrics = self.get_metrics()
+                    
+                    # Header
+                    uptime = timedelta(seconds=int(time.time() - psutil.boot_time()))
+                    header_text = f"RAG Pro Max System Monitor | 🕒 {datetime.now().strftime('%H:%M:%S')} | ⏱️  Uptime: {uptime}"
+                    
+                    # Battery Info
+                    battery = psutil.sensors_battery()
+                    if battery:
+                        plugged = "⚡" if battery.power_plugged else "🔋"
+                        header_text += f" | {plugged} {battery.percent}%"
+                        if not battery.power_plugged:
+                            header_text += f" ({timedelta(seconds=battery.secsleft)})"
+
+                    if not metrics['gpu']['auth']:
+                        header_text += " | ⚠️  Sudo Required for Full GPU Info"
+                        
+                    layout["header"].update(Panel(Align.center(header_text, vertical="middle"), style="bold white on blue"))
+                    
+                    # Upper Section (Resources)
+                    layout["cpu"].update(self._generate_cpu_table(metrics))
+                    layout["mem"].update(self._generate_mem_table(metrics))
+                    layout["io"].update(self._generate_io_table(metrics))
+                    
+                    # Lower Section (Processes)
+                    layout["lower"].update(self._generate_process_table())
+                    
+                    # Footer
+                    layout["footer"].update(Align.center("[bold]Ctrl+C[/bold] to Exit", vertical="middle"))
+                    
+                    time.sleep(1)
+                    
+            except KeyboardInterrupt:
+                pass
 
 if __name__ == "__main__":
-    monitor()
+    monitor = SystemMonitor()
+    monitor.run()

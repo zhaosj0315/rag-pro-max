@@ -1,15 +1,15 @@
-# RAG Pro Max v8.6.9 企业级系统架构文档
+# RAG Pro Max v8.8.0 企业级系统架构文档
 
-**版本**: v8.6.9 (Flagship Dual-Core Edition)  
-**更新日期**: 2026-01-21  
-**核心特性**: Omni-Source DB Integration, Cache-Busting Structural Movement, Smart Linkage
+**版本**: v8.8.0 (Flagship Unified Edition)  
+**更新日期**: 2026-01-22  
+**核心特性**: Minimalist Unified Architecture, Omni-Source DB Integration, Smart Linkage
 
 ---
 
 ## 🏗️ 业务层内核加固 (Service Layer Hardening)
 
 ### 1. 全源归一化数据库摄入 (Omni-Source DB Ingestion)
-在 v8.6.9 中，系统通过 **“全能适配器 (Omni-Adapter)”** 实现了对 9 种异构数据源的物理归一化：
+在 v8.8.0 中，系统通过 **“全能适配器 (Omni-Adapter)”** 实现了对 9 种异构数据源的物理归一化：
 - **Heterogeneous Drivers**: 封装了从 MySQL, Oracle 到 MaxCompute 的全量驱动逻辑。
 - **Source-Agnostic Mirroring**: 所有的远程表在摄入阶段均会被转化为标准 `.csv` 片段，确保下游的 RAG 向量化与 SQL 影子库构建逻辑 **100% 复用**。
 
@@ -24,12 +24,12 @@
 
 ## 🧬 归一化摄入管线 (Normalized Ingestion Pipeline)
 
-在 v8.1.1 中，表现层（Presentation Layer）经历了深度重构，实现了**入口逻辑的归一化**。
+在 v8.8.0 中，表现层（Presentation Layer）经历了深度重构，实现了**入口逻辑的归一化**。
 
-- **单一入口原则**: 废弃了基于 `main_mode` 的多页面分发逻辑（Legacy）。
+- **三大全能入口**: 界面收敛为文件、互联网、数据库三大核心支柱。
+- **智能路由**: 互联网模式下内置自动意图识别引擎 (Intent Recognition Engine)。
 - **万能附件 (Universal Attachment)**: 实现了全源文件上传入口，支持图片 OCR 与文档解析逻辑的深度复用。
 - **配置下沉**: 将“数据分析”从顶级导航下沉为 `IndexBuilder` 的配置参数 `enable_data_analysis`。
-- **状态流转**: 侧边栏不再负责复杂的模式切换，仅负责参数收集与任务触发。
 
 ---
 
@@ -55,11 +55,9 @@
 
 ```mermaid
 graph TD
-    A[📂 文件上传] --> N[归一化摄入中心]
-    B[🔗 网址抓取] --> N
-    C[📝 粘贴文本] --> N
-    D[🔍 智能搜索] --> N
-    E[🔌 数据库同步] --> N
+    A[📂 文件上传 (含粘贴/路径)] --> N[归一化摄入中心]
+    B[🌐 互联网提取 (含爬虫/搜索)] --> N
+    C[🔌 数据库同步] --> N
     
     N --> R[<b>RAG 核心管线 (必经)</b><br/>向量化固化]
     R --> S{勾选: 智能分析?}

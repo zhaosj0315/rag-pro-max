@@ -1,25 +1,25 @@
 # RAG Pro Max - Enterprise AI Document QA & Data Analysis System
 
-**Current Version**: v8.6.9 (Omni-Source Edition)  
-![Version](https://img.shields.io/badge/version-v8.6.9-purple)
+**Current Version**: v8.8.0 (Flagship Unified Edition)  
+![Version](https://img.shields.io/badge/version-v8.8.0-purple)
 
-RAG Pro Max v8.6.9 marks the ultimate evolution of the **"Omni-Source"** architecture. By supporting 9+ heterogeneous database integrations and a complete overhaul of the sidebar UX, the system now serves as an enterprise-grade data hub, capable of ingesting and analyzing data from any source in a unified manner.
+RAG Pro Max v8.8.0 represents the ultimate evolution of **"Minimalist Unified Architecture"**. By consolidating data ingestion into three all-encompassing entry points and integrating with 9+ heterogeneous databases, the system serves as an enterprise-grade data hub, capable of ingesting and analyzing global data in one stop.
 
 ---
 
-## 🚀 v8.6.9 Core Features
+## 🚀 v8.8.0 Core Features
 
-### 🔌 Heterogeneous Database Integration (9+ DB Support)
-- **Wide Adaptation**: Native support for **MySQL, PostgreSQL, SQLite, DuckDB, ClickHouse, SQL Server, Oracle, Alibaba MaxCompute (DataWorks), and Snowflake**.
-- **Four-Dimensional Perspective**: Deep preview of schema definitions, 50-row data samples, physical foreign key relations, and business insight statistics.
+### 🔌 Omni-Source Database Integration (9+ DB Support)
+- **Wide Adaptation**: Native support for MySQL, PostgreSQL, SQLite, DuckDB, ClickHouse, SQL Server, Oracle, MaxCompute (DataWorks), Snowflake.
+- **4D Panoramic View**: Provides field definitions, 50-row sampling, physical foreign key associations, and business insights statistics in the admin panel.
 
-### 🎨 Sidebar Interaction Revolution (One-Click Ingestion)
-- **One-Click Build**: Direct ingestion from checkbox selection, eliminating redundant pre-fetch steps.
-- **Universal Attachment**: Unified entry for File Upload, Paste Text, and OCR with a minimalist UI.
-- **Instant Peek**: Click the **`👁️`** icon to instantly view table/file contents in a popover bubble without leaving the sidebar.
-- **Omni-Source Coverage**: Five core modes: **Files, Text, URLs, Smart Search, and DB Sync**.
+### 🎨 Sidebar Interaction Revolution (Unified Ingestion)
+- **Three Core Pillars**: Interface refactored into **📂 File Upload (incl. Paste/Path), 🌐 Internet Extraction (incl. Crawler/Search), 🔌 Database Sync**.
+- **Intelligent Intent Recognition**: In Internet Extraction mode, automatically routes to precise crawler or global search engine based on input (URL or Keyword).
+- **Universal Attachment Integration**: "📝 Paste Text" and "Local Path" are deeply integrated into the File Upload panel, supporting auto-save on blur.
+- **Instant Peek**: Click the **`👁️`** icon when selecting tables to preview data instantly in a sidebar bubble.
 
-### ⚡ Smart Linkage (Mode-Sensing)
+### ⚡ Smart Linkage for QA Modes
 - **Detect & Activate**: Automatically senses KB capabilities and toggles the "Data Analysis" switch for the user.
 - **Unified Naming**: Global KB name component with 💡 smart naming suggestions across all ingestion modes.
 
