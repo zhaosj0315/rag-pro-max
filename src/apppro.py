@@ -1826,7 +1826,7 @@ with st.sidebar:
 
                     
                     # 不需要手动保存按钮了，失焦自动保存
-        else:
+        elif current_kb_name and current_kb_name != "pure_chat":
             # 管理模式 - 使用一行化布局 (1x2 紧凑布局)
             manage_title_col1, manage_title_col2 = st.columns([4, 1])
             with manage_title_col1:
@@ -2579,7 +2579,8 @@ with st.sidebar:
                             st.rerun()
                     
                     # [Audit] 记录对话导出点击准备行为
-                    st.download_button("📥 导出", export_content, file_name=f"chat_{current_kb_name}_{datetime.now().strftime('%Y%m%d')}.md", mime="text/markdown", use_container_width=True, disabled=len(state.get_messages()) == 0)
+                    safe_kb_name = sanitize_filename(current_kb_name) if current_kb_name else "chat"
+                    st.download_button("📥 导出", export_content, file_name=f"chat_{safe_kb_name}_{datetime.now().strftime('%Y%m%d')}.md", mime="text/markdown", use_container_width=True, disabled=len(state.get_messages()) == 0)
 
                 with op_row1[3]:
                     # 删除权限检查 (颗粒化)
