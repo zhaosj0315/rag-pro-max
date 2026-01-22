@@ -96,6 +96,10 @@ def cleanup_temp_files(temp_dir: str = "temp_uploads", max_age_hours: int = 24) 
     
     try:
         for root, dirs, files in os.walk(temp_dir):
+            # [v8.9.2] 豁免当前正在使用的暂存目录，防止多源同步时被误删
+            if "task_staging_" in root:
+                continue
+                
             for file in files:
                 file_path = os.path.join(root, file)
                 try:

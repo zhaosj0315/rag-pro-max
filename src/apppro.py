@@ -1573,13 +1573,13 @@ with st.sidebar:
                     if is_file:
                         dest = os.path.join(st.session_state.task_staging_dir, os.path.basename(source_path))
                         if not os.path.exists(dest):
-                            shutil.copy2(source_path, dest)
+                            # 使用 copy 而非 copy2，确保产生新的修改时间，防止被清理逻辑误杀
+                            shutil.copy(source_path, dest)
                             logger.info(f"📂 [{source_label}] 单文件同步成功: {os.path.basename(source_path)}")
                     else:
                         # 目录同步 (支持递归)
                         added_count = 0
                         for root, dirs, files in os.walk(source_path):
-                            # 计算相对路径，保持层级结构
                             rel_path = os.path.relpath(root, source_path)
                             if rel_path == ".":
                                 target_root = st.session_state.task_staging_dir
@@ -1594,7 +1594,8 @@ with st.sidebar:
                                 s = os.path.join(root, file)
                                 d = os.path.join(target_root, file)
                                 if not os.path.exists(d):
-                                    shutil.copy2(s, d)
+                                    # 产生新的时间戳，绕过清理脚本
+                                    shutil.copy(s, d)
                                     added_count += 1
                         logger.info(f"📂 [{source_label}] 递归同步完成: 从 {source_path} 导入了 {added_count} 个文件")
                     return True
