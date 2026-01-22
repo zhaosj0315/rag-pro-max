@@ -1,13 +1,18 @@
 # RAG Pro Max - 企业级智能文档问答与数据分析系统
 
-**当前版本**: v8.9.0 (Flagship Unified Edition)  
-![Version](https://img.shields.io/badge/version-v8.9.0-purple)
+**当前版本**: v9.0.0 (Flagship Evolution)  
+![Version](https://img.shields.io/badge/version-v9.0.0-purple)
 
-RAG Pro Max v8.9.0 引入了 **「精准抓取 (Crawler Precision)」** 算法升级，完美对齐用户对复杂网页结构的指数级扩散需求，同时加固了系统在大规模并发场景下的模块稳定性。
+RAG Pro Max v9.0.0 开启了 **「全能摄入 (Omni-Ingestion)」** 时代。通过引入物理暂存区机制，系统实现了文件、目录、粘贴文本的“并集叠加”收集模式，极大提升了复杂业务场景下的资料整合效率。
 
 ---
 
-## 🚀 v8.9.0 核心特性
+## 🚀 v9.0.0 核心特性
+
+### 📥 全能并集摄入 (Omni-Ingestion)
+- **多源叠加**: 告别单选，支持同时上传文件、添加本地路径、粘贴文本，自由组装知识库材料。
+- **物理暂存区**: 引入 `task_staging_dir` 机制，提供实时的文件计数与清空管理。
+- **管理员配额豁免**: 管理员拥有无限存储主权，支持在 UI 界面动态分配用户空间。
 
 ### 🕷️ 指数级精准抓取 (Crawler Precision)
 - **种子页独立化**: 种子 URL 作为 Level 0 起点，完美释放后续层级配额。

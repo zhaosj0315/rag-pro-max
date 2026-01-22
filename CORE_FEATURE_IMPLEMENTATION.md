@@ -47,4 +47,18 @@ v8.9.0 重新定义了递归爬取的层级语义，以解决深度扩散时的�
    - **Level 1**: 从种子页提取出的链接中抓取前 $n$ 个。
    - **Level 2**: 从 Level 1 页面中进一步提取链接，抓取前 $n^2$ 个。
 3. **Cross-Engine Consistency**: 同步 (`WebCrawler`)、异步 (`AsyncWebCrawler`)、并发 (`ConcurrentCrawler`) 三大引擎底层共享此递归逻辑，确保在不同性能模式下产出一致的文档集合。
-4. **Scope Guard**: 自动根据种子 URL 的域名及路径深度（如阿里云帮助文档的 `/help/zh/`）设定作用域锁，防止爬虫逃逸至无关域名。
+- **Scope Guard**: 自动根据种子 URL 的域名及路径深度（如阿里云帮助文档的 `/help/zh/`）设定作用域锁，防止爬虫逃逸至无关域名。
+
+---
+
+## 📦 5. 全能并集摄入逻辑 (Omni-Ingestion Pipeline)
+v9.0.0 引入了基于物理暂存区的“并集”收集算法，替代了原本基于优先级的互斥逻辑。
+
+### 设计实现 (Design Details)
+1.  **Staging Lifecycle**: 在新建知识库会话启动时，系统通过 `uuid` 生成唯一的 `task_staging_dir` 物理路径。
+2.  **Staging Sync (`sync_to_staging`)**:
+    *   **文件上传**: 捕获 `st.file_uploader` 状态，实时将缓存文件写入暂存区。
+    *   **目录同步**: 调用 `os.walk` 递归扫描本地目录，将符合规则的文件物理拷贝至暂存区。
+    *   **文本粘贴**: 将粘贴内容持久化为 `manual_pasted_{timestamp}.txt`。
+3.  **Atomic Anchoring**: 在执行 `IndexBuilder.build()` 之前，强制将 `uploaded_path` 指向暂存区，实现多源到单源的平滑转换。
+4.  **Self-Healing**: 自动检查暂存区的物理存在性，并在页面热重载时实现静默重建。

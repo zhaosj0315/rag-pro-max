@@ -14,8 +14,14 @@
 - **Exponential Depth Propagation**: 采用 $n^{depth}$ 扩散模型，平衡了抓取速度与文档关联广度。
 - **Unified Engine Interface**: 抽象了统一的 `crawl_recursive` 接口，解耦了同步（Requests）与异步（Aiohttp）底层实现。
 
-### 1. 全源归一化数据库摄入 (Omni-Source DB Ingestion)
-在 v8.8.0 中，系统通过 **“全能适配器 (Omni-Adapter)”** 实现了对 9 种异构数据源的物理归一化：
+### 1. 全源归一化摄入层 (Omni-Ingestion Architecture)
+在 v9.0.0 中，系统引入了 **「物理暂存区 (Physical Staging Area)」** 架构，实现了前端交互与后端引擎的解耦：
+- **Staging Buffer (`task_staging_dir`)**: 作为所有非结构化数据的统一汇聚点，通过 `uuid` 隔离不同任务。
+- **Source Aggregators**: 
+    - **Upload Ingestor**: 处理 Streamlit 文件缓冲区流。
+    - **Path Ingestor**: 执行 `os.walk` 递归文件扫描与物理镜像。
+    - **Paste Ingestor**: 实时文本持久化引擎。
+- **Atomic Dispatcher**: 将暂存区的“并集合集”一次性投递给 `IndexBuilder`，确保了构建原子性。
 - **Heterogeneous Drivers**: 封装了从 MySQL, Oracle 到 MaxCompute 的全量驱动逻辑。
 - **Source-Agnostic Mirroring**: 所有的远程表在摄入阶段均会被转化为标准 `.csv` 片段，确保下游的 RAG 向量化与 SQL 影子库构建逻辑 **100% 复用**。
 
