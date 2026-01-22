@@ -1,8 +1,8 @@
-# RAG Pro Max v6.9.5 企业级部署指南 (Flagship Purified Edition)
+# RAG Pro Max v8.8.0 企业级部署指南 (Flagship Unified Edition)
 
-**版本**: v6.9.5  
-**更新日期**: 2026-01-19  
-**核心特性**: 架构深度净化、个体安全调节舱、全合规自动巡检
+**版本**: v8.8.0  
+**更新日期**: 2026-01-22  
+**核心特性**: 极简归一化架构、全源异构数据库、智能意图识别
 
 ---
 
@@ -26,7 +26,7 @@ python -c "import pandas, plotly, sqlite3; print('✅ Data Analytics Stack Ready
 ## 🚀 部署流程
 
 ### 1. 初始化配置文件
-复制并编辑 `.env` 文件。v6.7.0 建议在此集中管理扩展密钥：
+复制并编辑 `.env` 文件。v8.0.0+ 建议在此集中管理扩展密钥：
 
 ```bash
 # 基础配置
@@ -46,6 +46,9 @@ export EXA_API_KEY=your_exa_key
 # 推荐方式 (自动加载 .env)
 source .env && ./start.sh
 
+# 增强方式 (v8.8.0 推荐)
+./scripts/start_enhanced.sh
+
 # Docker 方式
 docker-compose up -d --build
 ```
@@ -53,7 +56,7 @@ docker-compose up -d --build
 ---
 
 ## 🐳 Docker 镜像说明
-v6.9.5 官方镜像标签为 `ragpromax/rag-pro-max:v6.9.5`。
+v8.8.0 官方镜像标签为 `ragpromax/rag-pro-max:v8.8.0`。
 请在 `docker-compose.yml` 中确保更新版本号。
 
 ---
