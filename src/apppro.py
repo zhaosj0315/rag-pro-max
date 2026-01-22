@@ -1639,94 +1639,94 @@ with st.sidebar:
                     else:
                         st.caption("❌ 路径不存在，请检查拼写")
             
-            # --- [v8.8.0] 融合文本粘贴功能 ---
-            st.markdown("---")
-            with st.expander("📝 或直接粘贴文本内容", expanded=False):
-                if not can_upload:
-                    st.warning("🔒 权限不足")
-                else:
-                    if 'paste_css_injected' not in st.session_state:
-                        st.markdown("""
-                        <style>
-                        .stTextArea textarea {
-                            border: 2px dashed rgba(49, 51, 63, 0.2) !important;
-                            background-color: rgba(240, 242, 246, 0.5) !important;
-                            border-radius: 0.5rem !important;
-                        }
-                        </style>
-                        """, unsafe_allow_html=True)
-                        st.session_state.paste_css_injected = True
-                    
-                    def auto_save_text():
-                        content = st.session_state.get('paste_text_display', '')
-                        if content and content.strip():
-                            try:
-                                if "... [文本过长，已截断显示，完整内容已保存] ..." in content:
-                                    full_content = st.session_state.get('paste_text_content', content)
-                                else:
-                                    full_content = content
-                                
-                                if not full_content or not full_content.strip():
-                                    return
+                # --- [v8.8.0] 融合文本粘贴功能 ---
+                st.markdown("---")
+                with st.expander("📝 或直接粘贴文本内容", expanded=False):
+                    if not can_upload:
+                        st.warning("🔒 权限不足")
+                    else:
+                        if 'paste_css_injected' not in st.session_state:
+                            st.markdown("""
+                            <style>
+                            .stTextArea textarea {
+                                border: 2px dashed rgba(49, 51, 63, 0.2) !important;
+                                background-color: rgba(240, 242, 246, 0.5) !important;
+                                border-radius: 0.5rem !important;
+                            }
+                            </style>
+                            """, unsafe_allow_html=True)
+                            st.session_state.paste_css_injected = True
+                        
+                        def auto_save_text():
+                            content = st.session_state.get('paste_text_display', '')
+                            if content and content.strip():
+                                try:
+                                    if "... [文本过长，已截断显示，完整内容已保存] ..." in content:
+                                        full_content = st.session_state.get('paste_text_content', content)
+                                    else:
+                                        full_content = content
                                     
-                                save_dir = os.path.join(UPLOAD_DIR, f"text_{int(time.time())}")
-                                if not os.path.exists(save_dir): 
-                                    os.makedirs(save_dir)
-                                safe_name = "manual_input.txt"
-                                
-                                with open(os.path.join(save_dir, safe_name), 'w', encoding='utf-8') as f:
-                                    f.write(full_content)
-                                
-                                abs_path = os.path.abspath(save_dir)
-                                st.session_state.uploaded_path = abs_path
-                                st.session_state.path_input = abs_path
-                                
-                                preview = "".join(c for c in full_content[:15] if c.isalnum() or c.isspace()).strip()
-                                st.session_state.upload_auto_name = f"Text_{preview}"
-                                
-                                st.session_state.text_auto_saved = True
-                                st.session_state.saved_text_length = len(full_content)
-                                
-                            except Exception as e:
-                                st.error(f"自动保存失败: {e}")
-                    
-                    current_text = st.session_state.get('paste_text_display', '')
-                    display_text = current_text
-                    is_truncated = False
-                    
-                    if current_text:
-                        st.session_state.paste_text_content = current_text
-                    
-                    if len(current_text) > 100000:
-                        display_text = current_text[:10000] + "\n\n... [文本过长，已截断显示，完整内容已保存] ..."
-                        is_truncated = True
-                    
-                    text_input_content = st.text_area(
-                        "文本内容", 
-                        value=display_text,
-                        height=200,
-                        placeholder="在此粘贴文本，失焦时自动保存...", 
-                        label_visibility="collapsed",
-                        key="paste_text_display",
-                        on_change=auto_save_text
-                    )
-                    
-                    if not is_truncated:
-                        st.session_state.paste_text_content = text_input_content
-                    
-                    if st.session_state.get('text_auto_saved'):
-                        saved_length = st.session_state.get('saved_text_length', 0)
-                        st.success(f"✅ 文本已自动保存 ({saved_length:,} 字符) - {st.session_state.get('upload_auto_name', '')}")
-                    elif current_text:
-                        char_count = len(current_text)
-                        if is_truncated:
-                            st.info(f"📊 大文本 ({char_count:,} 字符) - 前端仅显示前10,000字符，完整内容将自动保存")
-                        else:
-                            st.caption(f"📊 字符数: {char_count:,}")
-            
-
+                                    if not full_content or not full_content.strip():
+                                        return
+                                        
+                                    save_dir = os.path.join(UPLOAD_DIR, f"text_{int(time.time())}")
+                                    if not os.path.exists(save_dir): 
+                                        os.makedirs(save_dir)
+                                    safe_name = "manual_input.txt"
+                                    
+                                    with open(os.path.join(save_dir, safe_name), 'w', encoding='utf-8') as f:
+                                        f.write(full_content)
+                                    
+                                    abs_path = os.path.abspath(save_dir)
+                                    st.session_state.uploaded_path = abs_path
+                                    st.session_state.path_input = abs_path
+                                    
+                                    preview = "".join(c for c in full_content[:15] if c.isalnum() or c.isspace()).strip()
+                                    st.session_state.upload_auto_name = f"Text_{preview}"
+                                    
+                                    st.session_state.text_auto_saved = True
+                                    st.session_state.saved_text_length = len(full_content)
+                                    
+                                except Exception as e:
+                                    st.error(f"自动保存失败: {e}")
+                        
+                        current_text = st.session_state.get('paste_text_display', '')
+                        display_text = current_text
+                        is_truncated = False
+                        
+                        if current_text:
+                            st.session_state.paste_text_content = current_text
+                        
+                        if len(current_text) > 100000:
+                            display_text = current_text[:10000] + "\n\n... [文本过长，已截断显示，完整内容已保存] ..."
+                            is_truncated = True
+                        
+                        text_input_content = st.text_area(
+                            "文本内容", 
+                            value=display_text,
+                            height=200,
+                            placeholder="在此粘贴文本，失焦时自动保存...", 
+                            label_visibility="collapsed",
+                            key="paste_text_display",
+                            on_change=auto_save_text
+                        )
+                        
+                        if not is_truncated:
+                            st.session_state.paste_text_content = text_input_content
+                        
+                        if st.session_state.get('text_auto_saved'):
+                            saved_length = st.session_state.get('saved_text_length', 0)
+                            st.success(f"✅ 文本已自动保存 ({saved_length:,} 字符) - {st.session_state.get('upload_auto_name', '')}")
+                        elif current_text:
+                            char_count = len(current_text)
+                            if is_truncated:
+                                st.info(f"📊 大文本 ({char_count:,} 字符) - 前端仅显示前10,000字符，完整内容将自动保存")
+                            else:
+                                st.caption(f"📊 字符数: {char_count:,}")
                 
-                # 不需要手动保存按钮了，失焦自动保存
+
+                    
+                    # 不需要手动保存按钮了，失焦自动保存
         else:
             # 管理模式 - 使用一行化布局 (1x2 紧凑布局)
             manage_title_col1, manage_title_col2 = st.columns([4, 1])
