@@ -1,13 +1,18 @@
 # RAG Pro Max - 企业级智能文档问答与数据分析系统
 
-**当前版本**: v8.8.0 (Flagship Unified Edition)  
-![Version](https://img.shields.io/badge/version-v8.8.0-purple)
+**当前版本**: v8.9.0 (Flagship Unified Edition)  
+![Version](https://img.shields.io/badge/version-v8.9.0-purple)
 
-RAG Pro Max v8.8.0 实现了 **「极简归一化 (Minimalist Unified)」** 架构的终极演进。通过将数据摄入收敛为三大全能入口，配合 9 种异构数据库集成，系统现在可以作为企业级数据中台，一站式吞噬并分析全域数据。
+RAG Pro Max v8.9.0 引入了 **「精准抓取 (Crawler Precision)」** 算法升级，完美对齐用户对复杂网页结构的指数级扩散需求，同时加固了系统在大规模并发场景下的模块稳定性。
 
 ---
 
-## 🚀 v8.8.0 核心特性
+## 🚀 v8.9.0 核心特性
+
+### 🕷️ 指数级精准抓取 (Crawler Precision)
+- **种子页独立化**: 种子 URL 作为 Level 0 起点，完美释放后续层级配额。
+- **5+25 递归扩散**: 严格遵循 $n^1 + n^2$ 的指数配额分布，输入 2x5 即可获得 30+ 深度关联文档。
+- **三端逻辑统合**: 同步、异步、并发爬虫实现 100% 行为一致性，满足不同性能场景。
 
 ### 🔌 全异构数据库大满贯 (9+ DB Support)
 - **极广适配**: 原生支持 MySQL, PostgreSQL, SQLite, DuckDB, ClickHouse, SQL Server, Oracle, MaxCompute (DataWorks), Snowflake。

@@ -1,8 +1,8 @@
 # RAG Pro Max 核心功能实现详述 (Core Feature Implementation)
 
-**版本**: v8.8.0 (Flagship Unified Edition)
+**版本**: v8.9.0 (Flagship Unified Edition)
 **状态**: 关键性资产 (永久保存)
-**描述**: 本文档记录了 v8.8「极简归一化」架构的底层实现逻辑、协同算法及物理闭环规范。
+**描述**: 本文档记录了 v8.9「精准抓取」逻辑及 v8.8「极简归一化」架构的底层实现逻辑、协同算法及物理闭环规范。
 
 ---
 
@@ -35,3 +35,16 @@
 ## 🧼 3. 架构鲁棒性与净化 (Robustness)
 - **逻辑单点**: 删除了所有残留的“模式选择”旧逻辑，确立了以 `process_knowledge_base_logic` 为核心的唯一编排器。
 - **物理闭环**: 同一个知识库 ID 文件夹内的双向引用通过物理文件 ID (`doc_id` <-> `row_id`) 实现初步关联。
+
+---
+
+## 🕷️ 4. 精准层级爬取逻辑 (Level-0 Exponential Crawl)
+v8.9.0 重新定义了递归爬取的层级语义，以解决深度扩散时的配额分配问题。
+
+### 算法演进 (Algorithm Evolution)
+1. **Level 0 (Seed Isolation)**: 种子 URL 被隔离处理。它不计入 Level 1 的 $n$ 个名额，仅作为初始 HTML 获取源。
+2. **Exponential Distribution**: 采用 $n^{depth}$ 的配额分配。
+   - **Level 1**: 从种子页提取出的链接中抓取前 $n$ 个。
+   - **Level 2**: 从 Level 1 页面中进一步提取链接，抓取前 $n^2$ 个。
+3. **Cross-Engine Consistency**: 同步 (`WebCrawler`)、异步 (`AsyncWebCrawler`)、并发 (`ConcurrentCrawler`) 三大引擎底层共享此递归逻辑，确保在不同性能模式下产出一致的文档集合。
+4. **Scope Guard**: 自动根据种子 URL 的域名及路径深度（如阿里云帮助文档的 `/help/zh/`）设定作用域锁，防止爬虫逃逸至无关域名。

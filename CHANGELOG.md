@@ -1,5 +1,17 @@
 # Changelog
 
+## [v8.9.0] - 2026-01-22 (Flagship Unified Edition - Crawler Precision)
+### 🕷️ 网页抓取算法精准化升级 (Crawler Precision Upgrade)
+- **种子页独立化 (Level 0 Seed Logic)**: 彻底重构抓取层级判定逻辑。种子 URL 不再占据第 1 层名额，而是作为 **Level 0 (种子层)** 独立存在，确保其下级链接能足额填满用户设定的指数配额。
+- **指数级递归配额 (Exponential 5+25)**: 完美对齐用户预期，实现 **Level 1 ($n^1$) + Level 2 ($n^2$)** 的深度扩散。例如在 `2x5` 配置下，系统将精准捕获 1(种子) + 5(第一层) + 25(第二层) = 31 个网页。
+- **三端逻辑大一统**: 实现了同步、异步、并发三类爬虫引擎在“层级深度”与“每层页数”参数处理上的 100% 行为一致性。
+
+### 🛡️ 核心鲁棒性与作用域修复 (Scope & Robustness Fixes)
+- **全局模块冲突修复**: 解决了 `WebCrawler` 中因局部导入 `re` 模块导致的 `UnboundLocalError`（局部变量覆盖全局引用）顽疾。
+- **异步方法作用域校正**: 修复了 `AsyncWebCrawler` 中因缩进错误导致 `crawl_recursive` 方法沦为局部函数、进而引发 API 调用失败的致命 Bug。
+- **挂载完整性校验**: 解决了由于爬虫空跑导致索引文件 (`docstore.json`) 缺失，进而引发知识库挂载失败 (`Errno 2`) 的连锁反应。
+- **系统监控面板 v3.0**: 优化了 `system_monitor.py` 的终端布局，消除了全屏显示时的进度条截断与布局重叠，提升了 M4 Max 环境下的视觉一致性。
+
 ## [v8.8.0] - 2026-01-22 (Flagship Unified Edition)
 ### 🎨 UI 极简重构与逻辑融合 (Minimalist UI Unification)
 - **三大全能入口**: 彻底重构数据摄入交互，将原本分散的 5 种模式收敛为 **“📂 文件上传”、“🌐 互联网提取”、“🔌 数据库同步”** 三大核心支柱。

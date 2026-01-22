@@ -1,12 +1,18 @@
-# RAG Pro Max v8.8.0 企业级系统架构文档
+# RAG Pro Max v8.9.0 企业级系统架构文档
 
-**版本**: v8.8.0 (Flagship Unified Edition)  
+**版本**: v8.9.0 (Flagship Unified Edition)  
 **更新日期**: 2026-01-22  
-**核心特性**: Minimalist Unified Architecture, Omni-Source DB Integration, Smart Linkage
+**核心特性**: Precision Crawler Algorithm, Minimalist Unified Architecture, Omni-Source DB Integration
 
 ---
 
 ## 🏗️ 业务层内核加固 (Service Layer Hardening)
+
+### 1. 网页抓取层级架构 (Precision Crawler Strategy)
+在 v8.9.0 中，系统重写了网页抓取逻辑的层级传播模型：
+- **Level-0 Seed Isolation**: 引入种子隔离层，确保主域名起始页不占用爬取名额。
+- **Exponential Depth Propagation**: 采用 $n^{depth}$ 扩散模型，平衡了抓取速度与文档关联广度。
+- **Unified Engine Interface**: 抽象了统一的 `crawl_recursive` 接口，解耦了同步（Requests）与异步（Aiohttp）底层实现。
 
 ### 1. 全源归一化数据库摄入 (Omni-Source DB Ingestion)
 在 v8.8.0 中，系统通过 **“全能适配器 (Omni-Adapter)”** 实现了对 9 种异构数据源的物理归一化：
