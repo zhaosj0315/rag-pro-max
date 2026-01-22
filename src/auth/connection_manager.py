@@ -40,8 +40,8 @@ class ConnectionManager:
             return {}
 
     def save_connection(self, alias: str, db_type: str, host: str, port: int, 
-                       user: str, password: str, db_name: str) -> bool:
-        """保存或更新连接配置"""
+                       user: str, password: str, db_name: str, owner: str = None) -> bool:
+        """保存或更新连接配置 (支持所有者隔离)"""
         try:
             current = self.load_connections()
             current[alias] = {
@@ -51,6 +51,7 @@ class ConnectionManager:
                 "user": user,
                 "password": self._encrypt(password), # 存储时加密
                 "database": db_name,
+                "owner": owner, # [v8.7.0] 新增所有者字段
                 "updated_at": str(os.path.getmtime(self.config_path)) if os.path.exists(self.config_path) else ""
             }
             

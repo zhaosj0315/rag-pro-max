@@ -1072,10 +1072,8 @@ with st.sidebar:
     
     # 横向标签页布局 (v3.4: 管理为先)
     # [v6.9.3] 侧边栏架构彻底净化修复
-    tab_labels = ["🏠 主页", "🎭 角色", "⚙️ 配置", "📊 监控", "❓ 帮助"]
+    tab_labels = ["🏠 主页", "🎭 角色", "⚙️ 配置", "📊 监控", "❓ 帮助", "👤 我的"]
     is_admin = (st.session_state.get('role') == 'admin')
-    if is_admin:
-        tab_labels.append("👤 用户")
     
     tabs = st.tabs(tab_labels)
     
@@ -1086,16 +1084,10 @@ with st.sidebar:
     tab_monitor = tabs[3]
     tab_help = tabs[4]
     
-    # 渲染 Admin 专用 Tab (物理对齐)
-    if is_admin and len(tabs) > 5:
-        with tabs[5]:
-            # [v8.6.7] 缓存爆破机制：通过局部函数定义强制刷新语法树
-            def force_render_admin_v867():
-                import src.auth.resource_governance as rg_mod
-                importlib.reload(rg_mod)
-                rg_mod.render_resource_governance_v19()
-            
-            force_render_admin_v867()
+    # 渲染 用户/管理 统一 Tab
+    with tabs[5]:
+        from src.ui.user_profile_ui import UserProfileUI
+        UserProfileUI.render()
 
     # --- 退出登录按钮 ---
     st.sidebar.markdown("---")
