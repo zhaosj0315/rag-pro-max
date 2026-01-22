@@ -2161,18 +2161,20 @@ with st.sidebar:
                     exclude_patterns = [line.strip() for line in exclude_text.split('\n') if line.strip()] if exclude_text else []
 
             # --- [v8.6.9] 归一化名称录入与建议区 (全模式共享) ---
-            kb_name_col1, kb_name_col2 = st.columns([4, 1])
+            kb_name_col1, kb_name_col2, kb_name_col3 = st.columns([1.2, 4, 0.5])
             with kb_name_col1:
+                st.markdown("<div style='margin-top: 6px;'><b>知识库名称</b></div>", unsafe_allow_html=True)
+            with kb_name_col2:
                 # 获取建议值 (优先级：手动输入 > 自动建议)
                 current_name_val = st.session_state.get('upload_auto_name', "")
                 kb_name_input = st.text_input(
                     "知识库名称", 
                     value=current_name_val,
                     placeholder="给您的知识资产起个名字...",
-                    key="kb_name_input_main"
+                    key="kb_name_input_main",
+                    label_visibility="collapsed"
                 )
-            with kb_name_col2:
-                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+            with kb_name_col3:
                 if st.button("💡", help="智能建议名称", key="smart_name_btn_main"):
                     if kb_name_input:
                         from src.utils.kb_utils import generate_smart_kb_name
