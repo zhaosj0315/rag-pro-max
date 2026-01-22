@@ -1719,7 +1719,6 @@ with st.sidebar:
                     st.caption("❌ 路径不存在，请检查拼写")
             
                 # --- [v8.8.0] 融合文本粘贴功能 ---
-                st.markdown("---")
                 with st.expander("📝 或直接粘贴文本内容", expanded=False):
                     if not can_upload:
                         st.warning("🔒 权限不足")
@@ -2162,7 +2161,6 @@ with st.sidebar:
                     exclude_patterns = [line.strip() for line in exclude_text.split('\n') if line.strip()] if exclude_text else []
 
             # --- [v8.6.9] 归一化名称录入与建议区 (全模式共享) ---
-            st.markdown("---")
             kb_name_col1, kb_name_col2 = st.columns([4, 1])
             with kb_name_col1:
                 # 获取建议值 (优先级：手动输入 > 自动建议)
