@@ -632,6 +632,21 @@ from src.ui.unified_dialogs import show_document_detail_dialog
 from src.utils.kb_utils import generate_smart_kb_name
 from src.utils.app_utils import initialize_session_state
 
+# --- Expander State Management ---
+if 'kb_adv_expanded' not in st.session_state:
+    st.session_state.kb_adv_expanded = False
+
+def keep_adv_open():
+    st.session_state.kb_adv_expanded = True
+
+if 'kb_adv_expanded_update' not in st.session_state:
+    st.session_state.kb_adv_expanded_update = False
+
+def keep_adv_open_update():
+    st.session_state.kb_adv_expanded_update = True
+
+
+
 
 # 引入 RAG 引擎
 from src.rag_engine import RAGEngine
@@ -1844,11 +1859,11 @@ with st.sidebar:
                             st.info(f"📄 {uploaded_file.name} - 暂不支持此文件类型的质量评估")
                 
                 # 高级选项 (复用新建模式的逻辑)
-                with st.expander("🔧 高级选项 (本次更新有效)", expanded=False):
+                with st.expander("🔧 高级选项 (本次更新有效)", expanded=st.session_state.kb_adv_expanded_update):
                     # 布局优化：全选 + 状态提示在一行
                     h_col1, h_col2 = st.columns([1.5, 2.5])
                     with h_col1:
-                        select_all = st.checkbox("✅ 一键全选", value=False, key="kb_adv_select_all_update", help="开启/关闭所有高级选项")
+                        select_all = st.checkbox("✅ 一键全选", value=False, key="kb_adv_select_all_update", help="开启/关闭所有高级选项", on_change=keep_adv_open_update)
                     with h_col2:
                         status_placeholder = st.empty()
                     
@@ -1856,11 +1871,11 @@ with st.sidebar:
                     
                     opt_col1, opt_col2, opt_col3 = st.columns(3)
                     with opt_col1:
-                        st.checkbox("🔍 OCR识别", value=default_val, key="kb_use_ocr", help="识别PDF中的图片文字")
+                        st.checkbox("🔍 OCR识别", value=default_val, key="kb_use_ocr_update", help="识别PDF中的图片文字", on_change=keep_adv_open_update)
                     with opt_col2:
-                        st.checkbox("📊 元数据", value=default_val, key="kb_extract_metadata", help="提取文件分类、关键词")
+                        st.checkbox("📊 元数据", value=default_val, key="kb_extract_metadata_update", help="提取文件分类、关键词", on_change=keep_adv_open_update)
                     with opt_col3:
-                        st.checkbox("📝 生成摘要", value=default_val, key="kb_generate_summary", help="生成AI摘要")
+                        st.checkbox("📝 生成摘要", value=default_val, key="kb_generate_summary_update", help="生成AI摘要", on_change=keep_adv_open_update)
                     
                     # 更新状态提示
                     options = []
@@ -2335,11 +2350,11 @@ with st.sidebar:
             st.write("")
 
             # 高级选项
-            with st.expander("🔧 高级选项", expanded=False):
+            with st.expander("🔧 高级选项", expanded=st.session_state.kb_adv_expanded):
                 # 布局优化：全选 + 状态提示在一行
                 h_col1, h_col2 = st.columns([1.5, 2.5])
                 with h_col1:
-                    select_all = st.checkbox("✅ 一键全选", value=False, key="kb_adv_select_all", help="开启/关闭所有高级选项")
+                    select_all = st.checkbox("✅ 一键全选", value=False, key="kb_adv_select_all", help="开启/关闭所有高级选项", on_change=keep_adv_open)
                 with h_col2:
                     status_placeholder = st.empty()
                 
@@ -2355,19 +2370,19 @@ with st.sidebar:
                 opt_col1, opt_col2 = st.columns(2)
                 
                 with opt_col1:
-                    use_ocr = st.checkbox("🔍 OCR文字识别", value=default_val, key="kb_use_ocr", help="识别图片或PDF中的文字")
-                    extract_metadata = st.checkbox("📊 元数据提取", value=default_val, key="kb_extract_metadata", help="自动提取文件分类、关键词")
+                    use_ocr = st.checkbox("🔍 OCR文字识别", value=default_val, key="kb_use_ocr", help="识别图片或PDF中的文字", on_change=keep_adv_open)
+                    extract_metadata = st.checkbox("📊 元数据提取", value=default_val, key="kb_extract_metadata", help="自动提取文件分类、关键词", on_change=keep_adv_open)
                     # 维护项紧跟其后，移除横杠
                     if can_rebuild:
-                        force_reindex = st.checkbox("🔄 强制重建索引", value=default_val, key="kb_force_reindex", help="物理删除旧索引，触发全量重建（慎用）")
+                        force_reindex = st.checkbox("🔄 强制重建索引", value=default_val, key="kb_force_reindex", help="物理删除旧索引，触发全量重建（慎用）", on_change=keep_adv_open)
                     else:
                         st.checkbox("🔄 强制重建索引 (🔒)", value=False, disabled=True, help="无重建索引权限")
                         force_reindex = False
 
                 with opt_col2:
                     # [v8.6.9 修复] 一键全选现在包含数据分析
-                    enable_data_analysis = st.checkbox("💎 智能数据分析", value=default_val, key="kb_enable_data_analysis", help="自动识别真数据，构建物理库，启用SQL决策")
-                    generate_summary = st.checkbox("📝 自动摘要生成", value=default_val, key="kb_generate_summary", help="为每份文件生成AI摘要")
+                    enable_data_analysis = st.checkbox("💎 智能数据分析", value=default_val, key="kb_enable_data_analysis", help="自动识别真数据，构建物理库，启用SQL决策", on_change=keep_adv_open)
+                    generate_summary = st.checkbox("📝 自动摘要生成", value=default_val, key="kb_generate_summary", help="为每份文件生成AI摘要", on_change=keep_adv_open)
                 
                 # 保存到session state
                 st.session_state.use_ocr = use_ocr
