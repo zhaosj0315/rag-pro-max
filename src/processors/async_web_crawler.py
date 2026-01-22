@@ -93,76 +93,107 @@ class AsyncWebCrawler:
         self, start_url: str, max_depth: int = 10, max_pages_per_level: int = 1000,
         output_dir: str = "crawled_data", status_callback: Optional[Callable] = None
     ) -> List[str]:
-        """【重构】饱和式队列爬取模式 - 取代层级递归"""
+        """【重构】分层递归爬取模式 - 优化种子页逻辑，支持 5+25 指数分布"""
         output_path = Path(output_dir)
         output_path.mkdir(exist_ok=True)
         
-        # 确定作用域前缀 (复刻原生脚本)
+        # 确定作用域前缀
         parsed = urlparse(start_url)
-        # 针对阿里云专项提取根路径
-        path_parts = parsed.path.strip('/').split('/')
-        if 'help.aliyun.com' in parsed.netloc and len(path_parts) >= 3:
-            scope_prefix = f"{parsed.scheme}://{parsed.netloc}/{'/'.join(path_parts[:3])}/"
+        if 'help.aliyun.com' in parsed.netloc:
+            path_parts = parsed.path.strip('/').split('/')
+            if len(path_parts) >= 3:
+                scope_prefix = f"{parsed.scheme}://{parsed.netloc}/{'/'.join(path_parts[:3])}/"
+            else:
+                scope_prefix = start_url.rsplit('/', 1)[0] + '/'
         else:
-            # 通用回退
             scope_prefix = start_url.rsplit('/', 1)[0] + '/'
 
         if status_callback:
-            status_callback(f"🌐 激活【饱和抓取】模式 (对齐原生脚本)")
+            status_callback(f"🌐 激活【指数级深度抓取】模式")
             status_callback(f"📍 作用域: {scope_prefix}")
-            status_callback(f"🐢 正在以单线程顺序爬取，请耐心等待...")
+            status_callback(f"🐢 参数设定: 深度={max_depth}, 基础页数={max_pages_per_level}")
 
-        urls_to_visit = {start_url}
         saved_files = []
-        
-        # 只要队列不空，就一直爬下去 (复刻 while 循环)
-        # [v7.0.1] 提升安全上限至 50,000 页，与同步爬虫保持一致
-        while urls_to_visit and len(saved_files) < 50000:
-            current_url = urls_to_visit.pop()
+        total_pages_limit = 50000
+
+        # --- Step 0: 处理种子页 (Level 0) ---
+        if status_callback:
+            status_callback(f"🚀 处理种子页: {start_url}")
             
-            if current_url in self.visited_urls:
-                continue
+        html = await self.fetch_page(start_url)
+        if html:
+            self.visited_urls.add(start_url)
+            content = HtmlToMarkdown.convert_with_html2text(html)
+            if len(content.strip()) >= 100:
+                filename = self._get_filename_pure(start_url)
+                filepath = output_path / filename
+                try:
+                    soup = BeautifulSoup(html, 'html.parser')
+                    title = soup.title.string.strip() if soup.title else "No Title"
+                except: title = "No Title"
+                
+                async with aiofiles.open(filepath, 'w', encoding='utf-8') as f:
+                    await f.write(f"**URL:** {start_url}\n\n# {title}\n\n{content}")
+                set_where_from_metadata(str(filepath), start_url)
+                saved_files.append(str(filepath))
             
-            self.visited_urls.add(current_url)
+            # 提取初始链接作为 Level 1 起点
+            current_level = set(self.extract_links_pure(html, start_url, scope_prefix))
+        else:
+            if status_callback: status_callback(f"❌ 种子页获取失败")
+            return []
+
+        # --- Step 1: 层级递归 ---
+        for depth in range(1, max_depth + 1):
+            if not current_level or len(saved_files) >= total_pages_limit:
+                break
+                
+            # 限制本层处理数量 - 指数级
+            target_layer_count = max_pages_per_level ** depth
+            urls_to_process = list(current_level)[:target_layer_count]
+            next_level = set()
             
             if status_callback:
-                status_callback(f"正在处理 ({len(saved_files)+1}): {current_url}")
+                status_callback(f"📂 第 {depth} 层开始: 目标抓取 {target_layer_count} 页")
             
-            html = await self.fetch_page(current_url)
-            if not html:
-                continue
+            for current_url in urls_to_process:
+                if current_url in self.visited_urls or len(saved_files) >= total_pages_limit:
+                    continue
+                    
+                self.visited_urls.add(current_url)
+                
+                if status_callback:
+                    status_callback(f"🔄 抓取 (L{depth}, 总:{len(saved_files)+1}): {current_url}")
+                
+                html = await self.fetch_page(current_url)
+                if not html: continue
+                
+                content = HtmlToMarkdown.convert_with_html2text(html)
+                if len(content.strip()) < 100: continue
+                
+                filename = self._get_filename_pure(current_url)
+                filepath = output_path / filename
+                
+                try:
+                    soup = BeautifulSoup(html, 'html.parser')
+                    title = soup.title.string.strip() if soup.title else "No Title"
+                except: title = "No Title"
+                
+                async with aiofiles.open(filepath, 'w', encoding='utf-8') as f:
+                    await f.write(f"**URL:** {current_url}\n\n# {title}\n\n{content}")
+                
+                set_where_from_metadata(str(filepath), current_url)
+                saved_files.append(str(filepath))
+                
+                if depth < max_depth:
+                    found_links = self.extract_links_pure(html, current_url, scope_prefix)
+                    next_level.update(set(found_links) - self.visited_urls)
             
-            # 提取内容 (使用高保真 HTML2Text，锁定 content-wrapper)
-            content = HtmlToMarkdown.convert_with_html2text(html)
-            if len(content.strip()) < 100:
-                continue
-            
-            # 保存文件 (复刻命名逻辑)
-            filename = self._get_filename_pure(current_url)
-            filepath = output_path / filename
-            
-            # 标题提取
-            try:
-                soup = BeautifulSoup(html, 'html.parser')
-                title = soup.title.string.strip() if soup.title else "No Title"
-            except: title = "No Title"
-            
-            async with aiofiles.open(filepath, 'w', encoding='utf-8') as f:
-                await f.write(f"**URL:** {current_url}\n\n# {title}\n\n{content}")
-            
-            set_where_from_metadata(str(filepath), current_url)
-            saved_files.append(str(filepath))
-            
-            # 提取新链接并更新队列 (复刻逻辑)
-            found_links = self.extract_links_pure(html, current_url, scope_prefix)
-            new_links = set(found_links) - self.visited_urls
-            urls_to_visit.update(new_links)
-            
-            # 每 10 个文件显示一次进度
-            if len(saved_files) % 10 == 0 and status_callback:
-                status_callback(f"✅ 已保存 {len(saved_files)} 个文档，当前队列中还有 {len(urls_to_visit)} 个待爬取链接")
+            current_level = next_level
 
         if status_callback:
             status_callback(f"🎉 爬取完成！共捕获 {len(saved_files)} 个页面")
         
         return saved_files
+
+    

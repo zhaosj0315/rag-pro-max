@@ -252,6 +252,7 @@ class WebToKBProcessor:
                                     core_subject = max(parts, key=len).lower() if parts else clean_kw.lower()
                                     
                                     kw_count = content.lower().count(core_subject)
+                                    is_title_relevant = core_subject in title.lower() if title else False
                                     
                                     # 最终判定逻辑：不能是噪音页，且标题相关，且核心词频 >= 3
                                     if not is_noise_page and (is_title_relevant or kw_count >= 3):

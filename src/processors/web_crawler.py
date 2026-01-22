@@ -79,7 +79,6 @@ class WebCrawler:
             return url
         
         # 如果是常见域名格式，自动添加https://
-        import re
         if re.match(r'^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', url):
             return f"https://{url}"
         
@@ -234,7 +233,6 @@ class WebCrawler:
         # --- v5.5.8 核心锚定逻辑 ---
         core_subject = ""
         if keyword:
-            import re
             # 找到关键词中最长的一个词（通常是主语，如 Google）
             all_parts = re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z0-9]+', keyword)
             if all_parts:
@@ -337,43 +335,75 @@ class WebCrawler:
                       parser_type: str = "default",
                       status_callback: Optional[Callable] = None) -> List[str]:
         """
-        高级递归爬取网页 - 修复递归逻辑
+        高级递归爬取网页 - 优化种子页逻辑，支持 5+25 指数级分布
         """
         # 🛑 安全熔断：全局最大页面限制
         GLOBAL_MAX_PAGES = 50000
-        total_estimated = max_pages ** max_depth
+        total_estimated = sum([max_pages ** i for i in range(1, max_depth + 1)])
         if total_estimated > GLOBAL_MAX_PAGES:
             if status_callback:
                 status_callback(f"⚠️ 安全熔断：预估页面数 {total_estimated} 超过限制 {GLOBAL_MAX_PAGES}")
+            # 简化计算一个合理的 max_pages
             max_pages = min(max_pages, int(GLOBAL_MAX_PAGES ** (1/max_depth)))
         
         # 自动修复URL格式
         start_url = self._fix_url(start_url)
         
-        # (此处省略其余已确认逻辑，确保 _fix_url 可用)
         self.visited_urls = set()
-        current_level = [start_url]
         saved_files = []
         total_count = 0
-        total_attempted = 0
         
         if status_callback:
-            status_callback(f"开始递归爬取: {start_url}")
-        
+            status_callback(f"🚀 开始网页抓取 (种子页): {start_url}")
+
+        # --- Step 0: 处理种子页面 (不计入 Level 1 配额) ---
+        try:
+            response = self._smart_request(start_url, status_callback)
+            response.encoding = response.apparent_encoding
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            title = soup.title.string if soup.title else "No Title"
+            content = self._extract_content_by_parser(soup, parser_type)
+            
+            filepath = self._save_content(start_url, title, content)
+            if filepath:
+                saved_files.append(filepath)
+                total_count += 1
+            
+            self.visited_urls.add(start_url)
+            
+            # 提取初始链接作为 Level 1 的起点
+            current_level = self._extract_links(soup, start_url, exclude_patterns)
+        except Exception as e:
+            if status_callback:
+                status_callback(f"❌ 种子页抓取失败: {e}")
+            return []
+
+        # --- Step 1: 开始层级递归 ---
         for depth in range(1, max_depth + 1):
             if not current_level: break
-            current_layer_limit = max_pages ** depth
-            current_level = current_level[:current_layer_limit]
-            next_level = []
             
-            for i, url in enumerate(current_level, 1):
-                total_attempted += 1
+            # 每一层的目标抓取数量 (指数级)
+            target_layer_count = max_pages ** depth
+            next_level_candidates = []
+            layer_processed_count = 0
+            
+            if status_callback:
+                status_callback(f"📂 进入第 {depth} 层抓取 (目标: {target_layer_count} 页)")
+
+            # 过滤掉已访问的链接并限制候选数量，避免无效循环
+            current_level = [url for url in current_level if url not in self.visited_urls]
+            
+            for url in current_level:
+                if layer_processed_count >= target_layer_count:
+                    break
+                
                 if url in self.visited_urls: continue
                 self.visited_urls.add(url)
                 
                 try:
                     if status_callback:
-                        status_callback(f"🔄 正在抓取 ({total_count+1}) 第{depth}层 ({i}/{len(current_level)}): {url}")
+                        status_callback(f"🔄 抓取 ({total_count+1}) L{depth}: {url}")
                     
                     response = self._smart_request(url, status_callback)
                     response.encoding = response.apparent_encoding
@@ -386,14 +416,18 @@ class WebCrawler:
                     if filepath:
                         saved_files.append(filepath)
                         total_count += 1
+                        layer_processed_count += 1
                     
+                    # 只有在还没到最后一层时才提取链接
                     if depth < max_depth:
                         links = self._extract_links(soup, url, exclude_patterns)
-                        next_level.extend(links)
+                        next_level_candidates.extend(links)
                     
                     time.sleep(0.5)
                 except: continue
-            current_level = list(set(next_level))
+                
+            # 准备下一层 (去重)
+            current_level = list(set(next_level_candidates))
                 
         return saved_files
 
@@ -419,3 +453,6 @@ class WebCrawler:
         return self.crawl_advanced(start_url, max_depth, max_pages, status_callback=status_callback)
     
     crawl_recursive = crawl_advanced
+    crawl_website = crawl_advanced
+
+    
