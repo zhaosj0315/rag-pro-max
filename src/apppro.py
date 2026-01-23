@@ -1563,6 +1563,7 @@ with st.sidebar:
         def render_data_source_config():
             # 引入依赖防止 UnboundLocalError
             from src.processors.upload_handler import UploadHandler
+            from src.utils.kb_utils import generate_smart_kb_name
 
             # 初始化本地变量
             uploaded_files = None
