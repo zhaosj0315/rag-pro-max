@@ -7030,14 +7030,20 @@ if st.session_state.get('is_processing') and final_prompt:
                     
                     # 立即渲染追问建议，保持交互连贯
                     if initial_sugs:
-                        st.markdown("---")
-                        st.caption("🤔 您可能想问：")
-                        cols = st.columns(len(initial_sugs))
+                        import hashlib
+                        # 视觉样式与 MessageRenderer 保持一致
+                        st.divider()
+                        st.markdown("###### 🚀 追问推荐")
+                        
+                        # 计算稳定哈希 (与 MessageRenderer 算法对齐)
+                        msg_hash = hashlib.md5(full_text[:100].encode()).hexdigest()[:8]
+                        
+                        # 垂直布局 (3x1) 直接渲染
                         for i, sug in enumerate(initial_sugs):
-                            with cols[i]:
-                                if st.button(sug, key=f"sug_btn_imm_{int(time.time())}_{i}", use_container_width=True):
-                                    st.session_state.prompt_trigger = sug
-                                    st.rerun()
+                            # 使用与 MessageRenderer 完全一致的 Key
+                            # 点击后 Rerun -> 映射到 History Loop 中的同名按钮 -> 触发 _click_suggestion
+                            btn_key = f"dyn_sug_{msg_hash}_{i}"
+                            st.button(f"👉 {sug}", key=btn_key, use_container_width=True)
                 
                 except Exception as e: 
                     # [v5.9.4] 错误诊断增强：禁止静默闪退，显式抛出异常详情
