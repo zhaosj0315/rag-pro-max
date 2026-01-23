@@ -6278,60 +6278,7 @@ if st.session_state.get('is_processing') and final_prompt:
             st.session_state.is_processing = False
             st.rerun()
                 
-    elif active_kb_name == "pure_chat":
-        # 纯对话模式处理 - 直接与LLM对话，无需知识库
-        st.session_state.is_processing = True
-        logger.info("✅ 纯对话模式开始处理")
-        logger.info(f"❓ 用户问题: {final_prompt}")
-        
-        # 添加用户消息
-        st.session_state.messages.append({"role": "user", "content": final_prompt})
-        
-        # 显示用户消息
-        with st.chat_message("user"):
-            st.write(final_prompt)
-        
-        # 显示助手回复
-        with st.chat_message("assistant"):
-            response_placeholder = st.empty()
-            
-            try:
-                # 获取当前LLM配置
-                from src.utils.model_manager import load_llm_model
-                llm = load_llm_model(llm_provider, llm_model, llm_key, llm_url)
-                
-                if llm:
-                    # 获取当前角色提示词
-                    from src.config.prompt_manager import PromptManager
-                    current_role_id = st.session_state.get('current_prompt_id', 'default')
-                    system_prompt = PromptManager.get_content(current_role_id)
-                    
-                    # 构建完整提示
-                    full_prompt = f"{system_prompt}\n\n用户问题: {final_prompt}"
-                    
-                    # 直接调用LLM
-                    response = llm.complete(full_prompt)
-                    response_text = str(response)
-                    
-                    # 显示回复
-                    response_placeholder.write(response_text)
-                    
-                    # 添加助手消息
-                    st.session_state.messages.append({"role": "assistant", "content": response_text})
-                    logger.log("纯对话模式", "complete", "✅ 纯对话模式查询完成")
-                else:
-                    error_msg = "❌ LLM模型未配置，请检查模型设置"
-                    response_placeholder.error(error_msg)
-                    st.session_state.messages.append({"role": "assistant", "content": error_msg})
-                    
-            except Exception as e:
-                error_msg = f"纯对话模式查询失败: {str(e)}"
-                logger.log("纯对话模式", "error", f"❌ 纯对话模式异常: {str(e)}")
-                response_placeholder.error(error_msg)
-                st.session_state.messages.append({"role": "assistant", "content": error_msg})
-            
-            st.session_state.is_processing = False
-            st.rerun()
+    # elif active_kb_name == "pure_chat": (Removed to enable streaming downstream)
                 
     elif st.session_state.chat_engine:
         # 不清空 suggestions_history，保留追问按钮
@@ -6340,7 +6287,7 @@ if st.session_state.get('is_processing') and final_prompt:
         
         # 强制检测知识库维度并切换模型（静默处理，不显示加载）
         # 优化：只在首次或切换知识库时检测，避免每次问答都重复
-        if active_kb_name:  # 只有在单知识库模式下才检测维度
+        if active_kb_name and active_kb_name != "pure_chat":  # 只有在单知识库模式且非Pure Chat下才检测维度
             db_path = os.path.join(output_base, active_kb_name)
             
             # 始终检测维度，确保模型匹配
