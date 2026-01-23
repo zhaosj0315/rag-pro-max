@@ -1745,7 +1745,7 @@ with st.sidebar:
                                     if sync_to_staging(manual_path, is_file=False, source_label="目录添加"):
                                         st.session_state.uploaded_path = st.session_state.task_staging_dir
                                         st.toast("✅ 目录内容已成功加入暂存区")
-                                        time.sleep(0.5); st.rerun()
+                                        st.rerun()
                             else:
                                 st.error("路径不存在")
     
