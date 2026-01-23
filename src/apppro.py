@@ -1053,6 +1053,15 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 # ==========================================
 # 2. 本地持久化与工具函数
 # ==========================================
+# --- [核心优化] 全局状态初始化 (防止局部刷新导致的作用域丢失) ---
+is_create_mode = False
+source_mode = st.session_state.get('data_source_selector', "📂 文件上传")
+btn_start = False
+target_path = ""
+crawl_url = ""
+search_keyword = ""
+auto_detected_mode = None
+
 CONFIG_FILE = "rag_config.json"
 HISTORY_DIR = "chat_histories"
 UPLOAD_DIR = "temp_uploads"
@@ -1566,8 +1575,6 @@ with st.sidebar:
 
         # 统一的数据源处理逻辑
         uploaded_files = st.session_state.get('uploader') # 优先从 uploader 获取，支持多模式
-        btn_start = False # 初始化变量，防止 NameError
-        target_path = "" # 初始化变量，防止 NameError
         
         # --- [v8.9.1] 暂存区初始化与同步逻辑 (AND 模式支持) ---
         # [UI Optimization] 统一渲染数据源配置区域 (无感刷新)
