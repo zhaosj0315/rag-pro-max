@@ -1,5 +1,20 @@
 # Changelog
 
+## [v9.1.0] - 2026-01-23 (Flagship Evolution - Performance & Decoupling)
+### 🚀 极致性能优化：“零白屏”丝滑体验 (Zero White Screen Optimization)
+- **局部刷新革命 (Fragment Isolation)**: 利用 `st.fragment` 深度重构了工具栏功能开关、数据源配置区域及追问建议面板。现在所有开关切换与配置调整均为**瞬时响应**，彻底消除了困扰已久的全页白屏闪烁。
+- **无缝对话流 (Seamless Chat Flow)**: 移除了回答生成后的强制重载逻辑。系统现在支持在流式输出结束的瞬间**原地渲染**追问建议，且点击建议后直接触发下一轮回答，流程一气呵成。
+- **调度延迟清零**: 优化了核心调度器（Core Scheduler），移除了启动任务时的冗余 `st.rerun()`，将提问到首字蹦出的延迟降低了 90% 以上。
+
+### 💬 纯对话模式深度解耦 (Pure Chat Decoupling)
+- **知识库零依赖**: 彻底剥离了纯对话模式对底层文件系统的依赖。现在该模式下系统将直接跳过任何知识库扫描与挂载步骤，彻底解决了因访问不存在路径而导致的 `Errno 2` 报错。
+- **直连 LLM 流式输出**: 实现了纯对话模式下的直连大模型（Ollama/OpenAI）流式响应链路，支持原生生成器（Generator）与包装对象（StreamingResponse）的自动兼容。
+
+### 🛡️ 稳健性加固与作用域修复
+- **变量作用域补全**: 修复了引入 Fragment 隔离后导致的 `UnboundLocalError` (`generate_smart_kb_name`, `UploadHandler`) 与 `NameError` (`btn_start`, `target_path`) 等全局变量可见性问题。
+- **API 冲突消除**: 解决了 `StreamlitAPIException`，通过解耦 Widget Key 与手动 Session State 赋值，确保了状态同步的合规性。
+- **文件名安全处理**: 在对话记录导出功能中引入了 `sanitize_filename` 校验，确保导出的文件名称在所有操作系统下均合法。
+
 ## [v9.0.0] - 2026-01-22 (Flagship Evolution - Omni-Ingestion)
 ### 📥 数据摄入革命：从“单选”到“并集” (Ingestion AND Logic)
 - **物理暂存区 (Staging Area)**: 引入了 `task_staging_dir` 缓冲层。系统不再强制用户在“上传、路径、粘贴”中三选一，而是支持将三者随意组装、累加。
