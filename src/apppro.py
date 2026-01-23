@@ -2457,18 +2457,17 @@ with st.sidebar:
                         else:
                             st.checkbox("🔄 强制重建索引 (🔒)", value=False, disabled=True, help="无重建索引权限")
                             force_reindex = False
+                            if "kb_force_reindex" in st.session_state:
+                                st.session_state.kb_force_reindex = False
 
                     with opt_col2:
                         # [v8.6.9 修复] 一键全选现在包含数据分析
                         enable_data_analysis = st.checkbox("💎 智能数据分析", value=default_val, key="kb_enable_data_analysis", help="自动识别真数据，构建物理库，启用SQL决策")
                         generate_summary = st.checkbox("📝 自动摘要生成", value=default_val, key="kb_generate_summary", help="为每份文件生成AI摘要")
                     
-                    # 保存到session state (Fragment内更新State是安全的)
+                    # 保存到session state (仅同步 Key 不一致的项)
                     st.session_state.use_ocr = use_ocr
                     st.session_state.generate_summary = generate_summary
-                    st.session_state.kb_force_reindex = force_reindex
-                    st.session_state.kb_extract_metadata = extract_metadata
-                    st.session_state.kb_enable_data_analysis = enable_data_analysis
 
                     # 更新状态提示
                     options = []
