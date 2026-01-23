@@ -6865,7 +6865,10 @@ if st.session_state.get('is_processing') and final_prompt:
                         token_count = 0 # 这里的计数仅用于进度估算
                         full_text = ""
                         
-                        for token in response.response_gen:
+                        # [Robust] 兼容 Generator 和 StreamingResponse 对象
+                        response_stream = response.response_gen if hasattr(response, 'response_gen') else response
+
+                        for token in response_stream:
                             # 🛑 检查停止信号
                             if st.session_state.get('stop_generation'):
                                 st.session_state.stop_generation = False
@@ -6873,7 +6876,18 @@ if st.session_state.get('is_processing') and final_prompt:
                                 msg_placeholder.markdown(full_text)
                                 break
                             
-                            full_text += token
+                            # [Robust] 提取文本内容
+                            chunk = ""
+                            if isinstance(token, str):
+                                chunk = token
+                            elif hasattr(token, 'delta'):
+                                chunk = token.delta or ""
+                            elif hasattr(token, 'message') and hasattr(token.message, 'content'):
+                                chunk = token.message.content or ""
+                            else:
+                                chunk = str(token)
+                            
+                            full_text += chunk
                             msg_placeholder.markdown(full_text + "▌")
                             token_count += 1
                         
