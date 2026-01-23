@@ -1556,6 +1556,7 @@ with st.sidebar:
 
         # 统一的数据源处理逻辑
         uploaded_files = st.session_state.get('uploader') # 优先从 uploader 获取，支持多模式
+        btn_start = False # 初始化变量，防止 NameError
         
         # --- [v8.9.1] 暂存区初始化与同步逻辑 (AND 模式支持) ---
         # [UI Optimization] 统一渲染数据源配置区域 (无感刷新)
