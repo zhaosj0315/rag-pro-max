@@ -1561,6 +1561,9 @@ with st.sidebar:
         # [UI Optimization] 统一渲染数据源配置区域 (无感刷新)
         @st.fragment
         def render_data_source_config():
+            # 引入依赖防止 UnboundLocalError
+            from src.processors.upload_handler import UploadHandler
+
             # 初始化本地变量
             uploaded_files = None
             target_path = ""
