@@ -1558,871 +1558,882 @@ with st.sidebar:
         uploaded_files = st.session_state.get('uploader') # 优先从 uploader 获取，支持多模式
         
         # --- [v8.9.1] 暂存区初始化与同步逻辑 (AND 模式支持) ---
-        if is_create_mode:
-            if 'task_staging_dir' not in st.session_state:
-                import uuid
-                staging_id = f"task_staging_{int(time.time())}_{uuid.uuid4().hex[:4]}"
-                st.session_state.task_staging_dir = os.path.abspath(os.path.join(UPLOAD_DIR, staging_id))
-                os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
-                st.session_state.staging_files_count = 0
+        # [UI Optimization] 统一渲染数据源配置区域 (无感刷新)
+        @st.fragment
+        def render_data_source_config():
+            # 初始化本地变量
+            uploaded_files = None
+            target_path = ""
             
-            # 辅助函数：同步文件到暂存区
-            def sync_to_staging(source_path, is_file=True, source_label="未知来源"):
-                import shutil
-                try:
-                    if is_file:
-                        dest = os.path.join(st.session_state.task_staging_dir, os.path.basename(source_path))
-                        if not os.path.exists(dest):
-                            # 使用 copy 而非 copy2，确保产生新的修改时间，防止被清理逻辑误杀
-                            shutil.copy(source_path, dest)
-                            logger.info(f"📂 [{source_label}] 单文件同步成功: {os.path.basename(source_path)}")
-                    else:
-                        # 目录同步 (支持递归)
-                        added_count = 0
-                        for root, dirs, files in os.walk(source_path):
-                            rel_path = os.path.relpath(root, source_path)
-                            if rel_path == ".":
-                                target_root = st.session_state.task_staging_dir
-                            else:
-                                target_root = os.path.join(st.session_state.task_staging_dir, rel_path)
-                            
-                            if not os.path.exists(target_root):
-                                os.makedirs(target_root)
-                                
-                            for file in files:
-                                if file.startswith('.'): continue
-                                s = os.path.join(root, file)
-                                d = os.path.join(target_root, file)
-                                if not os.path.exists(d):
-                                    # 产生新的时间戳，绕过清理脚本
-                                    shutil.copy(s, d)
-                                    added_count += 1
-                        logger.info(f"📂 [{source_label}] 递归同步完成: 从 {source_path} 导入了 {added_count} 个文件")
-                    return True
-                except Exception as e:
-                    logger.error(f"❌ [{source_label}] 暂存同步失败: {e}")
-                    return False
-        # -----------------------------------------------------
-
-        crawl_url = None
-        search_keyword = None
-        target_path = ""
-        btn_start = False # Initialize early to avoid NameError and support APPEND mode
-        source_mode = st.session_state.get('data_source_selector') # 确保从 radio 获取最新模式
-        
-        if is_create_mode:
-            # 注入 CSS 增强核心功能视觉效果
-            st.markdown("""
-            <style>
-            /* 放大 4x1 选择器的文字和图标 */
-            div[data-testid="stRadio"] > div[role="radiogroup"] > label {
-                padding: 10px 15px !important;
-                border-radius: 8px !important;
-                transition: all 0.2s ease !important;
-            }
-            div[data-testid="stRadio"] > div[role="radiogroup"] > label p {
-                font-size: 1.15rem !important;
-                font-weight: 600 !important;
-                color: #31333F !important;
-            }
-            /* 选中状态稍微变色提醒 */
-            div[data-testid="stRadio"] > div[role="radiogroup"] > label[data-baseweb="radio"]:has(input:checked) {
-                background-color: rgba(255, 75, 75, 0.05) !important;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-
-            # 4x1 水平数据源选择 (v8.1.1：数据分析已深度融入高级选项)
-            source_mode = st.radio(
-                "数据源", 
-                ["📂 文件上传", "🌐 互联网提取", "🔌 数据库同步"], 
-                horizontal=True,
-                label_visibility="collapsed",
-                key="data_source_selector"
-            )
-            
-            if source_mode == "📂 文件上传":
-                # 权限拦截 (实时校验)
-                from src.auth.permission_manager import permission_manager
-                current_user = st.session_state.get('user', 'guest_user')
-                can_upload = permission_manager.has_permission(current_user, "upload_files")
-                
-                if not can_upload:
-                    st.warning("🔒 权限不足：您当前的角色没有上传文件的权限。")
-                
-                # --- 暂存区统计与管理 ---
-                if not os.path.exists(st.session_state.task_staging_dir):
+            if is_create_mode:
+                if 'task_staging_dir' not in st.session_state:
+                    import uuid
+                    staging_id = f"task_staging_{int(time.time())}_{uuid.uuid4().hex[:4]}"
+                    st.session_state.task_staging_dir = os.path.abspath(os.path.join(UPLOAD_DIR, staging_id))
                     os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
-                    logger.warning(f"⚠️ 暂存目录丢失，已自动重建: {st.session_state.task_staging_dir}")
+                    st.session_state.staging_files_count = 0
                 
-                files_in_staging = os.listdir(st.session_state.task_staging_dir)
-                staging_count = len([f for f in files_in_staging if not f.startswith('.')])
-                
-                stat_col1, stat_col2 = st.columns([3, 1])
-                with stat_col1:
-                    tips = "支持格式: PDF, DOCX, TXT, MD, XLSX, CSV, PPTX, JPG, PNG (支持OCR)。建议单文件 < 50MB。支持多源(上传+目录+粘贴)同时叠加。"
-                    # 优化：增加 padding 以扩大鼠标命中区域，并使用更醒目的蓝色
-                    st.markdown(
-                        f"""<div style='display: flex; align-items: center; gap: 5px; white-space: nowrap;'>
-                            <span style='font-weight: 600;'>📦 待处理暂存区:</span>
-                            <code style='background: #f0f2f6; padding: 2px 5px; border-radius: 3px;'>{staging_count}</code>
-                            <span>个文件</span>
-                            <span title="{tips}" style="cursor: help; color: #1f77b4; font-size: 1.1rem; padding: 0 8px; font-weight: bold;">❓</span>
-                        </div>""", 
-                        unsafe_allow_html=True
-                    )
-                with stat_col2:
-                    if st.button("🧹 清空暂存", use_container_width=True, help="清空当前已收集的所有材料"):
-                        import shutil
-                        shutil.rmtree(st.session_state.task_staging_dir)
-                        os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
-                        st.session_state.uploaded_path = None
-                        st.rerun()
-
-                # 1. 拖拽上传 (一行化)
-                up_col1, up_col2 = st.columns([0.6, 5.4])
-                with up_col1:
-                    st.markdown("<div style='margin-top: 8px;'><b>上传:</b></div>", unsafe_allow_html=True)
-                with up_col2:
-                    # 使用 CSS 压缩上传组件高度
-                    st.markdown("""
-                        <style>
-                        /* 极致压缩上传组件 */
-                        div[data-testid="stFileUploader"] { padding-bottom: 0px !important; }
-                        div[data-testid="stFileUploaderDropzone"] { padding: 0.2rem !important; min-height: 40px !important; }
-                        div[data-testid="stFileUploaderDropzone"] label { display: none !important; }
-                        div[data-testid="stFileUploaderDropzone"] i { display: none !important; }
-                        /* 隐藏下方列表详情，仅保留计数 */
-                        div[data-testid="stFileUploader"] section { margin-top: 0px !important; }
-                        </style>
-                    """, unsafe_allow_html=True)
-                    uploaded_files = st.file_uploader(
-                        "拖入文件", 
-                        accept_multiple_files=True, 
-                        key="uploader",
-                        label_visibility="collapsed",
-                        type=['pdf', 'docx', 'txt', 'md', 'markdown', 'xlsx', 'xls', 'csv', 'pptx', 'jpg', 'png', 'jpeg'],
-                        disabled=not can_upload
-                    )
-                
-                # 即时同步上传的文件
-                if uploaded_files:
-                    with st.spinner("⚡ 正在搬运至暂存区..."):
-                        from src.common.utils import save_uploaded_files
-                        batch_dir = save_uploaded_files(uploaded_files, "temp_uploads")
-                        if batch_dir:
-                            sync_to_staging(batch_dir, is_file=False, source_label="文件上传")
-                            st.session_state.uploaded_path = st.session_state.task_staging_dir
-                
-                # 2. 本地路径 (一行化)
-                path_label_col, path_input_col, path_btn_col = st.columns([0.6, 4.2, 1.2])
-                with path_label_col:
-                    st.markdown("<div style='margin-top: 8px;'><b>路径:</b></div>", unsafe_allow_html=True)
-                with path_input_col:
-                    manual_path = st.text_input(
-                        "本地路径",
-                        placeholder="粘贴本地目录地址...",
-                        key="manual_path_input",
-                        label_visibility="collapsed",
-                        disabled=not can_upload
-                    )
-                with path_btn_col:
-                    if st.button("➕ 添加", use_container_width=True, disabled=not manual_path, key="add_path_btn_compact"):
-                        if os.path.exists(manual_path):
-                            with st.spinner("正在扫描..."):
-                                if sync_to_staging(manual_path, is_file=False, source_label="目录添加"):
-                                    st.session_state.uploaded_path = st.session_state.task_staging_dir
-                                    st.toast("✅ 目录内容已成功加入暂存区")
-                                    time.sleep(0.5); st.rerun()
-                        else:
-                            st.error("路径不存在")
-
-                # 3. 粘贴文本 (一行化，使用折叠标题作为交互)
-                paste_label_col, paste_content_col = st.columns([0.6, 5.4])
-                with paste_label_col:
-                    st.markdown("<div style='margin-top: 5px;'><b>粘贴:</b></div>", unsafe_allow_html=True)
-                with paste_content_col:
-                    with st.expander("📝 点击此处直接粘贴文本内容", expanded=False):
-                        if not can_upload:
-                            st.warning("🔒 权限不足")
-                        else:
-                            if 'paste_css_injected' not in st.session_state:
-                                st.markdown("""
-                                <style>
-                                .stTextArea textarea {
-                                    border: 2px dashed rgba(49, 51, 63, 0.2) !important;
-                                    background-color: rgba(240, 242, 246, 0.5) !important;
-                                    border-radius: 0.5rem !important;
-                                }
-                                </style>
-                                """, unsafe_allow_html=True)
-                                st.session_state.paste_css_injected = True
-                            
-                            def auto_save_text():
-                                content = st.session_state.get('paste_text_display', '')
-                                if content and content.strip():
-                                    try:
-                                        if "... [文本过长，已截断显示，完整内容已保存] ..." in content:
-                                            full_content = st.session_state.get('paste_text_content', content)
-                                        else:
-                                            full_content = content
-                                        
-                                        if not full_content or not full_content.strip():
-                                            return
-                                            
-                                        # [v8.9.1] 投递到统一暂存区，文件名包含时间戳以支持叠加
-                                        safe_name = f"manual_pasted_{int(time.time())}.txt"
-                                        save_path = os.path.join(st.session_state.task_staging_dir, safe_name)
-                                        
-                                        with open(save_path, 'w', encoding='utf-8') as f:
-                                            f.write(full_content)
-                                        
-                                        logger.info(f"📝 [文本粘贴] 已生成 {safe_name} 并投递至暂存区 (长度: {len(full_content)})")
-                                        st.session_state.uploaded_path = st.session_state.task_staging_dir
-                                        
-                                        preview = "".join(c for c in full_content[:15] if c.isalnum() or c.isspace()).strip()
-                                        st.session_state.upload_auto_name = f"Mixed_{preview}"
-                                        
-                                        st.session_state.text_auto_saved = True
-                                        st.session_state.saved_text_length = len(full_content)
-                                        
-                                    except Exception as e:
-                                        st.error(f"自动保存失败: {e}")
-                            
-                            current_text = st.session_state.get('paste_text_display', '')
-                            display_text = current_text
-                            is_truncated = False
-                            
-                            if current_text:
-                                st.session_state.paste_text_content = current_text
-                            
-                            if len(current_text) > 100000:
-                                display_text = current_text[:10000] + "\n\n... [文本过长，已截断显示，完整内容已保存] ..."
-                                is_truncated = True
-                            
-                            text_input_content = st.text_area(
-                                "文本内容", 
-                                value=display_text,
-                                height=200,
-                                placeholder="在此粘贴文本，失焦时自动保存...", 
-                                label_visibility="collapsed",
-                                key="paste_text_display",
-                                on_change=auto_save_text
-                            )
-                            
-                            if not is_truncated:
-                                st.session_state.paste_text_content = text_input_content
-                            
-                            if st.session_state.get('text_auto_saved'):
-                                saved_length = st.session_state.get('saved_text_length', 0)
-                                st.success(f"✅ 文本已自动保存 ({saved_length:,} 字符) - {st.session_state.get('upload_auto_name', '')}")
-                            elif current_text:
-                                char_count = len(current_text)
-                                if is_truncated:
-                                    st.info(f"📊 大文本 ({char_count:,} 字符) - 前端仅显示前10,000字符，完整内容将自动保存")
-                                else:
-                                    st.caption(f"📊 字符数: {char_count:,}")
-                
-
-                    
-                    # 不需要手动保存按钮了，失焦自动保存
-        elif current_kb_name and current_kb_name != "pure_chat":
-            # 管理模式 - 使用一行化布局 (1x2 紧凑布局)
-            manage_title_col1, manage_title_col2 = st.columns([4, 1])
-            with manage_title_col1:
-                st.markdown("📤 **添加文档**")
-            with manage_title_col2:
-                # 权限检查：重建索引
-                from src.auth.permission_manager import permission_manager
-                current_user = st.session_state.get('user', 'guest_user')
-                can_rebuild = permission_manager.has_permission(current_user, "kb_rebuild_index")
-                
-                if can_rebuild:
-                    if st.button("🔄", help="重建索引 (覆盖该库)", use_container_width=True):
-                        # 触发重建逻辑
-                        st.session_state.uploaded_path = os.path.join("vector_db_storage", current_kb_name)
-                        # 这里需要一种方式标记为 NEW 模式，并通过 trigger_btn_start 强制触发
-                        st.session_state.trigger_rebuild = True
-                        st.session_state.trigger_btn_start = True
-                        st.rerun()
-                else:
-                    st.button("🔒", help="无重建索引权限", disabled=True, use_container_width=True)
-
-            # 追加模式的文件上传
-            action_mode = "APPEND"
-            # 如果触发了重建，则强制改为 NEW
-            if st.session_state.get('trigger_rebuild'):
-                action_mode = "NEW"
-                st.session_state.trigger_rebuild = False # 消费掉标记
-            
-            # 初始化 btn_start
-            if st.session_state.get('trigger_btn_start'):
-                btn_start = True
-                st.session_state.trigger_btn_start = False # 消费掉标记
-            
-            target_path = "" # 管理模式不需要手动指定路径，使用KB原有路径
-            
-            uploaded_files = st.file_uploader(
-                "追加文件到当前知识库", 
-                accept_multiple_files=True, 
-                key="uploader_append",
-                label_visibility="collapsed"
-            )
-            
-            # 添加更新知识库按钮
-            if uploaded_files:
-                # 添加文件上传成功提示
-                st.success(f"✅ 文件上传成功！共选择了 {len(uploaded_files)} 个文件")
-                
-                # 导入进度显示组件
-                from src.ui.document_progress import doc_progress
-                
-                # 显示文件处理进度
-                st.markdown("### 📄 文件处理进度")
-                doc_progress.start_processing(uploaded_files)
-                
-                # 文档质量评估
-                if st.checkbox("📊 启用文档质量评估", value=False, key="enable_quality_assessment"):
-                    st.markdown("### 📋 文档质量评估")
-                    from src.utils.document_quality_assessor import show_quality_assessment, quality_assessor
-                    
-                    # 对每个上传的文件进行质量评估
-                    for uploaded_file in uploaded_files:
-                        if uploaded_file.type.startswith('text/') or uploaded_file.name.endswith(('.txt', '.md')):
-                            try:
-                                content = str(uploaded_file.read(), "utf-8")
-                                uploaded_file.seek(0)  # 重置文件指针
-                                
-                                with st.expander(f"📄 {uploaded_file.name} - 质量评估"):
-                                    show_quality_assessment(content, uploaded_file.name)
-                            except Exception as e:
-                                st.warning(f"⚠️ 无法评估 {uploaded_file.name}: {str(e)}")
-                        elif uploaded_file.name.endswith('.pdf'):
-                            try:
-                                with st.expander(f"📄 {uploaded_file.name} - PDF质量评估"):
-                                    assessment_result = quality_assessor.assess_pdf_file(uploaded_file)
-                                    
-                                    # 显示评估结果
-                                    col1, col2, col3 = st.columns(3)
-                                    
-                                    with col1:
-                                        score = assessment_result['scores']['overall']
-                                        if score >= 80:
-                                            st.success(f"📊 总体评分: {score:.1f}")
-                                        elif score >= 60:
-                                            st.warning(f"📊 总体评分: {score:.1f}")
-                                        else:
-                                            st.error(f"📊 总体评分: {score:.1f}")
-                                    
-                                    with col2:
-                                        st.info(f"🏆 质量等级: {assessment_result['grade']}")
-                                    
-                                    with col3:
-                                        st.info(f"📄 字数: {assessment_result['word_count']}")
-                                    
-                                    # 详细评分
-                                    st.markdown("**📋 详细评分**")
-                                    col1, col2 = st.columns(2)
-                                    
-                                    with col1:
-                                        st.metric("📖 可读性", f"{assessment_result['scores']['readability']:.1f}")
-                                        st.metric("💡 内容密度", f"{assessment_result['scores']['content_density']:.1f}")
-                                    
-                                    with col2:
-                                        st.metric("🏗️ 结构性", f"{assessment_result['scores']['structure']:.1f}")
-                                        st.metric("✏️ 语言质量", f"{assessment_result['scores']['language_quality']:.1f}")
-                                    
-                                    # 改进建议
-                                    if assessment_result['suggestions']:
-                                        st.markdown("**💡 改进建议**")
-                                        for suggestion in assessment_result['suggestions']:
-                                            st.write(f"• {suggestion}")
-                                            st.write(f"• {suggestion}")
-                                            
-                            except Exception as e:
-                                st.error(f"❌ PDF评估失败 {uploaded_file.name}: {str(e)}")
-                        else:
-                            st.info(f"📄 {uploaded_file.name} - 暂不支持此文件类型的质量评估")
-                
-                # 高级选项 (复用新建模式的逻辑)
-                with st.expander("🔧 高级选项 (本次更新有效)", expanded=st.session_state.kb_adv_expanded_update):
-                    @st.fragment
-                    def render_update_kb_options():
-                        # 布局优化：全选 + 状态提示在一行
-                        h_col1, h_col2 = st.columns([1.5, 2.5])
-                        with h_col1:
-                            select_all = st.checkbox("✅ 一键全选", value=False, key="kb_adv_select_all_update", help="开启/关闭所有高级选项")
-                        with h_col2:
-                            status_placeholder = st.empty()
-                        
-                        default_val = select_all
-                        
-                        opt_col1, opt_col2, opt_col3 = st.columns(3)
-                        with opt_col1:
-                            use_ocr = st.checkbox("🔍 OCR识别", value=default_val, key="kb_use_ocr_update", help="识别PDF中的图片文字")
-                        with opt_col2:
-                            use_meta = st.checkbox("📊 元数据", value=default_val, key="kb_extract_metadata_update", help="提取文件分类、关键词")
-                        with opt_col3:
-                            use_sum = st.checkbox("📝 生成摘要", value=default_val, key="kb_generate_summary_update", help="生成AI摘要")
-                        
-                        # 更新状态提示
-                        options = []
-                        if use_ocr: options.append("OCR")
-                        if use_meta: options.append("元数据")
-                        if use_sum: options.append("摘要")
-                        
-                        if options:
-                            status_placeholder.caption(f"🔧 启用: {'|'.join(options)}")
-                        else:
-                            status_placeholder.caption("⚡ 快速模式：已关闭高级选项")
-                    
-                    render_update_kb_options()
-
-                st.info("💡 上传后请点击下方 '更新知识库' 按钮")
-                if st.button("🔄 更新知识库", type="primary", use_container_width=True, key="update_kb_btn"):
-                    # 立即处理上传，确保路径存在 (Failsafe)
+                # 辅助函数：同步文件到暂存区
+                def sync_to_staging(source_path, is_file=True, source_label="未知来源"):
+                    import shutil
                     try:
-                        from src.processors.upload_handler import UploadHandler
-                        # UPLOAD_DIR is global/imported
-                        handler = UploadHandler(UPLOAD_DIR, logger)
-                        with st.spinner("正在预处理文件..."):
-                            result = handler.process_uploads(uploaded_files)
-                            st.session_state.uploaded_path = os.path.abspath(result.batch_dir)
-                            st.session_state.last_processed_path = st.session_state.uploaded_path
-                            # Update hash to prevent double processing downstream
-                            import hashlib
-                            upload_hash = hashlib.md5("".join([f"{f.name}_{f.size}" for f in uploaded_files]).encode()).hexdigest()
-                            st.session_state.last_upload_hash = upload_hash
-                    except Exception as e:
-                        logger.error(f"Immediate upload processing failed: {e}")
-                    
-                    btn_start = True
-                    action_mode = "APPEND"
-                    st.session_state.sidebar_state = "collapsed"
-                    st.markdown("""
-                    <style>
-                    [data-testid="stSidebar"] {
-                        width: 2.5rem !important;
-                        min-width: 2.5rem !important;
-                        max-width: 2.5rem !important;
-                    }
-                    [data-testid="stSidebar"] > div {
-                        overflow: hidden !important;
-                    }
-                    </style>
-                    """, unsafe_allow_html=True)
-
-        # 统一的数据源处理逻辑（仅针对 Web 抓取保留在外部，本地文件已在内部处理）
-        # btn_start already initialized above
-        
-        if is_create_mode:
-            if source_mode == "🌐 互联网提取":
-                # 权限拦截 (实时校验)
-                from src.auth.permission_manager import permission_manager
-                current_user = st.session_state.get('user', 'guest_user')
-                can_crawl = permission_manager.has_permission(current_user, "use_crawler")
-                
-                if not can_crawl:
-                    st.warning("🔒 权限不足：您当前的角色没有使用互联网提取的权限。")
-                
-                # --- 互联网提取模式 (融合 URL 与 搜索) ---
-                # 行业选择 (作为上下文，主要用于搜索，也作为 URL 抓取的元数据)
-                try:
-                    from src.config.unified_sites import get_industry_list
-                    industries = get_industry_list()
-                    # 使用 expander 收纳非核心选项，保持界面简洁
-                    with st.expander("⚙️ 行业上下文 (影响搜索结果)", expanded=False):
-                        sel_ind = st.selectbox("行业领域", industries, label_visibility="collapsed")
-                except:
-                    sel_ind = "🔧 技术开发"
-                selected_industry = sel_ind
-
-                # 统一输入框
-                c_input, c_btn = st.columns([7, 1])
-                with c_input:
-                    user_input = st.text_input("网址或关键词", placeholder="输入 URL (https://...) 或 搜索关键词", label_visibility="collapsed")
-                with c_btn:
-                    st.button("🧠", help="AI 智能分析", key="smart_analyze_unified", use_container_width=True)
-
-                # 智能识别逻辑
-                crawl_url = None
-                search_keyword = None
-                
-                if user_input:
-                    # 简单规则：包含 http 视为网址，否则视为关键词
-                    if user_input.strip().lower().startswith(('http://', 'https://')):
-                        crawl_url = user_input.strip()
-                        st.session_state.crawl_input_mode = "url"
-                        st.session_state.crawl_url = crawl_url
-                        st.caption(f"🔗 已识别为网址")
-                        
-                        # URL 分析逻辑 (复用原有优化器)
-                        try:
-                            from src.processors.crawl_optimizer import CrawlOptimizer
-                            if 'crawl_optimizer' not in st.session_state:
-                                st.session_state.crawl_optimizer = CrawlOptimizer()
-                            optimizer = st.session_state.crawl_optimizer
-                            # 简单的自动分析触发（如果有分析按钮被点击）
-                            if st.session_state.get('smart_analyze_unified'):
-                                with st.spinner("🔍 分析网页结构..."):
-                                    analysis = optimizer.analyze_website(crawl_url)
-                                    if analysis: st.session_state.crawl_analysis = analysis
-                        except Exception:
-                            pass
-                    else:
-                        search_keyword = user_input.strip()
-                        st.session_state.crawl_input_mode = "search"
-                        st.session_state.search_keyword = search_keyword
-                        st.caption(f"🔍 已识别为搜索关键词")
-
-                # 统一参数行 (紧凑 4列布局)
-                c_p1, c_p2, c_p3, c_p4 = st.columns(4)
-                with c_p1:
-                    crawl_depth = st.number_input("递归深度", 1, 10, 2, help="爬取链接的深度或搜索结果的深度")
-                    st.session_state.crawl_depth = crawl_depth
-                    st.session_state.search_crawl_depth = crawl_depth # 同步设置
-                with c_p2:
-                    max_pages = st.number_input("最大页数", 1, 1000, 5, help="限制获取的页面总数")
-                    st.session_state.max_pages = max_pages
-                    st.session_state.search_max_pages = max_pages # 同步设置
-                with c_p3:
-                    parser_type = st.selectbox("解析器", ["default", "article", "documentation"], label_visibility="visible")
-                    st.session_state.parser_type = parser_type
-                    st.session_state.search_parser_type = parser_type # 同步设置
-                with c_p4:
-                    # 质量筛选
-                    quality_threshold = st.number_input("质量阈值 (0=关)", 0.0, 100.0, 45.0, 5.0, help="低于此分数的页面将被丢弃")
-                    st.session_state.url_quality_threshold = quality_threshold
-                    st.session_state.quality_threshold = quality_threshold # 同步设置
-                    enable_url_filter = (quality_threshold > 0)
-                
-                # 预估提示
-                if max_pages > 50 or crawl_depth > 3:
-                    st.caption(f"ℹ️ 高负载任务: 预计最大处理 {max_pages} 个页面")
-
-            elif source_mode == "🔌 数据库同步":
-                # --- 数据库同步模式 (v8.3.0) ---
-                from src.auth.connection_manager import ConnectionManager
-                from src.processors.db_ingestor import DBIngestor
-                
-                conn_mgr = ConnectionManager()
-                # [v8.7.1] 修复普通用户可见所有连接的安全漏洞
-                current_user = st.session_state.get('user', 'guest_user')
-                current_role = st.session_state.get('role', 'guest')
-                
-                if current_role == 'admin':
-                    saved_conns = conn_mgr.load_connections()
-                else:
-                    saved_conns = conn_mgr.get_connections_for_user(current_user)
-                
-                if not saved_conns:
-                    st.warning("⚠️ 尚未配置任何数据库连接。")
-                    if st.button("前往配置", use_container_width=True):
-                        st.session_state.admin_active_tab = "🔌 数据源连接"
-                        st.session_state.current_nav = "🔐 资源治理"
-                        st.rerun()
-                else:
-                    # 1. 选择连接
-                    selected_alias = st.selectbox("选择数据源", list(saved_conns.keys()), key="db_sync_alias")
-                    
-                    if selected_alias:
-                        # 2. 选择数据库
-                        dbs = conn_mgr.get_database_list(selected_alias)
-                        default_db = saved_conns[selected_alias].get('database')
-                        db_idx = dbs.index(default_db) if default_db in dbs else 0
-                        selected_db = st.selectbox("选择数据库", dbs, index=db_idx, key="db_sync_db")
-                        
-                        # 3. 选择表 (v8.6.3 交互增强版)
-                        tables = conn_mgr.get_table_list(selected_alias, db_override=selected_db)
-                        
-                        if not tables:
-                            st.info(f"数据库 '{selected_db}' 中没有发现可读表")
-                            selected_tables = []
+                        if is_file:
+                            dest = os.path.join(st.session_state.task_staging_dir, os.path.basename(source_path))
+                            if not os.path.exists(dest):
+                                # 使用 copy 而非 copy2，确保产生新的修改时间，防止被清理逻辑误杀
+                                shutil.copy(source_path, dest)
+                                logger.info(f"📂 [{source_label}] 单文件同步成功: {os.path.basename(source_path)}")
                         else:
-                            # 全选控制
-                            select_all = st.checkbox(f"全选所有表 ({len(tables)})", key="db_sync_select_all")
-                            
-                            selected_tables = []
-                            # 限高滚动区域 (v8.6.4 智能预览版)
-                            with st.container(height=250, border=True):
-                                for t in tables:
-                                    col_t1, col_t2 = st.columns([0.8, 0.2])
-                                    with col_t1:
-                                        if st.checkbox(t, value=select_all, key=f"db_sync_chk_{t}"):
-                                            selected_tables.append(t)
-                                    with col_t2:
-                                        # 侧边栏即时预览
-                                        with st.popover("👁️", help=f"预览表 {t} 的数据"):
-                                            import pandas as pd # [v8.6.8] 局部导入加固
-                                            st.caption(f"📊 {t} 数据采样 (前5行)")
-                                            sample = conn_mgr.get_table_sample(selected_alias, t, db_override=selected_db, limit=5)
-                                            if sample:
-                                                st.dataframe(pd.DataFrame(sample), hide_index=True)
+                            # 目录同步 (支持递归)
+                            added_count = 0
+                            for root, dirs, files in os.walk(source_path):
+                                rel_path = os.path.relpath(root, source_path)
+                                if rel_path == ".":
+                                    target_root = st.session_state.task_staging_dir
+                                else:
+                                    target_root = os.path.join(st.session_state.task_staging_dir, rel_path)
+                                
+                                if not os.path.exists(target_root):
+                                    os.makedirs(target_root)
+                                    
+                                for file in files:
+                                    if file.startswith('.'): continue
+                                    s = os.path.join(root, file)
+                                    d = os.path.join(target_root, file)
+                                    if not os.path.exists(d):
+                                        # 产生新的时间戳，绕过清理脚本
+                                        shutil.copy(s, d)
+                                        added_count += 1
+                            logger.info(f"📂 [{source_label}] 递归同步完成: 从 {source_path} 导入了 {added_count} 个文件")
+                        return True
+                    except Exception as e:
+                        logger.error(f"❌ [{source_label}] 暂存同步失败: {e}")
+                        return False
+            # -----------------------------------------------------
+    
+            crawl_url = None
+            search_keyword = None
+            target_path = ""
+            btn_start = False # Initialize early to avoid NameError and support APPEND mode
+            source_mode = st.session_state.get('data_source_selector') # 确保从 radio 获取最新模式
+            
+            if is_create_mode:
+                # 注入 CSS 增强核心功能视觉效果
+                st.markdown("""
+                <style>
+                /* 放大 4x1 选择器的文字和图标 */
+                div[data-testid="stRadio"] > div[role="radiogroup"] > label {
+                    padding: 10px 15px !important;
+                    border-radius: 8px !important;
+                    transition: all 0.2s ease !important;
+                }
+                div[data-testid="stRadio"] > div[role="radiogroup"] > label p {
+                    font-size: 1.15rem !important;
+                    font-weight: 600 !important;
+                    color: #31333F !important;
+                }
+                /* 选中状态稍微变色提醒 */
+                div[data-testid="stRadio"] > div[role="radiogroup"] > label[data-baseweb="radio"]:has(input:checked) {
+                    background-color: rgba(255, 75, 75, 0.05) !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+    
+                # 4x1 水平数据源选择 (v8.1.1：数据分析已深度融入高级选项)
+                source_mode = st.radio(
+                    "数据源", 
+                    ["📂 文件上传", "🌐 互联网提取", "🔌 数据库同步"], 
+                    horizontal=True,
+                    label_visibility="collapsed",
+                    key="data_source_selector"
+                )
+                
+                if source_mode == "📂 文件上传":
+                    # 权限拦截 (实时校验)
+                    from src.auth.permission_manager import permission_manager
+                    current_user = st.session_state.get('user', 'guest_user')
+                    can_upload = permission_manager.has_permission(current_user, "upload_files")
+                    
+                    if not can_upload:
+                        st.warning("🔒 权限不足：您当前的角色没有上传文件的权限。")
+                    
+                    # --- 暂存区统计与管理 ---
+                    if not os.path.exists(st.session_state.task_staging_dir):
+                        os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
+                        logger.warning(f"⚠️ 暂存目录丢失，已自动重建: {st.session_state.task_staging_dir}")
+                    
+                    files_in_staging = os.listdir(st.session_state.task_staging_dir)
+                    staging_count = len([f for f in files_in_staging if not f.startswith('.')])
+                    
+                    stat_col1, stat_col2 = st.columns([3, 1])
+                    with stat_col1:
+                        tips = "支持格式: PDF, DOCX, TXT, MD, XLSX, CSV, PPTX, JPG, PNG (支持OCR)。建议单文件 < 50MB。支持多源(上传+目录+粘贴)同时叠加。"
+                        # 优化：增加 padding 以扩大鼠标命中区域，并使用更醒目的蓝色
+                        st.markdown(
+                            f"""<div style='display: flex; align-items: center; gap: 5px; white-space: nowrap;'>
+                                <span style='font-weight: 600;'>📦 待处理暂存区:</span>
+                                <code style='background: #f0f2f6; padding: 2px 5px; border-radius: 3px;'>{staging_count}</code>
+                                <span>个文件</span>
+                                <span title="{tips}" style="cursor: help; color: #1f77b4; font-size: 1.1rem; padding: 0 8px; font-weight: bold;">❓</span>
+                            </div>""", 
+                            unsafe_allow_html=True
+                        )
+                    with stat_col2:
+                        if st.button("🧹 清空暂存", use_container_width=True, help="清空当前已收集的所有材料"):
+                            import shutil
+                            shutil.rmtree(st.session_state.task_staging_dir)
+                            os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
+                            st.session_state.uploaded_path = None
+                            st.rerun()
+    
+                    # 1. 拖拽上传 (一行化)
+                    up_col1, up_col2 = st.columns([0.6, 5.4])
+                    with up_col1:
+                        st.markdown("<div style='margin-top: 8px;'><b>上传:</b></div>", unsafe_allow_html=True)
+                    with up_col2:
+                        # 使用 CSS 压缩上传组件高度
+                        st.markdown("""
+                            <style>
+                            /* 极致压缩上传组件 */
+                            div[data-testid="stFileUploader"] { padding-bottom: 0px !important; }
+                            div[data-testid="stFileUploaderDropzone"] { padding: 0.2rem !important; min-height: 40px !important; }
+                            div[data-testid="stFileUploaderDropzone"] label { display: none !important; }
+                            div[data-testid="stFileUploaderDropzone"] i { display: none !important; }
+                            /* 隐藏下方列表详情，仅保留计数 */
+                            div[data-testid="stFileUploader"] section { margin-top: 0px !important; }
+                            </style>
+                        """, unsafe_allow_html=True)
+                        uploaded_files = st.file_uploader(
+                            "拖入文件", 
+                            accept_multiple_files=True, 
+                            key="uploader",
+                            label_visibility="collapsed",
+                            type=['pdf', 'docx', 'txt', 'md', 'markdown', 'xlsx', 'xls', 'csv', 'pptx', 'jpg', 'png', 'jpeg'],
+                            disabled=not can_upload
+                        )
+                    
+                    # 即时同步上传的文件
+                    if uploaded_files:
+                        with st.spinner("⚡ 正在搬运至暂存区..."):
+                            from src.common.utils import save_uploaded_files
+                            batch_dir = save_uploaded_files(uploaded_files, "temp_uploads")
+                            if batch_dir:
+                                sync_to_staging(batch_dir, is_file=False, source_label="文件上传")
+                                st.session_state.uploaded_path = st.session_state.task_staging_dir
+                    
+                    # 2. 本地路径 (一行化)
+                    path_label_col, path_input_col, path_btn_col = st.columns([0.6, 4.2, 1.2])
+                    with path_label_col:
+                        st.markdown("<div style='margin-top: 8px;'><b>路径:</b></div>", unsafe_allow_html=True)
+                    with path_input_col:
+                        manual_path = st.text_input(
+                            "本地路径",
+                            placeholder="粘贴本地目录地址...",
+                            key="manual_path_input",
+                            label_visibility="collapsed",
+                            disabled=not can_upload
+                        )
+                    with path_btn_col:
+                        if st.button("➕ 添加", use_container_width=True, disabled=not manual_path, key="add_path_btn_compact"):
+                            if os.path.exists(manual_path):
+                                with st.spinner("正在扫描..."):
+                                    if sync_to_staging(manual_path, is_file=False, source_label="目录添加"):
+                                        st.session_state.uploaded_path = st.session_state.task_staging_dir
+                                        st.toast("✅ 目录内容已成功加入暂存区")
+                                        time.sleep(0.5); st.rerun()
+                            else:
+                                st.error("路径不存在")
+    
+                    # 3. 粘贴文本 (一行化，使用折叠标题作为交互)
+                    paste_label_col, paste_content_col = st.columns([0.6, 5.4])
+                    with paste_label_col:
+                        st.markdown("<div style='margin-top: 5px;'><b>粘贴:</b></div>", unsafe_allow_html=True)
+                    with paste_content_col:
+                        with st.expander("📝 点击此处直接粘贴文本内容", expanded=False):
+                            if not can_upload:
+                                st.warning("🔒 权限不足")
+                            else:
+                                if 'paste_css_injected' not in st.session_state:
+                                    st.markdown("""
+                                    <style>
+                                    .stTextArea textarea {
+                                        border: 2px dashed rgba(49, 51, 63, 0.2) !important;
+                                        background-color: rgba(240, 242, 246, 0.5) !important;
+                                        border-radius: 0.5rem !important;
+                                    }
+                                    </style>
+                                    """, unsafe_allow_html=True)
+                                    st.session_state.paste_css_injected = True
+                                
+                                def auto_save_text():
+                                    content = st.session_state.get('paste_text_display', '')
+                                    if content and content.strip():
+                                        try:
+                                            if "... [文本过长，已截断显示，完整内容已保存] ..." in content:
+                                                full_content = st.session_state.get('paste_text_content', content)
                                             else:
-                                                st.info("无法获取预览数据")
-                            
-                            if selected_tables:
-                                st.caption(f"✅ 已选择 {len(selected_tables)} 张业务表")
-                                # 物理存储到 session_state 供底部主按钮调用
-                                st.session_state.db_sync_pending = {
-                                    "alias": selected_alias,
-                                    "db": selected_db,
-                                    "tables": selected_tables,
-                                    "mode": "SAMPLE" if "采样" in st.session_state.get('db_sync_mode_ui', '推荐') else "SCHEMA_ONLY"
-                                }
+                                                full_content = content
+                                            
+                                            if not full_content or not full_content.strip():
+                                                return
+                                                
+                                            # [v8.9.1] 投递到统一暂存区，文件名包含时间戳以支持叠加
+                                            safe_name = f"manual_pasted_{int(time.time())}.txt"
+                                            save_path = os.path.join(st.session_state.task_staging_dir, safe_name)
+                                            
+                                            with open(save_path, 'w', encoding='utf-8') as f:
+                                                f.write(full_content)
+                                            
+                                            logger.info(f"📝 [文本粘贴] 已生成 {safe_name} 并投递至暂存区 (长度: {len(full_content)})")
+                                            st.session_state.uploaded_path = st.session_state.task_staging_dir
+                                            
+                                            preview = "".join(c for c in full_content[:15] if c.isalnum() or c.isspace()).strip()
+                                            st.session_state.upload_auto_name = f"Mixed_{preview}"
+                                            
+                                            st.session_state.text_auto_saved = True
+                                            st.session_state.saved_text_length = len(full_content)
+                                            
+                                        except Exception as e:
+                                            st.error(f"自动保存失败: {e}")
+                                
+                                current_text = st.session_state.get('paste_text_display', '')
+                                display_text = current_text
+                                is_truncated = False
+                                
+                                if current_text:
+                                    st.session_state.paste_text_content = current_text
+                                
+                                if len(current_text) > 100000:
+                                    display_text = current_text[:10000] + "\n\n... [文本过长，已截断显示，完整内容已保存] ..."
+                                    is_truncated = True
+                                
+                                text_input_content = st.text_area(
+                                    "文本内容", 
+                                    value=display_text,
+                                    height=200,
+                                    placeholder="在此粘贴文本，失焦时自动保存...", 
+                                    label_visibility="collapsed",
+                                    key="paste_text_display",
+                                    on_change=auto_save_text
+                                )
+                                
+                                if not is_truncated:
+                                    st.session_state.paste_text_content = text_input_content
+                                
+                                if st.session_state.get('text_auto_saved'):
+                                    saved_length = st.session_state.get('saved_text_length', 0)
+                                    st.success(f"✅ 文本已自动保存 ({saved_length:,} 字符) - {st.session_state.get('upload_auto_name', '')}")
+                                elif current_text:
+                                    char_count = len(current_text)
+                                    if is_truncated:
+                                        st.info(f"📊 大文本 ({char_count:,} 字符) - 前端仅显示前10,000字符，完整内容将自动保存")
+                                    else:
+                                        st.caption(f"📊 字符数: {char_count:,}")
+                    
+    
                         
-                        # 4. 同步模式 (改为 UI 专用 key)
-                        st.radio("同步策略", ["🧪 结构+采样 (推荐)", "⚡ 仅同步结构"], horizontal=True, key="db_sync_mode_ui")
-                        
-                        # [v8.6.9] 数据库模式专用命名种子
-                        if selected_tables:
-                            db_seed = f"DB_{selected_alias}_{selected_db}"
-                            if st.session_state.get('last_db_seed') != db_seed:
-                                st.session_state.upload_auto_name = db_seed
-                                st.session_state.last_db_seed = db_seed
-
-            # 排除配置 (通用)
-            if source_mode in ["🔗 网址抓取", "🔍 智能搜索"]:
-                with st.expander("🚫 排除链接", expanded=False):
-                    exclude_text = st.text_area("每行一个", height=68, placeholder="*/admin/*")
-                    exclude_patterns = [line.strip() for line in exclude_text.split('\n') if line.strip()] if exclude_text else []
-
-            # --- [v8.6.9] 归一化名称录入与建议区 (全模式共享) ---
-            kb_name_col1, kb_name_col2, kb_name_col3 = st.columns([1.2, 4, 0.5])
-            with kb_name_col1:
-                st.markdown("<div style='margin-top: 6px;'><b>知识库名称</b></div>", unsafe_allow_html=True)
-            with kb_name_col2:
-                # 获取建议值 (优先级：手动输入 > 自动建议)
-                current_name_val = st.session_state.get('upload_auto_name', "")
-                kb_name_input = st.text_input(
-                    "知识库名称", 
-                    value=current_name_val,
-                    placeholder="给您的知识资产起个名字...",
-                    key="kb_name_input_main",
+                        # 不需要手动保存按钮了，失焦自动保存
+            elif current_kb_name and current_kb_name != "pure_chat":
+                # 管理模式 - 使用一行化布局 (1x2 紧凑布局)
+                manage_title_col1, manage_title_col2 = st.columns([4, 1])
+                with manage_title_col1:
+                    st.markdown("📤 **添加文档**")
+                with manage_title_col2:
+                    # 权限检查：重建索引
+                    from src.auth.permission_manager import permission_manager
+                    current_user = st.session_state.get('user', 'guest_user')
+                    can_rebuild = permission_manager.has_permission(current_user, "kb_rebuild_index")
+                    
+                    if can_rebuild:
+                        if st.button("🔄", help="重建索引 (覆盖该库)", use_container_width=True):
+                            # 触发重建逻辑
+                            st.session_state.uploaded_path = os.path.join("vector_db_storage", current_kb_name)
+                            # 这里需要一种方式标记为 NEW 模式，并通过 trigger_btn_start 强制触发
+                            st.session_state.trigger_rebuild = True
+                            st.session_state.trigger_btn_start = True
+                            st.rerun()
+                    else:
+                        st.button("🔒", help="无重建索引权限", disabled=True, use_container_width=True)
+    
+                # 追加模式的文件上传
+                action_mode = "APPEND"
+                # 如果触发了重建，则强制改为 NEW
+                if st.session_state.get('trigger_rebuild'):
+                    action_mode = "NEW"
+                    st.session_state.trigger_rebuild = False # 消费掉标记
+                
+                # 初始化 btn_start
+                if st.session_state.get('trigger_btn_start'):
+                    btn_start = True
+                    st.session_state.trigger_btn_start = False # 消费掉标记
+                
+                target_path = "" # 管理模式不需要手动指定路径，使用KB原有路径
+                
+                uploaded_files = st.file_uploader(
+                    "追加文件到当前知识库", 
+                    accept_multiple_files=True, 
+                    key="uploader_append",
                     label_visibility="collapsed"
                 )
-            with kb_name_col3:
-                if st.button("💡", help="智能建议名称", key="smart_name_btn_main"):
-                    if kb_name_input:
-                        from src.utils.kb_utils import generate_smart_kb_name
-                        # 简单优化：追加日期
-                        optimized = f"{kb_name_input}_{datetime.now().strftime('%m%d')}"
-                        st.session_state.upload_auto_name = optimized
-                        st.rerun()
-                    else:
-                        st.toast("请先配置数据源或输入初步名称")
-
-            # 处理上传 (Stage 4.1 - 使用 UploadHandler)
-            if uploaded_files:
-                # 使用文件名+大小的组合作为哈希，判断文件列表是否真正改变
-                import hashlib
-                upload_hash = hashlib.md5("".join([f"{f.name}_{f.size}" for f in uploaded_files]).encode()).hexdigest()
                 
-                # 只要哈希不同，或者当前没有有效的上传路径，就重新处理
-                # 这能修复“路径丢失”的问题，同时保留哈希优化
-                if st.session_state.get('last_upload_hash') != upload_hash or not st.session_state.get('uploaded_path'):
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-
-                    # 使用 UploadHandler 处理上传
-                    handler = UploadHandler(UPLOAD_DIR, logger)
+                # 添加更新知识库按钮
+                if uploaded_files:
+                    # 添加文件上传成功提示
+                    st.success(f"✅ 文件上传成功！共选择了 {len(uploaded_files)} 个文件")
                     
-                    # 模拟进度显示（实际处理在 process_uploads 内部）
-                    status_text.text(f"正在处理 {len(uploaded_files)} 个文件...")
-                    progress_bar.progress(0.5)
-
-                    result = handler.process_uploads(uploaded_files)
+                    # 导入进度显示组件
+                    from src.ui.document_progress import doc_progress
                     
-                    progress_bar.empty()
-                    status_text.empty()
-
-                    # 记录哈希，防止重复处理
-                    st.session_state.last_upload_hash = upload_hash
-                    st.session_state.uploaded_path = os.path.abspath(result.batch_dir)
-                    st.session_state.last_processed_path = st.session_state.uploaded_path
+                    # 显示文件处理进度
+                    st.markdown("### 📄 文件处理进度")
+                    doc_progress.start_processing(uploaded_files)
                     
-                    # 显示上传结果
-                    if result.success_count > 0:
-                        st.toast(f"✅ 成功上传 {result.success_count} 个文件")
+                    # 文档质量评估
+                    if st.checkbox("📊 启用文档质量评估", value=False, key="enable_quality_assessment"):
+                        st.markdown("### 📋 文档质量评估")
+                        from src.utils.document_quality_assessor import show_quality_assessment, quality_assessor
                         
-                        # 文档质量评估
-                        if st.checkbox("📊 启用文档质量评估", value=False, key="enable_quality_assessment_new"):
-                            st.markdown("### 📋 文档质量评估")
-                            from src.utils.document_quality_assessor import show_quality_assessment, quality_assessor
-                            
-                            # 对每个上传的文件进行质量评估
-                            for uploaded_file in uploaded_files:
-                                if uploaded_file.type.startswith('text/') or uploaded_file.name.endswith(('.txt', '.md')):
-                                    try:
-                                        content = str(uploaded_file.read(), "utf-8")
-                                        uploaded_file.seek(0)  # 重置文件指针
+                        # 对每个上传的文件进行质量评估
+                        for uploaded_file in uploaded_files:
+                            if uploaded_file.type.startswith('text/') or uploaded_file.name.endswith(('.txt', '.md')):
+                                try:
+                                    content = str(uploaded_file.read(), "utf-8")
+                                    uploaded_file.seek(0)  # 重置文件指针
+                                    
+                                    with st.expander(f"📄 {uploaded_file.name} - 质量评估"):
+                                        show_quality_assessment(content, uploaded_file.name)
+                                except Exception as e:
+                                    st.warning(f"⚠️ 无法评估 {uploaded_file.name}: {str(e)}")
+                            elif uploaded_file.name.endswith('.pdf'):
+                                try:
+                                    with st.expander(f"📄 {uploaded_file.name} - PDF质量评估"):
+                                        assessment_result = quality_assessor.assess_pdf_file(uploaded_file)
                                         
-                                        with st.expander(f"📄 {uploaded_file.name} - 质量评估"):
-                                            show_quality_assessment(content, uploaded_file.name)
-                                    except Exception as e:
-                                        st.warning(f"⚠️ 无法评估 {uploaded_file.name}: {str(e)}")
-                                elif uploaded_file.name.endswith('.pdf'):
-                                    try:
-                                        with st.expander(f"📄 {uploaded_file.name} - PDF质量评估"):
-                                            assessment_result = quality_assessor.assess_pdf_file(uploaded_file)
-                                            
-                                            # 显示评估结果
-                                            col1, col2, col3 = st.columns(3)
-                                            
-                                            with col1:
-                                                score = assessment_result['scores']['overall']
-                                                if score >= 80:
-                                                    st.success(f"📊 总体评分: {score:.1f}")
-                                                elif score >= 60:
-                                                    st.warning(f"📊 总体评分: {score:.1f}")
-                                                else:
-                                                    st.error(f"📊 总体评分: {score:.1f}")
-                                            
-                                            with col2:
-                                                st.info(f"🏆 质量等级: {assessment_result['grade']}")
-                                            
-                                            with col3:
-                                                st.info(f"📄 字数: {assessment_result['word_count']}")
-                                            
-                                            # 详细评分
-                                            st.markdown("**📋 详细评分**")
-                                            col1, col2 = st.columns(2)
-                                            
-                                            with col1:
-                                                st.metric("📖 可读性", f"{assessment_result['scores']['readability']:.1f}")
-                                                st.metric("💡 内容密度", f"{assessment_result['scores']['content_density']:.1f}")
-                                            
-                                            with col2:
-                                                st.metric("🏗️ 结构性", f"{assessment_result['scores']['structure']:.1f}")
-                                                st.metric("✏️ 语言质量", f"{assessment_result['scores']['language_quality']:.1f}")
-                                            
-                                            # 改进建议
-                                            if assessment_result['suggestions']:
-                                                st.markdown("**💡 改进建议**")
-                                                for suggestion in assessment_result['suggestions']:
-                                                    st.write(f"• {suggestion}")
-                                                    
-                                    except Exception as e:
-                                        st.error(f"❌ PDF评估失败 {uploaded_file.name}: {str(e)}")
-                                else:
-                                    st.info(f"📄 {uploaded_file.name} - 暂不支持此文件类型的质量评估")
-
-                    if result.skipped_count > 0:
-                        st.warning(f"⚠️ 跳过 {result.skipped_count} 个文件")
-
-                    # 为文件上传场景生成智能名称 (兼容数据分析模式)
-                    if result.success_count > 0:
-                        try:
-                            # 统一捕获当前模式下的文件列表
-                            curr_files = uploaded_files if uploaded_files else []
+                                        # 显示评估结果
+                                        col1, col2, col3 = st.columns(3)
+                                        
+                                        with col1:
+                                            score = assessment_result['scores']['overall']
+                                            if score >= 80:
+                                                st.success(f"📊 总体评分: {score:.1f}")
+                                            elif score >= 60:
+                                                st.warning(f"📊 总体评分: {score:.1f}")
+                                            else:
+                                                st.error(f"📊 总体评分: {score:.1f}")
+                                        
+                                        with col2:
+                                            st.info(f"🏆 质量等级: {assessment_result['grade']}")
+                                        
+                                        with col3:
+                                            st.info(f"📄 字数: {assessment_result['word_count']}")
+                                        
+                                        # 详细评分
+                                        st.markdown("**📋 详细评分**")
+                                        col1, col2 = st.columns(2)
+                                        
+                                        with col1:
+                                            st.metric("📖 可读性", f"{assessment_result['scores']['readability']:.1f}")
+                                            st.metric("💡 内容密度", f"{assessment_result['scores']['content_density']:.1f}")
+                                        
+                                        with col2:
+                                            st.metric("🏗️ 结构性", f"{assessment_result['scores']['structure']:.1f}")
+                                            st.metric("✏️ 语言质量", f"{assessment_result['scores']['language_quality']:.1f}")
+                                        
+                                        # 改进建议
+                                        if assessment_result['suggestions']:
+                                            st.markdown("**💡 改进建议**")
+                                            for suggestion in assessment_result['suggestions']:
+                                                st.write(f"• {suggestion}")
+                                                st.write(f"• {suggestion}")
+                                                
+                                except Exception as e:
+                                    st.error(f"❌ PDF评估失败 {uploaded_file.name}: {str(e)}")
+                            else:
+                                st.info(f"📄 {uploaded_file.name} - 暂不支持此文件类型的质量评估")
+                    
+                    # 高级选项 (复用新建模式的逻辑)
+                    with st.expander("🔧 高级选项 (本次更新有效)", expanded=st.session_state.kb_adv_expanded_update):
+                        @st.fragment
+                        def render_update_kb_options():
+                            # 布局优化：全选 + 状态提示在一行
+                            h_col1, h_col2 = st.columns([1.5, 2.5])
+                            with h_col1:
+                                select_all = st.checkbox("✅ 一键全选", value=False, key="kb_adv_select_all_update", help="开启/关闭所有高级选项")
+                            with h_col2:
+                                status_placeholder = st.empty()
                             
-                            file_types = {}
-                            for f in curr_files:
-                                ext = os.path.splitext(f.name)[1].lower()
-                                file_types[ext] = file_types.get(ext, 0) + 1
-
-                            folder_name = os.path.basename(result.batch_dir)
-                            auto_name = generate_smart_kb_name(result.batch_dir, result.success_count, file_types, folder_name)
-                            st.session_state.upload_auto_name = auto_name
-                        except Exception:
-                            st.session_state.upload_auto_name = None
+                            default_val = select_all
+                            
+                            opt_col1, opt_col2, opt_col3 = st.columns(3)
+                            with opt_col1:
+                                use_ocr = st.checkbox("🔍 OCR识别", value=default_val, key="kb_use_ocr_update", help="识别PDF中的图片文字")
+                            with opt_col2:
+                                use_meta = st.checkbox("📊 元数据", value=default_val, key="kb_extract_metadata_update", help="提取文件分类、关键词")
+                            with opt_col3:
+                                use_sum = st.checkbox("📝 生成摘要", value=default_val, key="kb_generate_summary_update", help="生成AI摘要")
+                            
+                            # 更新状态提示
+                            options = []
+                            if use_ocr: options.append("OCR")
+                            if use_meta: options.append("元数据")
+                            if use_sum: options.append("摘要")
+                            
+                            if options:
+                                status_placeholder.caption(f"🔧 启用: {'|'.join(options)}")
+                            else:
+                                status_placeholder.caption("⚡ 快速模式：已关闭高级选项")
+                        
+                        render_update_kb_options()
+    
+                    st.info("💡 上传后请点击下方 '更新知识库' 按钮")
+                    if st.button("🔄 更新知识库", type="primary", use_container_width=True, key="update_kb_btn"):
+                        # 立即处理上传，确保路径存在 (Failsafe)
+                        try:
+                            from src.processors.upload_handler import UploadHandler
+                            # UPLOAD_DIR is global/imported
+                            handler = UploadHandler(UPLOAD_DIR, logger)
+                            with st.spinner("正在预处理文件..."):
+                                result = handler.process_uploads(uploaded_files)
+                                st.session_state.uploaded_path = os.path.abspath(result.batch_dir)
+                                st.session_state.last_processed_path = st.session_state.uploaded_path
+                                # Update hash to prevent double processing downstream
+                                import hashlib
+                                upload_hash = hashlib.md5("".join([f"{f.name}_{f.size}" for f in uploaded_files]).encode()).hexdigest()
+                                st.session_state.last_upload_hash = upload_hash
+                        except Exception as e:
+                            logger.error(f"Immediate upload processing failed: {e}")
+                        
+                        btn_start = True
+                        action_mode = "APPEND"
+                        st.session_state.sidebar_state = "collapsed"
+                        st.markdown("""
+                        <style>
+                        [data-testid="stSidebar"] {
+                            width: 2.5rem !important;
+                            min-width: 2.5rem !important;
+                            max-width: 2.5rem !important;
+                        }
+                        [data-testid="stSidebar"] > div {
+                            overflow: hidden !important;
+                        }
+                        </style>
+                        """, unsafe_allow_html=True)
+    
+            # 统一的数据源处理逻辑（仅针对 Web 抓取保留在外部，本地文件已在内部处理）
+            # btn_start already initialized above
+            
+            if is_create_mode:
+                if source_mode == "🌐 互联网提取":
+                    # 权限拦截 (实时校验)
+                    from src.auth.permission_manager import permission_manager
+                    current_user = st.session_state.get('user', 'guest_user')
+                    can_crawl = permission_manager.has_permission(current_user, "use_crawler")
                     
-                    # 关键修复：不再强制全页面 rerun，而是依靠 Streamlit 自然流转
-                    # 这样可以保留 uploader 的状态，避免其因刷新而报错或重置
-                
-                elif st.session_state.get('last_processed_path'):
-                    # 如果哈希匹配（说明是 rerun），且有备份路径，则恢复
-                    logger.debug(st.session_state.last_processed_path)
-                    st.session_state.uploaded_path = st.session_state.last_processed_path
-                else:
-                    logger.info("DEBUG: Hash matched but no last_processed_path found!")
-
-
-            # 使用上传路径或手动输入的路径
-            target_path = st.session_state.get('uploaded_path') or target_path
-
-            auto_name = ""
-
-            # 优先使用文件上传的智能名称
-            if hasattr(st.session_state, 'upload_auto_name') and st.session_state.upload_auto_name:
-                auto_name = st.session_state.upload_auto_name
-
-            if target_path:
-                if os.path.exists(target_path):
-                    # 使用 UploadHandler 统计文件信息 (Stage 4.1)
-                    cnt, file_types, total_size = UploadHandler.get_folder_stats(target_path)
-
-                    # 美化显示
-                    size_mb = total_size / (1024 * 1024)
-                    folder_name = os.path.basename(target_path.rstrip('/'))
-
-                    # 智能计算名称 (提前计算以优化显示)
-                    if hasattr(st.session_state, 'upload_auto_name') and st.session_state.upload_auto_name:
-                        auto_name = st.session_state.upload_auto_name
-                    elif cnt > 0:
-                        auto_name = generate_smart_kb_name(target_path, cnt, file_types, folder_name)
+                    if not can_crawl:
+                        st.warning("🔒 权限不足：您当前的角色没有使用互联网提取的权限。")
+                    
+                    # --- 互联网提取模式 (融合 URL 与 搜索) ---
+                    # 行业选择 (作为上下文，主要用于搜索，也作为 URL 抓取的元数据)
+                    try:
+                        from src.config.unified_sites import get_industry_list
+                        industries = get_industry_list()
+                        # 使用 expander 收纳非核心选项，保持界面简洁
+                        with st.expander("⚙️ 行业上下文 (影响搜索结果)", expanded=False):
+                            sel_ind = st.selectbox("行业领域", industries, label_visibility="collapsed")
+                    except:
+                        sel_ind = "🔧 技术开发"
+                    selected_industry = sel_ind
+    
+                    # 统一输入框
+                    c_input, c_btn = st.columns([7, 1])
+                    with c_input:
+                        user_input = st.text_input("网址或关键词", placeholder="输入 URL (https://...) 或 搜索关键词", label_visibility="collapsed")
+                    with c_btn:
+                        st.button("🧠", help="AI 智能分析", key="smart_analyze_unified", use_container_width=True)
+    
+                    # 智能识别逻辑
+                    crawl_url = None
+                    search_keyword = None
+                    
+                    if user_input:
+                        # 简单规则：包含 http 视为网址，否则视为关键词
+                        if user_input.strip().lower().startswith(('http://', 'https://')):
+                            crawl_url = user_input.strip()
+                            st.session_state.crawl_input_mode = "url"
+                            st.session_state.crawl_url = crawl_url
+                            st.caption(f"🔗 已识别为网址")
+                            
+                            # URL 分析逻辑 (复用原有优化器)
+                            try:
+                                from src.processors.crawl_optimizer import CrawlOptimizer
+                                if 'crawl_optimizer' not in st.session_state:
+                                    st.session_state.crawl_optimizer = CrawlOptimizer()
+                                optimizer = st.session_state.crawl_optimizer
+                                # 简单的自动分析触发（如果有分析按钮被点击）
+                                if st.session_state.get('smart_analyze_unified'):
+                                    with st.spinner("🔍 分析网页结构..."):
+                                        analysis = optimizer.analyze_website(crawl_url)
+                                        if analysis: st.session_state.crawl_analysis = analysis
+                            except Exception:
+                                pass
+                        else:
+                            search_keyword = user_input.strip()
+                            st.session_state.crawl_input_mode = "search"
+                            st.session_state.search_keyword = search_keyword
+                            st.caption(f"🔍 已识别为搜索关键词")
+    
+                    # 统一参数行 (紧凑 4列布局)
+                    c_p1, c_p2, c_p3, c_p4 = st.columns(4)
+                    with c_p1:
+                        crawl_depth = st.number_input("递归深度", 1, 10, 2, help="爬取链接的深度或搜索结果的深度")
+                        st.session_state.crawl_depth = crawl_depth
+                        st.session_state.search_crawl_depth = crawl_depth # 同步设置
+                    with c_p2:
+                        max_pages = st.number_input("最大页数", 1, 1000, 5, help="限制获取的页面总数")
+                        st.session_state.max_pages = max_pages
+                        st.session_state.search_max_pages = max_pages # 同步设置
+                    with c_p3:
+                        parser_type = st.selectbox("解析器", ["default", "article", "documentation"], label_visibility="visible")
+                        st.session_state.parser_type = parser_type
+                        st.session_state.search_parser_type = parser_type # 同步设置
+                    with c_p4:
+                        # 质量筛选
+                        quality_threshold = st.number_input("质量阈值 (0=关)", 0.0, 100.0, 45.0, 5.0, help="低于此分数的页面将被丢弃")
+                        st.session_state.url_quality_threshold = quality_threshold
+                        st.session_state.quality_threshold = quality_threshold # 同步设置
+                        enable_url_filter = (quality_threshold > 0)
+                    
+                    # 预估提示
+                    if max_pages > 50 or crawl_depth > 3:
+                        st.caption(f"ℹ️ 高负载任务: 预计最大处理 {max_pages} 个页面")
+    
+                elif source_mode == "🔌 数据库同步":
+                    # --- 数据库同步模式 (v8.3.0) ---
+                    from src.auth.connection_manager import ConnectionManager
+                    from src.processors.db_ingestor import DBIngestor
+                    
+                    conn_mgr = ConnectionManager()
+                    # [v8.7.1] 修复普通用户可见所有连接的安全漏洞
+                    current_user = st.session_state.get('user', 'guest_user')
+                    current_role = st.session_state.get('role', 'guest')
+                    
+                    if current_role == 'admin':
+                        saved_conns = conn_mgr.load_connections()
                     else:
-                        auto_name = folder_name
-
-                    # 决定显示名称：如果是临时目录名，则显示智能名称
-                    display_name = folder_name
-                    if folder_name.startswith(('batch_', 'Web_', 'Search_')) and auto_name:
-                        display_name = auto_name
-
-                    # --- 极简一行化：状态徽章 + 名称输入 ---
-                    # 避免在左侧重复显示长文件名，只显示状态，名称在输入框中显示
-                    status_col, input_col = st.columns([1.2, 4])
+                        saved_conns = conn_mgr.get_connections_for_user(current_user)
                     
-                    with status_col:
-                        # 垂直居中的状态徽章
-                        st.markdown(
-                            """<div style='
-                                background: #f0fdf4; 
-                                color: #15803d; 
-                                padding: 6px 8px; 
-                                border-radius: 6px; 
-                                border: 1px solid #bbf7d0;
-                                text-align: center; 
-                                font-size: 0.85rem; 
-                                font-weight: 500;
-                                white-space: nowrap;
-                                margin-top: 1px;
-                            '>✅ 源就绪</div>""", 
-                            unsafe_allow_html=True
-                        )
-                    
-                    # [v8.6.9] 移除旧的名称输入，已统一移至上方
-                    if is_create_mode:
-                        st.caption("ℹ️ 请在上方输入框设置知识库名称")
+                    if not saved_conns:
+                        st.warning("⚠️ 尚未配置任何数据库连接。")
+                        if st.button("前往配置", use_container_width=True):
+                            st.session_state.admin_active_tab = "🔌 数据源连接"
+                            st.session_state.current_nav = "🔐 资源治理"
+                            st.rerun()
                     else:
-                        st.markdown(f"<div style='padding-top: 6px;'><b>{current_kb_name}</b></div>", unsafe_allow_html=True)
-
-                    # 类型分布（紧凑化）
-                    if file_types:
-                        sorted_types = sorted(file_types.items(), key=lambda x: x[1], reverse=True)[:5]
-                        type_text = " · ".join([f"{ext.replace('.', '')}:{count}" for ext, count in sorted_types])
-                        st.caption(f"📊 {type_text} · 源: {display_name}")
-                else:
-                    # 只有在非爬虫且非数据分析初级阶段时才报错
-                    is_web_waiting = (source_mode == "🔗 网址抓取" and st.session_state.get('crawl_url_input'))
-                    is_da_waiting = (source_mode == "📊 数据分析" and uploaded_files)
+                        # 1. 选择连接
+                        selected_alias = st.selectbox("选择数据源", list(saved_conns.keys()), key="db_sync_alias")
+                        
+                        if selected_alias:
+                            # 2. 选择数据库
+                            dbs = conn_mgr.get_database_list(selected_alias)
+                            default_db = saved_conns[selected_alias].get('database')
+                            db_idx = dbs.index(default_db) if default_db in dbs else 0
+                            selected_db = st.selectbox("选择数据库", dbs, index=db_idx, key="db_sync_db")
+                            
+                            # 3. 选择表 (v8.6.3 交互增强版)
+                            tables = conn_mgr.get_table_list(selected_alias, db_override=selected_db)
+                            
+                            if not tables:
+                                st.info(f"数据库 '{selected_db}' 中没有发现可读表")
+                                selected_tables = []
+                            else:
+                                # 全选控制
+                                select_all = st.checkbox(f"全选所有表 ({len(tables)})", key="db_sync_select_all")
+                                
+                                selected_tables = []
+                                # 限高滚动区域 (v8.6.4 智能预览版)
+                                with st.container(height=250, border=True):
+                                    for t in tables:
+                                        col_t1, col_t2 = st.columns([0.8, 0.2])
+                                        with col_t1:
+                                            if st.checkbox(t, value=select_all, key=f"db_sync_chk_{t}"):
+                                                selected_tables.append(t)
+                                        with col_t2:
+                                            # 侧边栏即时预览
+                                            with st.popover("👁️", help=f"预览表 {t} 的数据"):
+                                                import pandas as pd # [v8.6.8] 局部导入加固
+                                                st.caption(f"📊 {t} 数据采样 (前5行)")
+                                                sample = conn_mgr.get_table_sample(selected_alias, t, db_override=selected_db, limit=5)
+                                                if sample:
+                                                    st.dataframe(pd.DataFrame(sample), hide_index=True)
+                                                else:
+                                                    st.info("无法获取预览数据")
+                                
+                                if selected_tables:
+                                    st.caption(f"✅ 已选择 {len(selected_tables)} 张业务表")
+                                    # 物理存储到 session_state 供底部主按钮调用
+                                    st.session_state.db_sync_pending = {
+                                        "alias": selected_alias,
+                                        "db": selected_db,
+                                        "tables": selected_tables,
+                                        "mode": "SAMPLE" if "采样" in st.session_state.get('db_sync_mode_ui', '推荐') else "SCHEMA_ONLY"
+                                    }
+                            
+                            # 4. 同步模式 (改为 UI 专用 key)
+                            st.radio("同步策略", ["🧪 结构+采样 (推荐)", "⚡ 仅同步结构"], horizontal=True, key="db_sync_mode_ui")
+                            
+                            # [v8.6.9] 数据库模式专用命名种子
+                            if selected_tables:
+                                db_seed = f"DB_{selected_alias}_{selected_db}"
+                                if st.session_state.get('last_db_seed') != db_seed:
+                                    st.session_state.upload_auto_name = db_seed
+                                    st.session_state.last_db_seed = db_seed
+    
+                # 排除配置 (通用)
+                if source_mode in ["🔗 网址抓取", "🔍 智能搜索"]:
+                    with st.expander("🚫 排除链接", expanded=False):
+                        exclude_text = st.text_area("每行一个", height=68, placeholder="*/admin/*")
+                        exclude_patterns = [line.strip() for line in exclude_text.split('\n') if line.strip()] if exclude_text else []
+    
+                # --- [v8.6.9] 归一化名称录入与建议区 (全模式共享) ---
+                kb_name_col1, kb_name_col2, kb_name_col3 = st.columns([1.2, 4, 0.5])
+                with kb_name_col1:
+                    st.markdown("<div style='margin-top: 6px;'><b>知识库名称</b></div>", unsafe_allow_html=True)
+                with kb_name_col2:
+                    # 获取建议值 (优先级：手动输入 > 自动建议)
+                    current_name_val = st.session_state.get('upload_auto_name', "")
+                    kb_name_input = st.text_input(
+                        "知识库名称", 
+                        value=current_name_val,
+                        placeholder="给您的知识资产起个名字...",
+                        key="kb_name_input_main",
+                        label_visibility="collapsed"
+                    )
+                with kb_name_col3:
+                    if st.button("💡", help="智能建议名称", key="smart_name_btn_main"):
+                        if kb_name_input:
+                            from src.utils.kb_utils import generate_smart_kb_name
+                            # 简单优化：追加日期
+                            optimized = f"{kb_name_input}_{datetime.now().strftime('%m%d')}"
+                            st.session_state.upload_auto_name = optimized
+                            st.rerun()
+                        else:
+                            st.toast("请先配置数据源或输入初步名称")
+    
+                # 处理上传 (Stage 4.1 - 使用 UploadHandler)
+                if uploaded_files:
+                    # 使用文件名+大小的组合作为哈希，判断文件列表是否真正改变
+                    import hashlib
+                    upload_hash = hashlib.md5("".join([f"{f.name}_{f.size}" for f in uploaded_files]).encode()).hexdigest()
                     
-                    if not is_web_waiting and not is_da_waiting:
-                        st.error("❌ 路径不存在，请检查路径是否正确")
-                        # 添加友好的错误引导
-                        from src.utils.friendly_error_handler import friendly_error
-                        friendly_error("文件上传", 
-                                     "指定的路径不存在或无法访问",
-                                     ["检查路径拼写是否正确", "确认您有访问该路径的权限", "尝试使用文件上传功能代替手动路径"])
-                    elif is_da_waiting:
-                        st.markdown(
-                            """<div style='background: #fffbeb; color: #92400e; padding: 6px 8px; border-radius: 6px; border: 1px solid #fef3c7; text-align: center; font-size: 0.85rem;'>⏳ 等待文件预处理...</div>""", 
-                            unsafe_allow_html=True
-                        )
+                    # 只要哈希不同，或者当前没有有效的上传路径，就重新处理
+                    # 这能修复“路径丢失”的问题，同时保留哈希优化
+                    if st.session_state.get('last_upload_hash') != upload_hash or not st.session_state.get('uploaded_path'):
+                        progress_bar = st.progress(0)
+                        status_text = st.empty()
+    
+                        # 使用 UploadHandler 处理上传
+                        handler = UploadHandler(UPLOAD_DIR, logger)
+                        
+                        # 模拟进度显示（实际处理在 process_uploads 内部）
+                        status_text.text(f"正在处理 {len(uploaded_files)} 个文件...")
+                        progress_bar.progress(0.5)
+    
+                        result = handler.process_uploads(uploaded_files)
+                        
+                        progress_bar.empty()
+                        status_text.empty()
+    
+                        # 记录哈希，防止重复处理
+                        st.session_state.last_upload_hash = upload_hash
+                        st.session_state.uploaded_path = os.path.abspath(result.batch_dir)
+                        st.session_state.last_processed_path = st.session_state.uploaded_path
+                        
+                        # 显示上传结果
+                        if result.success_count > 0:
+                            st.toast(f"✅ 成功上传 {result.success_count} 个文件")
+                            
+                            # 文档质量评估
+                            if st.checkbox("📊 启用文档质量评估", value=False, key="enable_quality_assessment_new"):
+                                st.markdown("### 📋 文档质量评估")
+                                from src.utils.document_quality_assessor import show_quality_assessment, quality_assessor
+                                
+                                # 对每个上传的文件进行质量评估
+                                for uploaded_file in uploaded_files:
+                                    if uploaded_file.type.startswith('text/') or uploaded_file.name.endswith(('.txt', '.md')):
+                                        try:
+                                            content = str(uploaded_file.read(), "utf-8")
+                                            uploaded_file.seek(0)  # 重置文件指针
+                                            
+                                            with st.expander(f"📄 {uploaded_file.name} - 质量评估"):
+                                                show_quality_assessment(content, uploaded_file.name)
+                                        except Exception as e:
+                                            st.warning(f"⚠️ 无法评估 {uploaded_file.name}: {str(e)}")
+                                    elif uploaded_file.name.endswith('.pdf'):
+                                        try:
+                                            with st.expander(f"📄 {uploaded_file.name} - PDF质量评估"):
+                                                assessment_result = quality_assessor.assess_pdf_file(uploaded_file)
+                                                
+                                                # 显示评估结果
+                                                col1, col2, col3 = st.columns(3)
+                                                
+                                                with col1:
+                                                    score = assessment_result['scores']['overall']
+                                                    if score >= 80:
+                                                        st.success(f"📊 总体评分: {score:.1f}")
+                                                    elif score >= 60:
+                                                        st.warning(f"📊 总体评分: {score:.1f}")
+                                                    else:
+                                                        st.error(f"📊 总体评分: {score:.1f}")
+                                                
+                                                with col2:
+                                                    st.info(f"🏆 质量等级: {assessment_result['grade']}")
+                                                
+                                                with col3:
+                                                    st.info(f"📄 字数: {assessment_result['word_count']}")
+                                                
+                                                # 详细评分
+                                                st.markdown("**📋 详细评分**")
+                                                col1, col2 = st.columns(2)
+                                                
+                                                with col1:
+                                                    st.metric("📖 可读性", f"{assessment_result['scores']['readability']:.1f}")
+                                                    st.metric("💡 内容密度", f"{assessment_result['scores']['content_density']:.1f}")
+                                                
+                                                with col2:
+                                                    st.metric("🏗️ 结构性", f"{assessment_result['scores']['structure']:.1f}")
+                                                    st.metric("✏️ 语言质量", f"{assessment_result['scores']['language_quality']:.1f}")
+                                                
+                                                # 改进建议
+                                                if assessment_result['suggestions']:
+                                                    st.markdown("**💡 改进建议**")
+                                                    for suggestion in assessment_result['suggestions']:
+                                                        st.write(f"• {suggestion}")
+                                                        
+                                        except Exception as e:
+                                            st.error(f"❌ PDF评估失败 {uploaded_file.name}: {str(e)}")
+                                    else:
+                                        st.info(f"📄 {uploaded_file.name} - 暂不支持此文件类型的质量评估")
+    
+                        if result.skipped_count > 0:
+                            st.warning(f"⚠️ 跳过 {result.skipped_count} 个文件")
+    
+                        # 为文件上传场景生成智能名称 (兼容数据分析模式)
+                        if result.success_count > 0:
+                            try:
+                                # 统一捕获当前模式下的文件列表
+                                curr_files = uploaded_files if uploaded_files else []
+                                
+                                file_types = {}
+                                for f in curr_files:
+                                    ext = os.path.splitext(f.name)[1].lower()
+                                    file_types[ext] = file_types.get(ext, 0) + 1
+    
+                                folder_name = os.path.basename(result.batch_dir)
+                                auto_name = generate_smart_kb_name(result.batch_dir, result.success_count, file_types, folder_name)
+                                st.session_state.upload_auto_name = auto_name
+                            except Exception:
+                                st.session_state.upload_auto_name = None
+                        
+                        # 关键修复：不再强制全页面 rerun，而是依靠 Streamlit 自然流转
+                        # 这样可以保留 uploader 的状态，避免其因刷新而报错或重置
+                    
+                    elif st.session_state.get('last_processed_path'):
+                        # 如果哈希匹配（说明是 rerun），且有备份路径，则恢复
+                        logger.debug(st.session_state.last_processed_path)
+                        st.session_state.uploaded_path = st.session_state.last_processed_path
+                    else:
+                        logger.info("DEBUG: Hash matched but no last_processed_path found!")
+    
+    
+                # 使用上传路径或手动输入的路径
+                target_path = st.session_state.get('uploaded_path') or target_path
+    
+                auto_name = ""
+    
+                # 优先使用文件上传的智能名称
+                if hasattr(st.session_state, 'upload_auto_name') and st.session_state.upload_auto_name:
+                    auto_name = st.session_state.upload_auto_name
+    
+                if target_path:
+                    if os.path.exists(target_path):
+                        # 使用 UploadHandler 统计文件信息 (Stage 4.1)
+                        cnt, file_types, total_size = UploadHandler.get_folder_stats(target_path)
+    
+                        # 美化显示
+                        size_mb = total_size / (1024 * 1024)
+                        folder_name = os.path.basename(target_path.rstrip('/'))
+    
+                        # 智能计算名称 (提前计算以优化显示)
+                        if hasattr(st.session_state, 'upload_auto_name') and st.session_state.upload_auto_name:
+                            auto_name = st.session_state.upload_auto_name
+                        elif cnt > 0:
+                            auto_name = generate_smart_kb_name(target_path, cnt, file_types, folder_name)
+                        else:
+                            auto_name = folder_name
+    
+                        # 决定显示名称：如果是临时目录名，则显示智能名称
+                        display_name = folder_name
+                        if folder_name.startswith(('batch_', 'Web_', 'Search_')) and auto_name:
+                            display_name = auto_name
+    
+                        # --- 极简一行化：状态徽章 + 名称输入 ---
+                        # 避免在左侧重复显示长文件名，只显示状态，名称在输入框中显示
+                        status_col, input_col = st.columns([1.2, 4])
+                        
+                        with status_col:
+                            # 垂直居中的状态徽章
+                            st.markdown(
+                                """<div style='
+                                    background: #f0fdf4; 
+                                    color: #15803d; 
+                                    padding: 6px 8px; 
+                                    border-radius: 6px; 
+                                    border: 1px solid #bbf7d0;
+                                    text-align: center; 
+                                    font-size: 0.85rem; 
+                                    font-weight: 500;
+                                    white-space: nowrap;
+                                    margin-top: 1px;
+                                '>✅ 源就绪</div>""", 
+                                unsafe_allow_html=True
+                            )
+                        
+                        # [v8.6.9] 移除旧的名称输入，已统一移至上方
+                        if is_create_mode:
+                            st.caption("ℹ️ 请在上方输入框设置知识库名称")
+                        else:
+                            st.markdown(f"<div style='padding-top: 6px;'><b>{current_kb_name}</b></div>", unsafe_allow_html=True)
+    
+                        # 类型分布（紧凑化）
+                        if file_types:
+                            sorted_types = sorted(file_types.items(), key=lambda x: x[1], reverse=True)[:5]
+                            type_text = " · ".join([f"{ext.replace('.', '')}:{count}" for ext, count in sorted_types])
+                            st.caption(f"📊 {type_text} · 源: {display_name}")
+                    else:
+                        # 只有在非爬虫且非数据分析初级阶段时才报错
+                        is_web_waiting = (source_mode == "🔗 网址抓取" and st.session_state.get('crawl_url_input'))
+                        is_da_waiting = (source_mode == "📊 数据分析" and uploaded_files)
+                        
+                        if not is_web_waiting and not is_da_waiting:
+                            st.error("❌ 路径不存在，请检查路径是否正确")
+                            # 添加友好的错误引导
+                            from src.utils.friendly_error_handler import friendly_error
+                            friendly_error("文件上传", 
+                                         "指定的路径不存在或无法访问",
+                                         ["检查路径拼写是否正确", "确认您有访问该路径的权限", "尝试使用文件上传功能代替手动路径"])
+                        elif is_da_waiting:
+                            st.markdown(
+                                """<div style='background: #fffbeb; color: #92400e; padding: 6px 8px; border-radius: 6px; border: 1px solid #fef3c7; text-align: center; font-size: 0.85rem;'>⏳ 等待文件预处理...</div>""", 
+                                unsafe_allow_html=True
+                            )
+                        final_kb_name = current_kb_name if not is_create_mode else ""
+                else:
                     final_kb_name = current_kb_name if not is_create_mode else ""
-            else:
-                final_kb_name = current_kb_name if not is_create_mode else ""
+    
 
+        render_data_source_config()
+
+        if is_create_mode:
             st.write("")
 
             # 高级选项
