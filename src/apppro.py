@@ -3425,8 +3425,8 @@ if active_kb_name and (active_kb_name != st.session_state.current_kb_id or not s
         st.warning("⚠️ 正在处理问题，请等待完成后再切换知识库")
         st.session_state.current_nav = f"📂 {st.session_state.current_kb_id}"
 
-# 知识库加载逻辑 - 跳过多知识库模式的单一加载
-if active_kb_name and st.session_state.chat_engine is None and active_kb_name != "multi_kb_mode":
+# 知识库加载逻辑 - 跳过多知识库模式的单一加载 (及纯对话模式)
+if active_kb_name and st.session_state.chat_engine is None and active_kb_name != "multi_kb_mode" and active_kb_name != "pure_chat":
     from src.kb.kb_loader import KnowledgeBaseLoader
     
     kb_loader = KnowledgeBaseLoader(output_base)
@@ -3442,7 +3442,9 @@ if active_kb_name and st.session_state.chat_engine is None and active_kb_name !=
         st.toast(f"✅ 知识库 '{active_kb_name}' 挂载成功！")
         cleanup_memory()
     else:
-        st.error(error_msg) 
+        st.error(error_msg)
+elif active_kb_name == "pure_chat" and st.session_state.chat_engine is None:
+    st.session_state.chat_engine = "pure_chat" 
 
 # 按钮处理
 if btn_start:
@@ -6825,7 +6827,35 @@ if st.session_state.get('is_processing') and final_prompt:
                         # GPU加速检索 - 批量处理
                         retrieval_start = time.time()
                         logger.info(f"🔍 开始查询: {final_prompt[:100]}...")
-                        response = st.session_state.chat_engine.stream_chat(final_prompt)
+                        
+                        if st.session_state.chat_engine == "pure_chat":
+                            from llama_index.core.llms import ChatMessage, MessageRole
+                            if not Settings.llm:
+                                raise Exception("全局 LLM 未初始化，请在设置中配置模型")
+                                
+                            # 构造历史上下文
+                            history = []
+                            # 系统提示
+                            sys_prompt = "你是一个智能助手。请直接回答用户的问题。"
+                            if hasattr(Settings.llm, 'system_prompt') and Settings.llm.system_prompt:
+                                sys_prompt = Settings.llm.system_prompt
+                            history.append(ChatMessage(role=MessageRole.SYSTEM, content=sys_prompt))
+                            
+                            # 加载最近历史 (避免上下文溢出)
+                            recent_msgs = st.session_state.get('messages', [])[-20:]
+                            for m in recent_msgs:
+                                role = MessageRole.USER if m.get('role') == 'user' else MessageRole.ASSISTANT
+                                content = m.get('content', '')
+                                if content:
+                                    history.append(ChatMessage(role=role, content=content))
+                                    
+                            # 添加当前 Prompt
+                            history.append(ChatMessage(role=MessageRole.USER, content=final_prompt))
+                            
+                            response = Settings.llm.stream_chat(history)
+                        else:
+                            response = st.session_state.chat_engine.stream_chat(final_prompt)
+                            
                         retrieval_time = time.time() - retrieval_start
                         
                         logger.info(f"🔍 检索耗时: {retrieval_time:.2f}s (GPU加速)")
@@ -6873,7 +6903,7 @@ if st.session_state.get('is_processing') and final_prompt:
 
                     # 多核并行处理节点
                     srcs = []
-                    if response.source_nodes:
+                    if hasattr(response, 'source_nodes') and response.source_nodes:
                         logger.log("INFO", f"检索完成，找到 {len(response.source_nodes)} 个相关文档", stage="查询对话", details={"kb_name": active_kb_name})
                         logger.data_summary("检索结果", {
                             "查询": final_prompt[:50] + "..." if len(final_prompt) > 50 else final_prompt,
