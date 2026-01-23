@@ -1670,26 +1670,32 @@ with st.sidebar:
                     files_in_staging = os.listdir(st.session_state.task_staging_dir)
                     staging_count = len([f for f in files_in_staging if not f.startswith('.')])
                     
+                    # 状态显示占位符 (避免 Rerun)
                     stat_col1, stat_col2 = st.columns([3, 1])
                     with stat_col1:
-                        tips = "支持格式: PDF, DOCX, TXT, MD, XLSX, CSV, PPTX, JPG, PNG (支持OCR)。建议单文件 < 50MB。支持多源(上传+目录+粘贴)同时叠加。"
-                        # 优化：增加 padding 以扩大鼠标命中区域，并使用更醒目的蓝色
-                        st.markdown(
-                            f"""<div style='display: flex; align-items: center; gap: 5px; white-space: nowrap;'>
-                                <span style='font-weight: 600;'>📦 待处理暂存区:</span>
-                                <code style='background: #f0f2f6; padding: 2px 5px; border-radius: 3px;'>{staging_count}</code>
-                                <span>个文件</span>
-                                <span title="{tips}" style="cursor: help; color: #1f77b4; font-size: 1.1rem; padding: 0 8px; font-weight: bold;">❓</span>
-                            </div>""", 
-                            unsafe_allow_html=True
-                        )
+                        stats_placeholder = st.empty()
+                        
+                        def update_stats_display(count):
+                            tips = "支持格式: PDF, DOCX, TXT, MD, XLSX, CSV, PPTX, JPG, PNG (支持OCR)。建议单文件 < 50MB。支持多源(上传+目录+粘贴)同时叠加。"
+                            stats_placeholder.markdown(
+                                f"""<div style='display: flex; align-items: center; gap: 5px; white-space: nowrap;'>
+                                    <span style='font-weight: 600;'>📦 待处理暂存区:</span>
+                                    <code style='background: #f0f2f6; padding: 2px 5px; border-radius: 3px;'>{count}</code>
+                                    <span>个文件</span>
+                                    <span title="{tips}" style="cursor: help; color: #1f77b4; font-size: 1.1rem; padding: 0 8px; font-weight: bold;">❓</span>
+                                </div>""", 
+                                unsafe_allow_html=True
+                            )
+                        
+                        update_stats_display(staging_count)
+
                     with stat_col2:
                         if st.button("🧹 清空暂存", use_container_width=True, help="清空当前已收集的所有材料"):
                             import shutil
                             shutil.rmtree(st.session_state.task_staging_dir)
                             os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
                             st.session_state.uploaded_path = None
-                            st.rerun()
+                            update_stats_display(0) # 无感刷新
     
                     # 1. 拖拽上传 (一行化)
                     up_col1, up_col2 = st.columns([0.6, 5.4])
@@ -1745,7 +1751,10 @@ with st.sidebar:
                                     if sync_to_staging(manual_path, is_file=False, source_label="目录添加"):
                                         st.session_state.uploaded_path = st.session_state.task_staging_dir
                                         st.toast("✅ 目录内容已成功加入暂存区")
-                                        st.rerun()
+                                        
+                                        # 更新计数 (无感刷新)
+                                        new_count = len([f for f in os.listdir(st.session_state.task_staging_dir) if not f.startswith('.')])
+                                        update_stats_display(new_count)
                             else:
                                 st.error("路径不存在")
     
