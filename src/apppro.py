@@ -1239,93 +1239,103 @@ with st.sidebar:
                 st.session_state.current_nav = nav_options[default_idx]
 
         # 知识库选择 - 直接复选框模式
-        select_col1, select_col2, select_col3 = st.columns([0.6, 5.9, 0.5])
-        with select_col1:
-            st.markdown("**选择:**")
-        with select_col2:
-            selected_nav = st.selectbox("选择知识库或对话模式", nav_options, index=default_idx, label_visibility="collapsed")
-            
-            # 自动启动纯对话模式 (v2.7.6) - 简化版本
-            if selected_nav == "💬 纯对话模式 (Pure Chat)" and st.session_state.get('current_kb_id') != "pure_chat":
-                # 纯对话模式不需要加载任何知识库，直接设置为纯对话状态
-                st.session_state.chat_engine = "pure_chat"  # 使用字符串标识，避免加载复杂组件
-                st.session_state.current_kb_id = "pure_chat"
-                st.toast("✅ 纯对话模式已启动 - 直接与AI对话")
-                st.rerun()
-
-            # 处理复选框点击逻辑 - 只有当用户手动更改选择时才触发
-            if selected_nav != st.session_state.get('current_nav') and (selected_nav.startswith("☐") or selected_nav.startswith("☑️")):
-                # 提取知识库名称 (支持带统计信息的格式)
-                kb_name = selected_nav.split("📂 ")[1].split(" (")[0].strip() if "📂 " in selected_nav else ""
-                if kb_name:
-                    # 切换复选框状态
-                    current_state = st.session_state.get(f"kb_check_{kb_name}", False)
-                    new_state = not current_state
-                    st.session_state[f"kb_check_{kb_name}"] = new_state
-                    
-                    # 关键修复：立即更新 current_nav 字符串，确保下次 rerun 时 index 匹配正确
-                    new_symbol = "☑️" if new_state else "☐"
-                    st.session_state.current_nav = f"{new_symbol} 📂 {kb_name}"
+        # 初始化选择变量，防止 NameError
+        if 'selected_nav' not in st.session_state: st.session_state.selected_nav = nav_options[default_idx]
+        selected_nav = st.session_state.selected_nav
+        # [UI Optimization] 知识库选择与自动启动独立渲染 (无感加载)
+        @st.fragment
+        def render_kb_selector_and_autostart():
+            select_col1, select_col2, select_col3 = st.columns([0.6, 5.9, 0.5])
+            with select_col1:
+                st.markdown("**选择:**")
+            with select_col2:
+                st.session_state.selected_nav = st.selectbox("选择知识库或对话模式", nav_options, index=default_idx, label_visibility="collapsed")
+                selected_nav = st.session_state.selected_nav
+                
+                # 自动启动纯对话模式 (v2.7.6) - 简化版本
+                if selected_nav == "💬 纯对话模式 (Pure Chat)" and st.session_state.get('current_kb_id') != "pure_chat":
+                    # 纯对话模式不需要加载任何知识库，直接设置为纯对话状态
+                    st.session_state.chat_engine = "pure_chat"  # 使用字符串标识，避免加载复杂组件
+                    st.session_state.current_kb_id = "pure_chat"
+                    st.toast("✅ 纯对话模式已启动 - 直接与AI对话")
                     st.rerun()
-        with select_col3:
-            if st.button("🔄", help="刷新知识库列表", use_container_width=True, key="refresh_kb_list"):
-                st.rerun()
-
-        # 自动启动系统逻辑 (替代原有的启动按钮)
-        # 纯对话模式已在上方 selectbox 处理，此处处理知识库模式
-        is_pure_chat = (selected_nav == "💬 纯对话模式 (Pure Chat)")
-        
-        # 仅在非创建模式且非纯对话模式下执行自动启动
-        if not is_pure_chat and selected_nav != "➕ 新建知识库...":
-            target_kb_id = None
-            selected_kbs = st.session_state.get('selected_kbs', [])
-            
-            if len(selected_kbs) == 1:
-                target_kb_id = selected_kbs[0]
-            elif len(selected_kbs) > 1:
-                target_kb_id = "multi_kb_mode"
-            
-            # 如果目标ID有效，且与当前运行的ID不一致，则触发启动
-            if target_kb_id and target_kb_id != st.session_state.get('current_kb_id'):
-                # 显示加载状态 (仅在初次加载或切换时)
-                if st.session_state.get('current_kb_id') is None:
-                     status_text = f"正在启动: {target_kb_id}..."
-                     spinner_ctx = st.spinner(status_text)
-                else:
-                     # 切换时使用 toast 以减少干扰
-                     status_text = None
-                     spinner_ctx = st.empty()
-
-                with spinner_ctx:
-                    try:
-                        if target_kb_id == "multi_kb_mode":
-                            st.session_state.chat_engine = "multi_kb_mode"
-                            st.session_state.current_kb_id = "multi_kb_mode"
-                            st.toast(f"✅ 多知识库模式已启动 ({len(selected_kbs)}个)")
-                        else:
-                            # 单知识库
-                            kb_name = target_kb_id
-                            from src.rag_engine import create_rag_engine
-                            rag_engine = create_rag_engine(kb_name)
-                            if rag_engine:
-                                st.session_state.chat_engine = rag_engine.get_chat_engine()
-                                st.session_state.current_kb_id = kb_name
-                                st.toast(f"✅ 知识库 '{kb_name}' 已启动")
-                            else:
-                                st.error(f"❌ 无法启动知识库 '{kb_name}'")
-                                # 添加友好的错误引导
-                                from src.utils.friendly_error_handler import friendly_error
-                                friendly_error("知识库未加载", 
-                                             f"知识库 '{kb_name}' 启动失败",
-                                             ["检查知识库文件是否完整", "尝试重新创建知识库", "查看系统日志获取详细信息"])
-                                st.session_state.current_kb_id = None
+    
+                # 处理复选框点击逻辑 - 只有当用户手动更改选择时才触发
+                if selected_nav != st.session_state.get('current_nav') and (selected_nav.startswith("☐") or selected_nav.startswith("☑️")):
+                    # 提取知识库名称 (支持带统计信息的格式)
+                    kb_name = selected_nav.split("📂 ")[1].split(" (")[0].strip() if "📂 " in selected_nav else ""
+                    if kb_name:
+                        # 切换复选框状态
+                        current_state = st.session_state.get(f"kb_check_{kb_name}", False)
+                        new_state = not current_state
+                        st.session_state[f"kb_check_{kb_name}"] = new_state
                         
-                        # 只有在引擎变化时才 rerun，确保界面刷新
+                        # 关键修复：立即更新 current_nav 字符串，确保下次 rerun 时 index 匹配正确
+                        new_symbol = "☑️" if new_state else "☐"
+                        st.session_state.current_nav = f"{new_symbol} 📂 {kb_name}"
                         st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ 启动失败: {str(e)}")
-                        logger.error(f"Auto-start failed: {e}")
+            with select_col3:
+                if st.button("🔄", help="刷新知识库列表", use_container_width=True, key="refresh_kb_list"):
+                    st.rerun()
+    
+            # 自动启动系统逻辑 (替代原有的启动按钮)
+            # 纯对话模式已在上方 selectbox 处理，此处处理知识库模式
+            is_pure_chat = (selected_nav == "💬 纯对话模式 (Pure Chat)")
+            
+            # 仅在非创建模式且非纯对话模式下执行自动启动
+            if not is_pure_chat and selected_nav != "➕ 新建知识库...":
+                target_kb_id = None
+                selected_kbs = st.session_state.get('selected_kbs', [])
+                
+                if len(selected_kbs) == 1:
+                    target_kb_id = selected_kbs[0]
+                elif len(selected_kbs) > 1:
+                    target_kb_id = "multi_kb_mode"
+                
+                # 如果目标ID有效，且与当前运行的ID不一致，则触发启动
+                if target_kb_id and target_kb_id != st.session_state.get('current_kb_id'):
+                    # 显示加载状态 (仅在初次加载或切换时)
+                    if st.session_state.get('current_kb_id') is None:
+                         status_text = f"正在启动: {target_kb_id}..."
+                         spinner_ctx = st.spinner(status_text)
+                    else:
+                         # 切换时使用 toast 以减少干扰
+                         status_text = None
+                         spinner_ctx = st.empty()
+    
+                    with spinner_ctx:
+                        try:
+                            if target_kb_id == "multi_kb_mode":
+                                st.session_state.chat_engine = "multi_kb_mode"
+                                st.session_state.current_kb_id = "multi_kb_mode"
+                                st.toast(f"✅ 多知识库模式已启动 ({len(selected_kbs)}个)")
+                            else:
+                                # 单知识库
+                                kb_name = target_kb_id
+                                from src.rag_engine import create_rag_engine
+                                rag_engine = create_rag_engine(kb_name)
+                                if rag_engine:
+                                    st.session_state.chat_engine = rag_engine.get_chat_engine()
+                                    st.session_state.current_kb_id = kb_name
+                                    st.toast(f"✅ 知识库 '{kb_name}' 已启动")
+                                else:
+                                    st.error(f"❌ 无法启动知识库 '{kb_name}'")
+                                    # 添加友好的错误引导
+                                    from src.utils.friendly_error_handler import friendly_error
+                                    friendly_error("知识库未加载", 
+                                                 f"知识库 '{kb_name}' 启动失败",
+                                                 ["检查知识库文件是否完整", "尝试重新创建知识库", "查看系统日志获取详细信息"])
+                                    st.session_state.current_kb_id = None
+                            
+                            # 只有在引擎变化时才 rerun，确保界面刷新
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ 启动失败: {str(e)}")
+                            logger.error(f"Auto-start failed: {e}")
+    
 
+        render_kb_selector_and_autostart()
+        selected_nav = st.session_state.selected_nav
         # 知识库搜索/过滤已按用户要求移除
 
         # 卸载知识库按钮（释放内存）
