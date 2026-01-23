@@ -6164,7 +6164,7 @@ if not st.session_state.get('is_processing') and st.session_state.question_queue
     st.session_state.current_active_query = query_to_process
     st.session_state.is_processing = True
     st.session_state.process_start_time = time.time()
-    st.rerun()
+    # st.rerun() # [极致优化] 移除二次刷新，直接透传进入处理引擎，消除白屏感
 
 # 2. 状态监控：如果处理超时(180s)，强制释放 (防止死锁)
 if st.session_state.get('is_processing'):
