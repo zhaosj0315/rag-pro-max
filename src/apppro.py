@@ -5654,6 +5654,27 @@ if st.session_state.get('artifacts'):
                         )
                         st.plotly_chart(fig, use_container_width=True, key=f"v424_art_{idx}")
 
+# [UI Optimization] 独立渲染Toggle以避免全页刷新 (Zero White Screen)
+@st.fragment
+def render_isolated_toggle(label, key, help=None, disabled=False, default_val=False):
+    # 确保 Key 存在
+    if key not in st.session_state:
+        st.session_state[key] = default_val
+    
+    current = st.session_state[key]
+    # 使用独立的 widget key 防止冲突，但绑定逻辑
+    widget_key = f"toggle_{key}_{int(time.time()/1000)}" # 动态key可能导致重绘丢失状态？
+    # 不，widget key 必须稳定。
+    widget_key = f"widget_{key}"
+    
+    # 渲染 Toggle
+    new_val = st.toggle(label, value=current, disabled=disabled, help=help, key=widget_key)
+    
+    # 同步状态
+    if new_val != current:
+        st.session_state[key] = new_val
+        # Fragment 会自动处理重绘，无需 rerun
+
 # 极简工具栏：模型与设置
 with st.container():
     # Tools: Leading Spacer | Provider | Model | Deep | Web | Research | Filter | Clear | Stop/Trailing Spacer
@@ -5842,8 +5863,7 @@ with st.container():
 
     # --- 3. 功能开关 (Toggle) ---
     with c_deep:
-        deep_on = st.toggle("深度思考", value=st.session_state.get('enable_query_optimization', False), help="启用智能查询优化")
-        st.session_state.enable_query_optimization = deep_on
+        render_isolated_toggle("深度思考", 'enable_query_optimization', help="启用智能查询优化")
 
     with c_web:
         # 权限检查：联网搜索 (实时颗粒化)
@@ -5851,12 +5871,12 @@ with st.container():
         current_user = st.session_state.get('user', 'guest_user')
         can_search = permission_manager.has_permission(current_user, "smart_search")
         
-        if not can_search:
-            st.toggle("🌐 联网搜索 (🔒 权限受限)", value=False, disabled=True, help="请联系管理员开启联网搜索权限")
-            web_search_on = False
-        else:
-            web_search_on = st.toggle("联网搜索", value=st.session_state.get('enable_web_search', False), help="启用联网搜索")
-        st.session_state.enable_web_search = web_search_on
+        render_isolated_toggle(
+            "🌐 联网搜索 (🔒)" if not can_search else "联网搜索",
+            'enable_web_search',
+            disabled=not can_search,
+            help="请联系管理员开启联网搜索权限" if not can_search else "启用联网搜索"
+        )
 
     with c_research:
         # 权限检查：智能研究
@@ -5864,12 +5884,12 @@ with st.container():
         current_user = st.session_state.get('user', 'guest_user')
         can_research = permission_manager.has_permission(current_user, "deep_research")
         
-        if not can_research:
-            st.toggle("智能研究 (🔒)", value=False, disabled=True, help="请联系管理员开启深度研究权限")
-            st.session_state.enable_deep_research = False
-        else:
-            research_on = st.toggle("智能研究", value=st.session_state.get('enable_deep_research', False), help="启用深度研究模式 (v2.9)")
-            st.session_state.enable_deep_research = research_on
+        render_isolated_toggle(
+            "智能研究 (🔒)" if not can_research else "智能研究",
+            'enable_deep_research',
+            disabled=not can_research,
+            help="请联系管理员开启深度研究权限" if not can_research else "启用深度研究模式 (v2.9)"
+        )
 
     with c_da:
         # 权限检查：数据分析
@@ -5877,18 +5897,20 @@ with st.container():
         current_user = st.session_state.get('user', 'guest_user')
         can_analyze = permission_manager.has_permission(current_user, "data_analysis")
         
-        if not can_analyze:
-            st.toggle("数据分析 (🔒)", value=False, disabled=True, help="请联系管理员开启数据分析权限")
-            st.session_state.is_data_analysis_mode = False
-        else:
-            # [v8.3.3] 智能默认：如果具备分析底座且未手动设置过，则默认开启
-            current_da_state = st.session_state.get('is_data_analysis_mode')
-            if current_da_state is None and active_kb_name and active_kb_name not in ["pure_chat", "multi_kb_mode"]:
-                schema_p = os.path.join(output_base, active_kb_name, "business_schema.json")
-                current_da_state = os.path.exists(schema_p)
+        # 智能默认计算
+        current_da_state = st.session_state.get('is_data_analysis_mode')
+        default_da = False
+        if current_da_state is None and active_kb_name and active_kb_name not in ["pure_chat", "multi_kb_mode"]:
+            schema_p = os.path.join(output_base, active_kb_name, "business_schema.json")
+            default_da = os.path.exists(schema_p)
             
-            da_on = st.toggle("数据分析", value=current_da_state if current_da_state is not None else False, key="da_toggle_main", help="手动触发宏观数据分析与推演 (v4.5)")
-            st.session_state.is_data_analysis_mode = da_on
+        render_isolated_toggle(
+            "数据分析 (🔒)" if not can_analyze else "数据分析",
+            'is_data_analysis_mode',
+            disabled=not can_analyze,
+            help="请联系管理员开启数据分析权限" if not can_analyze else "手动触发宏观数据分析与推演 (v4.5)",
+            default_val=default_da
+        )
 
     # --- 4. 操作按钮 (Popover/Button) ---
     if st.session_state.get('is_processing'):
