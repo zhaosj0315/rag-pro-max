@@ -7004,7 +7004,18 @@ if st.session_state.get('is_processing') and final_prompt:
                     # 添加详细的成功提示
                     st.success(f"✅ 查询处理完成！生成 {token_count} 个token，耗时 {total_time:.2f} 秒，速度 {tokens_per_sec:.1f} token/秒")
                     
-                    st.rerun()
+                    # st.rerun() # [优化] 移除自动刷新，避免白屏等待
+                    
+                    # 立即渲染追问建议，保持交互连贯
+                    if initial_sugs:
+                        st.markdown("---")
+                        st.caption("🤔 您可能想问：")
+                        cols = st.columns(len(initial_sugs))
+                        for i, sug in enumerate(initial_sugs):
+                            with cols[i]:
+                                if st.button(sug, key=f"sug_btn_imm_{int(time.time())}_{i}", use_container_width=True):
+                                    st.session_state.prompt_trigger = sug
+                                    st.rerun()
                 
                 except Exception as e: 
                     # [v5.9.4] 错误诊断增强：禁止静默闪退，显式抛出异常详情
