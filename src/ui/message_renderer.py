@@ -68,7 +68,7 @@ class MessageRenderer:
             msg_hash = hashlib.md5(msg['content'][:100].encode()).hexdigest()[:8]
             st.divider()
             
-            @st.fragment
+            # @st.fragment [Fix] 移除 Fragment 隔离，使点击事件触发全局 Rerun (Button 默认行为)，利用自然流处理队列
             def suggestions_fragment():
                 # 优先显示当前推荐，如果没有则显示历史推荐
                 display_suggestions = (
@@ -94,7 +94,7 @@ class MessageRenderer:
         from src.queue.queue_manager import QueueManager
         queue_manager = QueueManager()
         queue_manager.add_question(question)
-        st.rerun()
+        # st.rerun() [Fix] 移除强制重跑，避免白屏闪烁
     
     @staticmethod
     def _generate_more_suggestions(msg, chat_engine):

@@ -5607,7 +5607,7 @@ for msg_idx, msg in enumerate(state.get_messages()):
         
         st.divider()
         
-        @st.fragment
+        # @st.fragment [Fix] 移除 Fragment，改用全局流式更新，配合 click_btn 移除 rerun，实现无闪烁直接回复
         def suggestions_fragment():
             # 1. 状态指示与快捷操作栏 (v2.9)
             cols = st.columns([0.25, 0.15, 0.15, 0.15, 0.15, 0.15])
@@ -5658,7 +5658,7 @@ for msg_idx, msg in enumerate(state.get_messages()):
                         )
                         if new_sugs:
                             st.session_state.suggestions_history = new_sugs[:3]
-                            st.rerun(scope="fragment")
+                            st.rerun() # [Fix] Fragment removed, use global rerun for refresh
 
             # 2. 动态过滤与渲染推荐问题
             raw_suggestions = st.session_state.get('suggestions_history', [])

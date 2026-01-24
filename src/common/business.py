@@ -164,4 +164,4 @@ def click_btn(q: str):
     
     queue_manager = QueueManager()
     queue_manager.add_question(q)
-    st.rerun()
+    # st.rerun() # [Fix] 移除强制重跑，利用 Streamlit 自然交互流 (Button -> Script Run -> Queue Processing) 避免白屏闪烁
