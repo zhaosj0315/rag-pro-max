@@ -1,5 +1,19 @@
 # Changelog
 
+## [v9.2.0] - 2026-01-24 (UX/UI Polishing & Fragment Architecture)
+### 🚀 交互重构：全域局部渲染架构 (Universal Fragment Architecture)
+- **对话区全包裹 (Full-Canvas Fragment)**: 将核心对话交互区（历史记录、输入框、AI响应流）完整封装为单一 Fragment。实现了点击推荐问题、引用回复时的**零闪烁直接响应**，彻底根除了页面级重载（Full Rerun）带来的白屏感。
+- **文件管理局部化 (File Manager Isolation)**: 知识库详情页的文件列表、翻页器、搜索栏重构为独立 Fragment。所有的筛选与查看操作均在局部完成，不再触动侧边栏与顶栏。
+- **直接回复流 (Direct Reply)**: 移除了推荐问题点击后的二次刷新逻辑，实现了“点击即回复”的 Gemini/GPT 级丝滑体验。
+
+### 🎨 布局与视觉修复 (Layout & Visual Fixes)
+- **登录页侧边栏隔离**: 修复了登录加载阶段因全局 CSS 抢跑导致的侧边栏强制占位（850px）问题，确保登录页始终保持全宽洁净布局。
+- **上传组件防抖**: 通过全局 CSS 预加载技术，强制锁定了文件上传框的初始高度，消除了页面刷新时上传框“先大后小”的视觉跳动。
+
+### 🛡️ 功能增强与反馈
+- **Finder 深度集成**: 修复了“在 Finder 中显示”和“预览”功能的静默失败问题。现在操作会触发严格的文件存在性校验，并提供明确的 Toast 成功提示或 Error 失败反馈。
+- **上传命名优化**: 修复了在文件上传模式下手动输入本地路径时，知识库名称未自动生成的校验阻断 Bug。
+
 ## [v9.1.0] - 2026-01-23 (Flagship Evolution - Performance & Decoupling)
 ### 🚀 极致性能优化：“零白屏”丝滑体验 (Zero White Screen Optimization)
 - **局部刷新革命 (Fragment Isolation)**: 利用 `st.fragment` 深度重构了工具栏功能开关、数据源配置区域及追问建议面板。现在所有开关切换与配置调整均为**瞬时响应**，彻底消除了困扰已久的全页白屏闪烁。

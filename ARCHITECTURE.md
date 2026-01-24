@@ -1,20 +1,30 @@
-# RAG Pro Max v9.1.0 企业级系统架构文档
+# RAG Pro Max v9.2.0 企业级系统架构文档
 
-**版本**: v9.1.0 (Flagship Evolution - Ultra Performance)  
-**更新日期**: 2026-01-23  
-**核心特性**: Fragment UI Isolation, Seamless Chat Pipeline, Decoupled Pure Chat
+**版本**: v9.2.0 (Flagship Evolution - Ultra Performance)  
+**更新日期**: 2026-01-24  
+**核心特性**: Full-Canvas Fragment, Zero-Flicker Chat, Layout Isolation
 
 ---
 
 ## 🏗️ 极致表现层隔离 (Presentation Layer Isolation)
 
-### 1. 局部刷新隔离架构 (Fragment-Level UI Isolation)
-在 v9.1.0 中，表现层引入了 **「组件级状态隔离 (Fragment Isolation)」** 模式，解决了 Streamlit 传统的“单向数据流引发的全量重绘”痛点：
-- **Lifecycle Decoupling**: 利用 `@st.fragment` 装饰器，将工具栏切换、参数微调、数据摄入配置等高频交互组件的生命周期与主对话区解耦。
-- **Visual Performance**: 局部刷新机制将配置操作的响应延迟从秒级降低至 **50ms** 以内，彻底消除白屏闪烁。
-- **Incremental Rendering**: 对话结束后的“追问建议”采用原地增量渲染技术，确保用户在流式输出结束的瞬间即可进行下一次点击，无需等待页面重载。
+### 1. 全画布局部渲染架构 (Full-Canvas Fragment Architecture)
+在 v9.2.0 中，系统完成了从“组件级隔离”到“区域级隔离”的架构跃迁：
+- **Chat Interface Encapsulation**: 将整个对话交互区（History Render + Input Box + Response Stream）封装为单一的 `render_main_chat_interface` Fragment。
+- **Zero-Flicker Interaction**: 所有的点击（推荐问题）、提交（发送消息）与流式输出（AI 回答）均在 Fragment 内部闭环完成。外部容器（Sidebar, Header）在交互过程中保持静态，彻底消除了页面级重载带来的白屏闪烁。
+- **Direct Reply Pipeline**: 移除了中间态的 `st.rerun()`，实现了点击动作直接驱动后端队列处理（Queue Processing）的线性流水线，交互延迟降低至 0ms。
 
-### 2. 跨生命周期 Key 映射 (Stable-Key Binding)
+### 2. 局部刷新隔离架构 (Legacy Fragment Integration)
+- **File Manager Isolation**: 知识库详情页的文件列表与操作区被独立封装，翻页与筛选不再触动主页面状态。
+- **Lifecycle Decoupling**: 利用 `@st.fragment` 装饰器，将工具栏切换、参数微调、数据摄入配置等高频交互组件的生命周期与主对话区解耦。
+
+### 3. 布局防抖与 CSS 预加载 (Layout Stabilization)
+- **Pre-Login Isolation**: 将全局布局 CSS（如 850px 侧边栏）后置于登录检查之后加载，防止登录页布局被非预期样式挤压。
+- **Anti-Flicker CSS**: 针对文件上传组件实施了 `display: none` 级别的预加载隐藏策略，消除了组件渲染时的尺寸跳动（CLS）。
+
+---
+
+## 🏗️ 业务层内核加固 (Service Layer Hardening)
 为了解决 Fragment 内部点击事件在全页刷新后丢失的问题，系统实现了一套**基于内容的稳定哈希算法**：
 - **Deterministic Keying**: 实时计算回答内容的哈希值，确保即时生成的按钮 Key 与持久化后的历史记录 Key **100% 对齐**。
 - **Interaction Seamlessness**: 确保了用户在点击即时出现的建议按钮时，系统能精准映射到后台处理队列，实现了交互的无缝衔接。
