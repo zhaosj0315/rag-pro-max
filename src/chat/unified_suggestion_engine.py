@@ -6,7 +6,7 @@
 import json
 import os
 import re
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from urllib.parse import urlparse
 from datetime import datetime
 from llama_index.core import Settings

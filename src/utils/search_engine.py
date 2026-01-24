@@ -3,8 +3,7 @@
 """
 
 import re
-from typing import List, Dict, Optional
-from pathlib import Path
+from typing import List, Dict
 
 class SearchEngine:
     def __init__(self):

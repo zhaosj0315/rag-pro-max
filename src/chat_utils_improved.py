@@ -9,7 +9,6 @@
 import os
 import json
 import threading
-import time
 import re
 from pathlib import Path
 from collections import Counter
@@ -199,8 +198,6 @@ def generate_follow_up_questions_safe(context_text, num_questions=3, existing_qu
                         "这些内容如何与其他部分关联？",
                         "在实际应用中需要注意什么？"
                     ])
-        
-        return fallback[:num_questions]
         
         return fallback[:num_questions]
 

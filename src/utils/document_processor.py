@@ -6,12 +6,10 @@ logger = LogManager()
 文档处理模块 - 统一管理文档加载、解析和元数据提取
 """
 import os
-import re
 from datetime import datetime
 from llama_index.core.schema import Document
-
-
 from src.common.utils import sanitize_filename
+
 
 
 def get_file_size_str(size_bytes: int) -> str:

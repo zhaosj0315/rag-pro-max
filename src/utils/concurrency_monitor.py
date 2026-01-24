@@ -6,7 +6,7 @@
 import time
 import threading
 from typing import Dict, List, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from collections import defaultdict
 
 

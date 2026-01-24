@@ -4,7 +4,6 @@
 """
 
 import streamlit as st
-from typing import List, Dict
 from src.services.configurable_industry_service import get_configurable_industry_service
 
 class IndustryConfigInterface:

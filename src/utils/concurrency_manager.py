@@ -4,7 +4,7 @@
 """
 
 from typing import List, Dict, Any, Callable
-from .async_pipeline import AsyncPipeline, run_async_pipeline
+from .async_pipeline import run_async_pipeline
 from .dynamic_batch import DynamicBatchOptimizer
 from .smart_scheduler import SmartScheduler, TaskType
 import time

@@ -6,7 +6,7 @@
 import json
 import os
 import uuid
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 PROMPTS_FILE = "config/system_prompts.json"
 

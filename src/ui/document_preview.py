@@ -3,7 +3,6 @@
 """
 
 import streamlit as st
-from typing import Optional
 from src.kb.document_viewer import DocumentViewer, DocumentInfo
 
 

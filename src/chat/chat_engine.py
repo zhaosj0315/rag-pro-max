@@ -5,7 +5,7 @@ Stage 7.1 - 问答处理核心逻辑
 
 import time
 import re
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 import streamlit as st
 
 from src.app_logging import LogManager

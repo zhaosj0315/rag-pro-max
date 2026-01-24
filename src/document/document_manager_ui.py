@@ -12,7 +12,6 @@ class DocumentManagerUI:
     
     def __init__(self):
         """初始化文档管理界面"""
-        pass
     
     @staticmethod
     @st.dialog("📄 文档详情")

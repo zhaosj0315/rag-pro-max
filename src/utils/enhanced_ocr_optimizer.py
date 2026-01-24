@@ -19,7 +19,7 @@ def _process_single_image_global(args):
 
 import time
 import uuid
-from typing import List, Tuple
+from typing import List
 from PIL import Image
 
 from .adaptive_scheduler import adaptive_scheduler

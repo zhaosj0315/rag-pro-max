@@ -7,7 +7,7 @@ import time
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
-from typing import Dict, List
+from typing import Dict
 
 class CrawlProgressMonitor:
     def __init__(self):

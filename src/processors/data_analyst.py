@@ -3,9 +3,8 @@ import json
 import pandas as pd
 import sqlite3
 import re
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from datetime import datetime
-import hashlib
 from src.processors.schema_enhancer import SchemaEnhancer
 
 class DataAnalystEngine:
@@ -829,7 +828,6 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                         print(f"🔍 [Raw AI Response] {ai_response}")  # 显示完整响应
                 except Exception as e:
                     print(f"❌ [Error] SQL 生成失败: {e}")
-                    pass
 
                 if status_callback: status_callback(f"🧪 [Stage {i+1}] 执行逻辑验证...")
                 exec_res = {"success": False, "data": []}

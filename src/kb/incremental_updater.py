@@ -3,8 +3,7 @@
 import os
 import json
 import hashlib
-from typing import List, Dict, Optional, Set
-from pathlib import Path
+from typing import List, Dict
 
 
 class IncrementalUpdater:

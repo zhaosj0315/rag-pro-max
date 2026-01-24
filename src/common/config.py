@@ -3,7 +3,6 @@
 公共配置管理 - 合并重复的配置函数
 """
 
-import json
 from typing import Dict, Any, Optional
 from pathlib import Path
 
@@ -99,8 +98,3 @@ def set_config_value(key: str, value: Any, config: Optional[Dict] = None) -> Dic
         # 否则保存到默认配置文件
         unified_set_config_value("app_config", key, value)
         return load_config()
-    
-    # 设置值
-    current[keys[-1]] = value
-    
-    return config

@@ -3,7 +3,6 @@
 负责配置文件管理和默认值设置
 """
 
-import json
 import os
 from src.app_logging import LogManager
 

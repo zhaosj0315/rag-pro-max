@@ -9,10 +9,9 @@ import json
 import shutil
 import time
 from dataclasses import dataclass
-from typing import List, Dict, Optional
+from typing import Dict, Optional
 
 from llama_index.core import VectorStoreIndex, StorageContext, load_index_from_storage, Settings
-from llama_index.core.node_parser import SentenceSplitter
 
 from src.metadata_manager import MetadataManager
 from src.file_processor import scan_directory_safe
@@ -340,7 +339,6 @@ class IndexBuilder:
             # 导入摘要生成函数
             from src.common.business import generate_doc_summary
             from concurrent.futures import ThreadPoolExecutor, as_completed
-            import threading
             
             def generate_single_summary(fname, text):
                 """生成单个文件的摘要"""

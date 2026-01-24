@@ -4,16 +4,14 @@ import os
 import json
 import time
 import pandas as pd
-import hashlib
 import subprocess
 import importlib # [Fix] Hot reload support
-from datetime import datetime, timedelta
+from datetime import datetime
 from src.auth.user_auth import load_users, save_users
-from src.auth.session_manager import load_sharing_config, save_sharing_config, set_kb_public, revoke_user_sessions
+from src.auth.session_manager import load_sharing_config, set_kb_public
 from src.kb.kb_manager import KBManager
 from src.config.manifest_manager import ManifestManager
 import src.auth.connection_manager # [Fix] Import module for reloading
-from src.auth.connection_manager import ConnectionManager
 
 USER_CONFIG_PATH = "config/users.json"
 ROLE_TEMPLATE_PATH = "config/role_templates.json"

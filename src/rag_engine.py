@@ -6,7 +6,7 @@ RAG Pro Max - RAG 核心引擎
 import os
 import time
 import shutil
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 from llama_index.core import (
     VectorStoreIndex, 
     StorageContext, 

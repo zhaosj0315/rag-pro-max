@@ -6,9 +6,7 @@
 
 import streamlit as st
 import time
-import json
 from datetime import datetime
-import plotly.graph_objects as go
 from pathlib import Path
 
 class LocalRefreshMonitor:

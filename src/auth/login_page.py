@@ -1,7 +1,5 @@
 import streamlit as st
-import time
-import os
-from src.auth.user_auth import authenticate_user, register_user
+from src.auth.user_auth import register_user
 
 def render_login_page():
     # --- 1. 数字化指挥中心样式表 (v9.2 最终对齐高亮版) ---

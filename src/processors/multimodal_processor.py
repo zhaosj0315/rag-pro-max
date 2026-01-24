@@ -1,10 +1,8 @@
 """多模态处理器 - 支持图片、表格等多模态内容处理"""
 
 import os
-import base64
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any
 from pathlib import Path
-import tempfile
 
 try:
     from PIL import Image

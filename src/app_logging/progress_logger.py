@@ -10,7 +10,6 @@ logger = LogManager()
 import time
 import sys
 from datetime import datetime
-from typing import Optional
 
 class ProgressLogger:
     def __init__(self, total_steps: int = 6, logger=None):

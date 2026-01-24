@@ -10,7 +10,6 @@ class ConfigInterface:
     
     def __init__(self):
         """初始化配置界面"""
-        pass
     
     def render_config_tab(self):
         """渲染配置标签页"""

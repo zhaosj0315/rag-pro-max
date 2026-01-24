@@ -7,11 +7,10 @@ import json
 import os
 import time
 import psutil
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from datetime import datetime
+from typing import Dict, List
 from enum import Enum
 import logging  # 允许使用 - 智能调度专用
-from src.app_logging.log_manager import LogManager
 
 class TaskType(Enum):
     """任务类型枚举"""

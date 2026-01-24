@@ -8,7 +8,7 @@ import os
 import time
 import json
 from datetime import datetime
-from typing import Optional, Callable, Any
+from typing import Optional, Callable
 from urllib.parse import urlparse
 
 def update_status(message: str, status_type: str = "info") -> None:
@@ -160,7 +160,6 @@ def generate_doc_summary(doc_text: str, filename: str) -> str:
 def click_btn(q: str):
     """点击追问按钮，将问题加入队列（去重）"""
     from src.queue.queue_manager import QueueManager
-    import streamlit as st
     
     queue_manager = QueueManager()
     queue_manager.add_question(q)

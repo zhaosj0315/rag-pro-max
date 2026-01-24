@@ -12,7 +12,6 @@ class KBInterface:
     
     def __init__(self):
         """初始化知识库界面"""
-        pass
     
     def render_kb_console(self):
         """渲染知识库控制台"""

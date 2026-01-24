@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """知识图谱可视化组件"""
 
-import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
 import networkx as nx
-import pandas as pd
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 import numpy as np
 
 class KnowledgeGraph:

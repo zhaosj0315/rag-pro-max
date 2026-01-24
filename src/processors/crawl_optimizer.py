@@ -9,7 +9,7 @@ logger = LogManager()
 
 import re
 from urllib.parse import urlparse
-from typing import Dict, Tuple, List
+from typing import Dict, List
 import requests
 from bs4 import BeautifulSoup
 

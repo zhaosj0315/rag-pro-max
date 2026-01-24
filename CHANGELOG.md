@@ -1,5 +1,16 @@
 # Changelog
 
+## [v9.3.0] - 2026-01-24 (Codebase Governance Edition)
+### 🗺️ 代码资产透视系统 (Codebase Cartography)
+- **上帝视角索引**: 新增 `scripts/maintenance/audit_codebase.py` 自动化审计工具。一键生成全项目静态索引 (`CODE_INDEX.md`)、血缘依赖图 (`DEPENDENCY_GRAPH.svg`) 及缺失文档清单 (`MISSING_DOCS.json`)。
+- **僵尸代码猎杀**: 集成 `vulture` 与 `autoflake` 引擎。已自动清理所有未使用的 Import 引用，并产出高置信度的死代码报告 (`DEAD_CODE_REPORT.txt`)。
+- **文档自动化**: 实现了“代码即文档”的闭环。每次迭代后，系统结构图与功能清单均可由脚本自动刷新，确保文档永远忠实于代码。
+
+### 🛡️ 逻辑修复与死角清理
+- **数据库摄入修复**: 修复了 `DBIngestor` 中因 `return` 语句过早导致元数据保存逻辑 (`db_sync_meta.json`) 被截断的隐性 Bug。
+- **逻辑断路修复**: 清理了 `config_service`、`common/config` 及 `chat_utils_improved` 中所有 `unreachable code`，消除了逻辑歧义。
+- **冗余校验移除**: 移除了 `validate_config` 中已被统一服务接管的冗余校验代码，降低了模块耦合度。
+
 ## [v9.2.0] - 2026-01-24 (UX/UI Polishing & Fragment Architecture)
 ### 🚀 交互重构：全域局部渲染架构 (Universal Fragment Architecture)
 - **对话区全包裹 (Full-Canvas Fragment)**: 将核心对话交互区（历史记录、输入框、AI响应流）完整封装为单一 Fragment。实现了点击推荐问题、引用回复时的**零闪烁直接响应**，彻底根除了页面级重载（Full Rerun）带来的白屏感。

@@ -8,9 +8,8 @@ logger = LogManager()
 """
 
 import os
-from typing import List, Dict, Optional
+from typing import List, Dict
 from datetime import datetime
-from pathlib import Path
 
 
 class DocumentInfo:

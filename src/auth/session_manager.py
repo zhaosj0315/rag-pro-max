@@ -1,7 +1,6 @@
 import json
 import os
 import uuid
-import time
 from datetime import datetime, timedelta
 from src.auth.user_auth import load_users
 

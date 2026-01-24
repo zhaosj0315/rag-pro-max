@@ -6,10 +6,8 @@
 
 import streamlit as st
 import os
-import tempfile
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any
 from pathlib import Path
-import mimetypes
 
 class UnifiedDocumentProcessor:
     """统一文档处理器"""

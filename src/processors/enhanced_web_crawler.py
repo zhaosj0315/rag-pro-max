@@ -6,7 +6,6 @@ import asyncio
 from .async_web_crawler import AsyncWebCrawler
 from .web_crawler import WebCrawler
 import time
-from pathlib import Path
 
 class EnhancedWebCrawler:
     def __init__(self):

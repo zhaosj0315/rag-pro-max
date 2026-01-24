@@ -1,7 +1,6 @@
 """网页抓取到知识库的UI界面组件"""
 
 import streamlit as st
-from typing import Optional
 from ..processors.web_to_kb_processor import WebToKBProcessor
 
 

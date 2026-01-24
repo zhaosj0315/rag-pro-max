@@ -1,8 +1,25 @@
-# RAG Pro Max v9.2.0 企业级系统架构文档
+# RAG Pro Max v9.3.0 企业级系统架构文档
 
-**版本**: v9.2.0 (Flagship Evolution - Ultra Performance)  
+**版本**: v9.3.0 (Codebase Governance Edition)  
 **更新日期**: 2026-01-24  
-**核心特性**: Full-Canvas Fragment, Zero-Flicker Chat, Layout Isolation
+**核心特性**: Codebase Cartography, Fragment UI Isolation, Seamless Chat Pipeline
+
+---
+
+## 🏗️ 工程治理架构 (Engineering Governance Architecture)
+
+在 v9.3.0 中，系统引入了**“代码资产透视系统” (Codebase Cartography System)**，将代码维护从“人工经验”升级为“数据驱动”。
+
+### 1. 三维审计透视 (3D Audit Perspective)
+- **静态户籍档案 (Dimension 1)**: 基于 Python AST 解析器，自动生成所有类与函数的静态索引 (`CODE_INDEX.md`)，并智能识别缺失文档的模块 (`MISSING_DOCS.json`)。
+- **血缘依赖拓扑 (Dimension 2)**: 集成 `pydeps` 引擎，自动绘制模块间的调用依赖关系图 (`DEPENDENCY_GRAPH.svg`)，可视化展示系统耦合度。
+- **僵尸代码侦测 (Dimension 3)**: 利用 `vulture` 进行静态死代码分析，自动识别未引用的变量、函数与类，并输出高置信度清理报告。
+
+### 2. 自动化维护闭环 (Automated Maintenance Loop)
+系统建立了 `Audit -> Report -> Clean` 的自动化链路：
+- **Pre-Commit**: 每次提交前可运行 `audit_codebase.py` 刷新全景图。
+- **Auto-Cleanup**: 集成 `autoflake` 自动清理无用的 Import 引用。
+- **Safe-Delete**: 对 `unreachable code` 执行基于 AST 的精准剪枝。
 
 ---
 

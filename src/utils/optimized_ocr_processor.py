@@ -5,7 +5,6 @@
 
 import os
 import time
-import psutil
 import threading
 import logging
 from typing import List, Dict, Optional, Callable

@@ -320,7 +320,6 @@ class KnowledgeBaseLoader:
                 
                 if metadata_filters:
                     # 使用 OR 逻辑（满足任一类型即可）
-                    from llama_index.core.vector_stores import FilterOperator
                     filters = MetadataFilters(filters=metadata_filters, condition="or")
                     status.write(f"   🔍 应用筛选: {search_filters}")
 

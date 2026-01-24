@@ -9,7 +9,7 @@ logger = LogManager()
 
 import torch
 from sentence_transformers import SentenceTransformer
-from typing import List, Optional
+from typing import List
 
 class OfflineEmbeddings:
     """离线嵌入模型"""

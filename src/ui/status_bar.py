@@ -4,7 +4,6 @@
 """
 
 import streamlit as st
-from typing import Optional
 
 class StatusBar:
     """状态栏管理器"""

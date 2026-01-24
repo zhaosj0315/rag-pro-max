@@ -10,8 +10,7 @@ import sys
 import time
 import psutil
 import subprocess
-from datetime import datetime, timedelta
-from collections import deque
+from datetime import datetime
 
 # 自动处理路径
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -20,7 +19,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 try:
-    from rich.console import Console, Group
+    from rich.console import Console
     from rich.layout import Layout
     from rich.panel import Panel
     from rich.live import Live
@@ -78,16 +77,26 @@ class SystemMonitor:
 
     def make_bar(self, pct, color="green", width=15):
         filled = int((pct / 100) * width)
+        # 使用高对比度颜色组合
+        if pct >= 80:
+            color = "bright_red"
+        elif pct >= 60:
+            color = "bright_magenta"
+        elif pct >= 30:
+            color = "bright_white"
+        else:
+            color = "bright_green"
+            
         bar = "█" * filled + "░" * (width - filled)
-        return Text(bar, style=color)
+        return Text(bar, style=f"bold {color}")
 
     def _gen_cpu_summary(self, metrics):
         table = Table(box=None, show_header=False, expand=True)
         table.add_column("L", width=15); table.add_column("V", width=10); table.add_column("B", ratio=1)
         
         cpu_pct = metrics['cpu']['total']
-        color = "green" if cpu_pct < 60 else "yellow" if cpu_pct < 85 else "red"
-        table.add_row("💻 CPU 总利用率", f"{cpu_pct:>5.1f}%", self.make_bar(cpu_pct, color))
+        # 移除这里的颜色设置，让 make_bar 自动处理
+        table.add_row("💻 CPU 总利用率", f"{cpu_pct:>5.1f}%", self.make_bar(cpu_pct))
         
         stats = metrics['apple']
         if stats['auth']:
@@ -99,7 +108,7 @@ class SystemMonitor:
             
         load = metrics['cpu']['load']
         table.add_row("⚖️  平均负载", f"{load[0]:.2f} / {load[1]:.2f}", "[dim]1/5 min[/dim]")
-        return Panel(table, title="[bold blue]计算资源 (Compute)[/]", border_style="blue")
+        return Panel(table, title="[bold bright_blue]计算资源 (Compute)[/]", border_style="bright_blue")
 
     def _gen_mem_summary(self, metrics):
         table = Table(box=None, show_header=False, expand=True)
@@ -107,13 +116,13 @@ class SystemMonitor:
         table.add_column("L", width=12); table.add_column("V", width=18); table.add_column("B", ratio=1)
         
         mem = metrics['mem']
-        table.add_row("🧠 物理内存", f"{self.format_bytes(mem['used'])}/{self.format_bytes(mem['total'])}", self.make_bar(mem['percent'], "green"))
+        table.add_row("🧠 物理内存", f"{self.format_bytes(mem['used'])}/{self.format_bytes(mem['total'])}", self.make_bar(mem['percent']))
         swap = metrics['swap']
         if swap['total'] > 0:
-            table.add_row("💱 交换空间", f"{self.format_bytes(swap['used'])}/{self.format_bytes(swap['total'])}", self.make_bar(swap['percent'], "yellow"))
+            table.add_row("💱 交换空间", f"{self.format_bytes(swap['used'])}/{self.format_bytes(swap['total'])}", self.make_bar(swap['percent']))
         disk = metrics['disk']
-        table.add_row("💿 磁盘空间", f"{self.format_bytes(disk['used'])}/{self.format_bytes(disk['total'])}", self.make_bar(disk['percent'], "cyan"))
-        return Panel(table, title="[bold green]存储资源 (Storage)[/]", border_style="green")
+        table.add_row("💿 磁盘空间", f"{self.format_bytes(disk['used'])}/{self.format_bytes(disk['total'])}", self.make_bar(disk['percent']))
+        return Panel(table, title="[bold bright_green]存储资源 (Storage)[/]", border_style="bright_green")
 
     def _gen_cores_grid(self, metrics):
         cores = metrics['cpu']['cores']
@@ -128,11 +137,11 @@ class SystemMonitor:
                 if idx < len(cores):
                     u = cores[idx]
                     is_pcore = idx < 10
-                    # 更加丰富的颜色梯度
-                    if u > 85: color = "bold red"
-                    elif u > 60: color = "bold yellow"
-                    elif u > 30: color = "bright_cyan" if is_pcore else "cyan"
-                    else: color = "bright_green" if is_pcore else "green"
+                    # 高对比度颜色梯度
+                    if u > 85: color = "bold bright_red"
+                    elif u > 60: color = "bold bright_magenta"
+                    elif u > 30: color = "bold bright_white" if is_pcore else "bold white"
+                    else: color = "bold bright_green" if is_pcore else "bold green"
                     
                     label = "P" if is_pcore else "E"
                     bar_len = 7 
@@ -148,7 +157,7 @@ class SystemMonitor:
                     row.append(core_text)
                 else: row.append("")
             table.add_row(*row)
-        return Panel(table, title="[bold cyan]14-Core CPU (P:性能核 | E:能效核)[/]", border_style="cyan")
+        return Panel(table, title="[bold bright_cyan]14-Core CPU (P:性能核 | E:能效核)[/]", border_style="bright_cyan")
 
     def _gen_io_panel(self, metrics):
         table = Table(box=None, show_header=False, expand=True)
@@ -157,7 +166,7 @@ class SystemMonitor:
         table.add_row(f"🌐 Net: ↑{self.format_bytes(net['up'])} ↓{self.format_bytes(net['down'])}",
                       f"💿 Disk: R{self.format_bytes(io['read'])} W{self.format_bytes(io['write'])}",
                       f"⚡ Total Power: [bold yellow]{stats.get('total_p', 'N/A')}[/]")
-        return Panel(table, title="[bold yellow]实时 I/O 与 功耗[/]", border_style="yellow")
+        return Panel(table, title="[bold bright_yellow]实时 I/O 与 功耗[/]", border_style="bright_yellow")
 
     def _gen_process_table(self):
         table = Table(expand=True, box=box.MINIMAL_HEAVY_HEAD, border_style="bright_black")
@@ -174,7 +183,7 @@ class SystemMonitor:
         for p in sorted(procs, key=lambda x: x['cpu_percent'], reverse=True)[:6]:
             color = "red" if p['cpu_percent'] > 50 else "white"
             table.add_row(str(p['pid']), p['name'], f"{p['cpu_percent']:.1f}%", self.format_bytes(p['memory_info'].rss), p['status'], style=color)
-        return Panel(table, title="[bold red]核心进程监控[/]", border_style="red")
+        return Panel(table, title="[bold bright_red]核心进程监控[/]", border_style="bright_red")
 
     def run(self):
         psutil.cpu_percent()

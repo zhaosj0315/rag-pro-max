@@ -7,8 +7,7 @@ logger = LogManager()
 将所有扫描版PDF的OCR任务统一处理，避免重复创建进程池
 """
 
-from concurrent.futures import ProcessPoolExecutor
-from typing import List, Dict, Tuple
+from typing import List, Dict
 import time
 
 class BatchOCRProcessor:

@@ -123,9 +123,13 @@
 
 ## 🚀 执行工具 (Tooling)
 
-*   **清理脚本**: 使用 `./scripts/cleanup_development_materials.sh` 进行文件级清理。
+*   **代码透视审计 (Codebase Cartography)**: 
+    *   执行命令: `python3 scripts/maintenance/audit_codebase.py`
+    *   **强制性**: 每次重大版本发布前必须运行。
+    *   产出: `docs/CODE_INDEX.md` (户籍档案), `docs/DEPENDENCY_GRAPH.svg` (血缘图), `docs/DEAD_CODE_REPORT.txt` (僵尸检测)。
+*   **文件清理**: 使用 `./scripts/cleanup_development_materials.sh` 进行文件级清理。
 *   **依赖检查**: 使用 `pip-audit` 检查安全风险。
-*   **死代码扫描**: 使用 `vulture` (需配置白名单) 辅助发现死代码。
+*   **死代码扫描**: 使用 `vulture` (需配置白名单) 辅助发现死代码 (已集成至 `audit_codebase.py`)。
 
 ---
 

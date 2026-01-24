@@ -8,7 +8,6 @@ logger = LogManager()
 """
 
 import os
-import json
 from typing import Dict, Any, Optional, List
 from src.common.config import load_config, save_config, get_default_config
 
@@ -166,18 +165,6 @@ class ConfigService:
             'errors': [] if is_valid else ['配置验证失败'],
             'warnings': [],
             'config': config
-        }
-        
-        # 检查嵌入模型配置
-        if 'embedding' in config:
-            embedding_config = config['embedding']
-            if 'model' not in embedding_config:
-                errors.append("嵌入模型配置缺少model字段")
-        
-        return {
-            'valid': len(errors) == 0,
-            'errors': errors,
-            'warnings': warnings
         }
     
     def clear_cache(self):

@@ -7,11 +7,9 @@ logger = LogManager()
 支持多进程和多线程混合模式，突破GIL限制
 """
 
-import threading
 import time
 import random
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
-from queue import Queue, Empty
 from typing import List, Dict, Callable, Optional
 import requests
 from urllib.parse import urljoin, urlparse

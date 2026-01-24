@@ -3,11 +3,9 @@
 分级限流 + 内存泄漏检测 + 动态工作线程调整
 """
 
-import psutil
 import logging  # 允许使用 - 自适应节流专用
-from src.app_logging.log_manager import LogManager
 import numpy as np
-from typing import Dict, List
+from typing import Dict
 from collections import deque
 import gc
 import torch

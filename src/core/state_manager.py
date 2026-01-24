@@ -3,7 +3,7 @@
 """
 
 import sys
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 
 class StateManager:
     """多进程安全的状态管理器"""

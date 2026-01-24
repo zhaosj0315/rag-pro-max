@@ -13,7 +13,6 @@ class KBProcessor:
     
     def __init__(self):
         """初始化处理器"""
-        pass
     
     def process_knowledge_base(self, kb_name: str, source_path: str, options: dict):
         """处理知识库创建逻辑"""

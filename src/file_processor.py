@@ -74,7 +74,6 @@ import multiprocessing as mp
 def _ocr_page(args):
     """OCR单页处理（用于多进程）"""
     import pytesseract
-    import os
     
     idx, img = args
     try:
@@ -371,9 +370,7 @@ def _process_batch(args):
         use_ocr = True  # 默认值
         
     # 安全的CPU密集型计算，强制激活CPU核心
-    import math
     import os
-    import time
     
     # 获取进程ID
     pid = os.getpid()
@@ -397,7 +394,6 @@ def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'Fi
     Returns:
         (documents, result) - 文档列表和处理结果
     """
-    from llama_index.core import SimpleDirectoryReader
     from concurrent.futures import ThreadPoolExecutor, as_completed
     
     result = FileProcessResult()
@@ -446,10 +442,7 @@ def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'Fi
     logger.success(len(file_list))
     
     # 第二步：多线程并行处理（动态调度，保持资源 < 80%）
-    import psutil
     import time as time_module
-    from queue import Queue
-    from threading import Semaphore
     
     # 初始线程数（极限配置：250 线程，冲刺 80%）
     # 动态计算最优配置

@@ -1,4 +1,3 @@
-from .safe_parallel_tasks import safe_process_node_worker, safe_extract_metadata_task
 from .cpu_throttle import CPUThrottle, SafeThreadPoolExecutor
 from src.app_logging.log_manager import LogManager
 

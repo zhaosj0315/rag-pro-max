@@ -1,7 +1,7 @@
 import os
 import json
 import base64
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Any
 from sqlalchemy import create_engine, text
 
 class ConnectionManager:

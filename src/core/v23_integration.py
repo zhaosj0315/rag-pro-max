@@ -4,12 +4,9 @@ v2.3.0 功能集成模块
 """
 
 import streamlit as st
-from src.ui.monitoring_dashboard import render_monitoring_dashboard
 from src.ui.progress_tracker import render_progress_panel, get_progress_tracker
 from src.utils.smart_scheduler import get_smart_scheduler
 from src.utils.alert_system import get_alert_system
-import threading
-import time
 
 class V23Integration:
     def __init__(self):
@@ -34,7 +31,6 @@ class V23Integration:
     def _on_alert_received(self, alert):
         """处理收到的告警"""
         # 可以在这里添加自定义的告警处理逻辑
-        pass
     
     def render_monitoring_tab(self):
         """渲染监控标签页"""

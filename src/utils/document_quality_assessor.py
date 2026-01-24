@@ -5,9 +5,8 @@
 """
 
 import streamlit as st
-from pathlib import Path
 import re
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 class DocumentQualityAssessor:
     """文档质量评估器"""

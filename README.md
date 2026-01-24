@@ -40,4 +40,22 @@ RAG Pro Max v9.1.0 带来了 **「极致性能 (Ultra-Performance)」** 飞跃�
 
 ---
 
+## 🛠️ 维护与审计 (Maintenance & Auditing)
+
+本项目内置了工业级的**“代码资产透视系统” (Codebase Cartography System)**，用于自动化生成项目地图与健康报告。
+
+### 📊 生成全景图
+运行以下命令，即可在 `docs/` 目录下生成最新的代码档案：
+
+```bash
+python3 scripts/maintenance/audit_codebase.py
+```
+
+### 📄 产物说明
+- **`docs/CODE_INDEX.md`**: **代码户籍档案** —— 自动扫描所有源文件，列出类、函数及其核心职责（支持 AI 补全）。
+- **`docs/DEPENDENCY_GRAPH.svg`**: **血缘关系图** —— 可视化展示模块间的调用依赖拓扑。
+- **`docs/DEAD_CODE_REPORT.txt`**: **僵尸代码报告** —— 基于静态分析侦测未使用的变量与函数。
+
+---
+
 **🎯 目标**: 为企业用户提供最专业、极致流畅、高稳定的智能双核分析与 RAG 解决方案！

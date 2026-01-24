@@ -6,7 +6,7 @@ GPU利用率优化模块
 import torch
 import time
 import threading
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from src.app_logging import LogManager
 
 logger = LogManager()

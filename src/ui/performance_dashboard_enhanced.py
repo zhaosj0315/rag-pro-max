@@ -6,8 +6,8 @@ import time
 import psutil
 import torch
 import streamlit as st
-from datetime import datetime, timedelta
-from typing import Dict, List, Any
+from datetime import datetime
+from typing import Dict, Any
 
 class PerformanceDashboard:
     """实时性能仪表板"""

@@ -10,12 +10,10 @@ logger = LogManager()
 import asyncio
 import aiohttp
 import aiofiles
-import json
 import time
-import hashlib
 from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
-from typing import List, Dict, Set, Optional, Callable
+from typing import List, Set, Optional, Callable
 from pathlib import Path
 import os
 

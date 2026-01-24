@@ -10,7 +10,6 @@ class ChatInterface:
     
     def __init__(self):
         """初始化聊天界面"""
-        pass
     
     def render(self, kb_name: str):
         """渲染聊天界面"""

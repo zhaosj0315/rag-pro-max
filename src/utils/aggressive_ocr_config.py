@@ -1,6 +1,5 @@
 
 # 强制OCR配置
-import psutil
 import multiprocessing as mp
 
 from src.app_logging.log_manager import LogManager

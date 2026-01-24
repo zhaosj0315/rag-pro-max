@@ -1,7 +1,6 @@
 """查询缓存模块 - LRU Cache"""
 
-from functools import lru_cache
-from typing import Optional, List, Tuple
+from typing import Optional, Tuple
 import hashlib
 
 

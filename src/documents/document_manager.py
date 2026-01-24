@@ -11,7 +11,6 @@ from llama_index.core import StorageContext, load_index_from_storage
 
 from src.app_logging import LogManager
 from src.config import ManifestManager
-from src.metadata_manager import MetadataManager
 
 logger = LogManager()
 

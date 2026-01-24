@@ -2,7 +2,7 @@ import sqlite3
 import pandas as pd
 import json
 import os
-from typing import Dict, List, Any
+from typing import Dict
 
 class SchemaEnhancer:
     """

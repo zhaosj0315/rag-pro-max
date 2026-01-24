@@ -1,14 +1,13 @@
 # 初始化环境配置
 import warnings
 import os
-import sys
 import time
 import json
 import glob
 import re
 
 # 提前导入并行执行核心 (v6.9.7)
-from src.utils.parallel_executor import ParallelExecutor, get_global_executor
+from src.utils.parallel_executor import get_global_executor
 
 # --- Monkey Patch: 修复 Streamlit FileWatcher Race Condition ---
 # 捕获 watchdog 线程中的 FileNotFoundError (通常由临时文件快速删除引起)
@@ -155,10 +154,8 @@ st.set_page_config(
 )
 
 # 设置不截断HTML显示
-import streamlit.components.v1 as components
 
 import time
-import ollama
 import re
 import subprocess
 from urllib.parse import urlparse
@@ -178,7 +175,7 @@ if cleaned_count > 0:
 import json
 import platform
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import as_completed
 import multiprocessing as mp
 
 # 引入新工具
@@ -186,10 +183,8 @@ from src.utils.file_system_utils import get_deep_file_attributes, reveal_in_file
 notes_manager = NotesManager()
 
 # 引入新的优化组件
-from src.utils.enhanced_ocr_optimizer import enhanced_ocr_optimizer
 from src.ui.progress_monitor import progress_monitor
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings, StorageContext, load_index_from_storage
-from llama_index.core.memory import ChatMemoryBuffer
+from llama_index.core import SimpleDirectoryReader, Settings, StorageContext, load_index_from_storage
 
 def display_user_message_safe(prompt, original_query=None):
     """显示用户消息，包含附件信息 (Safe Mode)"""
@@ -217,7 +212,6 @@ def enhanced_web_search(final_prompt, logger):
     """增强的联网搜索功能"""
     import time
     import re
-    from urllib.parse import urlparse
     
     try:
         # 使用新版ddgs
@@ -358,7 +352,6 @@ def render_smart_visualization(df, query, msg_idx, stage_id, recommendation=None
     """
     [v5.9.3] 业务级全能画板：全局健壮性升级，彻底解决层级图表类型冲突。
     """
-    import pandas as pd
     import plotly.express as px
     import plotly.graph_objects as go
     from pandas.api.types import is_numeric_dtype
@@ -539,39 +532,25 @@ def render_smart_visualization(df, query, msg_idx, stage_id, recommendation=None
     # --- Tab 5: 原始数据 ---
     with tabs[5]:
         st.dataframe(df, use_container_width=True)
-from llama_index.core.node_parser import SentenceSplitter
-from llama_index.llms.ollama import Ollama
-from llama_index.llms.openai import OpenAI
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.embeddings.ollama import OllamaEmbedding
-from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.core.schema import Document
 
 # 导入自定义嵌入
-from src.custom_embeddings import create_custom_embedding
 
 # terminal_logger 已被 logger 替代
-from src.chat_utils_improved import generate_follow_up_questions_safe as generate_follow_up_questions
 from src.chat.unified_suggestion_engine import get_unified_suggestion_engine
 
 # 引入元数据管理
 from src.metadata_manager import MetadataManager
 
 # 引入工具模块
-from src.utils.memory import cleanup_memory, get_memory_stats
+from src.utils.memory import cleanup_memory
 from src.utils.model_manager import (
     load_embedding_model,
     load_llm_model,
-    set_global_embedding_model,
     set_global_llm_model
 )
 from src.utils.document_processor import (
-    sanitize_filename,
-    get_file_size_str,
-    get_file_type,
-    get_file_info,
-    get_relevance_label,
-    load_pptx_file
+    sanitize_filename
 )
 
 # 引入配置管理
@@ -589,17 +568,13 @@ from src.ui.mobile_adapter import MobileAdapter
 # 引入工具函数
 from src.utils.app_utils import (
     get_kb_embedding_dim,
-    remove_file_from_manifest,
-    show_first_time_guide,
-    open_file_native,
-    handle_kb_switching
+    remove_file_from_manifest
 )
 
 # 引入知识库处理器
 from src.kb.kb_processor import KBProcessor
 
 # 引入文档解析器
-from src.processors.document_parser import _parse_single_doc, _parse_batch_docs
 
 # 引入资源保护
 from src.utils.adaptive_throttling import get_resource_guard
@@ -623,13 +598,9 @@ from src.query.query_rewriter import QueryRewriter
 from src.utils.kb_name_optimizer import KBNameOptimizer, sanitize_filename
 
 # 文档预览 (v1.6)
-from src.kb.document_viewer import DocumentViewer
-from src.ui.document_preview import show_upload_preview, show_kb_documents
 
 # 引入统一UI组件
-from src.ui.unified_dialogs import show_document_detail_dialog
 
-from src.utils.kb_utils import generate_smart_kb_name
 from src.utils.app_utils import initialize_session_state
 
 # --- Expander State Management ---
@@ -649,32 +620,20 @@ def keep_adv_open_update():
 
 
 # 引入 RAG 引擎
-from src.rag_engine import RAGEngine
 
 # 引入资源监控和模型工具
-from src.utils.resource_monitor import check_resource_usage, get_system_stats
 from src.utils.model_utils import (
-    check_ollama_status,
     fetch_remote_models,
-    check_hf_model_exists,
-    get_kb_embedding_dim,
-    auto_switch_model,
-    get_model_dimension
+    get_kb_embedding_dim
 )
 
 # 引入 UI 展示组件 (Stage 3.1)
 from src.ui.display_components import (
     render_message_stats,
-    render_source_references,
-    get_relevance_label
+    render_source_references
 )
 
 # 引入 UI 模型选择器 (Stage 3.2.1)
-from src.ui.model_selectors import (
-    render_ollama_model_selector,
-    render_openai_model_selector,
-    render_hf_embedding_selector
-)
 
 # 引入 UI 配置表单 (Stage 3.2.2)
 from src.ui.config_forms import render_basic_config
@@ -683,29 +642,22 @@ from src.ui.config_forms import render_basic_config
 from src.core.state_manager import state
 
 # 引入文档处理器 (Stage 4.1)
-from src.processors import UploadHandler, IndexBuilder
 
 # ⚠️ 关键修复：强制使用本地模型，避免 OpenAI 默认
 os.environ['LLAMA_INDEX_EMBED_MODEL'] = 'local'
 
 # 引入文件处理模块
-from src.file_processor import scan_directory_safe
 
 
 # 增强功能模块 (v1.7.4)
-from src.utils.error_handler_enhanced import error_handler
-from src.utils.memory_manager_enhanced import memory_manager
-from src.ui.performance_dashboard_enhanced import performance_dashboard
-from src.ui.user_experience_enhanced import ux_enhancer
 
 # 引入并行执行模块 (v6.9.6)
-from src.utils.safe_parallel_tasks import safe_process_node_worker as process_node_worker, extract_metadata_task
+from src.utils.safe_parallel_tasks import safe_process_node_worker as process_node_worker
 
 # 引入聊天模块 (Stage 7)
-from src.chat import ChatEngine
 
 # 引入配置模块 (Stage 8)
-from src.config import ConfigLoader, ConfigValidator
+from src.config import ConfigLoader
 
 
 # 应用启动日志
@@ -797,7 +749,6 @@ if not st.session_state.get("logged_in"):
 # ==========================================
 # Force refresh
 from src.auth.login_page import render_login_page
-import importlib
 
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     render_login_page()
@@ -2173,7 +2124,6 @@ with st.sidebar:
                 elif source_mode == "🔌 数据库同步":
                     # --- 数据库同步模式 (v8.3.0) ---
                     from src.auth.connection_manager import ConnectionManager
-                    from src.processors.db_ingestor import DBIngestor
                     
                     conn_mgr = ConnectionManager()
                     # [v8.7.1] 修复普通用户可见所有连接的安全漏洞
@@ -3363,7 +3313,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 引入新的优化组件
-from src.utils.enhanced_ocr_optimizer import enhanced_ocr_optimizer
 from src.ui.progress_monitor import progress_monitor
 
 # 显示实时进度监控
@@ -4694,7 +4643,6 @@ elif active_kb_name:
                 st.rerun()  # 立即刷新页面显示摘要
             
             # 文档列表标签页 (v1.6) - 已移除
-            pass
             
             st.divider()
             

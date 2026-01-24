@@ -1,7 +1,6 @@
 import os
 import tempfile
 from typing import Optional, Tuple
-from llama_index.core import Document
 from src.file_processor import _load_single_file
 
 def process_uploaded_file_content(uploaded_file) -> Tuple[Optional[str], Optional[str]]:

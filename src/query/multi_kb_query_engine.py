@@ -5,12 +5,11 @@
 """
 
 import streamlit as st
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import time
 import multiprocessing as mp
 from pathlib import Path
-import os
 
 def query_single_kb_worker(kb_name: str, query: str, top_k: int = 3) -> Dict[str, Any]:
     """

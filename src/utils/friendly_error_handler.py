@@ -5,7 +5,7 @@
 """
 
 import streamlit as st
-from typing import Optional, Dict, Any
+from typing import Optional
 
 class FriendlyErrorHandler:
     """友好的错误处理器"""

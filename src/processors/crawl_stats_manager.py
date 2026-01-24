@@ -10,7 +10,7 @@ logger = LogManager()
 import json
 import time
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List
 from collections import defaultdict, deque
 import os
 

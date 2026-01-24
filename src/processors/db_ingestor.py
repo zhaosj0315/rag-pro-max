@@ -1,9 +1,8 @@
 import os
 import json
 import pandas as pd
-import sqlite3
-from typing import List, Dict, Any
-from sqlalchemy import create_engine, text
+from typing import List
+from sqlalchemy import create_engine
 from src.auth.connection_manager import ConnectionManager
 
 class DBIngestor:
@@ -69,12 +68,7 @@ class DBIngestor:
             # 💡 这里不再生成 business_data.db 或 business_schema.json
             # 后续调用标准构建流程时，系统会识别这些 CSV 并自动完成所有高级工作
             
-            return success_count > 0
-            
-        except Exception as e:
-            if self.logger:
-                self.logger.error(f"❌ [DB Ingest Fatal] 镜像准备失败: {e}")
-            return False
+            # [v8.3.3] 保存摄入元数据 (修复之前被 return 截断的问题)
             meta = {
                 "source_type": "database",
                 "connection": connection_alias,
@@ -85,10 +79,10 @@ class DBIngestor:
             }
             with open(os.path.join(self.persist_dir, "db_sync_meta.json"), 'w', encoding='utf-8') as f:
                 json.dump(meta, f, indent=2, ensure_ascii=False)
-                
+
             return success_count > 0
             
         except Exception as e:
             if self.logger:
-                self.logger.error(f"❌ [DB Ingest Fatal] 摄入流程崩溃: {e}")
+                self.logger.error(f"❌ [DB Ingest Fatal] 镜像准备失败: {e}")
             return False

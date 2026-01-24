@@ -7,7 +7,6 @@ logger = LogManager()
 """
 
 import re
-from collections import defaultdict
 
 class LogAnalyzer:
     def __init__(self):

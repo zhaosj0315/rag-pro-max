@@ -7,7 +7,7 @@ import streamlit as st
 import time
 import threading
 from datetime import datetime
-from typing import Dict, List, Optional, Callable
+from typing import Dict, List, Optional
 
 class ProgressTracker:
     def __init__(self):

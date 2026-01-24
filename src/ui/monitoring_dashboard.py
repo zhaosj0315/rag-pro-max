@@ -1,7 +1,6 @@
 import streamlit as st
 import psutil
 import pandas as pd
-import time
 import plotly.express as px
 from datetime import datetime
 from src.app_logging.log_manager import LogManager

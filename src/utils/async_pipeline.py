@@ -4,11 +4,9 @@ CPU和GPU流水线并行，提升处理效率
 """
 
 import asyncio
-from typing import List, Dict, Any, Callable, Optional
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from typing import List, Dict, Any, Callable
 import time
 import logging  # 允许使用 - 异步管道专用
-from src.app_logging.log_manager import LogManager
 
 logger = logging.getLogger(__name__)
 

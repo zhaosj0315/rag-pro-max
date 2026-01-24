@@ -8,10 +8,9 @@ import time
 import torch
 import numpy as np
 import multiprocessing
-from typing import List, Tuple, Optional
+from typing import List
 from PIL import Image
 import logging  # 允许使用 - GPU加速专用
-from src.app_logging.log_manager import LogManager
 
 # 强制禁用Paddle日志
 os.environ['GLOG_minloglevel'] = '3'

@@ -9,7 +9,6 @@ import psutil
 import torch
 import re
 import time
-from typing import Optional
 
 def cleanup_memory():
     """统一的内存清理函数"""
@@ -149,7 +148,6 @@ def get_file_stats(file_path: str) -> dict:
 
 def get_client_ip():
     """获取客户端真实IP"""
-    import streamlit as st
     try:
         # 尝试从 Streamlit 头部获取 (针对现代 Streamlit)
         from streamlit.web.server.websocket_headers import _get_websocket_headers

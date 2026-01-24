@@ -9,7 +9,7 @@ logger = LogManager()
 
 import re
 import hashlib
-from typing import List, Dict, Set, Tuple
+from typing import List, Dict, Set
 from collections import Counter
 import jieba
 from difflib import SequenceMatcher

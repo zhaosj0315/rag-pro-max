@@ -5,15 +5,12 @@ Stage 3.2.2 - 中风险重构
 使用统一配置组件
 """
 
-import os
 import streamlit as st
-from typing import Tuple, Dict
+from typing import Tuple
 from .model_selectors import (
     render_ollama_model_selector,
-    render_openai_model_selector,
     render_hf_embedding_selector
 )
-from src.utils.model_utils import fetch_remote_models
 from src.services.unified_config_service import save_config, load_config
 from src.utils.model_manager import set_global_llm_model
 
