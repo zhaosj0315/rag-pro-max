@@ -1,0 +1,662 @@
+[
+  {
+    "type": "file",
+    "name": "src/__init__.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/apppro.py",
+    "context": ""
+  },
+  {
+    "type": "function",
+    "name": "keep_adv_open",
+    "file": "src/apppro.py"
+  },
+  {
+    "type": "function",
+    "name": "keep_adv_open_update",
+    "file": "src/apppro.py"
+  },
+  {
+    "type": "function",
+    "name": "render_isolated_toggle",
+    "file": "src/apppro.py"
+  },
+  {
+    "type": "file",
+    "name": "src/custom_embeddings.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/file_processor.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "FileProcessResult",
+    "file": "src/file_processor.py"
+  },
+  {
+    "type": "method",
+    "name": "FileProcessResult.add_success",
+    "file": "src/file_processor.py"
+  },
+  {
+    "type": "method",
+    "name": "FileProcessResult.add_failed",
+    "file": "src/file_processor.py"
+  },
+  {
+    "type": "method",
+    "name": "FileProcessResult.add_skipped",
+    "file": "src/file_processor.py"
+  },
+  {
+    "type": "method",
+    "name": "FileProcessResult.get_summary",
+    "file": "src/file_processor.py"
+  },
+  {
+    "type": "file",
+    "name": "src/logger.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "SystemMonitor",
+    "file": "src/system_monitor.py"
+  },
+  {
+    "type": "method",
+    "name": "SystemMonitor.get_apple_silicon_stats",
+    "file": "src/system_monitor.py"
+  },
+  {
+    "type": "method",
+    "name": "SystemMonitor.format_bytes",
+    "file": "src/system_monitor.py"
+  },
+  {
+    "type": "method",
+    "name": "SystemMonitor.make_bar",
+    "file": "src/system_monitor.py"
+  },
+  {
+    "type": "method",
+    "name": "SystemMonitor.run",
+    "file": "src/system_monitor.py"
+  },
+  {
+    "type": "class",
+    "name": "CrawlProgressMonitor",
+    "file": "src/ui/crawl_progress.py"
+  },
+  {
+    "type": "class",
+    "name": "DocumentProcessingProgress",
+    "file": "src/ui/document_progress.py"
+  },
+  {
+    "type": "file",
+    "name": "src/ui/message_renderer.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/ui/model_selectors.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/ui/monitoring_dashboard.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "ProgressTracker",
+    "file": "src/ui/progress_tracker.py"
+  },
+  {
+    "type": "class",
+    "name": "ResponsiveLayout",
+    "file": "src/ui/responsive_layout.py"
+  },
+  {
+    "type": "file",
+    "name": "src/ui/scroll_buttons.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/ui/user_profile_ui.py",
+    "context": ""
+  },
+  {
+    "type": "method",
+    "name": "UserProfileUI.render",
+    "file": "src/ui/user_profile_ui.py"
+  },
+  {
+    "type": "class",
+    "name": "V23Integration",
+    "file": "src/core/v23_integration.py"
+  },
+  {
+    "type": "file",
+    "name": "src/kb/document_viewer.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/kb/kb_operations.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "ShareManager",
+    "file": "src/chat/share_manager.py"
+  },
+  {
+    "type": "method",
+    "name": "ConfigLoader.load_config",
+    "file": "src/config/config_loader.py"
+  },
+  {
+    "type": "file",
+    "name": "src/config/manifest_manager.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/auth/audit_logger.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "AuditLogger",
+    "file": "src/auth/audit_logger.py"
+  },
+  {
+    "type": "file",
+    "name": "src/auth/connection_manager.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/auth/login_page.py",
+    "context": ""
+  },
+  {
+    "type": "function",
+    "name": "render_login_page",
+    "file": "src/auth/login_page.py"
+  },
+  {
+    "type": "file",
+    "name": "src/auth/permission_manager.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "PermissionManager",
+    "file": "src/auth/permission_manager.py"
+  },
+  {
+    "type": "method",
+    "name": "PermissionManager.get_role_name",
+    "file": "src/auth/permission_manager.py"
+  },
+  {
+    "type": "file",
+    "name": "src/auth/resource_governance.py",
+    "context": ""
+  },
+  {
+    "type": "function",
+    "name": "render_resource_governance_v19",
+    "file": "src/auth/resource_governance.py"
+  },
+  {
+    "type": "function",
+    "name": "format_size",
+    "file": "src/auth/resource_governance.py"
+  },
+  {
+    "type": "function",
+    "name": "get_client_ip",
+    "file": "src/auth/resource_governance.py"
+  },
+  {
+    "type": "file",
+    "name": "src/auth/session_manager.py",
+    "context": ""
+  },
+  {
+    "type": "function",
+    "name": "load_session_store",
+    "file": "src/auth/session_manager.py"
+  },
+  {
+    "type": "function",
+    "name": "save_session_store",
+    "file": "src/auth/session_manager.py"
+  },
+  {
+    "type": "file",
+    "name": "src/auth/user_auth.py",
+    "context": ""
+  },
+  {
+    "type": "function",
+    "name": "hash_password",
+    "file": "src/auth/user_auth.py"
+  },
+  {
+    "type": "function",
+    "name": "load_users",
+    "file": "src/auth/user_auth.py"
+  },
+  {
+    "type": "function",
+    "name": "save_users",
+    "file": "src/auth/user_auth.py"
+  },
+  {
+    "type": "function",
+    "name": "register_user",
+    "file": "src/auth/user_auth.py"
+  },
+  {
+    "type": "function",
+    "name": "authenticate_user",
+    "file": "src/auth/user_auth.py"
+  },
+  {
+    "type": "file",
+    "name": "src/utils/adaptive_scheduler.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/utils/aggressive_ocr_config.py",
+    "context": ""
+  },
+  {
+    "type": "function",
+    "name": "get_aggressive_ocr_workers",
+    "file": "src/utils/aggressive_ocr_config.py"
+  },
+  {
+    "type": "function",
+    "name": "force_ocr_all_pdfs",
+    "file": "src/utils/aggressive_ocr_config.py"
+  },
+  {
+    "type": "class",
+    "name": "AlertSystem",
+    "file": "src/utils/alert_system.py"
+  },
+  {
+    "type": "file",
+    "name": "src/utils/batch_ocr_processor.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "BatchOperations",
+    "file": "src/utils/batch_operations.py"
+  },
+  {
+    "type": "file",
+    "name": "src/utils/cpu_throttle.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/utils/doc_search.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/utils/document_processor.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/utils/enhanced_logger.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "EnhancedLogger",
+    "file": "src/utils/enhanced_logger.py"
+  },
+  {
+    "type": "file",
+    "name": "src/utils/enhanced_ocr_optimizer.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "ExportManager",
+    "file": "src/utils/export_manager.py"
+  },
+  {
+    "type": "file",
+    "name": "src/utils/file_system_utils.py",
+    "context": ""
+  },
+  {
+    "type": "method",
+    "name": "NotesManager.get_note",
+    "file": "src/utils/file_system_utils.py"
+  },
+  {
+    "type": "method",
+    "name": "NotesManager.set_note",
+    "file": "src/utils/file_system_utils.py"
+  },
+  {
+    "type": "file",
+    "name": "src/utils/file_upload_handler.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "HtmlToMarkdown",
+    "file": "src/utils/html_to_markdown.py"
+  },
+  {
+    "type": "file",
+    "name": "src/utils/log_analyzer.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "LogAnalyzer",
+    "file": "src/utils/log_analyzer.py"
+  },
+  {
+    "type": "file",
+    "name": "src/utils/memory_optimizer.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "MemoryOptimizer",
+    "file": "src/utils/memory_optimizer.py"
+  },
+  {
+    "type": "file",
+    "name": "src/utils/model_utils.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/utils/ocr_optimizer.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/utils/offline_embeddings.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/utils/offline_query_engine.py",
+    "context": ""
+  },
+  {
+    "type": "function",
+    "name": "create_offline_query_engine_wrapper",
+    "file": "src/utils/offline_query_engine.py"
+  },
+  {
+    "type": "file",
+    "name": "src/utils/parallel_executor.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/utils/parallel_ocr_processor.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/utils/performance_monitor.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "PerformanceMonitor",
+    "file": "src/utils/performance_monitor.py"
+  },
+  {
+    "type": "class",
+    "name": "SearchEngine",
+    "file": "src/utils/search_engine.py"
+  },
+  {
+    "type": "class",
+    "name": "SmartScheduler",
+    "file": "src/utils/smart_scheduler.py"
+  },
+  {
+    "type": "file",
+    "name": "src/utils/terminal_progress.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "TerminalProgress",
+    "file": "src/utils/terminal_progress.py"
+  },
+  {
+    "type": "file",
+    "name": "src/utils/vectorization_wrapper.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/processors/async_web_crawler.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "AsyncWebCrawler",
+    "file": "src/processors/async_web_crawler.py"
+  },
+  {
+    "type": "file",
+    "name": "src/processors/concurrent_crawler.py",
+    "context": ""
+  },
+  {
+    "type": "method",
+    "name": "ConcurrentCrawler.get_smart_recommendations",
+    "file": "src/processors/concurrent_crawler.py"
+  },
+  {
+    "type": "method",
+    "name": "ConcurrentCrawler.crawl_with_smart_params",
+    "file": "src/processors/concurrent_crawler.py"
+  },
+  {
+    "type": "method",
+    "name": "ConcurrentCrawler.crawl_urls_concurrent",
+    "file": "src/processors/concurrent_crawler.py"
+  },
+  {
+    "type": "method",
+    "name": "ConcurrentCrawler.get_stats",
+    "file": "src/processors/concurrent_crawler.py"
+  },
+  {
+    "type": "method",
+    "name": "ConcurrentCrawler.reset_stats",
+    "file": "src/processors/concurrent_crawler.py"
+  },
+  {
+    "type": "file",
+    "name": "src/processors/content_analyzer.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/processors/crawl_optimizer.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/processors/crawl_stats_manager.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/processors/data_analyst.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "DataAnalystEngine",
+    "file": "src/processors/data_analyst.py"
+  },
+  {
+    "type": "method",
+    "name": "DataAnalystEngine.execute_analysis",
+    "file": "src/processors/data_analyst.py"
+  },
+  {
+    "type": "method",
+    "name": "DataAnalystEngine.process_files",
+    "file": "src/processors/data_analyst.py"
+  },
+  {
+    "type": "method",
+    "name": "DataAnalystEngine.execute_sql",
+    "file": "src/processors/data_analyst.py"
+  },
+  {
+    "type": "file",
+    "name": "src/processors/db_ingestor.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "EnhancedWebCrawler",
+    "file": "src/processors/enhanced_web_crawler.py"
+  },
+  {
+    "type": "file",
+    "name": "src/processors/schema_enhancer.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/processors/web_crawler.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "WebCrawler",
+    "file": "src/processors/web_crawler.py"
+  },
+  {
+    "type": "method",
+    "name": "WebCrawler.crawl",
+    "file": "src/processors/web_crawler.py"
+  },
+  {
+    "type": "class",
+    "name": "SQLEngine",
+    "file": "src/engines/sql_engine.py"
+  },
+  {
+    "type": "file",
+    "name": "src/app_logging/progress_logger.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "ProgressLogger",
+    "file": "src/app_logging/progress_logger.py"
+  },
+  {
+    "type": "class",
+    "name": "QueryRequest",
+    "file": "src/api/fastapi_server.py"
+  },
+  {
+    "type": "class",
+    "name": "QueryResponse",
+    "file": "src/api/fastapi_server.py"
+  },
+  {
+    "type": "class",
+    "name": "KnowledgeBaseInfo",
+    "file": "src/api/fastapi_server.py"
+  },
+  {
+    "type": "class",
+    "name": "IncrementalUpdateRequest",
+    "file": "src/api/fastapi_server.py"
+  },
+  {
+    "type": "class",
+    "name": "IncrementalUpdateResponse",
+    "file": "src/api/fastapi_server.py"
+  },
+  {
+    "type": "class",
+    "name": "MultimodalQueryRequest",
+    "file": "src/api/fastapi_server.py"
+  },
+  {
+    "type": "file",
+    "name": "src/services/config_service.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/services/configurable_industry_service.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/services/file_service.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "FileService",
+    "file": "src/services/file_service.py"
+  },
+  {
+    "type": "function",
+    "name": "get_file_service",
+    "file": "src/services/file_service.py"
+  },
+  {
+    "type": "file",
+    "name": "src/services/knowledge_base_service.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "KnowledgeBaseService",
+    "file": "src/services/knowledge_base_service.py"
+  },
+  {
+    "type": "function",
+    "name": "get_knowledge_base_service",
+    "file": "src/services/knowledge_base_service.py"
+  },
+  {
+    "type": "file",
+    "name": "src/services/unified_config_service.py",
+    "context": ""
+  }
+]
