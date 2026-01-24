@@ -4699,567 +4699,576 @@ elif active_kb_name:
             st.divider()
             
             # 搜索筛选排序（单行超紧凑布局）
-            col1, col2, col3, col4, col5, col6, col7 = st.columns([2.5, 1.2, 1.2, 1.2, 1.2, 1.5, 1])
-            search_term = col1.text_input("🔍", "", key="file_search", placeholder="搜索文件名...", label_visibility="collapsed")
-            filter_type = col2.selectbox("📂", ["📂 类型"] + sorted(set(f.get('type', 'Unknown') for f in doc_manager.manifest['files'])), label_visibility="collapsed")
-            
-            # 分类筛选
-            all_categories = set(f.get('category', '其他') for f in doc_manager.manifest['files'] if f.get('category'))
-            filter_category = col3.selectbox("📋", ["📋 分类"] + sorted(all_categories), label_visibility="collapsed") if all_categories else "📋 分类"
-            
-            # 热度筛选
-            filter_heat = col4.selectbox("🔥", ["🔥 热度", "高频", "中频", "低频", "未用"], label_visibility="collapsed")
-            
-            # 质量筛选
-            filter_quality = col5.selectbox("✅", ["✅ 质量", "优秀", "正常", "低质", "空"], label_visibility="collapsed")
-            
-            sort_by = col6.selectbox("排序", ["时间↓", "时间↑", "大小↓", "大小↑", "名称", "热度↓", "片段↓"], label_visibility="collapsed")
-            page_size = col7.selectbox("页", [5, 10, 20, 50], index=0, label_visibility="collapsed")
-            
-            # 筛选文件
-            filtered_files = doc_manager.manifest['files']
-            
-            # 搜索
-            if search_term:
-                filtered_files = [f for f in filtered_files if search_term.lower() in f['name'].lower()]
-            
-            # 类型筛选
-            if filter_type != "📂 类型":
-                filtered_files = [f for f in filtered_files if f.get('type') == filter_type]
-            
-            # 分类筛选
-            if filter_category != "📋 分类":
-                filtered_files = [f for f in filtered_files if f.get('category') == filter_category]
-            
-            # 热度筛选
-            if filter_heat == "高频":
-                filtered_files = [f for f in filtered_files if f.get('hit_count', 0) > 10]
-            elif filter_heat == "中频":
-                filtered_files = [f for f in filtered_files if 3 < f.get('hit_count', 0) <= 10]
-            elif filter_heat == "低频":
-                filtered_files = [f for f in filtered_files if 0 < f.get('hit_count', 0) <= 3]
-            elif filter_heat == "未用":
-                filtered_files = [f for f in filtered_files if f.get('hit_count', 0) == 0]
-            
-            # 质量筛选
-            if filter_quality == "优秀":
-                filtered_files = [f for f in filtered_files if len(f.get('doc_ids', [])) >= 10]
-            elif filter_quality == "正常":
-                filtered_files = [f for f in filtered_files if 2 <= len(f.get('doc_ids', [])) < 10]
-            elif filter_quality == "低质":
-                filtered_files = [f for f in filtered_files if 0 < len(f.get('doc_ids', [])) < 2]
-            elif filter_quality == "空":
-                filtered_files = [f for f in filtered_files if len(f.get('doc_ids', [])) == 0]
-            
-            # 排序
-            if sort_by == "时间↓":
-                filtered_files = sorted(filtered_files, key=lambda x: x.get('added_at', ''), reverse=True)
-            elif sort_by == "时间↑":
-                filtered_files = sorted(filtered_files, key=lambda x: x.get('added_at', ''))
-            elif sort_by == "大小↓":
-                filtered_files = sorted(filtered_files, key=lambda x: x.get('size_bytes', 0), reverse=True)
-            elif sort_by == "大小↑":
-                filtered_files = sorted(filtered_files, key=lambda x: x.get('size_bytes', 0))
-            elif sort_by == "名称A-Z":
-                filtered_files = sorted(filtered_files, key=lambda x: x['name'].lower())
-            elif sort_by == "热度↓":
-                filtered_files = sorted(filtered_files, key=lambda x: x.get('hit_count', 0), reverse=True)
-            elif sort_by == "片段↓":
-                filtered_files = sorted(filtered_files, key=lambda x: len(x.get('doc_ids', [])), reverse=True)
-            
-            # 分页
-            total_files = len(filtered_files)
-            total_pages = (total_files + page_size - 1) // page_size if total_files > 0 else 1
-            
-            if 'file_page' not in st.session_state:
-                st.session_state.file_page = 1
-            
-            # 确保页码在有效范围内
-            if st.session_state.file_page > total_pages:
-                st.session_state.file_page = 1
-            
-            # 分页控制和统计
-            if total_files == 0:
-                st.info("❌ 无匹配文件")
-            else:
-                # 简洁的筛选结果（单行）
-                filters = []
-                if search_term: filters.append(f"'{search_term}'")
-                if filter_type != "📂 类型": filters.append(filter_type)
-                if filter_category != "📋 分类": filters.append(filter_category)
-                if filter_heat != "🔥 热度": filters.append(filter_heat)
-                if filter_quality != "全部": filters.append(filter_quality)
+            @st.fragment
+            def file_manager_fragment():
+                col1, col2, col3, col4, col5, col6, col7 = st.columns([2.5, 1.2, 1.2, 1.2, 1.2, 1.5, 1])
+                search_term = col1.text_input("🔍", "", key="file_search", placeholder="搜索文件名...", label_visibility="collapsed")
+                filter_type = col2.selectbox("📂", ["📂 类型"] + sorted(set(f.get('type', 'Unknown') for f in doc_manager.manifest['files'])), label_visibility="collapsed")
                 
-                if filters:
-                    st.caption(f"**{' · '.join(filters)}** → {total_files} 个")
+                # 分类筛选
+                all_categories = set(f.get('category', '其他') for f in doc_manager.manifest['files'] if f.get('category'))
+                filter_category = col3.selectbox("📋", ["📋 分类"] + sorted(all_categories), label_visibility="collapsed") if all_categories else "📋 分类"
                 
-                # 分页控制
-                if total_pages > 1:
-                    col1, col2, col3 = st.columns([1, 2, 1])
-                    with col2:
-                        page_cols = st.columns([1, 3, 1])
-                        if page_cols[0].button("⬅️ 上一页", disabled=st.session_state.file_page <= 1):
-                            st.session_state.file_page -= 1
-                        page_cols[1].markdown(f"<div style='text-align:center'>第 {st.session_state.file_page}/{total_pages} 页</div>", unsafe_allow_html=True)
-                        if page_cols[2].button("下一页 ➡️", disabled=st.session_state.file_page >= total_pages):
-                            st.session_state.file_page += 1
+                # 热度筛选
+                filter_heat = col4.selectbox("🔥", ["🔥 热度", "高频", "中频", "低频", "未用"], label_visibility="collapsed")
                 
-                # 计算当前页文件范围
-                start_idx = (st.session_state.file_page - 1) * page_size
-                end_idx = min(start_idx + page_size, total_files)
+                # 质量筛选
+                filter_quality = col5.selectbox("✅", ["✅ 质量", "优秀", "正常", "低质", "空"], label_visibility="collapsed")
                 
-                # 表头
-                cols = st.columns([0.5, 2.5, 1, 0.8, 1, 0.8, 1.2, 0.8])
+                sort_by = col6.selectbox("排序", ["时间↓", "时间↑", "大小↓", "大小↑", "名称", "热度↓", "片段↓"], label_visibility="collapsed")
+                page_size = col7.selectbox("页", [5, 10, 20, 50], index=0, label_visibility="collapsed")
                 
-                # 全选复选框
-                current_page_files = [f['name'] for f in filtered_files[start_idx:end_idx] if not f.get('summary') and f.get('doc_ids')]
-                if current_page_files:
-                    all_selected = all(fname in st.session_state.selected_for_summary for fname in current_page_files)
-                    
-                    # 使用默认参数捕获当前值
-                    def toggle_select_all(files=current_page_files):
-                        if st.session_state.get(f"select_all_page_{st.session_state.file_page}"):
-                            st.session_state.selected_for_summary.update(files)
-                        else:
-                            st.session_state.selected_for_summary.difference_update(files)
-                    
-                    select_all = cols[0].checkbox(
-                        "全选", 
-                        value=all_selected, 
-                        key=f"select_all_page_{st.session_state.file_page}", 
-                        label_visibility="collapsed",
-                        on_change=toggle_select_all
-                    )
+                # 筛选文件
+                filtered_files = doc_manager.manifest['files']
+                
+                # 搜索
+                if search_term:
+                    filtered_files = [f for f in filtered_files if search_term.lower() in f['name'].lower()]
+                
+                # 类型筛选
+                if filter_type != "📂 类型":
+                    filtered_files = [f for f in filtered_files if f.get('type') == filter_type]
+                
+                # 分类筛选
+                if filter_category != "📋 分类":
+                    filtered_files = [f for f in filtered_files if f.get('category') == filter_category]
+                
+                # 热度筛选
+                if filter_heat == "高频":
+                    filtered_files = [f for f in filtered_files if f.get('hit_count', 0) > 10]
+                elif filter_heat == "中频":
+                    filtered_files = [f for f in filtered_files if 3 < f.get('hit_count', 0) <= 10]
+                elif filter_heat == "低频":
+                    filtered_files = [f for f in filtered_files if 0 < f.get('hit_count', 0) <= 3]
+                elif filter_heat == "未用":
+                    filtered_files = [f for f in filtered_files if f.get('hit_count', 0) == 0]
+                
+                # 质量筛选
+                if filter_quality == "优秀":
+                    filtered_files = [f for f in filtered_files if len(f.get('doc_ids', [])) >= 10]
+                elif filter_quality == "正常":
+                    filtered_files = [f for f in filtered_files if 2 <= len(f.get('doc_ids', [])) < 10]
+                elif filter_quality == "低质":
+                    filtered_files = [f for f in filtered_files if 0 < len(f.get('doc_ids', [])) < 2]
+                elif filter_quality == "空":
+                    filtered_files = [f for f in filtered_files if len(f.get('doc_ids', [])) == 0]
+                
+                # 排序
+                if sort_by == "时间↓":
+                    filtered_files = sorted(filtered_files, key=lambda x: x.get('added_at', ''), reverse=True)
+                elif sort_by == "时间↑":
+                    filtered_files = sorted(filtered_files, key=lambda x: x.get('added_at', ''))
+                elif sort_by == "大小↓":
+                    filtered_files = sorted(filtered_files, key=lambda x: x.get('size_bytes', 0), reverse=True)
+                elif sort_by == "大小↑":
+                    filtered_files = sorted(filtered_files, key=lambda x: x.get('size_bytes', 0))
+                elif sort_by == "名称A-Z":
+                    filtered_files = sorted(filtered_files, key=lambda x: x['name'].lower())
+                elif sort_by == "热度↓":
+                    filtered_files = sorted(filtered_files, key=lambda x: x.get('hit_count', 0), reverse=True)
+                elif sort_by == "片段↓":
+                    filtered_files = sorted(filtered_files, key=lambda x: len(x.get('doc_ids', [])), reverse=True)
+                
+                # 分页
+                total_files = len(filtered_files)
+                total_pages = (total_files + page_size - 1) // page_size if total_files > 0 else 1
+                
+                if 'file_page' not in st.session_state:
+                    st.session_state.file_page = 1
+                
+                # 确保页码在有效范围内
+                if st.session_state.file_page > total_pages:
+                    st.session_state.file_page = 1
+                
+                # 分页控制和统计
+                if total_files == 0:
+                    st.info("❌ 无匹配文件")
                 else:
-                    cols[0].markdown("**✨**")
-                
-                cols[1].caption(f"**文件列表 (共 {total_files} 个)**")
-                cols[2].caption("**操作**")
-                st.divider()
-                
-                # 注入极致紧凑 CSS
-                st.markdown("""
-                <style>
-                /* 极致压缩垂直间距 */
-                div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] {
-                    gap: 0.1rem !important;
-                }
-                /* 卡片内部 padding 最小化 */
-                div[data-testid="stContainer"] {
-                    padding: 0.3rem 0.6rem !important;
-                    margin-bottom: 0.1rem !important;
-                }
-                /* Expander 标题栏高度压缩 & 移除外边距 */
-                .streamlit-expanderHeader {
-                    height: 1.8rem !important;
-                    padding-top: 0 !important;
-                    padding-bottom: 0 !important;
-                    min-height: unset !important;
-                    margin-bottom: 0 !important; /* 关键 */
-                }
-                /* Expander 整体上移 */
-                div[data-testid="stExpander"] {
-                    margin-top: -0.2rem !important;
-                    border: none !important;
-                    box-shadow: none !important;
-                }
-                /* Expander 内容区域去顶距 */
-                div[data-testid="stExpanderDetails"] {
-                    padding-top: 0 !important;
-                    padding-bottom: 0.2rem !important;
-                }
-                /* 分割线紧凑 */
-                hr {
-                    margin-top: 0.1rem !important;
-                    margin-bottom: 0.1rem !important;
-                }
-                /* 文本紧凑 */
-                p, h5, span {
-                    margin: 0 !important;
-                    padding: 0 !important;
-                    line-height: 1.3 !important;
-                }
-                /* 按钮紧凑 */
-                button {
-                    height: 1.6rem !important;
-                    padding-top: 0 !important;
-                    padding-bottom: 0 !important;
-                    min-height: unset !important;
-                }
-                </style>
-                """, unsafe_allow_html=True)
-
-                # 渲染文件列表 (One-Line Card 模式)
-                for i in range(start_idx, end_idx):
-                    f = filtered_files[i]
-                    orig_idx = doc_manager.manifest['files'].index(f)
-                    chunk_count = len(f.get('doc_ids', []))
+                    # 简洁的筛选结果（单行）
+                    filters = []
+                    if search_term: filters.append(f"'{search_term}'")
+                    if filter_type != "📂 类型": filters.append(filter_type)
+                    if filter_category != "📋 分类": filters.append(filter_category)
+                    if filter_heat != "🔥 热度": filters.append(filter_heat)
+                    if filter_quality != "全部": filters.append(filter_quality)
                     
-                    # 准备元数据
-                    display_date = f.get('creation_date', f.get('added_at', '')[:10])
+                    if filters:
+                        st.caption(f"**{' · '.join(filters)}** → {total_files} 个")
                     
-                    # 质量评估
-                    if chunk_count == 0:
-                        q_icon = "❌"
-                    elif chunk_count < 2:
-                        q_icon = "⚠️"
-                    elif chunk_count < 10:
-                        q_icon = "✅"
+                    # 分页控制
+                    if total_pages > 1:
+                        col1, col2, col3 = st.columns([1, 2, 1])
+                        with col2:
+                            page_cols = st.columns([1, 3, 1])
+                            if page_cols[0].button("⬅️ 上一页", disabled=st.session_state.file_page <= 1):
+                                st.session_state.file_page -= 1
+                            page_cols[1].markdown(f"<div style='text-align:center'>第 {st.session_state.file_page}/{total_pages} 页</div>", unsafe_allow_html=True)
+                            if page_cols[2].button("下一页 ➡️", disabled=st.session_state.file_page >= total_pages):
+                                st.session_state.file_page += 1
+                    
+                    # 计算当前页文件范围
+                    start_idx = (st.session_state.file_page - 1) * page_size
+                    end_idx = min(start_idx + page_size, total_files)
+                    
+                    # 表头
+                    cols = st.columns([0.5, 2.5, 1, 0.8, 1, 0.8, 1.2, 0.8])
+                    
+                    # 全选复选框
+                    current_page_files = [f['name'] for f in filtered_files[start_idx:end_idx] if not f.get('summary') and f.get('doc_ids')]
+                    if current_page_files:
+                        all_selected = all(fname in st.session_state.selected_for_summary for fname in current_page_files)
+                        
+                        # 使用默认参数捕获当前值
+                        def toggle_select_all(files=current_page_files):
+                            if st.session_state.get(f"select_all_page_{st.session_state.file_page}"):
+                                st.session_state.selected_for_summary.update(files)
+                            else:
+                                st.session_state.selected_for_summary.difference_update(files)
+                        
+                        select_all = cols[0].checkbox(
+                            "全选", 
+                            value=all_selected, 
+                            key=f"select_all_page_{st.session_state.file_page}", 
+                            label_visibility="collapsed",
+                            on_change=toggle_select_all
+                        )
                     else:
-                        q_icon = "🎉"
-
-                    # === 极简卡片容器 ===
-                    with st.container(border=True):
-                        # 单行布局：标题 + 元数据 + 摘要 + 操作
-                        col_info, col_summary, col_ops = st.columns([6, 2.5, 1.5])
-                        
-                        with col_info:
-                            # 核心改动：一行显示所有关键信息
-                            # 格式：📄 网页标题/文件名  [灰色小字: 2.5MB · 2023-12-12 · 质量 · 命中3次]
-                            file_icon = f.get('icon', '📄')
-                            
-                            # 智能标题显示：如果是抓取的网页，尝试显示实际标题
-                            display_name = f['name']
-                            tech_name = ""
-                            
-                            # 尝试获取真实标题（针对 crawler 生成的 txt）
-                            if f['name'].endswith('.txt') and 'page_' in f['name']:
-                                # 尝试从文件元数据中读取标题（如果之前有保存）
-                                # 或者简单判断是否为 crawler 文件
-                                try:
-                                    # 简易优化：如果文件名是 page_X_timestamp.txt，显示更友好的名称
-                                    parts = f['name'].split('_')
-                                    if len(parts) >= 3 and parts[0] == 'page':
-                                        # 暂时只显示优化后的 ID，后续可升级为读取文件内容首行
-                                        display_name = f"网页 {parts[1]} ({parts[2][:8]})"
-                                        tech_name = f['name']
-                                except:
-                                    pass
-                            
-                            if len(display_name) > 25: display_name = display_name[:23] + "..."
-                            
-                            # 添加更多关键信息到一行中
-                            hit_count = f.get('hit_count', 0)
-                            category = f.get('category', '')
-                            hit_info = f"命中{hit_count}次" if hit_count > 0 else ""
-                            category_info = f"{category}" if category and category != '未分类' else ""
-                            
-                            # 组合额外信息
-                            extra_info = " · ".join(filter(None, [hit_info, category_info]))
-                            if extra_info:
-                                extra_info = " · " + extra_info
-                                
-                            # 质量提示优化
-                            q_tooltip = ""
-                            if chunk_count < 2:
-                                q_tooltip = "内容较少 (<500字)，建议作为补充材料"
-                            
-                            line_html = f"""
-                            <div style='display: flex; align-items: baseline; white-space: nowrap; overflow: hidden;'>
-                                <span style='font-weight: 600; font-size: 1rem; margin-right: 0.5rem;' title='{tech_name}'>{file_icon} {display_name}</span>
-                                <span style='color: gray; font-size: 0.75rem;'>
-                                    {f['size']} · {chunk_count}片段 · {display_date} · <span title="{q_tooltip}">{q_icon}</span>{extra_info}
-                                </span>
-                            </div>
-                            """
-                            if tech_name:
-                                line_html += f"<div style='font-size: 0.7rem; color: #999; margin-top: -2px;'>📄 {tech_name}</div>"
-                                
-                            st.markdown(line_html, unsafe_allow_html=True)
-                            
-                            # 🔧 高级选项处理状态标识
-                            processing_badges = []
-                            if f.get('used_ocr', False):
-                                processing_badges.append('<span style="background: #e8f5e8; color: #2d5a2d; padding: 1px 4px; border-radius: 3px; font-size: 0.7rem; margin-right: 3px;">🔍OCR</span>')
-                            if f.get('keywords') or f.get('category'):
-                                processing_badges.append('<span style="background: #e8f0ff; color: #1a4480; padding: 1px 4px; border-radius: 3px; font-size: 0.7rem; margin-right: 3px;">📊元数据</span>')
-                            if f.get('summary'):
-                                processing_badges.append('<span style="background: #fff3e0; color: #8b4513; padding: 1px 4px; border-radius: 3px; font-size: 0.7rem; margin-right: 3px;">📝摘要</span>')
-                            
-                            if processing_badges:
-                                badges_html = ''.join(processing_badges)
-                                st.markdown(f'<div style="margin-top: 2px; margin-bottom: 4px;">{badges_html}</div>', unsafe_allow_html=True)
-                            
-                            # 显示摘要（如果有的话）
-                            if f.get('summary'):
-                                summary_text = f['summary']
-                                if len(summary_text) > 100:
-                                    summary_text = summary_text[:97] + "..."
-                                st.caption(f"📝 {summary_text}")
-                            
-                            # 显示关键词（如果有的话）
-                            if f.get('keywords'):
-                                keywords = f['keywords'][:5]  # 只显示前5个关键词
-                                st.caption(f"🏷️ {', '.join(keywords)}")
-                        
-                        with col_summary:
-                            # 摘要生成按钮
-                            if not f.get('summary') and f.get('doc_ids'):
-                                if st.button("✨ 摘要", key=f"summary_{i}", help="生成文档摘要"):
-                                    with st.spinner("生成中..."):
-                                        try:
-                                            # 直接从索引获取文档内容
-                                            from llama_index.core import StorageContext, load_index_from_storage
-                                            
-                                            storage_context = StorageContext.from_defaults(persist_dir=db_path)
-                                            index = load_index_from_storage(storage_context)
-                                            retriever = index.as_retriever(similarity_top_k=3)
-                                            
-                                            nodes = retriever.retrieve(f['name'])
-                                            
-                                            doc_text = ""
-                                            for node in nodes:
-                                                if hasattr(node, 'node') and hasattr(node.node, 'text'):
-                                                    doc_text += node.node.text + "\n"
-                                                elif hasattr(node, 'text'):
-                                                    doc_text += node.text + "\n"
-                                                if len(doc_text) > 2000:
-                                                    break
-                                            
-                                            if doc_text.strip():
-                                                summary = generate_doc_summary(doc_text, f['name'])
-                                                if summary:
-                                                    # 更新manifest
-                                                    f['summary'] = summary
-                                                    doc_manager.manifest['files'][orig_idx]['summary'] = summary
-                                                    
-                                                    # 将摘要添加到向量数据库
-                                                    try:
-                                                        from llama_index.core import Document
-                                                        summary_doc = Document(
-                                                            text=f"文档摘要 - {f['name']}:\n{summary}",
-                                                            metadata={
-                                                                "file_name": f['name'],
-                                                                "file_type": "summary",
-                                                                "source_file": f['name']
-                                                            }
-                                                        )
-                                                        index.insert(summary_doc)
-                                                        index.storage_context.persist(persist_dir=db_path)
-                                                    except Exception as e:
-                                                        logger.warning(f"摘要添加到索引失败: {e}")
-                                                    
-                                                    # 保存manifest
-                                                    from src.config.manifest_manager import ManifestManager
-                                                    ManifestManager.save(db_path, doc_manager.manifest['files'], doc_manager.manifest.get('embed_model', 'Unknown'))
-                                                    
-                                                    st.success("✅ 摘要生成成功并已添加到知识库！")
-                                                    st.rerun()
-                                                else:
-                                                    st.error("❌ 生成失败")
-                                            else:
-                                                st.warning("⚠️ 无内容")
-                                        except Exception as e:
-                                            st.error(f"❌ 失败: {str(e)}")
-                            elif f.get('summary'):
-                                st.caption("📖 已有摘要")
-                        
-                        with col_ops:
-                            # 预览和删除
-                            op_c1, op_c2 = st.columns([1, 1])
-                            with op_c1:
-                                if st.button("👁️", key=f"prev_{i}", help="原生预览"):
-                                    try:
-                                        # 优先使用记录的完整路径，否则回退到知识库目录
-                                        file_path = f.get('file_path')
-                                        if not file_path or not os.path.exists(file_path):
-                                            file_path = os.path.join(db_path, f['name'])
-                                        
-                                        if os.path.exists(file_path):
-                                            # 异步启动预览，不阻塞主程序
-                                            subprocess.Popen(["qlmanage", "-p", file_path], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-                                            # 启动后台脚本强制置顶窗口
-                                            top_script = 'tell application "System Events"\n repeat until (exists process "qlmanage")\n delay 0.1\n end repeat\n set frontmost of process "qlmanage" to true\n end tell'
-                                            subprocess.Popen(['osascript', '-e', top_script])
-                                        else:
-                                            st.warning(f"源文件不存在: {f['name']}")
-                                    except Exception as e:
-                                        st.error(f"预览失败: {e}")
-                            
-                            with op_c2:
-                                # 操作区：仅保留删除按钮
-                                if st.button("🗑️", key=f"del_{i}", help="删除文件"):
-                                    with st.status(f"删除中...", expanded=True) as status:
-                                        try:
-                                            ctx = StorageContext.from_defaults(persist_dir=db_path)
-                                            idx = load_index_from_storage(ctx)
-                                            for did in f.get('doc_ids', []):
-                                                idx.delete_ref_doc(did, delete_from_docstore=True)
-                                            idx.storage_context.persist(persist_dir=db_path)
-                                            remove_file_from_manifest(db_path, f['name'])
-                                            status.update(label="已删除", state="complete")
-                                            st.session_state.chat_engine = None
-                                            time.sleep(0.5); st.rerun()
-                                        except Exception as e: st.error(str(e))
-                        
-                        # 详情直接展开 (专业版)
-                        with st.expander(f"🔍 深度档案与数据取证 - {f['name']}", expanded=False):
-                            actual_file_path = f.get('file_path')
-                            if not actual_file_path or not os.path.exists(actual_file_path):
-                                actual_file_path = os.path.join(db_path, f['name'])
-                            
-                            # 获取深度属性
-                            deep_attrs = get_deep_file_attributes(actual_file_path)
-                            
-                            # 1. 顶部专业仪表盘 (Health Dashboard)
-                            h_col1, h_col2, h_col3, h_col4 = st.columns(4)
-                            
-                            with h_col1:
-                                indexed_status = "✅ 已索引" if f.get('doc_ids') else "⏳ 未索引"
-                                st.markdown(f"<div style='background:#f0f7ff; color:#0550ae; padding:4px 10px; border-radius:15px; text-align:center; font-size:0.8rem; font-weight:600;'>{indexed_status}</div>", unsafe_allow_html=True)
-                            
-                            with h_col2:
-                                efficiency = deep_attrs.get('efficiency', '100%')
-                                st.markdown(f"<div style='background:#f6ffed; color:#389e0d; padding:4px 10px; border-radius:15px; text-align:center; font-size:0.8rem; font-weight:600;'>💾 存储效率 {efficiency}</div>", unsafe_allow_html=True)
-                                
-                            with h_col3:
-                                heat = "🔥 热数据" if f.get('hit_count', 0) > 5 else "❄️ 冷数据"
-                                st.markdown(f"<div style='background:#fff7e6; color:#d46b08; padding:4px 10px; border-radius:15px; text-align:center; font-size:0.8rem; font-weight:600;'>📈 {heat} ({f.get('hit_count', 0)})</div>", unsafe_allow_html=True)
-                                
-                            with h_col4:
-                                days = deep_attrs.get('longevity_days', 0)
-                                st.markdown(f"<div style='background:#fff1f0; color:#cf1322; padding:4px 10px; border-radius:15px; text-align:center; font-size:0.8rem; font-weight:600;'>🕒 存活 {days} 天</div>", unsafe_allow_html=True)
-                            
-                            st.write("")
-                            
-                            # 2. 60/40 黄金分割布局
-                            detail_col_left, detail_col_right = st.columns([6, 4])
-                            
-                            with detail_col_left:
-                                # --- 左侧：智能洞察 (60%) ---
-                                if f.get('summary'):
-                                    st.markdown("####### 🧠 智能摘要")
-                                    st.info(f"{f['summary']}")
-                                
-                                # RAG 预估与密度
-                                st.markdown("####### 📊 RAG 内容动力学")
-                                r_c1, r_c2, r_c3 = st.columns(3)
-                                with r_c1:
-                                    tokens = deep_attrs.get('token_estimate', 0)
-                                    st.metric("预估 Token", f"~{tokens}", help="基于字符数的估算值")
-                                with r_c2:
-                                    chunks = len(f.get('doc_ids', []))
-                                    st.metric("向量片段", f"{chunks} Pkts")
-                                with r_c3:
-                                    # 密度 = 字符/片段
-                                    density = tokens // chunks if chunks > 0 else 0
-                                    st.metric("内容密度", f"{density} c/p", help="平均每个片段包含的字符数")
-
-                                # 内容采样
-                                if os.path.exists(actual_file_path) and f.get('type', '').lower() in ['.txt', '.md', '.py', '.js', '.html', '.css', '.json']:
-                                    st.markdown("####### 📄 文本取证采样")
-                                    try:
-                                        with open(actual_file_path, 'r', encoding='utf-8', errors='ignore') as preview_f:
-                                            preview_content = preview_f.read(800)
-                                            st.code(preview_content, language='text')
-                                    except:
-                                        st.caption("无法读取内容预览")
-                                
-                                # 用户备注
-                                st.markdown("####### 📝 用户自定义备注")
-                                file_hash = f.get('file_hash', 'no_hash')
-                                current_note = notes_manager.get_note(file_hash)
-                                new_note = st.text_area("备注信息", value=current_note, height=80, key=f"note_{i}", label_visibility="collapsed")
-                                if new_note != current_note:
-                                    notes_manager.set_note(file_hash, new_note)
-                                    st.toast("✅ 备注已保存")
-
-                            with detail_col_right:
-                                # --- 右侧：技术档案 (40%) ---
-                                if "error" not in deep_attrs:
-                                    # 1. 优先展示系统记录的溯源 (针对抓取文件)
-                                    if deep_attrs.get("header_url"):
-                                        st.markdown("####### 🌐 溯源 (系统记录)")
-                                        st.caption(f"`{deep_attrs['header_url']}`")
-                                        st.divider()
-
-                                    # 2. macOS 专属增强元数据
-                                    if platform.system() == "Darwin":
-                                        st.markdown("####### 🍎 macOS 增强元数据")
-                                        m = deep_attrs.get("macos", {})
-                                        if any([m.get("tags"), m.get("finder_comment"), m.get("where_from"), m.get("version")]):
-                                            # 展示标签
-                                            if m.get("tags"):
-                                                tag_html = "".join([f"<span style='background:#f0f0f0; padding:2px 6px; border-radius:10px; font-size:0.7rem; margin-right:4px;'>🏷️ {t}</span>" for t in m["tags"]])
-                                                st.markdown(tag_html, unsafe_allow_html=True)
-                                            
-                                            # 展示来源
-                                            if m.get("where_from"):
-                                                st.markdown("**🌐 下载来源**")
-                                                for url in m["where_from"]:
-                                                    st.caption(f"`{url}`")
-                                            
-                                            # 展示系统注释
-                                            if m.get("finder_comment"):
-                                                st.caption(f"💬 **Finder 注释**: {m['finder_comment']}")
-                                            
-                                            if m.get("version"):
-                                                st.caption(f"🔢 **内部版本**: {m['version']}")
-                                        else:
-                                            st.caption("ℹ️ 未发现扩展元数据 (标签、来源等)")
-                                        
-                                        st.divider()
-
-                                    # 取证与底层
-                                    st.markdown("####### 🕵️ 系统取证")
-                                    st.caption(f"Magic Bytes: `{deep_attrs['magic_bytes']}`")
-                                    st.caption(f"SHA-256: `{deep_attrs['sha256'][:32]}...`")
-                                    st.caption(f"Inode: `{deep_attrs['inode']}` | FS: `{deep_attrs['fs_type']}`")
-                                    
-                                    # 时间轴与位置
-                                    st.markdown("####### 🕒 时间轴与位置")
-                                    st.caption(f"创建: `{deep_attrs['created']}`")
-                                    st.caption(f"最后访问: `{deep_attrs['accessed']}`")
-                                    
-                                    st.markdown("####### 📍 拓扑位置")
-                                    st.caption(f"真实路径: `{deep_attrs['real_path'][:40]}...`")
-                                    st.caption(f"符号链接: `{'是' if deep_attrs['is_symlink'] else '否'}`")
-                                    
-                                    # 权限系统
-                                    st.markdown("####### 🛡️ 权限系统")
-                                    st.caption(f"Unix权限: `{deep_attrs['permissions']}`")
-                                    st.caption(f"所有者: `{deep_attrs['owner']}` | 只读: `{'是' if deep_attrs['is_readonly'] else '否'}`")
-                                else:
-                                    st.warning(f"数据抓取异常: {deep_attrs['error']}")
-                                
-                                # 快捷功能按钮
-                                st.divider()
-                                btn_c1, btn_c2 = st.columns(2)
-                                with btn_c1:
-                                    if st.button("📂 在 Finder 中显示", key=f"reveal_{i}", use_container_width=True):
-                                        reveal_in_file_manager(actual_file_path)
-                                            
-                                with btn_c2:
-                                    if platform.system() == "Darwin":
-                                        if st.button("👁️ QuickLook", key=f"ql_{i}", use_container_width=True):
-                                            try:
-                                                subprocess.Popen(["qlmanage", "-p", actual_file_path], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-                                                # 强制置顶脚本
-                                                top_script = 'tell application "System Events"\n repeat 20 times\n if exists process "qlmanage" then\n set frontmost of process "qlmanage" to true\n exit repeat\n end if\n delay 0.1\n end repeat\n end tell'
-                                                subprocess.Popen(['osascript', '-e', top_script])
-                                            except Exception as e:
-                                                st.error(f"预览失败: {e}")
-                                    else:
-                                        if st.button("📋 复制路径", key=f"copy_path_{i}", use_container_width=True):
-                                            st.code(actual_file_path)
-
-                            # 向量片段ID (折叠)
-                            if f.get('doc_ids'):
-                                with st.expander("🧬 向量片段 ID 序列 (RAW)", expanded=False):
-                                    st.text_area("IDs", value='\n'.join(f['doc_ids']), height=100, label_visibility="collapsed", key=f"ids_raw_{i}")
-                
-                # 底部分页 (方便翻页)
-                if total_pages > 1:
+                        cols[0].markdown("**✨**")
+                    
+                    cols[1].caption(f"**文件列表 (共 {total_files} 个)**")
+                    cols[2].caption("**操作**")
                     st.divider()
-                    col1, col2, col3 = st.columns([1, 2, 1])
-                    with col2:
-                        page_cols = st.columns([1, 3, 1])
-                        if page_cols[0].button("⬅️", key="prev_bottom", disabled=st.session_state.file_page <= 1):
-                            st.session_state.file_page -= 1
-                        page_cols[1].markdown(f"<div style='text-align:center'>第 {st.session_state.file_page}/{total_pages} 页 · 共 {total_files} 个文件</div>", unsafe_allow_html=True)
-                        if page_cols[2].button("➡️", key="next_bottom", disabled=st.session_state.file_page >= total_pages):
-                            st.session_state.file_page += 1
-
+                    
+                    # 注入极致紧凑 CSS
+                    st.markdown("""
+                    <style>
+                    /* 极致压缩垂直间距 */
+                    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] {
+                        gap: 0.1rem !important;
+                    }
+                    /* 卡片内部 padding 最小化 */
+                    div[data-testid="stContainer"] {
+                        padding: 0.3rem 0.6rem !important;
+                        margin-bottom: 0.1rem !important;
+                    }
+                    /* Expander 标题栏高度压缩 & 移除外边距 */
+                    .streamlit-expanderHeader {
+                        height: 1.8rem !important;
+                        padding-top: 0 !important;
+                        padding-bottom: 0 !important;
+                        min-height: unset !important;
+                        margin-bottom: 0 !important; /* 关键 */
+                    }
+                    /* Expander 整体上移 */
+                    div[data-testid="stExpander"] {
+                        margin-top: -0.2rem !important;
+                        border: none !important;
+                        box-shadow: none !important;
+                    }
+                    /* Expander 内容区域去顶距 */
+                    div[data-testid="stExpanderDetails"] {
+                        padding-top: 0 !important;
+                        padding-bottom: 0.2rem !important;
+                    }
+                    /* 分割线紧凑 */
+                    hr {
+                        margin-top: 0.1rem !important;
+                        margin-bottom: 0.1rem !important;
+                    }
+                    /* 文本紧凑 */
+                    p, h5, span {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        line-height: 1.3 !important;
+                    }
+                    /* 按钮紧凑 */
+                    button {
+                        height: 1.6rem !important;
+                        padding-top: 0 !important;
+                        padding-bottom: 0 !important;
+                        min-height: unset !important;
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
+    
+                    # 渲染文件列表 (One-Line Card 模式)
+                    for i in range(start_idx, end_idx):
+                        f = filtered_files[i]
+                        orig_idx = doc_manager.manifest['files'].index(f)
+                        chunk_count = len(f.get('doc_ids', []))
+                        
+                        # 准备元数据
+                        display_date = f.get('creation_date', f.get('added_at', '')[:10])
+                        
+                        # 质量评估
+                        if chunk_count == 0:
+                            q_icon = "❌"
+                        elif chunk_count < 2:
+                            q_icon = "⚠️"
+                        elif chunk_count < 10:
+                            q_icon = "✅"
+                        else:
+                            q_icon = "🎉"
+    
+                        # === 极简卡片容器 ===
+                        with st.container(border=True):
+                            # 单行布局：标题 + 元数据 + 摘要 + 操作
+                            col_info, col_summary, col_ops = st.columns([6, 2.5, 1.5])
+                            
+                            with col_info:
+                                # 核心改动：一行显示所有关键信息
+                                # 格式：📄 网页标题/文件名  [灰色小字: 2.5MB · 2023-12-12 · 质量 · 命中3次]
+                                file_icon = f.get('icon', '📄')
+                                
+                                # 智能标题显示：如果是抓取的网页，尝试显示实际标题
+                                display_name = f['name']
+                                tech_name = ""
+                                
+                                # 尝试获取真实标题（针对 crawler 生成的 txt）
+                                if f['name'].endswith('.txt') and 'page_' in f['name']:
+                                    # 尝试从文件元数据中读取标题（如果之前有保存）
+                                    # 或者简单判断是否为 crawler 文件
+                                    try:
+                                        # 简易优化：如果文件名是 page_X_timestamp.txt，显示更友好的名称
+                                        parts = f['name'].split('_')
+                                        if len(parts) >= 3 and parts[0] == 'page':
+                                            # 暂时只显示优化后的 ID，后续可升级为读取文件内容首行
+                                            display_name = f"网页 {parts[1]} ({parts[2][:8]})"
+                                            tech_name = f['name']
+                                    except:
+                                        pass
+                                
+                                if len(display_name) > 25: display_name = display_name[:23] + "..."
+                                
+                                # 添加更多关键信息到一行中
+                                hit_count = f.get('hit_count', 0)
+                                category = f.get('category', '')
+                                hit_info = f"命中{hit_count}次" if hit_count > 0 else ""
+                                category_info = f"{category}" if category and category != '未分类' else ""
+                                
+                                # 组合额外信息
+                                extra_info = " · ".join(filter(None, [hit_info, category_info]))
+                                if extra_info:
+                                    extra_info = " · " + extra_info
+                                    
+                                # 质量提示优化
+                                q_tooltip = ""
+                                if chunk_count < 2:
+                                    q_tooltip = "内容较少 (<500字)，建议作为补充材料"
+                                
+                                line_html = f"""
+                                <div style='display: flex; align-items: baseline; white-space: nowrap; overflow: hidden;'>
+                                    <span style='font-weight: 600; font-size: 1rem; margin-right: 0.5rem;' title='{tech_name}'>{file_icon} {display_name}</span>
+                                    <span style='color: gray; font-size: 0.75rem;'>
+                                        {f['size']} · {chunk_count}片段 · {display_date} · <span title="{q_tooltip}">{q_icon}</span>{extra_info}
+                                    </span>
+                                </div>
+                                """
+                                if tech_name:
+                                    line_html += f"<div style='font-size: 0.7rem; color: #999; margin-top: -2px;'>📄 {tech_name}</div>"
+                                    
+                                st.markdown(line_html, unsafe_allow_html=True)
+                                
+                                # 🔧 高级选项处理状态标识
+                                processing_badges = []
+                                if f.get('used_ocr', False):
+                                    processing_badges.append('<span style="background: #e8f5e8; color: #2d5a2d; padding: 1px 4px; border-radius: 3px; font-size: 0.7rem; margin-right: 3px;">🔍OCR</span>')
+                                if f.get('keywords') or f.get('category'):
+                                    processing_badges.append('<span style="background: #e8f0ff; color: #1a4480; padding: 1px 4px; border-radius: 3px; font-size: 0.7rem; margin-right: 3px;">📊元数据</span>')
+                                if f.get('summary'):
+                                    processing_badges.append('<span style="background: #fff3e0; color: #8b4513; padding: 1px 4px; border-radius: 3px; font-size: 0.7rem; margin-right: 3px;">📝摘要</span>')
+                                
+                                if processing_badges:
+                                    badges_html = ''.join(processing_badges)
+                                    st.markdown(f'<div style="margin-top: 2px; margin-bottom: 4px;">{badges_html}</div>', unsafe_allow_html=True)
+                                
+                                # 显示摘要（如果有的话）
+                                if f.get('summary'):
+                                    summary_text = f['summary']
+                                    if len(summary_text) > 100:
+                                        summary_text = summary_text[:97] + "..."
+                                    st.caption(f"📝 {summary_text}")
+                                
+                                # 显示关键词（如果有的话）
+                                if f.get('keywords'):
+                                    keywords = f['keywords'][:5]  # 只显示前5个关键词
+                                    st.caption(f"🏷️ {', '.join(keywords)}")
+                            
+                            with col_summary:
+                                # 摘要生成按钮
+                                if not f.get('summary') and f.get('doc_ids'):
+                                    if st.button("✨ 摘要", key=f"summary_{i}", help="生成文档摘要"):
+                                        with st.spinner("生成中..."):
+                                            try:
+                                                # 直接从索引获取文档内容
+                                                from llama_index.core import StorageContext, load_index_from_storage
+                                                
+                                                storage_context = StorageContext.from_defaults(persist_dir=db_path)
+                                                index = load_index_from_storage(storage_context)
+                                                retriever = index.as_retriever(similarity_top_k=3)
+                                                
+                                                nodes = retriever.retrieve(f['name'])
+                                                
+                                                doc_text = ""
+                                                for node in nodes:
+                                                    if hasattr(node, 'node') and hasattr(node.node, 'text'):
+                                                        doc_text += node.node.text + "\n"
+                                                    elif hasattr(node, 'text'):
+                                                        doc_text += node.text + "\n"
+                                                    if len(doc_text) > 2000:
+                                                        break
+                                                
+                                                if doc_text.strip():
+                                                    summary = generate_doc_summary(doc_text, f['name'])
+                                                    if summary:
+                                                        # 更新manifest
+                                                        f['summary'] = summary
+                                                        doc_manager.manifest['files'][orig_idx]['summary'] = summary
+                                                        
+                                                        # 将摘要添加到向量数据库
+                                                        try:
+                                                            from llama_index.core import Document
+                                                            summary_doc = Document(
+                                                                text=f"文档摘要 - {f['name']}:\n{summary}",
+                                                                metadata={
+                                                                    "file_name": f['name'],
+                                                                    "file_type": "summary",
+                                                                    "source_file": f['name']
+                                                                }
+                                                            )
+                                                            index.insert(summary_doc)
+                                                            index.storage_context.persist(persist_dir=db_path)
+                                                        except Exception as e:
+                                                            logger.warning(f"摘要添加到索引失败: {e}")
+                                                        
+                                                        # 保存manifest
+                                                        from src.config.manifest_manager import ManifestManager
+                                                        ManifestManager.save(db_path, doc_manager.manifest['files'], doc_manager.manifest.get('embed_model', 'Unknown'))
+                                                        
+                                                        st.success("✅ 摘要生成成功并已添加到知识库！")
+                                                        st.rerun()
+                                                    else:
+                                                        st.error("❌ 生成失败")
+                                                else:
+                                                    st.warning("⚠️ 无内容")
+                                            except Exception as e:
+                                                st.error(f"❌ 失败: {str(e)}")
+                                elif f.get('summary'):
+                                    st.caption("📖 已有摘要")
+                            
+                            with col_ops:
+                                # 预览和删除
+                                op_c1, op_c2 = st.columns([1, 1])
+                                with op_c1:
+                                    if st.button("👁️", key=f"prev_{i}", help="原生预览"):
+                                        try:
+                                            # 优先使用记录的完整路径，否则回退到知识库目录
+                                            file_path = f.get('file_path')
+                                            if not file_path or not os.path.exists(file_path):
+                                                file_path = os.path.join(db_path, f['name'])
+                                            
+                                            if os.path.exists(file_path):
+                                                # 异步启动预览，不阻塞主程序
+                                                subprocess.Popen(["qlmanage", "-p", file_path], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                                                # 启动后台脚本强制置顶窗口
+                                                top_script = 'tell application "System Events"\n repeat until (exists process "qlmanage")\n delay 0.1\n end repeat\n set frontmost of process "qlmanage" to true\n end tell'
+                                                subprocess.Popen(['osascript', '-e', top_script])
+                                            else:
+                                                st.warning(f"源文件不存在: {f['name']}")
+                                        except Exception as e:
+                                            st.error(f"预览失败: {e}")
+                                
+                                with op_c2:
+                                    # 操作区：仅保留删除按钮
+                                    if st.button("🗑️", key=f"del_{i}", help="删除文件"):
+                                        with st.status(f"删除中...", expanded=True) as status:
+                                            try:
+                                                ctx = StorageContext.from_defaults(persist_dir=db_path)
+                                                idx = load_index_from_storage(ctx)
+                                                for did in f.get('doc_ids', []):
+                                                    idx.delete_ref_doc(did, delete_from_docstore=True)
+                                                idx.storage_context.persist(persist_dir=db_path)
+                                                remove_file_from_manifest(db_path, f['name'])
+                                                status.update(label="已删除", state="complete")
+                                                st.session_state.chat_engine = None
+                                                time.sleep(0.5); st.rerun()
+                                            except Exception as e: st.error(str(e))
+                            
+                            # 详情直接展开 (专业版)
+                            with st.expander(f"🔍 深度档案与数据取证 - {f['name']}", expanded=False):
+                                actual_file_path = f.get('file_path')
+                                if not actual_file_path or not os.path.exists(actual_file_path):
+                                    actual_file_path = os.path.join(db_path, f['name'])
+                                
+                                # 获取深度属性
+                                deep_attrs = get_deep_file_attributes(actual_file_path)
+                                
+                                # 1. 顶部专业仪表盘 (Health Dashboard)
+                                h_col1, h_col2, h_col3, h_col4 = st.columns(4)
+                                
+                                with h_col1:
+                                    indexed_status = "✅ 已索引" if f.get('doc_ids') else "⏳ 未索引"
+                                    st.markdown(f"<div style='background:#f0f7ff; color:#0550ae; padding:4px 10px; border-radius:15px; text-align:center; font-size:0.8rem; font-weight:600;'>{indexed_status}</div>", unsafe_allow_html=True)
+                                
+                                with h_col2:
+                                    efficiency = deep_attrs.get('efficiency', '100%')
+                                    st.markdown(f"<div style='background:#f6ffed; color:#389e0d; padding:4px 10px; border-radius:15px; text-align:center; font-size:0.8rem; font-weight:600;'>💾 存储效率 {efficiency}</div>", unsafe_allow_html=True)
+                                    
+                                with h_col3:
+                                    heat = "🔥 热数据" if f.get('hit_count', 0) > 5 else "❄️ 冷数据"
+                                    st.markdown(f"<div style='background:#fff7e6; color:#d46b08; padding:4px 10px; border-radius:15px; text-align:center; font-size:0.8rem; font-weight:600;'>📈 {heat} ({f.get('hit_count', 0)})</div>", unsafe_allow_html=True)
+                                    
+                                with h_col4:
+                                    days = deep_attrs.get('longevity_days', 0)
+                                    st.markdown(f"<div style='background:#fff1f0; color:#cf1322; padding:4px 10px; border-radius:15px; text-align:center; font-size:0.8rem; font-weight:600;'>🕒 存活 {days} 天</div>", unsafe_allow_html=True)
+                                
+                                st.write("")
+                                
+                                # 2. 60/40 黄金分割布局
+                                detail_col_left, detail_col_right = st.columns([6, 4])
+                                
+                                with detail_col_left:
+                                    # --- 左侧：智能洞察 (60%) ---
+                                    if f.get('summary'):
+                                        st.markdown("####### 🧠 智能摘要")
+                                        st.info(f"{f['summary']}")
+                                    
+                                    # RAG 预估与密度
+                                    st.markdown("####### 📊 RAG 内容动力学")
+                                    r_c1, r_c2, r_c3 = st.columns(3)
+                                    with r_c1:
+                                        tokens = deep_attrs.get('token_estimate', 0)
+                                        st.metric("预估 Token", f"~{tokens}", help="基于字符数的估算值")
+                                    with r_c2:
+                                        chunks = len(f.get('doc_ids', []))
+                                        st.metric("向量片段", f"{chunks} Pkts")
+                                    with r_c3:
+                                        # 密度 = 字符/片段
+                                        density = tokens // chunks if chunks > 0 else 0
+                                        st.metric("内容密度", f"{density} c/p", help="平均每个片段包含的字符数")
+    
+                                    # 内容采样
+                                    if os.path.exists(actual_file_path) and f.get('type', '').lower() in ['.txt', '.md', '.py', '.js', '.html', '.css', '.json']:
+                                        st.markdown("####### 📄 文本取证采样")
+                                        try:
+                                            with open(actual_file_path, 'r', encoding='utf-8', errors='ignore') as preview_f:
+                                                preview_content = preview_f.read(800)
+                                                st.code(preview_content, language='text')
+                                        except:
+                                            st.caption("无法读取内容预览")
+                                    
+                                    # 用户备注
+                                    st.markdown("####### 📝 用户自定义备注")
+                                    file_hash = f.get('file_hash', 'no_hash')
+                                    current_note = notes_manager.get_note(file_hash)
+                                    new_note = st.text_area("备注信息", value=current_note, height=80, key=f"note_{i}", label_visibility="collapsed")
+                                    if new_note != current_note:
+                                        notes_manager.set_note(file_hash, new_note)
+                                        st.toast("✅ 备注已保存")
+    
+                                with detail_col_right:
+                                    # --- 右侧：技术档案 (40%) ---
+                                    if "error" not in deep_attrs:
+                                        # 1. 优先展示系统记录的溯源 (针对抓取文件)
+                                        if deep_attrs.get("header_url"):
+                                            st.markdown("####### 🌐 溯源 (系统记录)")
+                                            st.caption(f"`{deep_attrs['header_url']}`")
+                                            st.divider()
+    
+                                        # 2. macOS 专属增强元数据
+                                        if platform.system() == "Darwin":
+                                            st.markdown("####### 🍎 macOS 增强元数据")
+                                            m = deep_attrs.get("macos", {})
+                                            if any([m.get("tags"), m.get("finder_comment"), m.get("where_from"), m.get("version")]):
+                                                # 展示标签
+                                                if m.get("tags"):
+                                                    tag_html = "".join([f"<span style='background:#f0f0f0; padding:2px 6px; border-radius:10px; font-size:0.7rem; margin-right:4px;'>🏷️ {t}</span>" for t in m["tags"]])
+                                                    st.markdown(tag_html, unsafe_allow_html=True)
+                                                
+                                                # 展示来源
+                                                if m.get("where_from"):
+                                                    st.markdown("**🌐 下载来源**")
+                                                    for url in m["where_from"]:
+                                                        st.caption(f"`{url}`")
+                                                
+                                                # 展示系统注释
+                                                if m.get("finder_comment"):
+                                                    st.caption(f"💬 **Finder 注释**: {m['finder_comment']}")
+                                                
+                                                if m.get("version"):
+                                                    st.caption(f"🔢 **内部版本**: {m['version']}")
+                                            else:
+                                                st.caption("ℹ️ 未发现扩展元数据 (标签、来源等)")
+                                            
+                                            st.divider()
+    
+                                        # 取证与底层
+                                        st.markdown("####### 🕵️ 系统取证")
+                                        st.caption(f"Magic Bytes: `{deep_attrs['magic_bytes']}`")
+                                        st.caption(f"SHA-256: `{deep_attrs['sha256'][:32]}...`")
+                                        st.caption(f"Inode: `{deep_attrs['inode']}` | FS: `{deep_attrs['fs_type']}`")
+                                        
+                                        # 时间轴与位置
+                                        st.markdown("####### 🕒 时间轴与位置")
+                                        st.caption(f"创建: `{deep_attrs['created']}`")
+                                        st.caption(f"最后访问: `{deep_attrs['accessed']}`")
+                                        
+                                        st.markdown("####### 📍 拓扑位置")
+                                        st.caption(f"真实路径: `{deep_attrs['real_path'][:40]}...`")
+                                        st.caption(f"符号链接: `{'是' if deep_attrs['is_symlink'] else '否'}`")
+                                        
+                                        # 权限系统
+                                        st.markdown("####### 🛡️ 权限系统")
+                                        st.caption(f"Unix权限: `{deep_attrs['permissions']}`")
+                                        st.caption(f"所有者: `{deep_attrs['owner']}` | 只读: `{'是' if deep_attrs['is_readonly'] else '否'}`")
+                                    else:
+                                        st.warning(f"数据抓取异常: {deep_attrs['error']}")
+                                    
+                                    # 快捷功能按钮
+                                    st.divider()
+                                    btn_c1, btn_c2 = st.columns(2)
+                                    with btn_c1:
+                                        if st.button("📂 在 Finder 中显示", key=f"reveal_{i}", use_container_width=True):
+                                            if reveal_in_file_manager(actual_file_path):
+                                                st.toast(f"✅ 已在 Finder 中选中: {os.path.basename(actual_file_path)}")
+                                            else:
+                                                st.error(f"❌ 无法定位文件 (可能已被清理): {actual_file_path}")
+                                                
+                                    with btn_c2:
+                                        if platform.system() == "Darwin":
+                                            if st.button("👁️ QuickLook", key=f"ql_{i}", use_container_width=True):
+                                                if os.path.exists(actual_file_path):
+                                                    try:
+                                                        subprocess.Popen(["qlmanage", "-p", actual_file_path], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                                                        # 强制置顶脚本
+                                                        top_script = 'tell application "System Events"\n repeat 20 times\n if exists process "qlmanage" then\n set frontmost of process "qlmanage" to true\n exit repeat\n end if\n delay 0.1\n end repeat\n end tell'
+                                                        subprocess.Popen(['osascript', '-e', top_script])
+                                                    except Exception as e:
+                                                        st.error(f"预览启动失败: {e}")
+                                                else:
+                                                    st.error(f"❌ 文件不存在: {actual_file_path}")
+                                        else:
+                                            if st.button("📋 复制路径", key=f"copy_path_{i}", use_container_width=True):
+                                                st.code(actual_file_path)
+    
+                                # 向量片段ID (折叠)
+                                if f.get('doc_ids'):
+                                    with st.expander("🧬 向量片段 ID 序列 (RAW)", expanded=False):
+                                        st.text_area("IDs", value='\n'.join(f['doc_ids']), height=100, label_visibility="collapsed", key=f"ids_raw_{i}")
+                    
+                    # 底部分页 (方便翻页)
+                    if total_pages > 1:
+                        st.divider()
+                        col1, col2, col3 = st.columns([1, 2, 1])
+                        with col2:
+                            page_cols = st.columns([1, 3, 1])
+                            if page_cols[0].button("⬅️", key="prev_bottom", disabled=st.session_state.file_page <= 1):
+                                st.session_state.file_page -= 1
+                            page_cols[1].markdown(f"<div style='text-align:center'>第 {st.session_state.file_page}/{total_pages} 页 · 共 {total_files} 个文件</div>", unsafe_allow_html=True)
+                            if page_cols[2].button("➡️", key="next_bottom", disabled=st.session_state.file_page >= total_pages):
+                                st.session_state.file_page += 1
+    
+            file_manager_fragment()
 # 创建模式的欢迎界面
 if is_create_mode:
     st.markdown("""
