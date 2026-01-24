@@ -1048,6 +1048,43 @@ st.markdown("""
             padding: 0.5rem !important;
         }
     }
+
+
+    /* 极致压缩上传组件 (全局预加载防止闪烁 - 增强版) */
+    [data-testid="stFileUploader"] {
+        padding-bottom: 0px !important;
+        margin-bottom: 0px !important;
+    }
+    [data-testid="stFileUploader"] section {
+        margin-top: 0px !important;
+        padding-top: 0px !important;
+    }
+    /* 核心区域控制 */
+    [data-testid="stFileUploaderDropzone"] {
+        padding: 6px 10px !important;
+        min-height: 0px !important; /* 核心：覆盖默认的 min-height */
+        height: auto !important;
+        align-items: center !important;
+        gap: 10px !important;
+    }
+    /* 彻底隐藏图标与说明文字 */
+    [data-testid="stFileUploaderDropzone"] svg, 
+    [data-testid="stFileUploaderDropzone"] small,
+    [data-testid="stFileUploaderDropzone"] [data-testid="stBaseButton-header"] {
+        display: none !important;
+    }
+    /* 隐藏顶部 Label */
+    [data-testid="stFileUploader"] label {
+        display: none !important;
+    }
+    /* 紧凑化按钮 */
+    [data-testid="stFileUploaderDropzone"] button {
+        margin: 0 !important;
+        padding-top: 4px !important;
+        padding-bottom: 4px !important;
+        min-height: 0px !important;
+        height: auto !important;
+    }
 </style>""", unsafe_allow_html=True)
 
 
@@ -1721,18 +1758,6 @@ with st.sidebar:
                     with up_col1:
                         st.markdown("<div style='margin-top: 8px;'><b>上传:</b></div>", unsafe_allow_html=True)
                     with up_col2:
-                        # 使用 CSS 压缩上传组件高度
-                        st.markdown("""
-                            <style>
-                            /* 极致压缩上传组件 */
-                            div[data-testid="stFileUploader"] { padding-bottom: 0px !important; }
-                            div[data-testid="stFileUploaderDropzone"] { padding: 0.2rem !important; min-height: 40px !important; }
-                            div[data-testid="stFileUploaderDropzone"] label { display: none !important; }
-                            div[data-testid="stFileUploaderDropzone"] i { display: none !important; }
-                            /* 隐藏下方列表详情，仅保留计数 */
-                            div[data-testid="stFileUploader"] section { margin-top: 0px !important; }
-                            </style>
-                        """, unsafe_allow_html=True)
                         uploaded_files = st.file_uploader(
                             "拖入文件", 
                             accept_multiple_files=True, 
