@@ -707,8 +707,103 @@ from src.chat import ChatEngine
 # 引入配置模块 (Stage 8)
 from src.config import ConfigLoader, ConfigValidator
 
-PageStyle.setup_page()
 
+# 应用启动日志
+if 'app_initialized' not in st.session_state:
+    logger.separator("RAG Pro Max 启动")
+    logger.info("应用初始化中...")
+    
+    # 立即设置全局LLM（确保摘要生成等功能可用）
+    try:
+        # 使用统一配置加载器 (读取 rag_config.json)
+        config = ConfigLoader.load()
+        
+        llm_provider = config.get('llm_provider', 'Ollama')
+        
+        # 提取配置
+        if llm_provider == 'OpenAI-Compatible':
+            llm_model = config.get('llm_model_other', '')
+            llm_url = config.get('llm_url_other', '')
+            llm_key = config.get('llm_key_other', '')
+        elif llm_provider == 'OpenAI':
+            llm_model = config.get('llm_model_openai', 'gpt-3.5-turbo')
+            llm_url = config.get('llm_url_openai', 'https://api.openai.com/v1')
+            llm_key = config.get('llm_key', '')
+        else:  # Ollama & Default
+            llm_model = config.get('llm_model_ollama', 'gpt-oss:20b')
+            llm_url = config.get('llm_url_ollama', 'http://localhost:11434')
+            llm_key = ""
+        
+        system_prompt = config.get('system_prompt', None)
+        
+        # 设置全局LLM
+        if llm_model:
+            set_global_llm_model(llm_provider, llm_model, llm_key, llm_url, system_prompt=system_prompt)
+            
+    except Exception as e:
+        logger.warning(f"全局LLM初始化失败: {e}")
+    
+    st.session_state.app_initialized = True
+    if 'current_session_id' not in st.session_state:
+        st.session_state.current_session_id = None
+    
+    # --- [v5.6.3] 现场恢复：基于 URL 参数持久化活跃会话 ---
+    if "kb_id" in st.query_params and st.session_state.get('current_kb_id') is None:
+        target_kb = st.query_params["kb_id"]
+        st.session_state.current_kb_id = target_kb
+        # 设置导航显示格式以匹配侧边栏
+        st.session_state.current_nav = f"☑️ 📂 {target_kb}"
+        # 如果有 session_id，一并恢复
+        if "sess_id" in st.query_params:
+            st.session_state.current_session_id = st.query_params["sess_id"]
+        
+        logger.info(f"🔄 正在从 URL 恢复现场: KB={target_kb}", stage="现场恢复")
+
+    logger.success("应用初始化完成")
+
+# 每次运行时同步当前状态到 URL，确保刷新不丢失
+if st.session_state.get('current_kb_id'):
+    st.query_params["kb_id"] = st.session_state.current_kb_id
+    if st.session_state.get('current_session_id'):
+        st.query_params["sess_id"] = st.session_state.current_session_id
+
+# --- 自动登录逻辑 (v4.5.2) ---
+# 必须在登录拦截之前执行
+if not st.session_state.get("logged_in"):
+    token = st.query_params.get("session_token")
+    if token:
+        try:
+            from src.auth.session_manager import validate_session
+            from src.auth.user_auth import load_users
+            
+            username = validate_session(token)
+            if username:
+                users = load_users()
+                user_info = users.get(username)
+                if user_info and user_info.get('is_active', True):
+                    from src.auth.audit_logger import AuditLogger
+                    from src.common.utils import get_client_ip
+                    st.session_state.logged_in = True
+                    st.session_state.user = username
+                    st.session_state.role = user_info.get('role', 'standard_user')
+                    AuditLogger.log(username, "AUTO_LOGIN", "通过 Session Token 自动登录", action_type="AUTH", ip=get_client_ip())
+                    logger.info(f"自动登录成功: {username}")
+                    st.toast(f"👋 欢迎回来, {username}", icon="✨")
+        except Exception as e:
+            logger.warning(f"自动登录失败: {e}")
+
+# ==========================================
+# 登录拦截逻辑 (管理为先)
+# ==========================================
+# Force refresh
+from src.auth.login_page import render_login_page
+import importlib
+
+if 'logged_in' not in st.session_state or not st.session_state.logged_in:
+    render_login_page()
+    st.stop()
+PageStyle.apply_custom_css()
+PageStyle.inject_resizable_sidebar()
 # 注入 CSS [v6.4.9] 强化双滚动条消除方案
 st.markdown("""
 <style>
@@ -955,100 +1050,6 @@ st.markdown("""
     }
 </style>""", unsafe_allow_html=True)
 
-# 应用启动日志
-if 'app_initialized' not in st.session_state:
-    logger.separator("RAG Pro Max 启动")
-    logger.info("应用初始化中...")
-    
-    # 立即设置全局LLM（确保摘要生成等功能可用）
-    try:
-        # 使用统一配置加载器 (读取 rag_config.json)
-        config = ConfigLoader.load()
-        
-        llm_provider = config.get('llm_provider', 'Ollama')
-        
-        # 提取配置
-        if llm_provider == 'OpenAI-Compatible':
-            llm_model = config.get('llm_model_other', '')
-            llm_url = config.get('llm_url_other', '')
-            llm_key = config.get('llm_key_other', '')
-        elif llm_provider == 'OpenAI':
-            llm_model = config.get('llm_model_openai', 'gpt-3.5-turbo')
-            llm_url = config.get('llm_url_openai', 'https://api.openai.com/v1')
-            llm_key = config.get('llm_key', '')
-        else:  # Ollama & Default
-            llm_model = config.get('llm_model_ollama', 'gpt-oss:20b')
-            llm_url = config.get('llm_url_ollama', 'http://localhost:11434')
-            llm_key = ""
-        
-        system_prompt = config.get('system_prompt', None)
-        
-        # 设置全局LLM
-        if llm_model:
-            set_global_llm_model(llm_provider, llm_model, llm_key, llm_url, system_prompt=system_prompt)
-            
-    except Exception as e:
-        logger.warning(f"全局LLM初始化失败: {e}")
-    
-    st.session_state.app_initialized = True
-    if 'current_session_id' not in st.session_state:
-        st.session_state.current_session_id = None
-    
-    # --- [v5.6.3] 现场恢复：基于 URL 参数持久化活跃会话 ---
-    if "kb_id" in st.query_params and st.session_state.get('current_kb_id') is None:
-        target_kb = st.query_params["kb_id"]
-        st.session_state.current_kb_id = target_kb
-        # 设置导航显示格式以匹配侧边栏
-        st.session_state.current_nav = f"☑️ 📂 {target_kb}"
-        # 如果有 session_id，一并恢复
-        if "sess_id" in st.query_params:
-            st.session_state.current_session_id = st.query_params["sess_id"]
-        
-        logger.info(f"🔄 正在从 URL 恢复现场: KB={target_kb}", stage="现场恢复")
-
-    logger.success("应用初始化完成")
-
-# 每次运行时同步当前状态到 URL，确保刷新不丢失
-if st.session_state.get('current_kb_id'):
-    st.query_params["kb_id"] = st.session_state.current_kb_id
-    if st.session_state.get('current_session_id'):
-        st.query_params["sess_id"] = st.session_state.current_session_id
-
-# --- 自动登录逻辑 (v4.5.2) ---
-# 必须在登录拦截之前执行
-if not st.session_state.get("logged_in"):
-    token = st.query_params.get("session_token")
-    if token:
-        try:
-            from src.auth.session_manager import validate_session
-            from src.auth.user_auth import load_users
-            
-            username = validate_session(token)
-            if username:
-                users = load_users()
-                user_info = users.get(username)
-                if user_info and user_info.get('is_active', True):
-                    from src.auth.audit_logger import AuditLogger
-                    from src.common.utils import get_client_ip
-                    st.session_state.logged_in = True
-                    st.session_state.user = username
-                    st.session_state.role = user_info.get('role', 'standard_user')
-                    AuditLogger.log(username, "AUTO_LOGIN", "通过 Session Token 自动登录", action_type="AUTH", ip=get_client_ip())
-                    logger.info(f"自动登录成功: {username}")
-                    st.toast(f"👋 欢迎回来, {username}", icon="✨")
-        except Exception as e:
-            logger.warning(f"自动登录失败: {e}")
-
-# ==========================================
-# 登录拦截逻辑 (管理为先)
-# ==========================================
-# Force refresh
-from src.auth.login_page import render_login_page
-import importlib
-
-if 'logged_in' not in st.session_state or not st.session_state.logged_in:
-    render_login_page()
-    st.stop()
 
 # ==========================================
 # 2. 本地持久化与工具函数
