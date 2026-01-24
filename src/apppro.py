@@ -1773,6 +1773,11 @@ with st.sidebar:
                                         # 更新计数 (无感刷新)
                                         new_count = len([f for f in os.listdir(st.session_state.task_staging_dir) if not f.startswith('.')])
                                         update_stats_display(new_count)
+
+                                        # [Fix] 自动生成知识库名称 (防止空名称报错)
+                                        if not st.session_state.get('upload_auto_name'):
+                                            folder_name = os.path.basename(manual_path.rstrip(os.sep))
+                                            st.session_state.upload_auto_name = folder_name
                             else:
                                 st.error("路径不存在")
     
