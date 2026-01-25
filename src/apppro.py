@@ -6762,48 +6762,7 @@ if st.session_state.get('is_processing') and final_prompt:
                                 
                                 st.session_state.is_processing = False
                                 st.rerun()
-                                # 1. 核心推演报告流式预览
-                                # 优化：将占位符留在容器内，直到 rerun 完成自然替换
-                                report_placeholder = st.empty()
-                                full_report = ""
-                                logic_stream = analysis_res.get("logic_gen")
-                                if logic_stream:
-                                    for token in logic_stream:
-                                        full_report += token
-                                        report_placeholder.markdown(full_report + "▌")
-                                # 优化：不再 empty()，减少闪烁
-                                report_placeholder.markdown(full_report) 
-                                
-                                # 2. [v6.7.3] 核心持久化逻辑
-                                if not full_report.strip() and not analysis_res.get("stages"):
-                                    full_report = "### 📋 战略分析摘要\n分析任务已完成，未发现显著异常。"
 
-                                st.session_state.messages.append({
-                                    "role": "assistant", 
-                                    "content": "", # 留空，防止普通文字渲染器重复输出
-                                    "report_text": full_report,
-                                    "is_data_report": True, 
-                                    "stages": analysis_res.get("stages", []), 
-                                    "macro_context": analysis_res.get("macro_context"),
-                                    "stats": {"time": time.time() - start_time}
-                                })
-
-                                # 3. [v5.2.3] 生成追问建议
-                                try:
-                                    from src.chat.unified_suggestion_engine import get_unified_suggestion_engine
-                                    sug_engine = get_unified_suggestion_engine(active_kb_name)
-                                    new_sugs = sug_engine.generate_suggestions(f"提问: {final_prompt}\n报告: {full_report}", 'chat', st.session_state.chat_engine, 3)
-                                    if new_sugs:
-                                        st.session_state.suggestions_history = new_sugs[:3]
-                                        st.session_state.messages[-1]['suggestions'] = new_sugs[:3]
-                                except: pass
-
-                                # 4. 固化存储并触发全量重绘
-                                if active_kb_name: 
-                                    HistoryManager.save_session(active_kb_name, st.session_state.messages, st.session_state.get('current_session_id'))
-                                
-                                st.session_state.is_processing = False
-                                st.rerun()
 
 
 
@@ -7064,27 +7023,7 @@ if st.session_state.get('is_processing') and final_prompt:
                     # 整体处理完成反馈
                     st.toast("✅ 回答生成完毕", icon="🎉")
                     
-                    # 添加详细的成功提示
-                    st.success(f"✅ 查询处理完成！生成 {token_count} 个token，耗时 {total_time:.2f} 秒，速度 {tokens_per_sec:.1f} token/秒")
-                    
-                    # st.rerun() # [优化] 移除自动刷新，避免白屏等待
-                    
-                    # 立即渲染追问建议，保持交互连贯
-                    if initial_sugs:
-                        import hashlib
-                        # 视觉样式与 MessageRenderer 保持一致
-                        st.divider()
-                        st.markdown("###### 🚀 追问推荐")
-                        
-                        # 计算稳定哈希 (与 MessageRenderer 算法对齐)
-                        msg_hash = hashlib.md5(full_text[:100].encode()).hexdigest()[:8]
-                        
-                        # 垂直布局 (3x1) 直接渲染
-                        for i, sug in enumerate(initial_sugs):
-                            # 使用与 MessageRenderer 完全一致的 Key
-                            # 点击后 Rerun -> 映射到 History Loop 中的同名按钮 -> 触发 _click_suggestion
-                            btn_key = f"dyn_sug_{msg_hash}_{i}"
-                            st.button(f"👉 {sug}", key=btn_key, use_container_width=True)
+                    st.rerun()
                 
                 except Exception as e: 
                     # [v5.9.4] 错误诊断增强：禁止静默闪退，显式抛出异常详情
