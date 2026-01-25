@@ -462,17 +462,43 @@ def render_resource_governance_v19():
                                                     st.warning("无法获取表结构")
                                             
                                             with t_tab2:
-                                                # 数据采样 (Lazy Load)
-                                                sample_data = conn_manager.get_table_sample(alias, table_name, db_override=sel_db, limit=100)
+                                                # 数据采样 (Lazy Load + Pagination)
+                                                limit = 100
+                                                # 获取总行数用于分页
+                                                insights = conn_manager.get_table_insights(alias, table_name, db_override=sel_db)
+                                                total_rows = insights.get('row_count', 0)
+                                                
+                                                # 分页状态管理
+                                                page_key = f"page_{alias}_{table_name}"
+                                                if page_key not in st.session_state:
+                                                    st.session_state[page_key] = 1
+                                                
+                                                current_page = st.session_state[page_key]
+                                                total_pages = max(1, (total_rows + limit - 1) // limit)
+                                                offset = (current_page - 1) * limit
+                                                
+                                                # 分页控件栏
+                                                c_prev, c_info, c_next = st.columns([1, 2, 1])
+                                                with c_prev:
+                                                    if st.button("⬅️ 上一页", key=f"prev_{page_key}", disabled=current_page <= 1):
+                                                        st.session_state[page_key] -= 1
+                                                        st.rerun()
+                                                with c_info:
+                                                    st.markdown(f"<div style='text-align:center; padding-top:5px'>第 <b>{current_page}</b> / {total_pages} 页 (共 {total_rows} 行)</div>", unsafe_allow_html=True)
+                                                with c_next:
+                                                    if st.button("下一页 ➡️", key=f"next_{page_key}", disabled=current_page >= total_pages):
+                                                        st.session_state[page_key] += 1
+                                                        st.rerun()
+
+                                                # 获取分页数据
+                                                sample_data = conn_manager.get_table_sample(alias, table_name, db_override=sel_db, limit=limit, offset=offset)
                                                 if sample_data:
                                                     st.dataframe(pd.DataFrame(sample_data), use_container_width=True, height=400)
-                                                    st.caption(f"共展示 {len(sample_data)} 条样本数据")
                                                 else:
-                                                    st.info("表为空或无法读取数据")
+                                                    st.info("当前页无数据")
                                             
                                             with t_tab3:
-                                                # 业务洞察
-                                                insights = conn_manager.get_table_insights(alias, table_name, db_override=sel_db)
+                                                # 业务洞察 (复用已获取的 insights)
                                                 stats = conn_manager.get_table_stats(alias, table_name, db_override=sel_db)
                                                 
                                                 c1, c2, c3 = st.columns(3)

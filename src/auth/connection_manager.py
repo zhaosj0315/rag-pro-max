@@ -299,8 +299,8 @@ class ConnectionManager:
         except:
             return []
 
-    def get_table_sample(self, alias: str, table_name: str, db_override: str = None, limit: int = 50) -> List[Dict]:
-        """获取数据采样 (增加至 50 行)"""
+    def get_table_sample(self, alias: str, table_name: str, db_override: str = None, limit: int = 50, offset: int = 0) -> List[Dict]:
+        """获取数据采样 (支持分页)"""
         try:
             conns = self.load_connections()
             if alias not in conns: return []
@@ -309,16 +309,21 @@ class ConnectionManager:
             engine = create_engine(url)
             
             with engine.connect() as conn:
-                # 兼容不同数据库的采样语法
+                # 兼容不同数据库的分页语法
                 if conns[alias]['type'] == 'SQL Server':
-                    query = text(f"SELECT TOP {limit} * FROM {table_name}")
+                    # SQL Server 2012+ (Requires ORDER BY)
+                    query = text(f"SELECT * FROM {table_name} ORDER BY (SELECT NULL) OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY")
+                elif conns[alias]['type'] == 'Oracle':
+                    query = text(f"SELECT * FROM {table_name} OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY")
                 else:
-                    query = text(f'SELECT * FROM "{table_name}" LIMIT {limit}')
+                    # MySQL, PG, SQLite, etc.
+                    query = text(f'SELECT * FROM "{table_name}" LIMIT {limit} OFFSET {offset}')
                 
                 try:
                     res = conn.execute(query)
                 except:
-                    res = conn.execute(text(f"SELECT * FROM {table_name} LIMIT {limit}"))
+                    # 降级尝试无引号
+                    res = conn.execute(text(f"SELECT * FROM {table_name} LIMIT {limit} OFFSET {offset}"))
                 
                 rows = [dict(row._mapping) for row in res]
                 return rows
