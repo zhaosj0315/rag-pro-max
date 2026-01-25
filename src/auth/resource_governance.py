@@ -473,9 +473,15 @@ def render_resource_governance_v19():
                                             with t_tab3:
                                                 # 业务洞察
                                                 insights = conn_manager.get_table_insights(alias, table_name, db_override=sel_db)
-                                                c1, c2 = st.columns(2)
+                                                stats = conn_manager.get_table_stats(alias, table_name, db_override=sel_db)
+                                                
+                                                c1, c2, c3 = st.columns(3)
                                                 c1.metric("预估行数", f"{insights.get('row_count', 0):,}")
-                                                c2.metric("存储引擎", insights.get('engine', 'unknown').upper())
+                                                c2.metric("物理大小", stats.get('size_mb', 'Unknown'))
+                                                c3.metric("存储引擎", insights.get('engine', 'unknown').upper())
+                                                
+                                                if stats.get('create_time') != 'Unknown':
+                                                    st.caption(f"🕒 创建时间: {stats['create_time']}")
                                                 
                                                 fks = insights.get('foreign_keys', [])
                                                 if fks:

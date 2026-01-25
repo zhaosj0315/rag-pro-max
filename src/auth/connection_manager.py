@@ -325,6 +325,49 @@ class ConnectionManager:
         except:
             return []
 
+    def get_table_stats(self, alias: str, table_name: str, db_override: str = None) -> Dict[str, Any]:
+        """[v9.4.1] 获取表级物理统计信息 (大小/行数)"""
+        stats = {"size_mb": "Unknown", "avg_row_len": "Unknown", "create_time": "Unknown"}
+        try:
+            conns = self.load_connections()
+            if alias not in conns: return stats
+            config = conns[alias]
+            db_target = db_override if db_override else config.get('database')
+            
+            url = self.get_connection_url(config, db_override)
+            engine = create_engine(url)
+            
+            with engine.connect() as conn:
+                if config['type'] == 'MySQL':
+                    sql = text(f"""
+                        SELECT 
+                            ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 2) AS size_mb,
+                            AVG_ROW_LENGTH,
+                            CREATE_TIME
+                        FROM information_schema.TABLES 
+                        WHERE TABLE_SCHEMA = '{db_target}' AND TABLE_NAME = '{table_name}'
+                    """)
+                    res = conn.execute(sql).fetchone()
+                    if res:
+                        stats['size_mb'] = f"{res[0]} MB"
+                        stats['avg_row_len'] = f"{res[1]} Bytes"
+                        stats['create_time'] = str(res[2])
+                
+                elif config['type'] == 'PostgreSQL':
+                    try:
+                        # 尝试带引号和不带引号两种方式
+                        sql = text(f"SELECT pg_total_relation_size('\"{table_name}\"') / 1024 / 1024")
+                        res = conn.execute(sql).fetchone()
+                    except:
+                        sql = text(f"SELECT pg_total_relation_size('{table_name}') / 1024 / 1024")
+                        res = conn.execute(sql).fetchone()
+                        
+                    if res:
+                        stats['size_mb'] = f"{round(float(res[0]), 2)} MB"
+            return stats
+        except Exception as e:
+            return stats
+
     def get_table_insights(self, alias: str, table_name: str, db_override: str = None) -> Dict[str, Any]:
         """[v8.6.0] 获取深度业务洞察 (行数、外键、统计)"""
         try:
