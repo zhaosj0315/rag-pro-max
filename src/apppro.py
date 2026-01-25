@@ -2142,6 +2142,9 @@ with st.sidebar:
                             st.session_state.current_nav = "🔐 资源治理"
                             st.rerun()
                     else:
+                        # 初始化变量防止 UnboundLocalError
+                        selected_tables = []
+                        
                         # --- 1. 上半区：选择与控制 ---
                         c_conn, c_db = st.columns(2)
                         selected_alias = c_conn.selectbox("数据源", list(saved_conns.keys()), key="db_sync_alias")
