@@ -368,15 +368,28 @@ def render_resource_governance_v19():
                     
                     ic_btn_col1, ic_btn_col2 = ic3.columns(2)
                     with ic_btn_col1:
-                        show_struct = st.button("🔍 预览", key=f"preview_conn_{alias}", use_container_width=True)
+                        # [Fix] 使用 Session State 持久化预览状态
+                        if st.button("🔍 预览", key=f"preview_conn_{alias}", use_container_width=True):
+                            st.session_state.active_preview_alias = alias
+                            st.rerun()
                     with ic_btn_col2:
                         if st.button("🗑️", key=f"del_conn_{alias}", use_container_width=True, help="删除连接"):
                             if conn_manager.delete_connection(alias):
                                 st.toast("已删除"); time.sleep(0.5); st.rerun()
                     
                     # 预览区域 (v9.4.0 全新分栏布局 - 数据库全景透视)
-                    if show_struct:
+                    # [Fix] 检查 Session State 状态
+                    if st.session_state.get('active_preview_alias') == alias:
                         with st.container(border=True):
+                            # [Fix] 头部添加关闭按钮
+                            col_head, col_close = st.columns([20, 1])
+                            with col_head:
+                                st.caption(f"🌐 数据库透视看板: {alias}")
+                            with col_close:
+                                if st.button("✖️", key=f"close_prev_{alias}", help="关闭预览"):
+                                    st.session_state.active_preview_alias = None
+                                    st.rerun()
+                            
                             # Level 1: 数据库选择 (顶部固定)
                             dbs = conn_manager.get_database_list(alias)
                             current_db = info.get('database', '')
