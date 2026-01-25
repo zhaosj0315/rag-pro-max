@@ -390,132 +390,133 @@ def render_resource_governance_v19():
                                     st.session_state.active_preview_alias = None
                                     st.rerun()
                             
-                            # Level 1: 数据库选择 (顶部固定)
+                            # Level 1: 数据库选择 (顶部导航第一级)
                             dbs = conn_manager.get_database_list(alias)
                             current_db = info.get('database', '')
                             default_idx = dbs.index(current_db) if current_db in dbs else 0
-                            sel_db = st.selectbox("切换数据库 Schema", dbs, index=default_idx, key=f"sel_db_{alias}")
+                            
+                            # 布局优化：将数据库和表选择放在顶部两列
+                            nav_c1, nav_c2 = st.columns([1, 2])
+                            with nav_c1:
+                                sel_db = st.selectbox("切换数据库 Schema", dbs, index=default_idx, key=f"sel_db_{alias}")
                             
                             if sel_db:
                                 tables = conn_manager.get_table_list(alias, db_override=sel_db)
                                 if not tables:
                                     st.warning(f"数据库 '{sel_db}' 中没有发现可读表")
                                 else:
+                                    with nav_c2:
+                                        # Level 2: 表选择 (顶部导航第二级 - 支持搜索)
+                                        table_options = ["🏠 数据库概览"] + sorted(tables)
+                                        selection = st.selectbox("定位数据表 (支持搜索)", table_options, key=f"nav_{alias}")
+                                    
                                     st.divider()
-                                    # 布局核心：20% 导航 + 80% 内容
-                                    nav_col, content_col = st.columns([1, 4])
                                     
-                                    with nav_col:
-                                        st.caption(f"**📚 资源导航** ({len(tables)})")
-                                        # 使用 Radio 模拟树形导航，默认选中概览
-                                        nav_options = ["🏠 概览属性"] + [f"📄 {t}" for t in tables]
-                                        selection = st.radio("导航", nav_options, label_visibility="collapsed", key=f"nav_{alias}")
-                                    
-                                    with content_col:
-                                        if selection == "🏠 概览属性":
-                                            # --- 数据库级信息预览 ---
-                                            db_info = conn_manager.get_database_info(alias, db_override=sel_db)
-                                            
-                                            st.markdown(f"#### 🌐 数据库全景: {sel_db}")
-                                            
-                                            # 分类卡片展示
-                                            dt1, dt2 = st.columns(2)
-                                            with dt1:
-                                                with st.container(border=True):
-                                                    st.caption("📝 基础属性")
-                                                    c1, c2 = st.columns(2)
-                                                    c1.metric("数据库类型", db_info['type'])
-                                                    c2.metric("字符集", db_info['charset'])
-                                                    st.caption(f"版本: {db_info['version']}")
-                                            
-                                            with dt2:
-                                                with st.container(border=True):
-                                                    st.caption("📊 规模统计")
-                                                    c1, c2 = st.columns(2)
-                                                    c1.metric("表数量", db_info['table_count'])
-                                                    c2.metric("索引总数", db_info['index_count'])
-                                                    st.caption(f"主机: {info.get('host')}:{info.get('port')}")
+                                    # 内容展示区 (100% 宽度自适应)
+                                    if selection == "🏠 数据库概览":
+                                        # --- 数据库级信息预览 ---
+                                        db_info = conn_manager.get_database_info(alias, db_override=sel_db)
+                                        
+                                        st.markdown(f"#### 🌐 数据库全景: {sel_db}")
+                                        
+                                        # 分类卡片展示
+                                        dt1, dt2 = st.columns(2)
+                                        with dt1:
+                                            with st.container(border=True):
+                                                st.caption("📝 基础属性")
+                                                c1, c2 = st.columns(2)
+                                                c1.metric("数据库类型", db_info['type'])
+                                                c2.metric("字符集", db_info['charset'])
+                                                st.caption(f"版本: {db_info['version']}")
+                                        
+                                        with dt2:
+                                            with st.container(border=True):
+                                                st.caption("📊 规模统计")
+                                                c1, c2 = st.columns(2)
+                                                c1.metric("表数量", db_info['table_count'])
+                                                c2.metric("索引总数", db_info['index_count'])
+                                                st.caption(f"主机: {info.get('host')}:{info.get('port')}")
 
-                                        else:
-                                            # --- 表级信息预览 ---
-                                            table_name = selection.replace("📄 ", "")
-                                            st.markdown(f"#### 📄 数据表: `{table_name}`")
+                                    else:
+                                        # --- 表级信息预览 ---
+                                        table_name = selection # No prefix
+                                        st.markdown(f"#### 📄 数据表: `{table_name}`")
+                                        
+                                        t_tab1, t_tab2, t_tab3 = st.tabs(["📋 结构定义", "💾 数据预览 (100行+)", "🕸️ 关联与洞察"])
+                                        
+                                        with t_tab1:
+                                            # 表结构
+                                            schema_data = conn_manager.get_table_schema(alias, table_name, db_override=sel_db)
+                                            if schema_data:
+                                                df_schema = pd.DataFrame(schema_data)
+                                                st.dataframe(
+                                                    df_schema, 
+                                                    use_container_width=True, 
+                                                    hide_index=True,
+                                                    column_config={
+                                                        "主键": st.column_config.TextColumn("PK", width="small"),
+                                                        "允许为空": st.column_config.TextColumn("Null", width="small"),
+                                                        "类型": st.column_config.TextColumn("Type", width="medium"),
+                                                    }
+                                                )
+                                            else:
+                                                st.warning("无法获取表结构")
+                                        
+                                        with t_tab2:
+                                            # 数据采样 (Lazy Load + Pagination)
+                                            limit = 100
+                                            # 获取总行数用于分页
+                                            insights = conn_manager.get_table_insights(alias, table_name, db_override=sel_db)
+                                            total_rows = insights.get('row_count', 0)
                                             
-                                            t_tab1, t_tab2, t_tab3 = st.tabs(["📋 结构定义", "💾 数据预览 (100行)", "🕸️ 关联与洞察"])
+                                            # 分页状态管理
+                                            page_key = f"page_{alias}_{table_name}"
+                                            if page_key not in st.session_state:
+                                                st.session_state[page_key] = 1
                                             
-                                            with t_tab1:
-                                                # 表结构
-                                                schema_data = conn_manager.get_table_schema(alias, table_name, db_override=sel_db)
-                                                if schema_data:
-                                                    df_schema = pd.DataFrame(schema_data)
-                                                    st.dataframe(
-                                                        df_schema, 
-                                                        use_container_width=True, 
-                                                        hide_index=True,
-                                                        column_config={
-                                                            "主键": st.column_config.TextColumn("PK", width="small"),
-                                                            "允许为空": st.column_config.TextColumn("Null", width="small"),
-                                                            "类型": st.column_config.TextColumn("Type", width="medium"),
-                                                        }
-                                                    )
-                                                else:
-                                                    st.warning("无法获取表结构")
+                                            current_page = st.session_state[page_key]
+                                            total_pages = max(1, (total_rows + limit - 1) // limit)
+                                            offset = (current_page - 1) * limit
                                             
-                                            with t_tab2:
-                                                # 数据采样 (Lazy Load + Pagination)
-                                                limit = 100
-                                                # 获取总行数用于分页
-                                                insights = conn_manager.get_table_insights(alias, table_name, db_override=sel_db)
-                                                total_rows = insights.get('row_count', 0)
-                                                
-                                                # 分页状态管理
-                                                page_key = f"page_{alias}_{table_name}"
-                                                if page_key not in st.session_state:
-                                                    st.session_state[page_key] = 1
-                                                
-                                                current_page = st.session_state[page_key]
-                                                total_pages = max(1, (total_rows + limit - 1) // limit)
-                                                offset = (current_page - 1) * limit
-                                                
-                                                # 分页控件栏
-                                                c_prev, c_info, c_next = st.columns([1, 2, 1])
-                                                with c_prev:
-                                                    if st.button("⬅️ 上一页", key=f"prev_{page_key}", disabled=current_page <= 1):
-                                                        st.session_state[page_key] -= 1
-                                                        st.rerun()
-                                                with c_info:
-                                                    st.markdown(f"<div style='text-align:center; padding-top:5px'>第 <b>{current_page}</b> / {total_pages} 页 (共 {total_rows} 行)</div>", unsafe_allow_html=True)
-                                                with c_next:
-                                                    if st.button("下一页 ➡️", key=f"next_{page_key}", disabled=current_page >= total_pages):
-                                                        st.session_state[page_key] += 1
-                                                        st.rerun()
+                                            # 分页控件栏
+                                            c_prev, c_info, c_next = st.columns([1, 2, 1])
+                                            with c_prev:
+                                                if st.button("⬅️ 上一页", key=f"prev_{page_key}", disabled=current_page <= 1):
+                                                    st.session_state[page_key] -= 1
+                                                    st.rerun()
+                                            with c_info:
+                                                st.markdown(f"<div style='text-align:center; padding-top:5px'>第 <b>{current_page}</b> / {total_pages} 页 (共 {total_rows} 行)</div>", unsafe_allow_html=True)
+                                            with c_next:
+                                                if st.button("下一页 ➡️", key=f"next_{page_key}", disabled=current_page >= total_pages):
+                                                    st.session_state[page_key] += 1
+                                                    st.rerun()
 
-                                                # 获取分页数据
-                                                sample_data = conn_manager.get_table_sample(alias, table_name, db_override=sel_db, limit=limit, offset=offset)
-                                                if sample_data:
-                                                    st.dataframe(pd.DataFrame(sample_data), use_container_width=True, height=400)
-                                                else:
-                                                    st.info("当前页无数据")
+                                            # 获取分页数据
+                                            sample_data = conn_manager.get_table_sample(alias, table_name, db_override=sel_db, limit=limit, offset=offset)
+                                            if sample_data:
+                                                st.dataframe(pd.DataFrame(sample_data), use_container_width=True, height=400)
+                                            else:
+                                                st.info("当前页无数据")
+                                        
+                                        with t_tab3:
+                                            # 业务洞察 (复用已获取的 insights)
+                                            stats = conn_manager.get_table_stats(alias, table_name, db_override=sel_db)
                                             
-                                            with t_tab3:
-                                                # 业务洞察 (复用已获取的 insights)
-                                                stats = conn_manager.get_table_stats(alias, table_name, db_override=sel_db)
-                                                
-                                                c1, c2, c3 = st.columns(3)
-                                                c1.metric("预估行数", f"{insights.get('row_count', 0):,}")
-                                                c2.metric("物理大小", stats.get('size_mb', 'Unknown'))
-                                                c3.metric("存储引擎", insights.get('engine', 'unknown').upper())
-                                                
-                                                if stats.get('create_time') != 'Unknown':
-                                                    st.caption(f"🕒 创建时间: {stats['create_time']}")
-                                                
-                                                fks = insights.get('foreign_keys', [])
-                                                if fks:
-                                                    st.divider()
-                                                    st.markdown("**🔗 外键拓扑**")
-                                                    st.dataframe(pd.DataFrame(fks), use_container_width=True, hide_index=True)
-                                                else:
-                                                    st.caption("未检测到显式外键约束")
+                                            c1, c2, c3 = st.columns(3)
+                                            c1.metric("预估行数", f"{insights.get('row_count', 0):,}")
+                                            c2.metric("物理大小", stats.get('size_mb', 'Unknown'))
+                                            c3.metric("存储引擎", insights.get('engine', 'unknown').upper())
+                                            
+                                            if stats.get('create_time') != 'Unknown':
+                                                st.caption(f"🕒 创建时间: {stats['create_time']}")
+                                            
+                                            fks = insights.get('foreign_keys', [])
+                                            if fks:
+                                                st.divider()
+                                                st.markdown("**🔗 外键拓扑**")
+                                                st.dataframe(pd.DataFrame(fks), use_container_width=True, hide_index=True)
+                                            else:
+                                                st.caption("未检测到显式外键约束")
 
     # --- Tab 5: 行为审计 (全功能回归融合版) ---
     with tab_audit:
