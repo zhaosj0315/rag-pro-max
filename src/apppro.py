@@ -1843,6 +1843,165 @@ with st.sidebar:
                                         st.info(f"📊 大文本 ({char_count:,} 字符) - 前端仅显示前10,000字符，完整内容将自动保存")
                                     else:
                                         st.caption(f"📊 字符数: {char_count:,}")
+
+                    # 4. 数据库快照 (独立卡片设计 - v9.5.0 UI重构)
+                    st.markdown("<div style='margin-top: 15px; margin-bottom: 8px; font-size: 0.95rem; font-weight: 600; color: #444;'>🗄️ 数据库快照提取 (Database Snapshot)</div>", unsafe_allow_html=True)
+                    
+                    with st.container(border=True):
+                        if not can_upload:
+                            st.warning("🔒 权限不足: 无法访问数据库连接")
+                        else:
+                            from src.utils.mysql_manager import MySQLManager
+                            from src.auth.connection_manager import ConnectionManager
+                            import pandas as pd
+                            
+                            # 获取当前用户可用的连接
+                            conn_mgr = ConnectionManager()
+                            current_user = st.session_state.get('user', 'guest_user')
+                            current_role = st.session_state.get('role', 'guest')
+                            
+                            if current_role == 'admin':
+                                saved_conns = conn_mgr.load_connections()
+                            else:
+                                saved_conns = conn_mgr.get_connections_for_user(current_user)
+                            
+                            if not saved_conns:
+                                st.info("ℹ️ 暂无可用连接，请在 [👤 我的 -> 🔌 数据连接] 中配置")
+                            else:
+                                # --- 第一行：数据源选择 ---
+                                c_conn, c_info = st.columns([2, 1])
+                                selected_alias = c_conn.selectbox("1. 选择数据源连接", list(saved_conns.keys()), key="snap_conn_alias", help="选择已配置的数据库连接")
+                                
+                                conn_conf = saved_conns[selected_alias]
+                                db_type = conn_conf.get('type', 'MySQL')
+                                
+                                with c_info:
+                                    st.markdown(f"<div style='padding-top: 26px; font-size: 0.8rem; color: #666;'>🔗 {conn_conf.get('host')}</div>", unsafe_allow_html=True)
+
+                                if db_type.lower() != 'mysql':
+                                    st.warning(f"⚠️ 快照工具暂仅深度适配 MySQL，当前为 {db_type}，可能存在兼容性问题。")
+                                
+                                # --- 自动连接与层级选择 ---
+                                if selected_alias:
+                                    try:
+                                        # 初始化管理器
+                                        mgr = MySQLManager(
+                                            host=conn_conf.get('host', 'localhost'),
+                                            port=int(conn_conf.get('port', 3306)),
+                                            user=conn_conf.get('user', 'root'),
+                                            password=conn_conf.get('password', '')
+                                        )
+                                        
+                                        # --- 第二行：库表选择 (双列布局) ---
+                                        c_db, c_tbl = st.columns(2)
+                                        
+                                        # A. 获取数据库
+                                        dbs = mgr.get_databases()
+                                        default_db = conn_conf.get('database')
+                                        default_idx = dbs.index(default_db) if default_db in dbs else 0
+                                        
+                                        sel_db = c_db.selectbox("2. 选择数据库", dbs, index=default_idx, key="snap_sel_db")
+                                        
+                                        if sel_db:
+                                            # B. 获取表
+                                            mgr.connect()
+                                            with mgr.conn.cursor() as cursor:
+                                                cursor.execute(f"SHOW TABLES FROM `{sel_db}`")
+                                                tables = [list(x.values())[0] for x in cursor.fetchall()]
+                                            mgr.close()
+                                            
+                                            # 全选辅助
+                                            if "snap_sel_tables" not in st.session_state: st.session_state.snap_sel_tables = []
+                                            
+                                            # 布局优化：全选按钮 (必须在 multiselect 之前渲染以修改 State)
+                                            if c_tbl.button("全选所有表", key="snap_select_all_btn", use_container_width=True):
+                                                st.session_state.snap_sel_tables = tables
+                                                st.rerun()
+                                            
+                                            sel_tables = c_tbl.multiselect("3. 选择数据表 (支持多选)", tables, key="snap_sel_tables")
+                                            
+                                            # --- 第三行：预览与操作 ---
+                                            if sel_tables:
+                                                # 预览逻辑：仅当单选时可用
+                                                if len(sel_tables) == 1:
+                                                    target_table = sel_tables[0]
+                                                    with st.expander(f"👁️ 预览表内容: {target_table}", expanded=False):
+                                                        try:
+                                                            mgr.connect()
+                                                            with mgr.conn.cursor() as cursor:
+                                                                cursor.execute(f"SELECT * FROM `{sel_db}`.`{target_table}` LIMIT 5")
+                                                                preview_data = cursor.fetchall()
+                                                                
+                                                                cursor.execute(f"SELECT TABLE_ROWS FROM information_schema.TABLES WHERE TABLE_SCHEMA = '{sel_db}' AND TABLE_NAME = '{target_table}'")
+                                                                count_res = cursor.fetchone()
+                                                                est_rows = count_res['TABLE_ROWS'] if count_res else 'Unknown'
+                                                            mgr.close()
+                                                            
+                                                            if preview_data:
+                                                                st.dataframe(pd.DataFrame(preview_data), use_container_width=True, hide_index=True)
+                                                                st.caption(f"📊 预估行数: {est_rows} 行 | 仅展示前 5 条样本")
+                                                            else:
+                                                                st.info("表为空")
+                                                        except Exception as e:
+                                                            st.error(f"预览失败: {e}")
+                                                else:
+                                                    st.info(f"📚 已选择 {len(sel_tables)} 张表，批量模式下不支持预览")
+
+                                                st.write("") # Spacer
+                                                
+                                                # 提取按钮
+                                                btn_col, info_col = st.columns([1.5, 2.5])
+                                                with btn_col:
+                                                    if st.button(f"📸 批量提取 ({len(sel_tables)}张)", use_container_width=True, type="primary"):
+                                                        with st.spinner(f"正在批量导出 {len(sel_tables)} 张表..."):
+                                                            try:
+                                                                import pymysql
+                                                                conn = pymysql.connect(
+                                                                    host=conn_conf.get('host'), 
+                                                                    port=int(conn_conf.get('port')), 
+                                                                    user=conn_conf.get('user'), 
+                                                                    password=conn_conf.get('password'), 
+                                                                    database=sel_db
+                                                                )
+                                                                
+                                                                success_count = 0
+                                                                for tbl in sel_tables:
+                                                                    try:
+                                                                        df = pd.read_sql(f"SELECT * FROM `{tbl}`", conn)
+                                                                        
+                                                                        # 保存
+                                                                        safe_name = f"{selected_alias}_{sel_db}_{tbl}_{int(time.time())}.csv"
+                                                                        save_path = os.path.join(st.session_state.task_staging_dir, safe_name)
+                                                                        df.to_csv(save_path, index=False, encoding='utf-8-sig')
+                                                                        success_count += 1
+                                                                    except Exception as inner_e:
+                                                                        st.warning(f"表 {tbl} 提取失败: {inner_e}")
+                                                                
+                                                                conn.close()
+                                                                
+                                                                # 更新路径和统计
+                                                                st.session_state.uploaded_path = st.session_state.task_staging_dir
+                                                                new_count = len([f for f in os.listdir(st.session_state.task_staging_dir) if not f.startswith('.')])
+                                                                update_stats_display(new_count)
+                                                                
+                                                                # 自动命名
+                                                                if not st.session_state.get('upload_auto_name'):
+                                                                    st.session_state.upload_auto_name = f"Snap_{selected_alias}_{sel_db}_Batch"
+                                                                
+                                                                st.toast(f"✅ 成功提取 {success_count} 张表", icon="📦")
+                                                                st.session_state.snap_last_success = f"批量完成 ({success_count})"
+                                                                
+                                                            except Exception as e:
+                                                                st.error(f"提取流程中断: {e}")
+                                                
+                                                with info_col:
+                                                    if st.session_state.get('snap_last_success'):
+                                                        st.success(f"✅ {st.session_state.snap_last_success}")
+                                                    else:
+                                                        st.caption("ℹ️ 数据将批量转换为 CSV 加入上方暂存区。")
+
+                                    except Exception as e:
+                                        st.error(f"连接数据库失败: {e}")
                     
     
                         

@@ -112,8 +112,8 @@ def render_resource_governance_v19():
         })
 
     st.markdown("### 💎 全域资源与账户访问安全治理 (旗舰版)")
-    tab_dist, tab_users, tab_roles, tab_conns, tab_audit, tab_term = st.tabs([
-        "🛡️ 资源深度治理", "👤 账户与访问安全", "🎭 权限矩阵定义", "🔌 数据源连接", "📜 系统行为审计", "💻 全能终端控制"
+    tab_dist, tab_users, tab_roles, tab_conns, tab_db_users, tab_audit, tab_term = st.tabs([
+        "🛡️ 资源深度治理", "👤 账户与访问安全", "🎭 权限矩阵定义", "🔌 数据源连接", "🗄️ 数据库用户", "📜 系统行为审计", "💻 全能终端控制"
     ])
 
     # --- Tab 1: 资源深度治理 (功能完全找回版) ---
@@ -518,7 +518,12 @@ def render_resource_governance_v19():
                                             else:
                                                 st.caption("未检测到显式外键约束")
 
-    # --- Tab 5: 行为审计 (全功能回归融合版) ---
+    # --- Tab 5: 数据库用户管理 (New) ---
+    with tab_db_users:
+        from src.ui.db_admin_ui import DBAdminUI
+        DBAdminUI.render()
+
+    # --- Tab 6: 行为审计 (全功能回归融合版) ---
     with tab_audit:
         st.caption("全量行为链路追踪：支持高性能分页查询与多维逻辑穿透")
         raw_logs = AuditLogger.get_logs(limit=5000)
