@@ -576,7 +576,7 @@
 
 ### 🐛 稳定性修复
 - **🔧 配置加载健壮性**: 修复了 `UnifiedConfigService` 不自动合并默认配置导致的关键参数 (`llm_provider`) 丢失问题。
-- **🛡️ 空值防御**: 在 `rag_engine` 工厂函数中增加了对空配置项 (`""`) 的回退机制，彻底解决了 Pydantic 校验报错 (`string_too_short`)。
+- **🛡️ 空值防御**: 在 `rag_engine` 工射函数中增加了对空配置项 (`""`) 的回退机制，彻底解决了 Pydantic 校验报错 (`string_too_short`)。
 - **🧩 语法修正**: 修复了 `src/rag_engine.py` 中因 docstring 格式错误导致的 `SyntaxError`。
 - **🏭 工厂方法补全**: 补全了 `src/rag_engine.py` 中缺失的 `create_rag_engine` 工厂函数，修复了 `ImportError`。
 
@@ -1086,7 +1086,7 @@
 ### 🔧 优化改进
 - 📊 修复预估算法：从指数增长改为线性增长+智能系数
 - 🎯 网站类型系数：Corporate(1.2x), Documentation(2.5x), News(3.0x)
-- 🔍 动态调整：根据实际链接数量和网站结构调整预估
+- 🔍 动态调整：根据实际链接数量 and 网站结构调整预估
 - 🛠️ 错误修复：修复智能搜索模式中的变量未定义问题
 
 ### 📈 性能提升

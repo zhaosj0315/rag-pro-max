@@ -1,13 +1,13 @@
 # RAG Pro Max - 企业级智能文档问答与数据分析系统
 
-**当前版本**: v9.1.0 (Flagship Evolution)  
-![Version](https://img.shields.io/badge/version-v9.1.0-purple)
+**当前版本**: v9.3.0-stable (Flagship Evolution)  
+![Version](https://img.shields.io/badge/version-v9.3.0-green)
 
-RAG Pro Max v9.1.0 带来了 **「极致性能 (Ultra-Performance)」** 飞跃。通过深度应用局部刷新隔离技术，系统实现了 **“零白屏”** 的无缝交互体验，在对话流畅度与配置响应速度上达到了行业顶尖水平。
+RAG Pro Max v9.3.0 带来了 **「极致性能 (Ultra-Performance)」** 飞跃。通过深度应用局部刷新隔离技术，系统实现了 **“零白屏”** 的无缝交互体验，在对话流畅度与配置响应速度上达到了行业顶尖水平。
 
 ---
 
-## 🚀 v9.1.0 核心特性
+## 🚀 v9.3.0 核心特性
 
 ### ⚡ 极致性能：零白屏交互 (Zero White Screen)
 - **局部刷新隔离**: 深度应用 `st.fragment` 技术。功能开关切换、参数调整、数据源配置均实现 **0 毫秒全页重载**，彻底消除视觉闪烁。
