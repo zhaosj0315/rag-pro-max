@@ -38,7 +38,8 @@ class MySQLManager:
                 dbs = cursor.fetchall()
                 # Filter out standard system dbs to make it cleaner, or keep them.
                 # Usually we don't want to mess with information_schema, etc.
-                filtered_dbs = [db['Database'] for db in dbs]
+                exclude_dbs = {'information_schema', 'mysql', 'performance_schema', 'sys'}
+                filtered_dbs = [db['Database'] for db in dbs if db['Database'].lower() not in exclude_dbs]
                 return filtered_dbs
         finally:
             self.close()

@@ -1956,43 +1956,43 @@ with st.sidebar:
                                                             else:
                                                                 st.error(f"预览失败: {e}")
                                                     
-                                                    # 提取操作栏 (极简)
-                                                    ex_c1, ex_c2 = st.columns([1.5, 4.5])
-                                                    with ex_c1:
-                                                        if st.button(f"🚀 提取 ({len(sel_tables)})", use_container_width=True, type="primary"):
-                                                            with st.spinner("提取中..."):
-                                                                try:
-                                                                    import pymysql
-                                                                    conn = pymysql.connect(host=conn_conf.get('host'), port=int(conn_conf.get('port')), user=conn_conf.get('user'), password=conn_conf.get('password'), database=sel_db)
-                                                                    success_c = 0
-                                                                    for tbl in sel_tables:
-                                                                        try:
-                                                                            df = pd.read_sql(f"SELECT * FROM `{tbl}`", conn)
-                                                                            safe_name = f"{selected_alias}_{sel_db}_{tbl}_{int(time.time())}.csv"
-                                                                            df.to_csv(os.path.join(st.session_state.task_staging_dir, safe_name), index=False, encoding='utf-8-sig')
-                                                                            success_c += 1
-                                                                        except Exception as inner_e:
-                                                                            if "Access denied" in str(inner_e) or "1044" in str(inner_e):
-                                                                                st.warning(f"⚠️ 跳过表 '{tbl}': 权限不足")
-                                                                            else:
-                                                                                st.warning(f"⚠️ 跳过表 '{tbl}': {inner_e}")
-                                                                    conn.close()
-                                                                    
-                                                                    st.session_state.uploaded_path = st.session_state.task_staging_dir
-                                                                    update_stats_display(len([f for f in os.listdir(st.session_state.task_staging_dir) if not f.startswith('.')]))
-                                                                    
-                                                                    if not st.session_state.get('upload_auto_name'):
-                                                                        st.session_state.upload_auto_name = f"Snap_{sel_db}_Batch"
-                                                                    
-                                                                    logger.info(f"🗄️ [数据库快照] 批量提取完成: 源={selected_alias}, 库={sel_db}, 表数={success_c}, 路径={st.session_state.task_staging_dir}")
-                                                                    st.toast(f"✅ 已提取 {success_c} 张表")
-                                                                    st.rerun()
-                                                                except Exception as e:
-                                                                    err_msg = str(e)
-                                                                    if "Access denied" in err_msg or "1044" in err_msg:
-                                                                        st.error(f"🔒 连接被拒绝: 账号 '{conn_conf.get('user')}' 权限不足。\n请联系管理员检查数据库授权。")
-                                                                    else:
-                                                                        st.error(f"失败: {e}")
+                                                # 提取操作栏 (极简)
+                                                ex_c1, ex_c2 = st.columns([1.5, 4.5])
+                                                with ex_c1:
+                                                    if st.button(f"🚀 提取 ({len(sel_tables)})", use_container_width=True, type="primary"):
+                                                        with st.spinner("提取中..."):
+                                                            try:
+                                                                import pymysql
+                                                                conn = pymysql.connect(host=conn_conf.get('host'), port=int(conn_conf.get('port')), user=conn_conf.get('user'), password=conn_conf.get('password'), database=sel_db)
+                                                                success_c = 0
+                                                                for tbl in sel_tables:
+                                                                    try:
+                                                                        df = pd.read_sql(f"SELECT * FROM `{tbl}`", conn)
+                                                                        safe_name = f"{selected_alias}_{sel_db}_{tbl}_{int(time.time())}.csv"
+                                                                        df.to_csv(os.path.join(st.session_state.task_staging_dir, safe_name), index=False, encoding='utf-8-sig')
+                                                                        success_c += 1
+                                                                    except Exception as inner_e:
+                                                                        if "Access denied" in str(inner_e) or "1044" in str(inner_e):
+                                                                            st.warning(f"⚠️ 跳过表 '{tbl}': 权限不足")
+                                                                        else:
+                                                                            st.warning(f"⚠️ 跳过表 '{tbl}': {inner_e}")
+                                                                conn.close()
+                                                                
+                                                                st.session_state.uploaded_path = st.session_state.task_staging_dir
+                                                                update_stats_display(len([f for f in os.listdir(st.session_state.task_staging_dir) if not f.startswith('.')]))
+                                                                
+                                                                if not st.session_state.get('upload_auto_name'):
+                                                                    st.session_state.upload_auto_name = f"Snap_{sel_db}_Batch"
+                                                                
+                                                                logger.info(f"🗄️ [数据库快照] 批量提取完成: 源={selected_alias}, 库={sel_db}, 表数={success_c}, 路径={st.session_state.task_staging_dir}")
+                                                                st.toast(f"✅ 已提取 {success_c} 张表")
+                                                                st.rerun()
+                                                            except Exception as e:
+                                                                err_msg = str(e)
+                                                                if "Access denied" in err_msg or "1044" in err_msg:
+                                                                    st.error(f"🔒 连接被拒绝: 账号 '{conn_conf.get('user')}' 权限不足。\n请联系管理员检查数据库授权。")
+                                                                else:
+                                                                    st.error(f"失败: {e}")
                                                 with ex_c2:
                                                     st.caption("数据将存入暂存区。")
 

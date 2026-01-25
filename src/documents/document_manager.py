@@ -413,6 +413,8 @@ class DocumentManager:
                 os.path.join("temp_uploads", "Search_*", file_name),
                 os.path.join("temp_uploads", "Web_*", file_name),
                 os.path.join("vector_db_storage", kb_name, file_name),
+                # [Fix] 显式查找 raw_sources 目录 (数据分析/快照源文件)
+                os.path.join("vector_db_storage", kb_name, "raw_sources", file_name),
                 # 递归查找知识库目录下的文件
                 os.path.join("vector_db_storage", kb_name, "**", file_name)
             ]
