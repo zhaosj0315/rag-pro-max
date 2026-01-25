@@ -22,5 +22,5 @@
     "temp_cleanup_hours": 24,
     "max_concurrent_tasks": 4
   },
-  "llm_model_ollama": "gpt-oss:20b"
+  "llm_model_ollama": "gpt-oss:latest"
 }

@@ -10,13 +10,13 @@ class DBAdminUI:
 
         # --- 1. 连接配置 ---
         # 默认隐藏配置，使用内置默认值
-        with st.expander("🔌 数据库连接配置 (默认: localhost/root)", expanded=False):
+        with st.expander("🔌 管理员连接配置 (请使用 Root/Admin 账号)", expanded=False):
             col1, col2 = st.columns(2)
             host = col1.text_input("Host", "localhost", key="db_host")
             port = col2.number_input("Port", 3306, step=1, key="db_port")
             
             col3, col4 = st.columns(2)
-            user = col3.text_input("User", "root", key="db_user")
+            user = col3.text_input("User (Admin/Root)", "root", key="db_user")
             # 预填用户提供的密码
             password = col4.text_input("Password", value="66315066", type="password", key="db_pass")
             
@@ -68,9 +68,11 @@ class DBAdminUI:
                             all_dbs = mgr.get_databases()
                             # 排除系统库建议
                             sys_dbs = ['information_schema', 'mysql', 'performance_schema', 'sys']
-                            rec_dbs = [d for d in all_dbs if d not in sys_dbs]
+                            # [Fix] 仅展示非系统库，避免误解。information_schema 默认对所有用户可见。
+                            selectable_dbs = [d for d in all_dbs if d not in sys_dbs]
                             
-                            target_dbs = st.multiselect("选择数据库 (可多选)", all_dbs, default=None, placeholder="选择数据库...")
+                            target_dbs = st.multiselect("选择数据库 (可多选)", selectable_dbs, default=None, placeholder="选择数据库...")
+                            st.caption("ℹ️ 注: `information_schema` 对所有用户默认可见，无需单独授权。")
                         
                         with col_act:
                             st.write("") # Spacer
@@ -96,7 +98,11 @@ class DBAdminUI:
                     st.info("未找到用户")
 
             except Exception as e:
-                st.error(f"操作失败 (请检查连接配置): {e}")
+                err_msg = str(e)
+                if "1142" in err_msg or "1045" in err_msg or "denied" in err_msg.lower():
+                    st.error("⚠️ 权限不足：当前配置的账号无法管理用户。请在上方【管理员连接配置】中切换回 Root 或 Admin 账号。")
+                else:
+                    st.error(f"操作失败 (请检查连接配置): {e}")
 
         with tab2:
             st.subheader("创建新用户")
@@ -123,6 +129,26 @@ class DBAdminUI:
             如果连接时报错 `Access denied for user 'user'@'192.168.65.1'`, 说明 MySQL 识别到的来源 IP 是 `192.168.65.1` (通常是 Docker 网关)。
             此时必须确保您创建的用户 Host 为 `%` 或该特定 IP，**不能**是 `localhost`。
             """)
+            
+            st.markdown("---")
+            with st.expander("🧪 验证新用户连接 (独立测试)", expanded=True):
+                t1, t2 = st.columns(2)
+                test_u = t1.text_input("测试用户名", value=new_u if 'new_u' in locals() and new_u else "")
+                test_p = t2.text_input("测试密码", type="password")
+                t3, t4 = st.columns(2)
+                test_h = t3.text_input("测试主机", value=host, disabled=True, help="使用当前配置的主机")
+                test_db = t4.text_input("测试数据库 (可选)", placeholder="例如: students")
+                
+                if st.button("🚀 验证连接"):
+                    if not test_u: st.error("请输入用户名")
+                    else:
+                        try:
+                            import pymysql
+                            t_conn = pymysql.connect(host=host, port=int(port), user=test_u, password=test_p, database=test_db if test_db else None)
+                            t_conn.close()
+                            st.success(f"✅ 连接成功! 用户 '{test_u}' 可以正常访问{' ' + test_db if test_db else ''}。")
+                        except Exception as e:
+                            st.error(f"❌ 连接失败: {e}")
 
         with tab3:
             st.error("⚠️ 危险区域")

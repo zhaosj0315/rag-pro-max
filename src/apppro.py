@@ -1868,20 +1868,20 @@ with st.sidebar:
                             if not saved_conns:
                                 st.info("ℹ️ 暂无可用连接，请在 [👤 我的 -> 🔌 数据连接] 中配置")
                             else:
-                                # --- 第一行：数据源选择 ---
-                                c_conn, c_info = st.columns([2, 1])
-                                selected_alias = c_conn.selectbox("1. 选择数据源连接", list(saved_conns.keys()), key="snap_conn_alias", help="选择已配置的数据库连接")
+                                # --- 紧凑单行布局：源 -> 库 -> 表 ---
+                                c_conn, c_db, c_tbl = st.columns([1.5, 1.5, 3])
                                 
-                                conn_conf = saved_conns[selected_alias]
-                                db_type = conn_conf.get('type', 'MySQL')
+                                # 1. 数据源选择
+                                with c_conn:
+                                    selected_alias = st.selectbox("1. 数据源", list(saved_conns.keys()), key="snap_conn_alias", help="选择已配置的数据库连接")
+                                    conn_conf = saved_conns[selected_alias]
+                                    db_type = conn_conf.get('type', 'MySQL')
+                                    st.caption(f"🔗 {conn_conf.get('host')}")
                                 
-                                with c_info:
-                                    st.markdown(f"<div style='padding-top: 26px; font-size: 0.8rem; color: #666;'>🔗 {conn_conf.get('host')}</div>", unsafe_allow_html=True)
-
                                 if db_type.lower() != 'mysql':
-                                    st.warning(f"⚠️ 快照工具暂仅深度适配 MySQL，当前为 {db_type}，可能存在兼容性问题。")
+                                    st.warning(f"⚠️ 暂仅支持 MySQL (当前: {db_type})")
                                 
-                                # --- 自动连接与层级选择 ---
+                                # 自动连接与级联选择
                                 if selected_alias:
                                     try:
                                         # 初始化管理器
@@ -1892,40 +1892,39 @@ with st.sidebar:
                                             password=conn_conf.get('password', '')
                                         )
                                         
-                                        # --- 第二行：库表选择 (双列布局) ---
-                                        c_db, c_tbl = st.columns(2)
-                                        
-                                        # A. 获取数据库
+                                        # 2. 数据库选择
                                         dbs = mgr.get_databases()
                                         default_db = conn_conf.get('database')
                                         default_idx = dbs.index(default_db) if default_db in dbs else 0
                                         
-                                        sel_db = c_db.selectbox("2. 选择数据库", dbs, index=default_idx, key="snap_sel_db")
+                                        with c_db:
+                                            sel_db = st.selectbox("2. 数据库", dbs, index=default_idx, key="snap_sel_db")
                                         
                                         if sel_db:
-                                            # B. 获取表
+                                            # 3. 表选择
                                             mgr.connect()
                                             with mgr.conn.cursor() as cursor:
                                                 cursor.execute(f"SHOW TABLES FROM `{sel_db}`")
                                                 tables = [list(x.values())[0] for x in cursor.fetchall()]
                                             mgr.close()
                                             
-                                            # 全选辅助
-                                            if "snap_sel_tables" not in st.session_state: st.session_state.snap_sel_tables = []
-                                            
-                                            # 布局优化：全选按钮 (必须在 multiselect 之前渲染以修改 State)
-                                            if c_tbl.button("全选所有表", key="snap_select_all_btn", use_container_width=True):
-                                                st.session_state.snap_sel_tables = tables
-                                                st.rerun()
-                                            
-                                            sel_tables = c_tbl.multiselect("3. 选择数据表 (支持多选)", tables, key="snap_sel_tables")
-                                            
-                                            # --- 第三行：预览与操作 ---
+                                            with c_tbl:
+                                                # 全选辅助 (行内布局)
+                                                if "snap_sel_tables" not in st.session_state: st.session_state.snap_sel_tables = []
+                                                
+                                                # 极简全选按钮
+                                                if st.button("全选", key="snap_select_all_btn", use_container_width=True, help="选中所有表"):
+                                                    st.session_state.snap_sel_tables = tables
+                                                    st.rerun()
+                                                
+                                                sel_tables = st.multiselect("3. 数据表", tables, key="snap_sel_tables", label_visibility="collapsed", placeholder="选择数据表...")
+
+                                            # --- 预览与操作区域 ---
                                             if sel_tables:
-                                                # 预览逻辑：仅当单选时可用
+                                                # 预览逻辑
                                                 if len(sel_tables) == 1:
                                                     target_table = sel_tables[0]
-                                                    with st.expander(f"👁️ 预览表内容: {target_table}", expanded=False):
+                                                    with st.expander(f"👁️ 预览: {target_table} (前5行)", expanded=False):
                                                         try:
                                                             mgr.connect()
                                                             with mgr.conn.cursor() as cursor:
@@ -1941,67 +1940,64 @@ with st.sidebar:
                                                                 st.dataframe(pd.DataFrame(preview_data), use_container_width=True, hide_index=True)
                                                                 st.caption(f"📊 预估行数: {est_rows} 行 | 仅展示前 5 条样本")
                                                             else:
-                                                                st.info("表为空")
+                                                                # [Fix] 表为空时显示结构
+                                                                mgr.connect()
+                                                                with mgr.conn.cursor() as cursor:
+                                                                    cursor.execute(f"SHOW COLUMNS FROM `{sel_db}`.`{target_table}`")
+                                                                    cols = [c['Field'] for c in cursor.fetchall()]
+                                                                mgr.close()
+                                                                st.dataframe(pd.DataFrame(columns=cols), use_container_width=True, hide_index=True)
+                                                                st.info(f"表为空 (暂无数据)，仅显示结构")
+                                                                st.caption(f"📊 预估行数: {est_rows} 行")
                                                         except Exception as e:
-                                                            st.error(f"预览失败: {e}")
-                                                else:
-                                                    st.info(f"📚 已选择 {len(sel_tables)} 张表，批量模式下不支持预览")
-
-                                                st.write("") # Spacer
-                                                
-                                                # 提取按钮
-                                                btn_col, info_col = st.columns([1.5, 2.5])
-                                                with btn_col:
-                                                    if st.button(f"📸 批量提取 ({len(sel_tables)}张)", use_container_width=True, type="primary"):
-                                                        with st.spinner(f"正在批量导出 {len(sel_tables)} 张表..."):
-                                                            try:
-                                                                import pymysql
-                                                                conn = pymysql.connect(
-                                                                    host=conn_conf.get('host'), 
-                                                                    port=int(conn_conf.get('port')), 
-                                                                    user=conn_conf.get('user'), 
-                                                                    password=conn_conf.get('password'), 
-                                                                    database=sel_db
-                                                                )
-                                                                
-                                                                success_count = 0
-                                                                for tbl in sel_tables:
-                                                                    try:
-                                                                        df = pd.read_sql(f"SELECT * FROM `{tbl}`", conn)
-                                                                        
-                                                                        # 保存
-                                                                        safe_name = f"{selected_alias}_{sel_db}_{tbl}_{int(time.time())}.csv"
-                                                                        save_path = os.path.join(st.session_state.task_staging_dir, safe_name)
-                                                                        df.to_csv(save_path, index=False, encoding='utf-8-sig')
-                                                                        success_count += 1
-                                                                    except Exception as inner_e:
-                                                                        st.warning(f"表 {tbl} 提取失败: {inner_e}")
-                                                                
-                                                                conn.close()
-                                                                
-                                                                # 更新路径和统计
-                                                                st.session_state.uploaded_path = st.session_state.task_staging_dir
-                                                                new_count = len([f for f in os.listdir(st.session_state.task_staging_dir) if not f.startswith('.')])
-                                                                update_stats_display(new_count)
-                                                                
-                                                                # 自动命名
-                                                                if not st.session_state.get('upload_auto_name'):
-                                                                    st.session_state.upload_auto_name = f"Snap_{selected_alias}_{sel_db}_Batch"
-                                                                
-                                                                st.toast(f"✅ 成功提取 {success_count} 张表", icon="📦")
-                                                                st.session_state.snap_last_success = f"批量完成 ({success_count})"
-                                                                
-                                                            except Exception as e:
-                                                                st.error(f"提取流程中断: {e}")
-                                                
-                                                with info_col:
-                                                    if st.session_state.get('snap_last_success'):
-                                                        st.success(f"✅ {st.session_state.snap_last_success}")
-                                                    else:
-                                                        st.caption("ℹ️ 数据将批量转换为 CSV 加入上方暂存区。")
+                                                            err_msg = str(e)
+                                                            if "Access denied" in err_msg or "1044" in err_msg:
+                                                                st.error(f"🔒 权限拒绝: 账号 '{conn_conf.get('user')}' 无权读取此表。\n请检查数据库授权。")
+                                                            else:
+                                                                st.error(f"预览失败: {e}")
+                                                    
+                                                    # 提取操作栏 (极简)
+                                                    ex_c1, ex_c2 = st.columns([1.5, 4.5])
+                                                    with ex_c1:
+                                                        if st.button(f"🚀 提取 ({len(sel_tables)})", use_container_width=True, type="primary"):
+                                                            with st.spinner("提取中..."):
+                                                                try:
+                                                                    import pymysql
+                                                                    conn = pymysql.connect(host=conn_conf.get('host'), port=int(conn_conf.get('port')), user=conn_conf.get('user'), password=conn_conf.get('password'), database=sel_db)
+                                                                    success_c = 0
+                                                                    for tbl in sel_tables:
+                                                                        try:
+                                                                            df = pd.read_sql(f"SELECT * FROM `{tbl}`", conn)
+                                                                            safe_name = f"{selected_alias}_{sel_db}_{tbl}_{int(time.time())}.csv"
+                                                                            df.to_csv(os.path.join(st.session_state.task_staging_dir, safe_name), index=False, encoding='utf-8-sig')
+                                                                            success_c += 1
+                                                                        except Exception as inner_e:
+                                                                            if "Access denied" in str(inner_e) or "1044" in str(inner_e):
+                                                                                st.warning(f"⚠️ 跳过表 '{tbl}': 权限不足")
+                                                                            else:
+                                                                                st.warning(f"⚠️ 跳过表 '{tbl}': {inner_e}")
+                                                                    conn.close()
+                                                                    
+                                                                    st.session_state.uploaded_path = st.session_state.task_staging_dir
+                                                                    update_stats_display(len([f for f in os.listdir(st.session_state.task_staging_dir) if not f.startswith('.')]))
+                                                                    
+                                                                    if not st.session_state.get('upload_auto_name'):
+                                                                        st.session_state.upload_auto_name = f"Snap_{sel_db}_Batch"
+                                                                    
+                                                                    logger.info(f"🗄️ [数据库快照] 批量提取完成: 源={selected_alias}, 库={sel_db}, 表数={success_c}, 路径={st.session_state.task_staging_dir}")
+                                                                    st.toast(f"✅ 已提取 {success_c} 张表")
+                                                                    st.rerun()
+                                                                except Exception as e:
+                                                                    err_msg = str(e)
+                                                                    if "Access denied" in err_msg or "1044" in err_msg:
+                                                                        st.error(f"🔒 连接被拒绝: 账号 '{conn_conf.get('user')}' 权限不足。\n请联系管理员检查数据库授权。")
+                                                                    else:
+                                                                        st.error(f"失败: {e}")
+                                                with ex_c2:
+                                                    st.caption("数据将存入暂存区。")
 
                                     except Exception as e:
-                                        st.error(f"连接数据库失败: {e}")
+                                        st.error(f"连接失败: {e}")
                     
     
                         

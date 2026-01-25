@@ -161,7 +161,16 @@ class ConnectionManager:
                 conn.execute(text("SELECT 1"))
             return True, "连接成功"
         except Exception as e:
-            return False, str(e)
+            err_msg = str(e)
+            # 针对 MySQL 常见错误提供友好提示
+            if "1045" in err_msg:
+                return False, f"身份验证失败 (1045): 请检查用户名或密码。\n用户: {config.get('user')}"
+            if "1044" in err_msg:
+                return False, f"无权访问数据库 (1044): 用户 '{config.get('user')}' 连接成功，但无法访问库 '{config.get('database')}'.\n请在 [🗄️ 数据库用户] 中为该用户授予对应数据库的权限。"
+            if "2003" in err_msg or "Can't connect" in err_msg:
+                return False, f"无法连接服务器 (2003): 请检查主机地址 '{config.get('host')}' 和端口 '{config.get('port')}' 是否正确，或防火墙是否放行。"
+            
+            return False, err_msg
 
     def get_database_list(self, alias: str) -> List[str]:
         """[v8.3.1] 获取实例下的所有数据库列表"""
