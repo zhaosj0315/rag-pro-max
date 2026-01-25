@@ -196,6 +196,68 @@ class ConnectionManager:
             print(f"List DB error: {e}")
             return [conns[alias].get('database', 'main')]
 
+    def get_database_info(self, alias: str, db_override: str = None) -> Dict[str, Any]:
+        """[v9.4.0] 获取数据库层面的元数据信息"""
+        info = {
+            "type": "Unknown", "version": "Unknown", "charset": "Unknown",
+            "table_count": 0, "size_mb": "Unknown", "index_count": "Unknown"
+        }
+        try:
+            conns = self.load_connections()
+            if alias not in conns: return info
+            config = conns[alias]
+            info['type'] = config.get('type')
+            
+            url = self.get_connection_url(config, db_override)
+            engine = create_engine(url)
+            from sqlalchemy import inspect, text
+            inspector = inspect(engine)
+            
+            # 1. 表数量
+            try:
+                tables = inspector.get_table_names()
+                info['table_count'] = len(tables)
+            except: tables = []
+            
+            # 2. 版本信息 & 字符集
+            try:
+                with engine.connect() as conn:
+                    # 尝试获取版本
+                    ver = "Unknown"
+                    try:
+                        if config['type'] == 'SQLite':
+                            ver = conn.execute(text("SELECT sqlite_version()")).fetchone()[0]
+                        elif config['type'] == 'SQL Server':
+                            ver = conn.execute(text("SELECT @@VERSION")).fetchone()[0]
+                        elif config['type'] == 'Oracle':
+                            ver = conn.execute(text("SELECT * FROM v$version")).fetchone()[0]
+                        else:
+                            ver = conn.execute(text("SELECT VERSION()")).fetchone()[0]
+                    except: pass
+                    info['version'] = str(ver)[:50] + "..." if len(str(ver)) > 50 else str(ver)
+
+                    # 尝试获取字符集
+                    if config['type'] == 'MySQL':
+                        res = conn.execute(text("SHOW VARIABLES LIKE 'character_set_database'")).fetchone()
+                        if res: info['charset'] = res[1]
+                    elif config['type'] == 'PostgreSQL':
+                        res = conn.execute(text("SHOW server_encoding")).fetchone()
+                        if res: info['charset'] = res[0]
+            except: pass
+            
+            # 3. 索引总数估算 (限制前20张表)
+            try:
+                idx_cnt = 0
+                for t in tables[:20]: 
+                    idx_cnt += len(inspector.get_indexes(t))
+                info['index_count'] = f"{idx_cnt}+" if len(tables)>20 else idx_cnt
+            except: pass
+            
+            return info
+        except Exception as e:
+            print(f"DB Info Error: {e}")
+            return info
+
     def get_table_list(self, alias: str, db_override: str = None) -> List[str]:
         """获取指定连接(及库)的所有表名"""
         try:

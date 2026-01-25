@@ -374,58 +374,103 @@ def render_resource_governance_v19():
                             if conn_manager.delete_connection(alias):
                                 st.toast("已删除"); time.sleep(0.5); st.rerun()
                     
-                    # 预览区域 (v8.6.0 深度透视版)
+                    # 预览区域 (v9.4.0 全新分栏布局 - 数据库全景透视)
                     if show_struct:
                         with st.container(border=True):
-                            st.caption(f"🌐 数据库透视看板: {alias}")
-                            
-                            # Level 1: 数据库选择
+                            # Level 1: 数据库选择 (顶部固定)
                             dbs = conn_manager.get_database_list(alias)
                             current_db = info.get('database', '')
                             default_idx = dbs.index(current_db) if current_db in dbs else 0
-                            sel_db = st.selectbox("选择数据库 (Schema)", dbs, index=default_idx, key=f"sel_db_{alias}")
+                            sel_db = st.selectbox("切换数据库 Schema", dbs, index=default_idx, key=f"sel_db_{alias}")
                             
                             if sel_db:
-                                # Level 2: 表选择
                                 tables = conn_manager.get_table_list(alias, db_override=sel_db)
                                 if not tables:
-                                    st.info(f"数据库 '{sel_db}' 中没有发现可读表")
+                                    st.warning(f"数据库 '{sel_db}' 中没有发现可读表")
                                 else:
-                                    sel_t = st.selectbox(f"选择表 ({len(tables)})", [""] + tables, key=f"sel_t_{alias}")
+                                    st.divider()
+                                    # 布局核心：20% 导航 + 80% 内容
+                                    nav_col, content_col = st.columns([1, 4])
                                     
-                                    # Level 3: 四维全景详情 (v8.6.0)
-                                    if sel_t:
-                                        t_tab1, t_tab2, t_tab3, t_tab4 = st.tabs(["📋 字段结构", "📊 数据采样", "🕸️ 关联血缘", "📈 业务洞察"])
-                                        
-                                        with t_tab1:
-                                            schema_data = conn_manager.get_table_schema(alias, sel_t, db_override=sel_db)
-                                            if schema_data:
-                                                st.dataframe(pd.DataFrame(schema_data), use_container_width=True, hide_index=True)
-                                            else:
-                                                st.info("无法获取表详情")
+                                    with nav_col:
+                                        st.caption(f"**📚 资源导航** ({len(tables)})")
+                                        # 使用 Radio 模拟树形导航，默认选中概览
+                                        nav_options = ["🏠 概览属性"] + [f"📄 {t}" for t in tables]
+                                        selection = st.radio("导航", nav_options, label_visibility="collapsed", key=f"nav_{alias}")
+                                    
+                                    with content_col:
+                                        if selection == "🏠 概览属性":
+                                            # --- 数据库级信息预览 ---
+                                            db_info = conn_manager.get_database_info(alias, db_override=sel_db)
+                                            
+                                            st.markdown(f"#### 🌐 数据库全景: {sel_db}")
+                                            
+                                            # 分类卡片展示
+                                            dt1, dt2 = st.columns(2)
+                                            with dt1:
+                                                with st.container(border=True):
+                                                    st.caption("📝 基础属性")
+                                                    c1, c2 = st.columns(2)
+                                                    c1.metric("数据库类型", db_info['type'])
+                                                    c2.metric("字符集", db_info['charset'])
+                                                    st.caption(f"版本: {db_info['version']}")
+                                            
+                                            with dt2:
+                                                with st.container(border=True):
+                                                    st.caption("📊 规模统计")
+                                                    c1, c2 = st.columns(2)
+                                                    c1.metric("表数量", db_info['table_count'])
+                                                    c2.metric("索引总数", db_info['index_count'])
+                                                    st.caption(f"主机: {info.get('host')}:{info.get('port')}")
+
+                                        else:
+                                            # --- 表级信息预览 ---
+                                            table_name = selection.replace("📄 ", "")
+                                            st.markdown(f"#### 📄 数据表: `{table_name}`")
+                                            
+                                            t_tab1, t_tab2, t_tab3 = st.tabs(["📋 结构定义", "💾 数据预览 (100行)", "🕸️ 关联与洞察"])
+                                            
+                                            with t_tab1:
+                                                # 表结构
+                                                schema_data = conn_manager.get_table_schema(alias, table_name, db_override=sel_db)
+                                                if schema_data:
+                                                    df_schema = pd.DataFrame(schema_data)
+                                                    st.dataframe(
+                                                        df_schema, 
+                                                        use_container_width=True, 
+                                                        hide_index=True,
+                                                        column_config={
+                                                            "主键": st.column_config.TextColumn("PK", width="small"),
+                                                            "允许为空": st.column_config.TextColumn("Null", width="small"),
+                                                            "类型": st.column_config.TextColumn("Type", width="medium"),
+                                                        }
+                                                    )
+                                                else:
+                                                    st.warning("无法获取表结构")
+                                            
+                                            with t_tab2:
+                                                # 数据采样 (Lazy Load)
+                                                sample_data = conn_manager.get_table_sample(alias, table_name, db_override=sel_db, limit=100)
+                                                if sample_data:
+                                                    st.dataframe(pd.DataFrame(sample_data), use_container_width=True, height=400)
+                                                    st.caption(f"共展示 {len(sample_data)} 条样本数据")
+                                                else:
+                                                    st.info("表为空或无法读取数据")
+                                            
+                                            with t_tab3:
+                                                # 业务洞察
+                                                insights = conn_manager.get_table_insights(alias, table_name, db_override=sel_db)
+                                                c1, c2 = st.columns(2)
+                                                c1.metric("预估行数", f"{insights.get('row_count', 0):,}")
+                                                c2.metric("存储引擎", insights.get('engine', 'unknown').upper())
                                                 
-                                        with t_tab2:
-                                            sample_data = conn_manager.get_table_sample(alias, sel_t, db_override=sel_db)
-                                            if sample_data:
-                                                st.dataframe(pd.DataFrame(sample_data), use_container_width=True)
-                                            else:
-                                                st.warning("暂无数据记录")
-
-                                        with t_tab3:
-                                            insights = conn_manager.get_table_insights(alias, sel_t, db_override=sel_db)
-                                            fks = insights.get('foreign_keys', [])
-                                            if fks:
-                                                st.markdown("**🔗 外键关联关系**")
-                                                st.table(pd.DataFrame(fks))
-                                            else:
-                                                st.info("该表未定义显式外键关系")
-
-                                        with t_tab4:
-                                            insights = conn_manager.get_table_insights(alias, sel_t, db_override=sel_db)
-                                            col_i1, col_i2 = st.columns(2)
-                                            col_i1.metric("预估行数", f"{insights.get('row_count', 0):,}")
-                                            col_i2.metric("数据库引擎", insights.get('engine', 'unknown').upper())
-                                            st.caption("💡 此数据由 SQLAlchemy Inspector 实时抓取")
+                                                fks = insights.get('foreign_keys', [])
+                                                if fks:
+                                                    st.divider()
+                                                    st.markdown("**🔗 外键拓扑**")
+                                                    st.dataframe(pd.DataFrame(fks), use_container_width=True, hide_index=True)
+                                                else:
+                                                    st.caption("未检测到显式外键约束")
 
     # --- Tab 5: 行为审计 (全功能回归融合版) ---
     with tab_audit:
