@@ -2122,11 +2122,11 @@ with st.sidebar:
                         st.caption(f"ℹ️ 高负载任务: 预计最大处理 {max_pages} 个页面")
     
                 elif source_mode == "🔌 数据库同步":
-                    # --- 数据库同步模式 (v8.3.0) ---
+                    # --- 数据库同步模式 (v9.4.0 预览一体化版) ---
                     from src.auth.connection_manager import ConnectionManager
+                    import pandas as pd
                     
                     conn_mgr = ConnectionManager()
-                    # [v8.7.1] 修复普通用户可见所有连接的安全漏洞
                     current_user = st.session_state.get('user', 'guest_user')
                     current_role = st.session_state.get('role', 'guest')
                     
@@ -2136,54 +2136,111 @@ with st.sidebar:
                         saved_conns = conn_mgr.get_connections_for_user(current_user)
                     
                     if not saved_conns:
-                        st.warning("⚠️ 尚未配置任何数据库连接。")
+                        st.warning("⚠️ 尚未配置任何数据库连接")
                         if st.button("前往配置", use_container_width=True):
                             st.session_state.admin_active_tab = "🔌 数据源连接"
                             st.session_state.current_nav = "🔐 资源治理"
                             st.rerun()
                     else:
-                        # 1. 选择连接
-                        selected_alias = st.selectbox("选择数据源", list(saved_conns.keys()), key="db_sync_alias")
+                        # --- 1. 上半区：选择与控制 ---
+                        c_conn, c_db = st.columns(2)
+                        selected_alias = c_conn.selectbox("数据源", list(saved_conns.keys()), key="db_sync_alias")
                         
+                        selected_db = None
                         if selected_alias:
-                            # 2. 选择数据库
                             dbs = conn_mgr.get_database_list(selected_alias)
                             default_db = saved_conns[selected_alias].get('database')
                             db_idx = dbs.index(default_db) if default_db in dbs else 0
-                            selected_db = st.selectbox("选择数据库", dbs, index=db_idx, key="db_sync_db")
-                            
-                            # 3. 选择表 (v8.6.3 交互增强版)
+                            selected_db = c_db.selectbox("数据库", dbs, index=db_idx, key="db_sync_db")
+                        
+                        if selected_db:
                             tables = conn_mgr.get_table_list(selected_alias, db_override=selected_db)
                             
                             if not tables:
-                                st.info(f"数据库 '{selected_db}' 中没有发现可读表")
-                                selected_tables = []
+                                st.info(f"数据库 '{selected_db}' 空空如也")
                             else:
-                                # 全选控制
-                                select_all = st.checkbox(f"全选所有表 ({len(tables)})", key="db_sync_select_all")
+                                # 初始化选中状态
+                                if "db_sync_selected" not in st.session_state:
+                                    st.session_state.db_sync_selected = []
                                 
-                                selected_tables = []
-                                # 限高滚动区域 (v8.6.4 智能预览版)
-                                with st.container(height=250, border=True):
-                                    for t in tables:
-                                        col_t1, col_t2 = st.columns([0.8, 0.2])
-                                        with col_t1:
-                                            if st.checkbox(t, value=select_all, key=f"db_sync_chk_{t}"):
-                                                selected_tables.append(t)
-                                        with col_t2:
-                                            # 侧边栏即时预览
-                                            with st.popover("👁️", help=f"预览表 {t} 的数据"):
-                                                import pandas as pd # [v8.6.8] 局部导入加固
-                                                st.caption(f"📊 {t} 数据采样 (前5行)")
-                                                sample = conn_mgr.get_table_sample(selected_alias, t, db_override=selected_db, limit=5)
-                                                if sample:
-                                                    st.dataframe(pd.DataFrame(sample), hide_index=True)
-                                                else:
-                                                    st.info("无法获取预览数据")
+                                # 表选择与预览控制
+                                st.markdown("##### 📋 表选择与预览")
+                                col_sel, col_prev = st.columns([3, 2])
                                 
+                                with col_sel:
+                                    # 多选控件
+                                    selected_tables = st.multiselect(
+                                        "选择要同步的表", 
+                                        tables, 
+                                        default=st.session_state.db_sync_selected,
+                                        key="db_sync_multiselect",
+                                        help="支持搜索，可多选"
+                                    )
+                                    # 同步回 session (双向绑定)
+                                    st.session_state.db_sync_selected = selected_tables
+                                    
+                                    # 快捷操作
+                                    sc1, sc2 = st.columns([1, 1])
+                                    if sc1.button("全选所有", use_container_width=True):
+                                        st.session_state.db_sync_selected = tables
+                                        st.rerun()
+                                    if sc2.button("清空选择", use_container_width=True):
+                                        st.session_state.db_sync_selected = []
+                                        st.rerun()
+
+                                with col_prev:
+                                    # 预览目标选择
+                                    preview_target = st.selectbox(
+                                        "👁️ 预览哪张表?", 
+                                        ["(请选择)"] + tables, 
+                                        key="db_sync_preview_target"
+                                    )
+
+                                # --- 2. 下半区：深度预览 (v9.4.0) ---
+                                if preview_target and preview_target != "(请选择)":
+                                    st.divider()
+                                    p_head, p_btn = st.columns([4, 1])
+                                    p_head.markdown(f"**🧐 深度预览: `{preview_target}`**")
+                                    
+                                    # 快捷勾选
+                                    if preview_target not in selected_tables:
+                                        if p_btn.button("➕ 加入同步", use_container_width=True):
+                                            st.session_state.db_sync_selected.append(preview_target)
+                                            st.rerun()
+                                    else:
+                                        p_btn.success("✅ 已在列表中")
+
+                                    # 三维视图标签页
+                                    pt1, pt2, pt3 = st.tabs(["📋 结构定义", "💾 数据样本 (20行)", "📊 统计概览"])
+                                    
+                                    with pt1:
+                                        schema = conn_mgr.get_table_schema(selected_alias, preview_target, db_override=selected_db)
+                                        if schema:
+                                            st.dataframe(pd.DataFrame(schema), use_container_width=True, hide_index=True)
+                                        else:
+                                            st.warning("无法获取结构")
+                                    
+                                    with pt2:
+                                        sample = conn_mgr.get_table_sample(selected_alias, preview_target, db_override=selected_db, limit=20)
+                                        if sample:
+                                            st.dataframe(pd.DataFrame(sample), use_container_width=True)
+                                        else:
+                                            st.info("暂无数据")
+                                    
+                                    with pt3:
+                                        stats = conn_mgr.get_table_stats(selected_alias, preview_target, db_override=selected_db)
+                                        insights = conn_mgr.get_table_insights(selected_alias, preview_target, db_override=selected_db)
+                                        
+                                        m1, m2, m3 = st.columns(3)
+                                        m1.metric("预估行数", f"{insights.get('row_count', 0):,}")
+                                        m2.metric("物理大小", stats.get('size_mb', 'Unknown'))
+                                        m3.metric("创建时间", stats.get('create_time', 'Unknown')[:10])
+                                
+                                st.divider()
+                                
+                                # 最终确认逻辑
                                 if selected_tables:
-                                    st.caption(f"✅ 已选择 {len(selected_tables)} 张业务表")
-                                    # 物理存储到 session_state 供底部主按钮调用
+                                    st.caption(f"✅ 已就绪: 将同步 **{selected_alias} / {selected_db}** 下的 **{len(selected_tables)}** 张表")
                                     st.session_state.db_sync_pending = {
                                         "alias": selected_alias,
                                         "db": selected_db,
@@ -2191,10 +2248,10 @@ with st.sidebar:
                                         "mode": "SAMPLE" if "采样" in st.session_state.get('db_sync_mode_ui', '推荐') else "SCHEMA_ONLY"
                                     }
                             
-                            # 4. 同步模式 (改为 UI 专用 key)
+                            # 同步模式
                             st.radio("同步策略", ["🧪 结构+采样 (推荐)", "⚡ 仅同步结构"], horizontal=True, key="db_sync_mode_ui")
                             
-                            # [v8.6.9] 数据库模式专用命名种子
+                            # 命名种子
                             if selected_tables:
                                 db_seed = f"DB_{selected_alias}_{selected_db}"
                                 if st.session_state.get('last_db_seed') != db_seed:
