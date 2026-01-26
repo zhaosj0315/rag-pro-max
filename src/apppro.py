@@ -1651,357 +1651,445 @@ with st.sidebar:
                 </style>
                 """, unsafe_allow_html=True)
     
-                # 4x1 水平数据源选择 (v8.1.1：数据分析已深度融入高级选项)
+                # 4x1 水平数据源选择 (v9.5.1 Omni-Ingestion 重构)
                 source_mode = st.radio(
-                    "数据源", 
-                    ["📂 文件上传", "🌐 互联网提取", "🔌 数据库同步"], 
+                    "数据源模式", 
+                    ["⚡ 全源摄入", "🔌 数据库同步"], 
                     horizontal=True,
                     label_visibility="collapsed",
                     key="data_source_selector"
                 )
                 
-                if source_mode == "📂 文件上传":
+                if source_mode == "⚡ 全源摄入":
                     # 权限拦截 (实时校验)
                     from src.auth.permission_manager import permission_manager
                     current_user = st.session_state.get('user', 'guest_user')
                     can_upload = permission_manager.has_permission(current_user, "upload_files")
                     
                     if not can_upload:
-                        st.warning("🔒 权限不足：您当前的角色没有上传文件的权限。")
+                        st.warning("🔒 权限不足：您当前的角色没有数据摄入权限。")
                     
-                    # --- 暂存区统计与管理 ---
+                    # --- 公共暂存状态栏 (置顶) ---
                     if not os.path.exists(st.session_state.task_staging_dir):
                         os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
-                        logger.warning(f"⚠️ 暂存目录丢失，已自动重建: {st.session_state.task_staging_dir}")
                     
                     files_in_staging = os.listdir(st.session_state.task_staging_dir)
                     staging_count = len([f for f in files_in_staging if not f.startswith('.')])
                     
-                    # 状态显示占位符 (避免 Rerun)
                     stat_col1, stat_col2 = st.columns([3, 1])
                     with stat_col1:
                         stats_placeholder = st.empty()
-                        
                         def update_stats_display(count):
-                            tips = "支持格式: PDF, DOCX, TXT, MD, XLSX, CSV, PPTX, JPG, PNG (支持OCR)。建议单文件 < 50MB。支持多源(上传+目录+粘贴)同时叠加。"
                             stats_placeholder.markdown(
-                                f"""<div style='display: flex; align-items: center; gap: 5px; white-space: nowrap;'>
-                                    <span style='font-weight: 600;'>📦 待处理暂存区:</span>
-                                    <code style='background: #f0f2f6; padding: 2px 5px; border-radius: 3px;'>{count}</code>
-                                    <span>个文件</span>
-                                    <span title="{tips}" style="cursor: help; color: #1f77b4; font-size: 1.1rem; padding: 0 8px; font-weight: bold;">❓</span>
-                                </div>""", 
-                                unsafe_allow_html=True
+                                f"""<div style='display: flex; align-items: center; gap: 8px;'>
+                                    <span style='font-weight: 600; color: #1f77b4;'>📦 待处理暂存区:</span>
+                                    <span style='background: #e1f5fe; color: #01579b; padding: 2px 10px; border-radius: 12px; font-weight: bold; font-family: monospace;'>{count}</span>
+                                    <span style='color: #666; font-size: 0.85rem;'>个文件已就绪</span>
+                                </div>""", unsafe_allow_html=True
                             )
-                        
                         update_stats_display(staging_count)
-
                     with stat_col2:
-                        if st.button("🧹 清空暂存", use_container_width=True, help="清空当前已收集的所有材料"):
+                        if st.button("🧹 清空暂存", use_container_width=True, key="clean_staging_omni"):
                             import shutil
                             shutil.rmtree(st.session_state.task_staging_dir)
                             os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
                             st.session_state.uploaded_path = None
-                            update_stats_display(0) # 无感刷新
-    
-                    # 1. 拖拽上传 (一行化)
-                    up_col1, up_col2 = st.columns([0.6, 5.4])
-                    with up_col1:
-                        st.markdown("<div style='margin-top: 8px;'><b>上传:</b></div>", unsafe_allow_html=True)
-                    with up_col2:
+                            st.rerun()
+
+                    # --- 五大源标准 Tabs ---
+                    omni_tabs = st.tabs(["📂 上传文件", "📁 扫描路径", "📝 文本粘贴", "🌐 网页摄入", "🗄️ 数据库快照"])
+                    
+                    # Tab 1: 文件上传
+                    with omni_tabs[0]:
                         uploaded_files = st.file_uploader(
                             "拖入文件", 
                             accept_multiple_files=True, 
                             key="uploader",
                             label_visibility="collapsed",
-                            type=['pdf', 'docx', 'txt', 'md', 'markdown', 'xlsx', 'xls', 'csv', 'pptx', 'jpg', 'png', 'jpeg'],
+                            type=['pdf', 'docx', 'txt', 'md', 'xlsx', 'csv', 'pptx', 'jpg', 'png', 'jpeg'],
                             disabled=not can_upload
                         )
+                        if uploaded_files:
+                            with st.spinner("⚡ 同步中..."):
+                                from src.common.utils import save_uploaded_files
+                                batch_dir = save_uploaded_files(uploaded_files, "temp_uploads")
+                                if batch_dir:
+                                    sync_to_staging(batch_dir, is_file=False, source_label="文件上传")
+                                    st.session_state.uploaded_path = st.session_state.task_staging_dir
+                                    st.toast("✅ 已加入暂存区")
                     
-                    # 即时同步上传的文件
-                    if uploaded_files:
-                        with st.spinner("⚡ 正在搬运至暂存区..."):
-                            from src.common.utils import save_uploaded_files
-                            batch_dir = save_uploaded_files(uploaded_files, "temp_uploads")
-                            if batch_dir:
-                                sync_to_staging(batch_dir, is_file=False, source_label="文件上传")
-                                st.session_state.uploaded_path = st.session_state.task_staging_dir
-                    
-                    # 2. 本地路径 (一行化)
-                    path_label_col, path_input_col, path_btn_col = st.columns([0.6, 4.2, 1.2])
-                    with path_label_col:
-                        st.markdown("<div style='margin-top: 8px;'><b>路径:</b></div>", unsafe_allow_html=True)
-                    with path_input_col:
-                        manual_path = st.text_input(
-                            "本地路径",
-                            placeholder="粘贴本地目录地址...",
-                            key="manual_path_input",
-                            label_visibility="collapsed",
-                            disabled=not can_upload
-                        )
-                    with path_btn_col:
-                        if st.button("➕ 添加", use_container_width=True, disabled=not manual_path, key="add_path_btn_compact"):
+                    # Tab 2: 本地路径
+                    with omni_tabs[1]:
+                        path_c1, path_c2 = st.columns([5, 1])
+                        manual_path = path_c1.text_input("本地路径", placeholder="粘贴本地目录地址...", key="omni_path_input", label_visibility="collapsed")
+                        if path_c2.button("➕ 添加", use_container_width=True, key="omni_path_btn"):
                             if os.path.exists(manual_path):
-                                with st.spinner("正在扫描..."):
-                                    if sync_to_staging(manual_path, is_file=False, source_label="目录添加"):
-                                        st.session_state.uploaded_path = st.session_state.task_staging_dir
-                                        st.toast("✅ 目录内容已成功加入暂存区")
-                                        
-                                        # 更新计数 (无感刷新)
-                                        new_count = len([f for f in os.listdir(st.session_state.task_staging_dir) if not f.startswith('.')])
-                                        update_stats_display(new_count)
-
-                                        # [Fix] 自动生成知识库名称 (防止空名称报错)
-                                        if not st.session_state.get('upload_auto_name'):
-                                            folder_name = os.path.basename(manual_path.rstrip(os.sep))
-                                            st.session_state.upload_auto_name = folder_name
-                            else:
-                                st.error("路径不存在")
-    
-                    # 3. 粘贴文本 (一行化，使用折叠标题作为交互)
-                    paste_label_col, paste_content_col = st.columns([0.6, 5.4])
-                    with paste_label_col:
-                        st.markdown("<div style='margin-top: 5px;'><b>粘贴:</b></div>", unsafe_allow_html=True)
-                    with paste_content_col:
-                        with st.expander("📝 点击此处直接粘贴文本内容", expanded=False):
-                            if not can_upload:
-                                st.warning("🔒 权限不足")
-                            else:
-                                if 'paste_css_injected' not in st.session_state:
-                                    st.markdown("""
-                                    <style>
-                                    .stTextArea textarea {
-                                        border: 2px dashed rgba(49, 51, 63, 0.2) !important;
-                                        background-color: rgba(240, 242, 246, 0.5) !important;
-                                        border-radius: 0.5rem !important;
-                                    }
-                                    </style>
-                                    """, unsafe_allow_html=True)
-                                    st.session_state.paste_css_injected = True
-                                
-                                def auto_save_text():
-                                    content = st.session_state.get('paste_text_display', '')
-                                    if content and content.strip():
-                                        try:
-                                            if "... [文本过长，已截断显示，完整内容已保存] ..." in content:
-                                                full_content = st.session_state.get('paste_text_content', content)
-                                            else:
-                                                full_content = content
-                                            
-                                            if not full_content or not full_content.strip():
-                                                return
-                                                
-                                            # [v8.9.1] 投递到统一暂存区，文件名包含时间戳以支持叠加
-                                            safe_name = f"manual_pasted_{int(time.time())}.txt"
-                                            save_path = os.path.join(st.session_state.task_staging_dir, safe_name)
-                                            
-                                            with open(save_path, 'w', encoding='utf-8') as f:
-                                                f.write(full_content)
-                                            
-                                            logger.info(f"📝 [文本粘贴] 已生成 {safe_name} 并投递至暂存区 (长度: {len(full_content)})")
-                                            st.session_state.uploaded_path = st.session_state.task_staging_dir
-                                            
-                                            preview = "".join(c for c in full_content[:15] if c.isalnum() or c.isspace()).strip()
-                                            st.session_state.upload_auto_name = f"Mixed_{preview}"
-                                            
-                                            st.session_state.text_auto_saved = True
-                                            st.session_state.saved_text_length = len(full_content)
-                                            
-                                        except Exception as e:
-                                            st.error(f"自动保存失败: {e}")
-                                
-                                current_text = st.session_state.get('paste_text_display', '')
-                                display_text = current_text
-                                is_truncated = False
-                                
-                                if current_text:
-                                    st.session_state.paste_text_content = current_text
-                                
-                                if len(current_text) > 100000:
-                                    display_text = current_text[:10000] + "\n\n... [文本过长，已截断显示，完整内容已保存] ..."
-                                    is_truncated = True
-                                
-                                text_input_content = st.text_area(
-                                    "文本内容", 
-                                    value=display_text,
-                                    height=200,
-                                    placeholder="在此粘贴文本，失焦时自动保存...", 
-                                    label_visibility="collapsed",
-                                    key="paste_text_display",
-                                    on_change=auto_save_text
-                                )
-                                
-                                if not is_truncated:
-                                    st.session_state.paste_text_content = text_input_content
-                                
-                                if st.session_state.get('text_auto_saved'):
-                                    saved_length = st.session_state.get('saved_text_length', 0)
-                                    st.success(f"✅ 文本已自动保存 ({saved_length:,} 字符) - {st.session_state.get('upload_auto_name', '')}")
-                                elif current_text:
-                                    char_count = len(current_text)
-                                    if is_truncated:
-                                        st.info(f"📊 大文本 ({char_count:,} 字符) - 前端仅显示前10,000字符，完整内容将自动保存")
-                                    else:
-                                        st.caption(f"📊 字符数: {char_count:,}")
-
-                    # 4. 数据库快照 (独立卡片设计 - v9.5.0 UI重构)
-                    st.markdown("<div style='margin-top: 15px; margin-bottom: 8px; font-size: 0.95rem; font-weight: 600; color: #444;'>🗄️ 数据库快照提取 (Database Snapshot)</div>", unsafe_allow_html=True)
+                                if sync_to_staging(manual_path, is_file=False, source_label="目录添加"):
+                                    st.session_state.uploaded_path = st.session_state.task_staging_dir
+                                    st.rerun()
+                            else: st.error("路径不存在")
                     
-                    with st.container(border=True):
-                        if not can_upload:
-                            st.warning("🔒 权限不足: 无法访问数据库连接")
-                        else:
-                            from src.utils.mysql_manager import MySQLManager
-                            from src.auth.connection_manager import ConnectionManager
-                            import pandas as pd
-                            
-                            # 获取当前用户可用的连接
-                            conn_mgr = ConnectionManager()
-                            current_user = st.session_state.get('user', 'guest_user')
-                            current_role = st.session_state.get('role', 'guest')
-                            
-                            if current_role == 'admin':
-                                saved_conns = conn_mgr.load_connections()
-                            else:
-                                saved_conns = conn_mgr.get_connections_for_user(current_user)
-                            
-                            if not saved_conns:
-                                st.info("ℹ️ 暂无可用连接，请在 [👤 我的 -> 🔌 数据连接] 中配置")
-                            else:
-                                # --- 紧凑单行布局：源 -> 库 -> 表 ---
-                                c_conn, c_db, c_tbl = st.columns([1.5, 1.5, 3])
-                                
-                                # 1. 数据源选择
-                                with c_conn:
-                                    selected_alias = st.selectbox("1. 数据源", list(saved_conns.keys()), key="snap_conn_alias", help="选择已配置的数据库连接")
-                                    conn_conf = saved_conns[selected_alias]
-                                    db_type = conn_conf.get('type', 'MySQL')
-                                    st.caption(f"🔗 {conn_conf.get('host')}")
-                                
-                                if db_type.lower() != 'mysql':
-                                    st.warning(f"⚠️ 暂仅支持 MySQL (当前: {db_type})")
-                                
-                                # 自动连接与级联选择
-                                if selected_alias:
-                                    try:
-                                        # 初始化管理器
-                                        mgr = MySQLManager(
-                                            host=conn_conf.get('host', 'localhost'),
-                                            port=int(conn_conf.get('port', 3306)),
-                                            user=conn_conf.get('user', 'root'),
-                                            password=conn_conf.get('password', '')
-                                        )
-                                        
-                                        # 2. 数据库选择
-                                        dbs = mgr.get_databases()
-                                        default_db = conn_conf.get('database')
-                                        default_idx = dbs.index(default_db) if default_db in dbs else 0
-                                        
-                                        with c_db:
-                                            sel_db = st.selectbox("2. 数据库", dbs, index=default_idx, key="snap_sel_db")
-                                        
-                                        if sel_db:
-                                            # 3. 表选择
-                                            mgr.connect()
-                                            with mgr.conn.cursor() as cursor:
-                                                cursor.execute(f"SHOW TABLES FROM `{sel_db}`")
-                                                tables = [list(x.values())[0] for x in cursor.fetchall()]
-                                            mgr.close()
-                                            
-                                            with c_tbl:
-                                                # 全选辅助 (行内布局)
-                                                if "snap_sel_tables" not in st.session_state: st.session_state.snap_sel_tables = []
-                                                
-                                                # 极简全选按钮
-                                                if st.button("全选", key="snap_select_all_btn", use_container_width=True, help="选中所有表"):
-                                                    st.session_state.snap_sel_tables = tables
-                                                    st.rerun()
-                                                
-                                                sel_tables = st.multiselect("3. 数据表", tables, key="snap_sel_tables", label_visibility="collapsed", placeholder="选择数据表...")
+                    # Tab 3: 文本粘贴
+                    with omni_tabs[2]:
+                        st.session_state.paste_text_display = st.text_area("粘贴文本内容", height=150, placeholder="在此输入或粘贴文本...", label_visibility="collapsed", key="omni_paste_input")
+                        if st.button("📥 确认存入暂存区", use_container_width=True, key="omni_paste_btn"):
+                            content = st.session_state.paste_text_display
+                            if content.strip():
+                                safe_name = f"Pasted_{int(time.time())}.txt"
+                                with open(os.path.join(st.session_state.task_staging_dir, safe_name), 'w', encoding='utf-8') as f:
+                                    f.write(content)
+                                st.session_state.uploaded_path = st.session_state.task_staging_dir
+                                st.rerun()
+                    
+                    # Tab 4: 网页摄入 (Omni-Version: 逻辑原样复用)
+                    with omni_tabs[3]:
+                        # --- 1:1 复制原互联网提取模式的 UI 逻辑 ---
+                        try:
+                            from src.config.unified_sites import get_industry_list
+                            industries = get_industry_list()
+                            with st.expander("⚙️ 行业上下文 (影响搜索结果)", expanded=False):
+                                sel_ind = st.selectbox("行业领域", industries, key="omni_wf_industry_context", label_visibility="collapsed")
+                        except:
+                            sel_ind = "🔧 技术开发"
+                        selected_industry = sel_ind
 
-                                            # --- 预览与操作区域 ---
-                                            if sel_tables:
-                                                # 预览逻辑
-                                                if len(sel_tables) == 1:
-                                                    target_table = sel_tables[0]
-                                                    with st.expander(f"👁️ 预览: {target_table} (前5行)", expanded=False):
-                                                        try:
+                        # 统一输入框与智能识别 (完全保留原版布局)
+                        c_input, c_btn = st.columns([7, 1])
+                        with c_input:
+                            user_input = st.text_input("网址或关键词", placeholder="输入 URL (https://...) 或 搜索关键词", label_visibility="collapsed", key="omni_wf_user_input")
+                        with c_btn:
+                            st.button("🧠", help="AI 智能分析", key="omni_wf_smart_analyze_btn", use_container_width=True)
+
+                        # 智能识别变量 (保持原版命名)
+                        crawl_url = None
+                        search_keyword = None
+                        if user_input:
+                            if user_input.strip().lower().startswith(('http://', 'https://')):
+                                crawl_url = user_input.strip()
+                                st.caption(f"🔗 已识别为网址")
+                            else:
+                                search_keyword = user_input.strip()
+                                st.caption(f"🔍 已识别为搜索关键词")
+
+                        # 统一参数行 (完全保留原版 4列布局)
+                        c_p1, c_p2, c_p3, c_p4 = st.columns(4)
+                        with c_p1:
+                            wf_crawl_depth = st.number_input("递归深度", 1, 10, 2, key="omni_wf_crawl_depth")
+                        with c_p2:
+                            wf_max_pages = st.number_input("最大页数", 1, 1000, 5, key="omni_wf_max_pages")
+                        with c_p3:
+                            wf_parser_type = st.selectbox("解析器", ["default", "article", "documentation"], key="omni_wf_parser_type")
+                        with c_p4:
+                            wf_quality_threshold = st.number_input("质量阈值 (0=关)", 0.0, 100.0, 45.0, 5.0, key="omni_wf_quality_threshold")
+
+                        with st.expander("🚫 排除链接", expanded=False):
+                            wf_exclude_text = st.text_area("每行一个", height=68, placeholder="*/admin/*", key="omni_wf_exclude_patterns")
+                            wf_exclude_patterns = [line.strip() for line in wf_exclude_text.split('\n') if line.strip()] if wf_exclude_text else []
+
+                        # 执行按钮 (逻辑重定向到暂存区，代码保持原样)
+                        if st.button("🚀 立即获取并投递至暂存区", use_container_width=True, type="primary", key="omni_wf_run_main", disabled=not user_input):
+                            status_container = st.status("🕷️ 正在执行全量摄入...", expanded=True)
+                            
+                            def web_log(msg, *args):
+                                status_container.write(msg)
+                                logger.info(f"🌐 [网页摄入] {msg}")
+
+                            try:
+                                target_dir = st.session_state.task_staging_dir
+                                saved_files = []
+                                
+                                if crawl_url:
+                                    # --- 复用原 URL 抓取逻辑逻辑 ---
+                                    from src.processors.enhanced_web_crawler import run_async_crawl
+                                    from urllib.parse import urlparse
+                                    domain = urlparse(crawl_url).netloc.replace('.', '_') or "unknown"
+                                    
+                                    # 执行抓取
+                                    saved_files = run_async_crawl(
+                                        start_url=crawl_url, 
+                                        max_depth=wf_crawl_depth, 
+                                        max_pages=wf_max_pages,
+                                        parser_type=wf_parser_type, 
+                                        output_dir=target_dir, 
+                                        exclude_patterns=wf_exclude_patterns,
+                                        status_callback=web_log
+                                    )
+                                else:
+                                    # --- 复用原智能搜索逻辑 ---
+                                    from src.processors.concurrent_crawler import ConcurrentCrawler
+                                    from urllib.parse import quote
+                                    
+                                    q = quote(search_keyword)
+                                    search_engines = [
+                                        f"https://www.bing.com/search?q={q}", 
+                                        f"https://html.duckduckgo.com/html/?q={q}"
+                                    ]
+                                    
+                                    web_log(f"🔍 启动关键词搜索: {search_keyword}")
+                                    crawler = ConcurrentCrawler(max_workers=3)
+                                    crawl_results = crawler.crawl_with_depth(
+                                        search_engines, 
+                                        max_depth=wf_crawl_depth, 
+                                        max_pages_per_level=wf_max_pages, 
+                                        keyword=search_keyword,
+                                        progress_callback=web_log
+                                    )
+                                    
+                                    for i, result in enumerate(crawl_results):
+                                        if result['success'] and result['content']:
+                                            fname = f"Search_{int(time.time())}_{i}.md"
+                                            fpath = os.path.join(target_dir, fname)
+                                            with open(fpath, 'w', encoding='utf-8') as f:
+                                                f.write(f"**URL:** {result['url']}\n\n# {result['title']}\n\n{result['content']}")
+                                            
+                                            from src.utils.file_system_utils import set_where_from_metadata
+                                            set_where_from_metadata(fpath, result['url'])
+                                            saved_files.append(fpath)
+                                            web_log(f"✅ 已保存: {result['title'][:30]}...")
+
+                                if saved_files:
+                                    st.session_state.uploaded_path = target_dir
+                                    status_container.update(label=f"🎉 摄入完成！共捕获 {len(saved_files)} 个源文件", state="complete", expanded=False)
+                                    st.toast(f"✅ 成功摄入 {len(saved_files)} 个源文件")
+                                    time.sleep(1)
+                                    st.rerun()
+                                else:
+                                    status_container.update(label="❌ 未能抓取到有效内容", state="error", expanded=True)
+                            except Exception as e: 
+                                status_container.update(label=f"❌ 摄入失败: {str(e)}", state="error", expanded=True)
+                                logger.error(f"Web ingestion failed: {e}")
+
+                    # Tab 5: 数据库快照 (Omni-Version: 逻辑 1:1 恢复)
+                    with omni_tabs[4]:
+                        from src.auth.connection_manager import ConnectionManager
+                        from src.utils.mysql_manager import MySQLManager
+                        import pandas as pd
+                        
+                        conn_mgr = ConnectionManager()
+                        curr_user = st.session_state.get('user', 'guest_user')
+                        curr_role = st.session_state.get('role', 'guest')
+                        saved_conns = conn_mgr.load_connections() if curr_role == 'admin' else conn_mgr.get_connections_for_user(curr_user)
+                        
+                        if not saved_conns:
+                            st.info("ℹ️ 暂无可用连接，请在 [👤 我的 -> 🔌 数据连接] 中配置")
+                        else:
+                            # 1:1 还原原版 3列紧凑布局
+                            c_conn, c_db, c_tbl = st.columns([1.5, 1.5, 3])
+                            with c_conn:
+                                selected_alias = st.selectbox("1. 数据源", list(saved_conns.keys()), key="omni_snap_alias")
+                                conn_conf = saved_conns[selected_alias]
+                                st.caption(f"🔗 {conn_conf.get('host')}")
+                            
+                            if conn_conf.get('type', 'MySQL').lower() != 'mysql':
+                                st.warning("⚠️ 暂仅支持 MySQL")
+                            else:
+                                try:
+                                    mgr = MySQLManager(host=conn_conf.get('host'), port=int(conn_conf.get('port', 3306)), user=conn_conf.get('user'), password=conn_conf.get('password', ''))
+                                    dbs = mgr.get_databases()
+                                    default_db = conn_conf.get('database')
+                                    db_idx = dbs.index(default_db) if default_db in dbs else 0
+                                    with c_db:
+                                        sel_db = st.selectbox("2. 数据库", dbs, index=db_idx, key="omni_snap_db")
+                                    
+                                    if sel_db:
+                                        mgr.connect()
+                                        with mgr.conn.cursor() as cursor:
+                                            cursor.execute(f"SHOW TABLES FROM `{sel_db}`")
+                                            tables = [list(x.values())[0] for x in cursor.fetchall()]
+                                        mgr.close()
+                                        
+                                        with c_tbl:
+                                            if st.button("全选", key="omni_snap_select_all", use_container_width=True):
+                                                st.session_state.omni_sel_tables = tables
+                                                st.rerun()
+                                            sel_tables = st.multiselect("3. 数据表", tables, key="omni_sel_tables", label_visibility="collapsed", placeholder="选择数据表...")
+
+                                        # --- 深度预览区域 (1:1 原样复用逻辑) ---
+                                        if sel_tables:
+                                            if len(sel_tables) == 1:
+                                                target_table = sel_tables[0]
+                                                with st.expander(f"👁️ 预览: {target_table} (前5行)", expanded=False):
+                                                    try:
+                                                        mgr.connect()
+                                                        with mgr.conn.cursor() as cursor:
+                                                            cursor.execute(f"SELECT * FROM `{sel_db}`.`{target_table}` LIMIT 5")
+                                                            preview_data = cursor.fetchall()
+                                                            cursor.execute(f"SELECT TABLE_ROWS FROM information_schema.TABLES WHERE TABLE_SCHEMA = '{sel_db}' AND TABLE_NAME = '{target_table}'")
+                                                            count_res = cursor.fetchone()
+                                                            est_rows = count_res['TABLE_ROWS'] if count_res else 'Unknown'
+                                                        mgr.close()
+                                                        if preview_data:
+                                                            st.dataframe(pd.DataFrame(preview_data), use_container_width=True, hide_index=True)
+                                                            st.caption(f"📊 预估行数: {est_rows} 行")
+                                                        else:
                                                             mgr.connect()
                                                             with mgr.conn.cursor() as cursor:
-                                                                cursor.execute(f"SELECT * FROM `{sel_db}`.`{target_table}` LIMIT 5")
-                                                                preview_data = cursor.fetchall()
-                                                                
-                                                                cursor.execute(f"SELECT TABLE_ROWS FROM information_schema.TABLES WHERE TABLE_SCHEMA = '{sel_db}' AND TABLE_NAME = '{target_table}'")
-                                                                count_res = cursor.fetchone()
-                                                                est_rows = count_res['TABLE_ROWS'] if count_res else 'Unknown'
+                                                                cursor.execute(f"SHOW COLUMNS FROM `{sel_db}`.`{target_table}`")
+                                                                cols = [c['Field'] for c in cursor.fetchall()]
                                                             mgr.close()
-                                                            
-                                                            if preview_data:
-                                                                st.dataframe(pd.DataFrame(preview_data), use_container_width=True, hide_index=True)
-                                                                st.caption(f"📊 预估行数: {est_rows} 行 | 仅展示前 5 条样本")
-                                                            else:
-                                                                # [Fix] 表为空时显示结构
-                                                                mgr.connect()
-                                                                with mgr.conn.cursor() as cursor:
-                                                                    cursor.execute(f"SHOW COLUMNS FROM `{sel_db}`.`{target_table}`")
-                                                                    cols = [c['Field'] for c in cursor.fetchall()]
-                                                                mgr.close()
-                                                                st.dataframe(pd.DataFrame(columns=cols), use_container_width=True, hide_index=True)
-                                                                st.info(f"表为空 (暂无数据)，仅显示结构")
-                                                                st.caption(f"📊 预估行数: {est_rows} 行")
-                                                        except Exception as e:
-                                                            err_msg = str(e)
-                                                            if "Access denied" in err_msg or "1044" in err_msg:
-                                                                st.error(f"🔒 权限拒绝: 账号 '{conn_conf.get('user')}' 无权读取此表。\n请检查数据库授权。")
-                                                            else:
-                                                                st.error(f"预览失败: {e}")
-                                                    
-                                                # 提取操作栏 (极简)
-                                                ex_c1, ex_c2 = st.columns([1.5, 4.5])
-                                                with ex_c1:
-                                                    if st.button(f"🚀 提取 ({len(sel_tables)})", use_container_width=True, type="primary"):
-                                                        with st.spinner("提取中..."):
-                                                            try:
-                                                                import pymysql
-                                                                conn = pymysql.connect(host=conn_conf.get('host'), port=int(conn_conf.get('port')), user=conn_conf.get('user'), password=conn_conf.get('password'), database=sel_db)
-                                                                success_c = 0
-                                                                for tbl in sel_tables:
-                                                                    try:
-                                                                        df = pd.read_sql(f"SELECT * FROM `{tbl}`", conn)
-                                                                        safe_name = f"{selected_alias}_{sel_db}_{tbl}_{int(time.time())}.csv"
-                                                                        df.to_csv(os.path.join(st.session_state.task_staging_dir, safe_name), index=False, encoding='utf-8-sig')
-                                                                        success_c += 1
-                                                                    except Exception as inner_e:
-                                                                        if "Access denied" in str(inner_e) or "1044" in str(inner_e):
-                                                                            st.warning(f"⚠️ 跳过表 '{tbl}': 权限不足")
-                                                                        else:
-                                                                            st.warning(f"⚠️ 跳过表 '{tbl}': {inner_e}")
-                                                                conn.close()
-                                                                
-                                                                st.session_state.uploaded_path = st.session_state.task_staging_dir
-                                                                update_stats_display(len([f for f in os.listdir(st.session_state.task_staging_dir) if not f.startswith('.')]))
-                                                                
-                                                                if not st.session_state.get('upload_auto_name'):
-                                                                    st.session_state.upload_auto_name = f"Snap_{sel_db}_Batch"
-                                                                
-                                                                logger.info(f"🗄️ [数据库快照] 批量提取完成: 源={selected_alias}, 库={sel_db}, 表数={success_c}, 路径={st.session_state.task_staging_dir}")
-                                                                st.toast(f"✅ 已提取 {success_c} 张表")
-                                                                st.rerun()
-                                                            except Exception as e:
-                                                                err_msg = str(e)
-                                                                if "Access denied" in err_msg or "1044" in err_msg:
-                                                                    st.error(f"🔒 连接被拒绝: 账号 '{conn_conf.get('user')}' 权限不足。\n请联系管理员检查数据库授权。")
-                                                                else:
-                                                                    st.error(f"失败: {e}")
-                                                with ex_c2:
-                                                    st.caption("数据将存入暂存区。")
+                                                            st.dataframe(pd.DataFrame(columns=cols), use_container_width=True, hide_index=True)
+                                                            st.info(f"表为空，仅显示结构")
+                                                    except Exception as e: st.error(f"预览失败: {e}")
+                                            
+                                            # --- 提取操作 (1:1 还原逻辑) ---
+                                            ex_c1, ex_c2 = st.columns([1.5, 4.5])
+                                            with ex_c1:
+                                                if st.button(f"🚀 提取 ({len(sel_tables)})", use_container_width=True, type="primary", key="omni_snap_run"):
+                                                    with st.spinner("提取中..."):
+                                                        try:
+                                                            import pymysql
+                                                            conn = pymysql.connect(host=conn_conf.get('host'), port=int(conn_conf.get('port')), user=conn_conf.get('user'), password=conn_conf.get('password'), database=sel_db)
+                                                            for tbl in sel_tables:
+                                                                df = pd.read_sql(f"SELECT * FROM `{tbl}`", conn)
+                                                                safe_name = f"{selected_alias}_{sel_db}_{tbl}_{int(time.time())}.csv"
+                                                                df.to_csv(os.path.join(st.session_state.task_staging_dir, safe_name), index=False, encoding='utf-8-sig')
+                                                            conn.close()
+                                                            st.session_state.uploaded_path = st.session_state.task_staging_dir
+                                                            st.toast(f"✅ 已成功提取 {len(sel_tables)} 张表")
+                                                            st.rerun()
+                                                        except Exception as e: st.error(f"失败: {e}")
+                                            with ex_c2: st.caption("数据将存入暂存区。")
+                                except Exception as e: st.error(f"连接失败: {e}")
 
-                                    except Exception as e:
-                                        st.error(f"连接失败: {e}")
+                elif source_mode == "🔌 数据库同步":
+                    # --- 数据库同步模式 (v9.4.0 预览一体化版) ---
+                    from src.auth.connection_manager import ConnectionManager
+                    import pandas as pd
                     
-    
+                    conn_mgr = ConnectionManager()
+                    current_user = st.session_state.get('user', 'guest_user')
+                    current_role = st.session_state.get('role', 'guest')
+                    
+                    if current_role == 'admin':
+                        saved_conns = conn_mgr.load_connections()
+                    else:
+                        saved_conns = conn_mgr.get_connections_for_user(current_user)
+                    
+                    if not saved_conns:
+                        st.warning("⚠️ 尚未配置任何数据库连接")
+                        if st.button("前往配置", use_container_width=True):
+                            st.session_state.admin_active_tab = "🔌 数据源连接"
+                            st.session_state.current_nav = "🔐 资源治理"
+                            st.rerun()
+                    else:
+                        # 初始化变量防止 UnboundLocalError
+                        selected_tables = []
                         
-                        # 不需要手动保存按钮了，失焦自动保存
+                        # --- 1. 上半区：选择与控制 ---
+                        c_conn, c_db = st.columns(2)
+                        selected_alias = c_conn.selectbox("数据源", list(saved_conns.keys()), key="db_sync_alias")
+                        
+                        selected_db = None
+                        if selected_alias:
+                            dbs = conn_mgr.get_database_list(selected_alias)
+                            default_db = saved_conns[selected_alias].get('database')
+                            db_idx = dbs.index(default_db) if default_db in dbs else 0
+                            selected_db = c_db.selectbox("数据库", dbs, index=db_idx, key="db_sync_db")
+                        
+                        if selected_db:
+                            tables = conn_mgr.get_table_list(selected_alias, db_override=selected_db)
+                            
+                            if not tables:
+                                st.info(f"数据库 '{selected_db}' 空空如也")
+                            else:
+                                # 初始化选中状态
+                                if "db_sync_selected" not in st.session_state:
+                                    st.session_state.db_sync_selected = []
+                                
+                                # 表选择与预览控制
+                                st.markdown("##### 📋 表选择与预览")
+                                col_sel, col_prev = st.columns([3, 2])
+                                
+                                with col_sel:
+                                    # 多选控件
+                                    selected_tables = st.multiselect(
+                                        "选择要同步的表", 
+                                        tables, 
+                                        default=st.session_state.db_sync_selected,
+                                        key="db_sync_multiselect",
+                                        help="支持搜索，可多选"
+                                    )
+                                    # 同步回 session (双向绑定)
+                                    st.session_state.db_sync_selected = selected_tables
+                                    
+                                    # 快捷操作
+                                    sc1, sc2 = st.columns([1, 1])
+                                    if sc1.button("全选所有", use_container_width=True):
+                                        st.session_state.db_sync_selected = tables
+                                        st.rerun()
+                                    if sc2.button("清空选择", use_container_width=True):
+                                        st.session_state.db_sync_selected = []
+                                        st.rerun()
+
+                                with col_prev:
+                                    # 预览目标选择
+                                    preview_target = st.selectbox(
+                                        "👁️ 预览哪张表?", 
+                                        ["(请选择)"] + tables, 
+                                        key="db_sync_preview_target"
+                                    )
+
+                                # --- 2. 下半区：深度预览 (v9.4.0) ---
+                                if preview_target and preview_target != "(请选择)":
+                                    st.divider()
+                                    p_head, p_btn = st.columns([4, 1])
+                                    p_head.markdown(f"**🧐 深度预览: `{preview_target}`**")
+                                    
+                                    # 快捷勾选
+                                    if preview_target not in selected_tables:
+                                        if p_btn.button("➕ 加入同步", use_container_width=True):
+                                            st.session_state.db_sync_selected.append(preview_target)
+                                            st.rerun()
+                                    else:
+                                        p_btn.success("✅ 已在列表中")
+
+                                    # 三维视图标签页
+                                    pt1, pt2, pt3 = st.tabs(["📋 结构定义", "💾 数据样本 (20行)", "📊 统计概览"])
+                                    
+                                    with pt1:
+                                        schema = conn_mgr.get_table_schema(selected_alias, preview_target, db_override=selected_db)
+                                        if schema:
+                                            st.dataframe(pd.DataFrame(schema), use_container_width=True, hide_index=True)
+                                        else:
+                                            st.warning("无法获取结构")
+                                    
+                                    with pt2:
+                                        sample = conn_mgr.get_table_sample(selected_alias, preview_target, db_override=selected_db, limit=20)
+                                        if sample:
+                                            st.dataframe(pd.DataFrame(sample), use_container_width=True)
+                                        else:
+                                            st.info("暂无数据")
+                                    
+                                    with pt3:
+                                        stats = conn_mgr.get_table_stats(selected_alias, preview_target, db_override=selected_db)
+                                        insights = conn_mgr.get_table_insights(selected_alias, preview_target, db_override=selected_db)
+                                        
+                                        m1, m2, m3 = st.columns(3)
+                                        m1.metric("预估行数", f"{insights.get('row_count', 0):,}")
+                                        m2.metric("物理大小", stats.get('size_mb', 'Unknown'))
+                                        m3.metric("创建时间", stats.get('create_time', 'Unknown')[:10])
+                                
+                                st.divider()
+                                
+                                # 最终确认逻辑
+                                if selected_tables:
+                                    st.caption(f"✅ 已就绪: 将同步 **{selected_alias} / {selected_db}** 下的 **{len(selected_tables)}** 张表")
+                                    st.session_state.db_sync_pending = {
+                                        "alias": selected_alias,
+                                        "db": selected_db,
+                                        "tables": selected_tables,
+                                        "mode": "SAMPLE" if "采样" in st.session_state.get('db_sync_mode_ui', '推荐') else "SCHEMA_ONLY"
+                                    }
+                            
+                            # 同步模式
+                            st.radio("同步策略", ["🧪 结构+采样 (推荐)", "⚡ 仅同步结构"], horizontal=True, key="db_sync_mode_ui")
+                            
+                            # 命名种子
+                            if selected_tables:
+                                db_seed = f"DB_{selected_alias}_{selected_db}"
+                                if st.session_state.get('last_db_seed') != db_seed:
+                                    st.session_state.upload_auto_name = db_seed
+                                    st.session_state.last_db_seed = db_seed
             elif current_kb_name and current_kb_name != "pure_chat":
                 # 管理模式 - 使用一行化布局 (1x2 紧凑布局)
                 manage_title_col1, manage_title_col2 = st.columns([4, 1])
@@ -2727,6 +2815,10 @@ with st.sidebar:
             st.write("")
 
             btn_label = "🚀 立即创建" if is_create_mode else ("➕ 执行追加" if action_mode=="APPEND" else "🔄 执行覆盖")
+            # [v1.0 Omni-Ingestion] 如果是互联网提取模式，主按钮变更为“抓取”
+            if is_create_mode and source_mode == "🌐 互联网提取":
+                btn_label = "🌐 立即抓取 (Fetch to Staging)"
+            
             btn_start = st.button(btn_label, type="primary", use_container_width=True, key="main_sidebar_start_btn")
             
             # 自动收起侧边栏
@@ -3847,26 +3939,18 @@ if btn_start:
                     }
                     
                     try:
-                        logger.log("网页抓取", "info", f"🚀 正在通过标准逻辑创建知识库: {kb_name}")
-                        # [v5.5.7] 强制锚定路径，确保物理归档生效
+                        logger.log("网页抓取", "info", f"🚀 正在抓取网页内容到暂存区: {target_path}")
+                        # [v1.0 Omni-Ingestion] 仅执行抓取，不自动创建知识库
                         st.session_state.uploaded_path = target_path
                         
-                        process_knowledge_base_logic(
-                            kb_name=kb_name,
-                            action_mode='NEW',
-                            use_ocr=current_use_ocr,
-                            extract_metadata=current_extract_metadata,
-                            generate_summary=current_generate_summary,
-                            force_reindex=current_force_reindex,
-                            owner=st.session_state.get('user', 'admin'),
-                            enable_data_analysis=st.session_state.get('kb_enable_data_analysis', False)
-                        )
+                        # 自动生成名称建议
+                        if not st.session_state.get('upload_auto_name'):
+                            st.session_state.upload_auto_name = f"Web_{domain}"
+                            
+                        # 切换到文件上传模式以便查看和继续操作
+                        st.session_state.data_source_selector = "📂 文件上传"
+                        st.toast("✅ 网页抓取完成并已存入暂存区，已为您切换到文件管理界面")
                         
-                        logger.log("网页抓取", "success", f"✅ 知识库创建并归档成功: {kb_name}")
-                        st.success(f"🎉 网页抓取知识库 '{kb_name}' 创建成功！")
-                        
-                        # 设置标记，防止重复执行
-                        st.session_state.web_crawl_completed = True
                         time.sleep(1); st.rerun()
                         
                     except Exception as e:
@@ -4072,25 +4156,18 @@ if btn_start:
                     }
                     
                     try:
-                        logger.log("智能搜索", "info", f"🚀 正在通过标准逻辑创建知识库: {kb_name}")
-                        # [v5.5.7] 强制锚定搜索路径
+                        logger.log("智能搜索", "info", f"🚀 正在抓取搜索结果到暂存区: {target_path}")
+                        # [v1.0 Omni-Ingestion] 仅执行抓取，不自动创建知识库
                         st.session_state.uploaded_path = target_path
                         
-                        process_knowledge_base_logic(
-                            kb_name=kb_name,
-                            action_mode='NEW',
-                            use_ocr=current_use_ocr,
-                            extract_metadata=current_extract_metadata,
-                            generate_summary=current_generate_summary,
-                            force_reindex=current_force_reindex,
-                            owner=st.session_state.get('user', 'admin'),
-                            enable_data_analysis=st.session_state.get('kb_enable_data_analysis', False)
-                        )
+                        # 自动生成名称建议
+                        if not st.session_state.get('upload_auto_name'):
+                            st.session_state.upload_auto_name = f"Search_{search_keyword.replace(' ', '_')}"
                         
-                        logger.log("智能搜索", "success", f"✅ 知识库创建并归档成功: {kb_name}")
-                        st.success(f"🎉 智能搜索知识库 '{kb_name}' 创建成功！")
+                        # 切换到文件上传模式以便查看和继续操作
+                        st.session_state.data_source_selector = "📂 文件上传"
+                        st.toast("✅ 智能搜索完成并已存入暂存区，已为您切换到文件管理界面")
                         
-                        st.session_state.smart_search_completed = True
                         time.sleep(1); st.rerun()
                     except Exception as e:
                         st.error(f"❌ 知识库创建失败: {str(e)}")

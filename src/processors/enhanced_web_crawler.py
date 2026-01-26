@@ -127,13 +127,25 @@ def run_async_crawl(*args, **kwargs):
     
     try:
         # 尝试获取当前事件循环
-        loop = asyncio.get_event_loop()
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            return asyncio.run(crawler.crawl_async(*args, **kwargs))
+            
         if loop.is_running():
-            # 如果已有事件循环在运行，创建任务
-            return asyncio.create_task(crawler.crawl_async(*args, **kwargs))
+            # 修复：Streamlit 环境下已存在运行中的 loop
+            # 使用 nest_asyncio 允许在现有 loop 中 run_until_complete
+            try:
+                import nest_asyncio
+                nest_asyncio.apply()
+            except ImportError:
+                pass 
+            return loop.run_until_complete(crawler.crawl_async(*args, **kwargs))
         else:
             # 运行新的事件循环
             return loop.run_until_complete(crawler.crawl_async(*args, **kwargs))
-    except RuntimeError:
-        # 没有事件循环，创建新的
-        return asyncio.run(crawler.crawl_async(*args, **kwargs))
+    except Exception as e:
+        import logging
+        logging.error(f"run_async_crawl error: {e}")
+        # 最后的保底：回退到同步爬虫模式
+        return crawler.crawl_sync(*args, **kwargs)
