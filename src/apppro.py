@@ -1671,7 +1671,9 @@ with st.sidebar:
                     files_in_staging = os.listdir(st.session_state.task_staging_dir)
                     staging_count = len([f for f in files_in_staging if not f.startswith('.')])
                     
-                    stat_col1, stat_col2 = st.columns([3, 1])
+                    # [v9.5.3] 优化布局：引入 Popover 查看详情
+                    stat_col1, stat_col_icon, stat_col2 = st.columns([2.5, 0.5, 1])
+                    
                     with stat_col1:
                         stats_placeholder = st.empty()
                         def update_stats_display(count):
@@ -1683,6 +1685,20 @@ with st.sidebar:
                                 </div>""", unsafe_allow_html=True
                             )
                         update_stats_display(staging_count)
+                    
+                    with stat_col_icon:
+                        with st.popover("📂", help="查看暂存区详情"):
+                            st.caption(f"📍 物理路径: `{st.session_state.task_staging_dir}`")
+                            if files_in_staging:
+                                st.divider()
+                                for f in files_in_staging:
+                                    if f.startswith('.'): continue
+                                    fpath = os.path.join(st.session_state.task_staging_dir, f)
+                                    size_str = f"{os.path.getsize(fpath)/1024:.1f} KB" if os.path.exists(fpath) else "Unknown"
+                                    st.text(f"📄 {f} ({size_str})")
+                            else:
+                                st.info("暂存区为空")
+
                     with stat_col2:
                         if st.button("🧹 清空暂存", use_container_width=True, key="clean_staging_omni"):
                             import shutil
