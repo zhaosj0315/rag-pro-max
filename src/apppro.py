@@ -1652,13 +1652,8 @@ with st.sidebar:
                 """, unsafe_allow_html=True)
     
                 # 4x1 水平数据源选择 (v9.5.1 Omni-Ingestion 重构)
-                source_mode = st.radio(
-                    "数据源模式", 
-                    ["⚡ 全源摄入", "🔌 数据库同步"], 
-                    horizontal=True,
-                    label_visibility="collapsed",
-                    key="data_source_selector"
-                )
+                # [v2.5.0] 架构统一：废弃独立的“数据库同步”入口，将其能力完全融合进“全源摄入”的 Tab 5
+                source_mode = "⚡ 全源摄入" 
                 
                 if source_mode == "⚡ 全源摄入":
                     # 权限拦截 (实时校验)
@@ -1859,237 +1854,85 @@ with st.sidebar:
                                 status_container.update(label=f"❌ 摄入失败: {str(e)}", state="error", expanded=True)
                                 logger.error(f"Web ingestion failed: {e}")
 
-                    # Tab 5: 数据库快照 (Omni-Version: 逻辑 1:1 恢复)
+                    # Tab 5: 数据库快照 (Omni-Version: 融合高级版)
                     with omni_tabs[4]:
+                        from src.processors.database_exporter import DatabaseExporter
                         from src.auth.connection_manager import ConnectionManager
-                        from src.utils.mysql_manager import MySQLManager
                         import pandas as pd
                         
                         conn_mgr = ConnectionManager()
                         curr_user = st.session_state.get('user', 'guest_user')
                         curr_role = st.session_state.get('role', 'guest')
+                        
                         saved_conns = conn_mgr.load_connections() if curr_role == 'admin' else conn_mgr.get_connections_for_user(curr_user)
                         
                         if not saved_conns:
                             st.info("ℹ️ 暂无可用连接，请在 [👤 我的 -> 🔌 数据连接] 中配置")
                         else:
-                            # 1:1 还原原版 3列紧凑布局
-                            c_conn, c_db, c_tbl = st.columns([1.5, 1.5, 3])
+                            c_conn, c_db = st.columns([1, 1])
                             with c_conn:
-                                selected_alias = st.selectbox("1. 数据源", list(saved_conns.keys()), key="omni_snap_alias")
+                                selected_alias = st.selectbox("1. 数据源", list(saved_conns.keys()), key="omni_snap_alias_v2")
                                 conn_conf = saved_conns[selected_alias]
-                                st.caption(f"🔗 {conn_conf.get('host')}")
+                                st.caption(f"🔗 {conn_conf.get('host')} ({conn_conf.get('type')})")
                             
-                            if conn_conf.get('type', 'MySQL').lower() != 'mysql':
-                                st.warning("⚠️ 暂仅支持 MySQL")
-                            else:
-                                try:
-                                    mgr = MySQLManager(host=conn_conf.get('host'), port=int(conn_conf.get('port', 3306)), user=conn_conf.get('user'), password=conn_conf.get('password', ''))
-                                    dbs = mgr.get_databases()
-                                    default_db = conn_conf.get('database')
-                                    db_idx = dbs.index(default_db) if default_db in dbs else 0
-                                    with c_db:
-                                        sel_db = st.selectbox("2. 数据库", dbs, index=db_idx, key="omni_snap_db")
-                                    
-                                    if sel_db:
-                                        mgr.connect()
-                                        with mgr.conn.cursor() as cursor:
-                                            cursor.execute(f"SHOW TABLES FROM `{sel_db}`")
-                                            tables = [list(x.values())[0] for x in cursor.fetchall()]
-                                        mgr.close()
-                                        
-                                        with c_tbl:
-                                            if st.button("全选", key="omni_snap_select_all", use_container_width=True):
-                                                st.session_state.omni_sel_tables = tables
-                                                st.rerun()
-                                            sel_tables = st.multiselect("3. 数据表", tables, key="omni_sel_tables", label_visibility="collapsed", placeholder="选择数据表...")
+                            with c_db:
+                                dbs = conn_mgr.get_database_list(selected_alias)
+                                default_db = conn_conf.get('database')
+                                db_idx = dbs.index(default_db) if default_db in dbs else 0
+                                selected_db = st.selectbox("2. 数据库", dbs, index=db_idx, key="omni_snap_db_v2")
 
-                                        # --- 深度预览区域 (1:1 原样复用逻辑) ---
-                                        if sel_tables:
-                                            if len(sel_tables) == 1:
-                                                target_table = sel_tables[0]
-                                                with st.expander(f"👁️ 预览: {target_table} (前5行)", expanded=False):
-                                                    try:
-                                                        mgr.connect()
-                                                        with mgr.conn.cursor() as cursor:
-                                                            cursor.execute(f"SELECT * FROM `{sel_db}`.`{target_table}` LIMIT 5")
-                                                            preview_data = cursor.fetchall()
-                                                            cursor.execute(f"SELECT TABLE_ROWS FROM information_schema.TABLES WHERE TABLE_SCHEMA = '{sel_db}' AND TABLE_NAME = '{target_table}'")
-                                                            count_res = cursor.fetchone()
-                                                            est_rows = count_res['TABLE_ROWS'] if count_res else 'Unknown'
-                                                        mgr.close()
-                                                        if preview_data:
-                                                            st.dataframe(pd.DataFrame(preview_data), use_container_width=True, hide_index=True)
-                                                            st.caption(f"📊 预估行数: {est_rows} 行")
-                                                        else:
-                                                            mgr.connect()
-                                                            with mgr.conn.cursor() as cursor:
-                                                                cursor.execute(f"SHOW COLUMNS FROM `{sel_db}`.`{target_table}`")
-                                                                cols = [c['Field'] for c in cursor.fetchall()]
-                                                            mgr.close()
-                                                            st.dataframe(pd.DataFrame(columns=cols), use_container_width=True, hide_index=True)
-                                                            st.info(f"表为空，仅显示结构")
-                                                    except Exception as e: st.error(f"预览失败: {e}")
-                                            
-                                            # --- 提取操作 (1:1 还原逻辑) ---
-                                            ex_c1, ex_c2 = st.columns([1.5, 4.5])
-                                            with ex_c1:
-                                                if st.button(f"🚀 提取 ({len(sel_tables)})", use_container_width=True, type="primary", key="omni_snap_run"):
-                                                    with st.spinner("提取中..."):
-                                                        try:
-                                                            import pymysql
-                                                            conn = pymysql.connect(host=conn_conf.get('host'), port=int(conn_conf.get('port')), user=conn_conf.get('user'), password=conn_conf.get('password'), database=sel_db)
-                                                            for tbl in sel_tables:
-                                                                df = pd.read_sql(f"SELECT * FROM `{tbl}`", conn)
-                                                                safe_name = f"{selected_alias}_{sel_db}_{tbl}_{int(time.time())}.csv"
-                                                                df.to_csv(os.path.join(st.session_state.task_staging_dir, safe_name), index=False, encoding='utf-8-sig')
-                                                            conn.close()
-                                                            st.session_state.uploaded_path = st.session_state.task_staging_dir
-                                                            st.toast(f"✅ 已成功提取 {len(sel_tables)} 张表")
-                                                            st.rerun()
-                                                        except Exception as e: st.error(f"失败: {e}")
-                                            with ex_c2: st.caption("数据将存入暂存区。")
-                                except Exception as e: st.error(f"连接失败: {e}")
-
-                elif source_mode == "🔌 数据库同步":
-                    # --- 数据库同步模式 (v9.4.0 预览一体化版) ---
-                    from src.auth.connection_manager import ConnectionManager
-                    import pandas as pd
-                    
-                    conn_mgr = ConnectionManager()
-                    current_user = st.session_state.get('user', 'guest_user')
-                    current_role = st.session_state.get('role', 'guest')
-                    
-                    if current_role == 'admin':
-                        saved_conns = conn_mgr.load_connections()
-                    else:
-                        saved_conns = conn_mgr.get_connections_for_user(current_user)
-                    
-                    if not saved_conns:
-                        st.warning("⚠️ 尚未配置任何数据库连接")
-                        if st.button("前往配置", use_container_width=True):
-                            st.session_state.admin_active_tab = "🔌 数据源连接"
-                            st.session_state.current_nav = "🔐 资源治理"
-                            st.rerun()
-                    else:
-                        # 初始化变量防止 UnboundLocalError
-                        selected_tables = []
-                        
-                        # --- 1. 上半区：选择与控制 ---
-                        c_conn, c_db = st.columns(2)
-                        selected_alias = c_conn.selectbox("数据源", list(saved_conns.keys()), key="db_sync_alias")
-                        
-                        selected_db = None
-                        if selected_alias:
-                            dbs = conn_mgr.get_database_list(selected_alias)
-                            default_db = saved_conns[selected_alias].get('database')
-                            db_idx = dbs.index(default_db) if default_db in dbs else 0
-                            selected_db = c_db.selectbox("数据库", dbs, index=db_idx, key="db_sync_db")
-                        
-                        if selected_db:
-                            tables = conn_mgr.get_table_list(selected_alias, db_override=selected_db)
-                            
-                            if not tables:
-                                st.info(f"数据库 '{selected_db}' 空空如也")
-                            else:
-                                # 初始化选中状态
-                                if "db_sync_selected" not in st.session_state:
-                                    st.session_state.db_sync_selected = []
-                                
-                                # 表选择与预览控制
-                                st.markdown("##### 📋 表选择与预览")
-                                col_sel, col_prev = st.columns([3, 2])
-                                
-                                with col_sel:
-                                    # 多选控件
-                                    selected_tables = st.multiselect(
-                                        "选择要同步的表", 
-                                        tables, 
-                                        default=st.session_state.db_sync_selected,
-                                        key="db_sync_multiselect",
-                                        help="支持搜索，可多选"
-                                    )
-                                    # 同步回 session (双向绑定)
-                                    st.session_state.db_sync_selected = selected_tables
-                                    
-                                    # 快捷操作
-                                    sc1, sc2 = st.columns([1, 1])
-                                    if sc1.button("全选所有", use_container_width=True):
-                                        st.session_state.db_sync_selected = tables
-                                        st.rerun()
-                                    if sc2.button("清空选择", use_container_width=True):
-                                        st.session_state.db_sync_selected = []
-                                        st.rerun()
-
-                                with col_prev:
-                                    # 预览目标选择
-                                    preview_target = st.selectbox(
-                                        "👁️ 预览哪张表?", 
-                                        ["(请选择)"] + tables, 
-                                        key="db_sync_preview_target"
-                                    )
-
-                                # --- 2. 下半区：深度预览 (v9.4.0) ---
-                                if preview_target and preview_target != "(请选择)":
-                                    st.divider()
-                                    p_head, p_btn = st.columns([4, 1])
-                                    p_head.markdown(f"**🧐 深度预览: `{preview_target}`**")
-                                    
-                                    # 快捷勾选
-                                    if preview_target not in selected_tables:
-                                        if p_btn.button("➕ 加入同步", use_container_width=True):
-                                            st.session_state.db_sync_selected.append(preview_target)
-                                            st.rerun()
-                                    else:
-                                        p_btn.success("✅ 已在列表中")
-
-                                    # 三维视图标签页
-                                    pt1, pt2, pt3 = st.tabs(["📋 结构定义", "💾 数据样本 (20行)", "📊 统计概览"])
-                                    
-                                    with pt1:
-                                        schema = conn_mgr.get_table_schema(selected_alias, preview_target, db_override=selected_db)
-                                        if schema:
-                                            st.dataframe(pd.DataFrame(schema), use_container_width=True, hide_index=True)
-                                        else:
-                                            st.warning("无法获取结构")
-                                    
-                                    with pt2:
-                                        sample = conn_mgr.get_table_sample(selected_alias, preview_target, db_override=selected_db, limit=20)
-                                        if sample:
-                                            st.dataframe(pd.DataFrame(sample), use_container_width=True)
-                                        else:
-                                            st.info("暂无数据")
-                                    
-                                    with pt3:
-                                        stats = conn_mgr.get_table_stats(selected_alias, preview_target, db_override=selected_db)
-                                        insights = conn_mgr.get_table_insights(selected_alias, preview_target, db_override=selected_db)
-                                        
-                                        m1, m2, m3 = st.columns(3)
-                                        m1.metric("预估行数", f"{insights.get('row_count', 0):,}")
-                                        m2.metric("物理大小", stats.get('size_mb', 'Unknown'))
-                                        m3.metric("创建时间", stats.get('create_time', 'Unknown')[:10])
-                                
+                            if selected_db:
                                 st.divider()
+                                snap_mode = st.radio("快照模式", ["📋 数据表选择", "📝 自定义 SQL"], horizontal=True, label_visibility="collapsed", key="omni_snap_mode_radio")
                                 
-                                # 最终确认逻辑
-                                if selected_tables:
-                                    st.caption(f"✅ 已就绪: 将同步 **{selected_alias} / {selected_db}** 下的 **{len(selected_tables)}** 张表")
-                                    st.session_state.db_sync_pending = {
-                                        "alias": selected_alias,
-                                        "db": selected_db,
-                                        "tables": selected_tables,
-                                        "mode": "SAMPLE" if "采样" in st.session_state.get('db_sync_mode_ui', '推荐') else "SCHEMA_ONLY"
-                                    }
-                            
-                            # 同步模式
-                            st.radio("同步策略", ["🧪 结构+采样 (推荐)", "⚡ 仅同步结构"], horizontal=True, key="db_sync_mode_ui")
-                            
-                            # 命名种子
-                            if selected_tables:
-                                db_seed = f"DB_{selected_alias}_{selected_db}"
-                                if st.session_state.get('last_db_seed') != db_seed:
-                                    st.session_state.upload_auto_name = db_seed
-                                    st.session_state.last_db_seed = db_seed
+                                exporter = DatabaseExporter(st.session_state.task_staging_dir)
+                                
+                                if snap_mode == "📋 数据表选择":
+                                    tables = conn_mgr.get_table_list(selected_alias, db_override=selected_db)
+                                    if not tables:
+                                        st.warning("📭 该库为空")
+                                    else:
+                                        col_list, col_action = st.columns([3, 1])
+                                        with col_list:
+                                            sel_tables = st.multiselect("选择数据表", tables, key="omni_snap_tables_v2", placeholder="选择要导出快照的表...")
+                                        with col_action:
+                                            if st.button("🚀 生成快照", type="primary", use_container_width=True, disabled=not sel_tables, key="omni_snap_btn_table"):
+                                                status = st.status("📸 正在生成数据库快照...", expanded=True)
+                                                try:
+                                                    for t in sel_tables:
+                                                        status.write(f"正在导出: {t}...")
+                                                        exporter.export(selected_alias, selected_db, table_name=t)
+                                                    status.update(label="✅ 快照生成完毕", state="complete", expanded=False)
+                                                    st.session_state.uploaded_path = st.session_state.task_staging_dir
+                                                    st.toast(f"✅ 已导出 {len(sel_tables)} 张表")
+                                                    time.sleep(1)
+                                                    st.rerun()
+                                                except Exception as e:
+                                                    status.update(label="❌ 导出失败", state="error")
+                                                    st.error(f"失败: {e}")
+
+                                elif snap_mode == "📝 自定义 SQL":
+                                    sql_input = st.text_area("SQL 查询语句", height=150, placeholder="SELECT * FROM orders WHERE created_at > '2025-01-01'...", key="omni_snap_sql_v2")
+                                    filename_hint = st.text_input("文件命名标识 (可选)", placeholder="例如: 2025_Q1_Sales", key="omni_snap_hint_v2")
+                                    
+                                    if st.button("🚀 执行并生成快照", type="primary", key="omni_snap_sql_run"):
+                                        if not sql_input.strip():
+                                            st.error("请输入 SQL")
+                                        else:
+                                            with st.spinner("⏳ 查询并导出中..."):
+                                                try:
+                                                    final_name = None
+                                                    if filename_hint.strip():
+                                                        timestamp = int(time.time())
+                                                        final_name = f"[SQL]{filename_hint}_{timestamp}.csv"
+                                                    
+                                                    fpath = exporter.export(selected_alias, selected_db, sql_query=sql_input, output_filename=final_name)
+                                                    st.success(f"✅ 已导出: {os.path.basename(fpath)}")
+                                                    st.session_state.uploaded_path = st.session_state.task_staging_dir
+                                                    time.sleep(1)
+                                                    st.rerun()
+                                                except Exception as e:
+                                                    st.error(f"执行失败: {e}")
             elif current_kb_name and current_kb_name != "pure_chat":
                 # 管理模式 - 使用一行化布局 (1x2 紧凑布局)
                 manage_title_col1, manage_title_col2 = st.columns([4, 1])
