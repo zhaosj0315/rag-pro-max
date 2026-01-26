@@ -3799,7 +3799,8 @@ if btn_start:
     elif search_keyword:
         auto_detected_mode = 'search'
     
-    is_web_crawl_mode = (is_create_mode and auto_detected_mode is not None and source_mode == "🌐 互联网提取")
+    # [v1.1 Omni-Ingestion] 兼容新旧模式名称
+    is_web_crawl_mode = (is_create_mode and auto_detected_mode is not None and source_mode in ["🌐 互联网提取", "⚡ 全源摄入"])
     
     if is_web_crawl_mode:
         current_mode = auto_detected_mode
@@ -4303,11 +4304,12 @@ if btn_start:
                 if not final_kb_name.startswith(f"{current_user}_"):
                     final_kb_name = f"{current_user}_{final_kb_name}"
             
-            # --- [v8.9.1] 最终路径锚定逻辑 (AND 模式核心) ---
-            if is_create_mode and source_mode == "📂 文件上传":
-                # 在创建模式下，强制使用我们累加好的暂存文件夹
-                st.session_state.uploaded_path = st.session_state.task_staging_dir
-                logger.info(f"📦 [AND模式] 统一暂存区路径已锚定: {st.session_state.uploaded_path}")
+            # --- [v1.1 Omni-Ingestion] 最终路径锚定逻辑 (全量识别核心) ---
+            if is_create_mode and source_mode in ["📂 文件上传", "⚡ 全源摄入"]:
+                # 在创建模式下，只要是全源摄入，强制使用物理暂存文件夹
+                if os.path.exists(st.session_state.task_staging_dir):
+                    st.session_state.uploaded_path = st.session_state.task_staging_dir
+                    logger.info(f"📦 [Omni-Ingestion] 已强制锚定物理暂存区: {st.session_state.uploaded_path}")
             elif 'uploaded_files' in locals() and uploaded_files and not st.session_state.get('uploaded_path'):
                 # 兜底逻辑：如果是追加模式且只有上传文件
                 from src.common.utils import save_uploaded_files
