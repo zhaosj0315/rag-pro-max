@@ -1731,11 +1731,7 @@ with st.sidebar:
                     
                     with stat_col_icon:
                         with st.popover("📂", help="查看暂存区详情"):
-                            # [v9.5.13] UI 优化：固定标题，内容限高滚动
-                            st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-                            st.markdown("#### 📦 暂存区资产清单")
-                            st.caption(f"📍 物理路径: `{st.session_state.task_staging_dir}`")
-                            
+                            # [v9.5.21] UI 结构加固：全内容包装在限高滚动容器内
                             if files_in_staging:
                                 # [v9.5.9] 深度分类与追踪展现
                                 grouped_files = {} # {source_label: [file_info, ...]}
@@ -1755,7 +1751,6 @@ with st.sidebar:
                                                     if line.startswith("Source:"):
                                                         source_label = line.split(":", 1)[1].strip()
                                                     elif line.startswith("SyncTime:"):
-                                                        # 仅保留 时:分
                                                         sync_time = line.split(":", 1)[1].strip()[11:16]
                                         except: pass
                                     else:
@@ -1776,10 +1771,15 @@ with st.sidebar:
                                         "time": sync_time
                                     })
 
-                                # [v9.5.13] 使用 HTML 构建滚动容器，解决内容溢出顶部问题
-                                list_html = "<div style='max-height: 380px; overflow-y: auto; padding-right: 10px; border-top: 1px solid #eee; margin-top: 5px;'>"
+                                # 构建全量内容 HTML
+                                full_html = f"""
+                                <div style='max-height: 450px; overflow-y: auto; overflow-x: hidden; padding-right: 5px;'>
+                                    <h4 style='margin-bottom: 5px;'>📦 暂存区资产清单</h4>
+                                    <div style='font-size: 0.8rem; color: #666; margin-bottom: 10px;'>📍 物理路径: <code>{st.session_state.task_staging_dir}</code></div>
+                                    <div style='border-top: 1px solid #eee; padding-top: 5px;'>
+                                """
+                                
                                 for label, files in grouped_files.items():
-                                    # 匹配图标
                                     icon = "📄"
                                     if "数据库" in label or "SQL" in label: icon = "🗄️"
                                     elif "网页" in label: icon = "🌐"
@@ -1788,19 +1788,20 @@ with st.sidebar:
                                     elif "上传" in label: icon = "📤"
                                     elif "目录" in label: icon = "📁"
                                     
-                                    list_html += f"<div style='font-weight: bold; margin-top: 12px; margin-bottom: 6px; font-size: 0.9rem;'>{icon} {label} ({len(files)})</div>"
+                                    full_html += f"<div style='font-weight: bold; margin-top: 12px; margin-bottom: 4px; font-size: 0.85rem; color: #1f77b4;'>{icon} {label} ({len(files)})</div>"
                                     
                                     for item in files:
-                                        list_html += (
+                                        full_html += (
                                             f"<div style='font-size: 0.75rem; margin-left: 10px; border-left: 2px solid #f0f2f6; "
-                                            f"padding-left: 8px; color: #555; white-space: nowrap; overflow: hidden; "
-                                            f"text-overflow: ellipsis; line-height: 1.8;'>"
+                                            f"padding-left: 8px; color: #555; word-break: break-all; "
+                                            f"line-height: 1.6; margin-bottom: 2px;'>"
                                             f"▫️ {item['name']} <span style='color: #bbb;'>({item['size']} | {item['time']})</span>"
                                             f"</div>"
                                         )
-                                list_html += "</div>"
-                                st.markdown(list_html, unsafe_allow_html=True)
+                                full_html += "</div></div>"
+                                st.markdown(full_html, unsafe_allow_html=True)
                             else:
+                                st.markdown("#### 📦 暂存区资产清单")
                                 st.info("暂存区为空")
 
                     with stat_col_open:
@@ -1957,23 +1958,71 @@ with st.sidebar:
 
                         # 执行按钮 (逻辑重定向到暂存区，代码保持原样)
                         if st.button("🚀 立即获取并投递至暂存区", use_container_width=True, type="primary", key="omni_wf_run_main", disabled=not user_input):
+                            # [v9.5.35] 强制重载核心爬虫模块，解决缓存失效问题
+                            try:
+                                import importlib
+                                import src.processors.concurrent_crawler
+                                importlib.reload(src.processors.concurrent_crawler)
+                                st.toast("📡 爬虫引擎热重载成功")
+                            except: pass
+
                             status_container = st.status("🕷️ 正在执行全量摄入...", expanded=True)
                             
                             def web_log(msg, *args):
                                 status_container.write(msg)
                                 logger.info(f"🌐 [网页摄入] {msg}")
 
+                            # [v9.5.36] 暴力探测函数：物理下沉至主文件，绕过模块缓存
+                            def discovery_links_violently(urls, keyword):
+                                import requests
+                                import re
+                                from bs4 import BeautifulSoup
+                                from urllib.parse import urljoin, urlparse
+                                
+                                all_initial_links = []
+                                headers = {
+                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                                }
+                                
+                                for u in urls:
+                                    try:
+                                        web_log(f"🕵️ 正在暴力探测: {u[:60]}...")
+                                        resp = requests.get(u, headers=headers, timeout=15)
+                                        if resp.status_code == 200:
+                                            html_text = resp.text
+                                            # 1. 正则暴力提取 (最高优先级)
+                                            raw_http_links = re.findall(r'https?://[^\s"\'<>)]+', html_text)
+                                            # 2. BeautifulSoup 补充
+                                            soup = BeautifulSoup(resp.content, 'html.parser')
+                                            bs_links = [urljoin(u, a['href']) for a in soup.find_all('a', href=True)]
+                                            
+                                            combined = list(set(raw_http_links + bs_links))
+                                            web_log(f"   📊 原始链接数: {len(combined)}")
+                                            
+                                            # 过滤
+                                            base_domain = urlparse(u).netloc.lower()
+                                            for link in combined:
+                                                parsed_link = urlparse(link)
+                                                # 允许跳转链接 (bing.com/ck, ddg.com/l)
+                                                if "bing.com/ck/a" in link.lower() or "duckduckgo.com/l/" in link.lower():
+                                                    all_initial_links.append(link)
+                                                # 允许非搜索域名的链接
+                                                elif parsed_link.netloc and parsed_link.netloc.lower() != base_domain:
+                                                    if not any(x in link.lower() for x in ['microsoft.com', 'google.com', 'apple.com']):
+                                                        all_initial_links.append(link)
+                                    except Exception as e:
+                                        web_log(f"   ⚠️ 探测异常: {e}")
+                                
+                                return list(set(all_initial_links))
+
                             try:
                                 target_dir = st.session_state.task_staging_dir
                                 saved_files = []
                                 
                                 if crawl_url:
-                                    # --- 复用原 URL 抓取逻辑逻辑 ---
+                                    # --- 原 URL 抓取逻辑 ---
                                     from src.processors.enhanced_web_crawler import run_async_crawl
-                                    from urllib.parse import urlparse
-                                    domain = urlparse(crawl_url).netloc.replace('.', '_') or "unknown"
-                                    
-                                    # 执行抓取
                                     saved_files = run_async_crawl(
                                         start_url=crawl_url, 
                                         max_depth=wf_crawl_depth, 
@@ -1984,7 +2033,7 @@ with st.sidebar:
                                         status_callback=web_log
                                     )
                                 else:
-                                    # --- 复用原智能搜索逻辑 ---
+                                    # --- [v9.5.36] 物理重构的智能搜索逻辑 ---
                                     from src.processors.concurrent_crawler import ConcurrentCrawler
                                     from urllib.parse import quote
                                     
@@ -1995,32 +2044,55 @@ with st.sidebar:
                                     ]
                                     
                                     web_log(f"🔍 启动关键词搜索: {search_keyword}")
-                                    crawler = ConcurrentCrawler(max_workers=3)
-                                    crawl_results = crawler.crawl_with_depth(
-                                        search_engines, 
-                                        max_depth=wf_crawl_depth, 
-                                        max_pages_per_level=wf_max_pages, 
-                                        keyword=search_keyword,
-                                        progress_callback=web_log
-                                    )
                                     
-                                    for i, result in enumerate(crawl_results):
-                                        if result['success'] and result['content']:
+                                    # [Step 0] 暴力探测初始链接
+                                    initial_docs = discovery_links_violently(search_engines, search_keyword)
+                                    
+                                    if not initial_docs:
+                                        web_log("❌ [L0] 未能探测到任何有效初始链接，任务中止")
+                                    else:
+                                        web_log(f"✅ [L0] 探测完成，锁定 {len(initial_docs)} 个高价值目标")
+                                        
+                                        # [Step 1+] 进入深度抓取环节
+                                        crawler = ConcurrentCrawler(max_workers=3)
+                                        crawl_results = crawler.crawl_with_depth(
+                                            initial_docs, 
+                                            max_depth=wf_crawl_depth - 1 if wf_crawl_depth > 1 else 1, 
+                                            max_pages_per_level=wf_max_pages, 
+                                            keyword=None, # [v9.5.37] 强制设为 None，防止内部再次触发不稳定的搜索引擎探测逻辑
+                                            progress_callback=web_log
+                                        )
+                                        
+                                        # [v9.5.31] 物理路径自愈
+                                        if not os.path.exists(target_dir):
+                                            os.makedirs(target_dir, exist_ok=True)
+
+                                        # 保存结果
+                                        for i, result in enumerate(crawl_results):
+                                            if not result.get('success') or not result.get('content') or len(result.get('content', '')) < 100:
+                                                continue
+                                            
+                                            # 过滤列表
+                                            blacklist = ['bing.com', 'duckduckgo.com', 'google.com', 'baidu.com', 'zhihu.com/search']
+                                            if any(domain in result.get('url', '').lower() for domain in blacklist):
+                                                continue
+                                                    
                                             fname = f"Search_{int(time.time())}_{i}.md"
                                             fpath = os.path.join(target_dir, fname)
-                                            with open(fpath, 'w', encoding='utf-8') as f:
-                                                f.write(f"**URL:** {result['url']}\n\n# {result['title']}\n\n{result['content']}")
                                             
-                                            # [v9.5.6] 写入元数据方便审计
-                                            with open(fpath + ".meta", "w", encoding="utf-8") as meta_f:
-                                                meta_f.write(f"Source: 智能搜索\n")
-                                                meta_f.write(f"URL: {result['url']}\n")
-                                                meta_f.write(f"SyncTime: {datetime.now().isoformat()}\n")
-                                            
-                                            from src.utils.file_system_utils import set_where_from_metadata
-                                            set_where_from_metadata(fpath, result['url'])
-                                            saved_files.append(fpath)
-                                            web_log(f"✅ 已保存: {result['title'][:30]}...")
+                                            try:
+                                                with open(fpath, 'w', encoding='utf-8') as f:
+                                                    f.write(f"**URL:** {result['url']}\n\n# {result.get('title', '无标题')}\n\n{result['content']}")
+                                                
+                                                if os.path.exists(fpath):
+                                                    with open(fpath + ".meta", "w", encoding="utf-8") as meta_f:
+                                                        meta_f.write(f"Source: 智能搜索\nSyncTime: {datetime.now().isoformat()}\n")
+                                                    
+                                                    from src.utils.file_system_utils import set_where_from_metadata
+                                                    set_where_from_metadata(fpath, result['url'])
+                                                    saved_files.append(fpath)
+                                                    web_log(f"✅ 已存入: {result.get('title', '未知')[:25]}...")
+                                            except: pass
 
                                 if saved_files:
                                     # [v9.5.8] 终端过程追踪报告
