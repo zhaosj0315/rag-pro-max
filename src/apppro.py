@@ -1571,7 +1571,7 @@ with st.sidebar:
         def render_data_source_config():
             # 引入依赖防止 UnboundLocalError
             from src.processors.upload_handler import UploadHandler
-            from src.utils.kb_utils import generate_smart_kb_name
+            from src.utils.kb_name_optimizer import KBNameOptimizer
 
             # 初始化本地变量
             uploaded_files = None
@@ -1593,13 +1593,9 @@ with st.sidebar:
                         if staging_dir and os.path.exists(staging_dir):
                             files = [f for f in os.listdir(staging_dir) if not f.startswith('.') and not f.endswith('.meta')]
                             if files:
-                                from src.utils.kb_utils import generate_smart_kb_name
-                                # 计算文件类型分布
-                                file_types = {}
-                                for f in files:
-                                    ext = os.path.splitext(f)[1].lower()
-                                    file_types[ext] = file_types.get(ext, 0) + 1
-                                suggested = generate_smart_kb_name(staging_dir, len(files), file_types, os.path.basename(staging_dir))
+                                from src.utils.kb_name_optimizer import KBNameOptimizer
+                                # 使用自动检测模式，根据暂存区内容智能判断来源类型
+                                suggested = KBNameOptimizer.smart_generate(staging_dir, "auto", "")
                                 if suggested:
                                     st.session_state.upload_auto_name = suggested
 
@@ -2060,8 +2056,8 @@ with st.sidebar:
                                     else:
                                         web_log(f"✅ [L0] 探测完成，锁定 {len(initial_docs)} 个高价值目标")
                                         
-                                        # [Step 1+] 进入深度抓取环节
-                                        crawler = ConcurrentCrawler(max_workers=3)
+                                        # [Step 1+] 进入深度抓取环节 - 使用线程模式避免 __main__ 错误
+                                        crawler = ConcurrentCrawler(max_workers=3, use_processes=False)
                                         crawl_results = crawler.crawl_with_depth(
                                             initial_docs, 
                                             max_depth=wf_crawl_depth - 1 if wf_crawl_depth > 1 else 1, 
@@ -2119,7 +2115,10 @@ with st.sidebar:
                                 else:
                                     status_container.update(label="❌ 未能抓取到有效内容", state="error", expanded=True)
                             except Exception as e: 
-                                status_container.update(label=f"❌ 摄入失败: {str(e)}", state="error", expanded=True)
+                                error_msg = str(e)
+                                if "'__main__'" in error_msg:
+                                    error_msg = "网页摄入模块初始化失败，请重启应用后重试"
+                                status_container.update(label=f"❌ 摄入失败: {error_msg}", state="error", expanded=True)
                                 logger.error(f"Web ingestion failed: {e}")
 
                     # Tab 5: 数据库快照 (Omni-Version: 融合高级版)
@@ -2697,9 +2696,10 @@ with st.sidebar:
                     if st.button("💡", help="智能建议名称", key="smart_name_btn_main"):
                         # 如果已有名称且非默认，则执行日期优化
                         if kb_name_input and kb_name_input not in ["知识库", "文档知识库"]:
-                            from src.utils.kb_utils import generate_smart_kb_name
-                            # 简单优化：追加日期
-                            optimized = f"{kb_name_input}_{datetime.now().strftime('%m%d')}"
+                            from src.utils.kb_name_optimizer import KBNameOptimizer
+                            # 使用统一的时间戳优化
+                            output_base = os.path.join(os.getcwd(), "vector_db_storage")
+                            optimized = KBNameOptimizer._generate_timestamped_unique_name(kb_name_input, output_base)
                             st.session_state.upload_auto_name = optimized
                             st.rerun()
                         else:
@@ -2820,7 +2820,7 @@ with st.sidebar:
                                     file_types[ext] = file_types.get(ext, 0) + 1
     
                                 folder_name = os.path.basename(result.batch_dir)
-                                auto_name = generate_smart_kb_name(result.batch_dir, result.success_count, file_types, folder_name)
+                                auto_name = KBNameOptimizer.smart_generate(result.batch_dir, "file", "")
                                 st.session_state.upload_auto_name = auto_name
                             except Exception:
                                 st.session_state.upload_auto_name = None
@@ -2858,7 +2858,7 @@ with st.sidebar:
                         if hasattr(st.session_state, 'upload_auto_name') and st.session_state.upload_auto_name:
                             auto_name = st.session_state.upload_auto_name
                         elif cnt > 0:
-                            auto_name = generate_smart_kb_name(target_path, cnt, file_types, folder_name)
+                            auto_name = KBNameOptimizer.smart_generate(target_path, "file", "")
                         else:
                             auto_name = folder_name
     
@@ -4236,7 +4236,7 @@ if btn_start:
                     from src.processors.concurrent_crawler import ConcurrentCrawler
                     from src.processors.content_analyzer import ContentQualityAnalyzer
                     
-                    concurrent_crawler = ConcurrentCrawler(max_workers=3)
+                    concurrent_crawler = ConcurrentCrawler(max_workers=3, use_processes=False)
                     content_analyzer = ContentQualityAnalyzer()
 
                     def enhanced_progress_callback(message, progress=None):

@@ -502,7 +502,7 @@ class KBInterface:
                 # 生成知识库名称
                 from src.utils.kb_name_optimizer import KBNameOptimizer
                 output_base = os.path.join(os.getcwd(), "vector_db_storage")
-                kb_name = KBNameOptimizer.generate_name_from_url(url, output_base)
+                kb_name = KBNameOptimizer.smart_generate("", "url", url)
                 
                 st.success(f"✅ 抓取完成！获取 {len(saved_files)} 页，正在创建知识库: {kb_name}")
                 
@@ -576,7 +576,7 @@ class KBInterface:
                 # 生成知识库名称
                 from src.utils.kb_name_optimizer import KBNameOptimizer
                 output_base = os.path.join(os.getcwd(), "vector_db_storage")
-                kb_name = KBNameOptimizer.generate_name_from_keyword(keyword, output_base)
+                kb_name = KBNameOptimizer.smart_generate("", "search", keyword)
                 
                 st.success(f"✅ 全网搜索完成！获取 {len(all_saved_files)} 页，正在创建知识库: {kb_name}")
                 

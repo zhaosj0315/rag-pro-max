@@ -23,30 +23,15 @@ def update_status(message: str, status_type: str = "info") -> None:
         st.info(message)
 
 def generate_smart_kb_name(source: str, source_type: str = "file") -> str:
-    """统一的智能知识库命名函数"""
-    from src.common.utils import sanitize_filename
+    """统一的智能知识库命名函数 - 已重构为使用 KBNameOptimizer"""
+    from src.utils.kb_name_optimizer import KBNameOptimizer
     
     if source_type == "url":
-        try:
-            domain = urlparse(source).netloc
-            domain = domain.replace('www.', '').replace('.', '_')
-            timestamp = time.strftime('%Y%m%d_%H%M%S')
-            return sanitize_filename(f"Web_{domain}_{timestamp}")
-        except:
-            timestamp = time.strftime('%Y%m%d_%H%M%S')
-            return f"Web_Unknown_{timestamp}"
-    
+        return KBNameOptimizer.smart_generate("", "url", source)
     elif source_type == "file":
-        if os.path.isfile(source):
-            base_name = os.path.splitext(os.path.basename(source))[0]
-            return sanitize_filename(f"KB_{base_name}_{int(time.time())}")
-        elif os.path.isdir(source):
-            dir_name = os.path.basename(source.rstrip('/\\'))
-            return sanitize_filename(f"KB_{dir_name}_{int(time.time())}")
-    
-    # 默认命名
-    timestamp = time.strftime('%Y%m%d_%H%M%S')
-    return f"KB_{timestamp}"
+        return KBNameOptimizer.smart_generate(source, "file", "")
+    else:
+        return KBNameOptimizer.smart_generate("", source_type, source)
 
 def process_knowledge_base_logic(
     kb_name: str,

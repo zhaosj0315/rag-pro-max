@@ -83,45 +83,9 @@ class WebToKBProcessor:
         }
     
     def generate_kb_name_from_url(self, url: str, content_preview: str = "") -> str:
-        """根据URL和内容预览生成智能知识库名称"""
-        from urllib.parse import urlparse
-        import re
-        
-        parsed = urlparse(url)
-        domain = parsed.netloc.replace('www.', '')
-        
-        # 从URL路径提取关键词
-        path_parts = [p for p in parsed.path.split('/') if p and len(p) > 2]
-        
-        # 从内容预览提取关键词
-        content_keywords = []
-        if content_preview:
-            # 简单的关键词提取
-            words = re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z]+', content_preview[:500])
-            content_keywords = [w for w in words if len(w) >= 2][:5]
-        
-        # 生成名称策略
-        if domain in ['zh.wikipedia.org', 'baike.baidu.com']:
-            if path_parts:
-                return f"百科_{path_parts[-1][:10]}"
-        elif domain in ['zhihu.com']:
-            return f"知乎_{path_parts[-1][:10]}" if path_parts else "知乎问答"
-        elif domain in ['csdn.net', 'blog.csdn.net']:
-            return f"技术_{path_parts[-1][:10]}" if path_parts else "CSDN技术"
-        elif domain in ['github.com']:
-            if len(path_parts) >= 2:
-                return f"项目_{path_parts[1][:10]}"
-        elif domain in ['stackoverflow.com']:
-            return "编程问答"
-        
-        # 通用策略
-        if content_keywords:
-            return f"网页_{content_keywords[0][:8]}"
-        elif path_parts:
-            return f"网页_{path_parts[-1][:8]}"
-        else:
-            domain_name = domain.split('.')[0]
-            return f"{domain_name}_{datetime.now().strftime('%m%d')}"
+        """根据URL生成知识库名称 - 使用统一的命名系统"""
+        from src.utils.kb_name_optimizer import KBNameOptimizer
+        return KBNameOptimizer.smart_generate("", "url", url)
     
     def search_preset_sites(self, keyword: str, sites: List[str] = None) -> List[Dict]:
         """在预设网站中搜索关键词，返回搜索结果URL"""

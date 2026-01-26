@@ -1,6 +1,9 @@
-from src.app_logging.log_manager import LogManager
-
-logger = LogManager()
+try:
+    from src.app_logging.log_manager import LogManager
+    logger = LogManager()
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
 """
 并发爬取管理器
@@ -17,8 +20,11 @@ from bs4 import BeautifulSoup
 import os
 import re
 
-# 🔥 新增：导入智能优化器
-from .crawl_optimizer import CrawlOptimizer
+# 🔥 新增：导入智能优化器 - 使用安全导入
+try:
+    from .crawl_optimizer import CrawlOptimizer
+except ImportError:
+    CrawlOptimizer = None
 
 def extract_real_url(url: str) -> str:
     """[v9.5.32] 从搜索引擎跳转链接中提取真实目标 URL"""
@@ -50,63 +56,68 @@ def extract_real_url(url: str) -> str:
     return url
 
 def fetch_url_worker(args):
-    """多进程工作函数"""
-    # 解包参数 (增加了 keyword)
-    if len(args) == 6:
-        url, timeout, user_agents, base_delay, max_delay, keyword = args
-    else:
-        url, timeout, user_agents, base_delay, max_delay = args
-        keyword = None
-    
-    start_time = time.time()
-    result = {
-        'url': url,
-        'success': False,
-        'content': None,
-        'title': None,
-        'links': [],
-        'response_time': 0,
-        'error': None
-    }
-    
-    # [v9.5.32] 预处理：如果是跳转链接，先解壳
-    real_url = extract_real_url(url)
-    result['url'] = real_url
-    
+    """多进程工作函数 - 增强错误处理"""
     try:
-        # 创建新的session
-        session = requests.Session()
+        # 解包参数 (增加了 keyword)
+        if len(args) == 6:
+            url, timeout, user_agents, base_delay, max_delay, keyword = args
+        else:
+            url, timeout, user_agents, base_delay, max_delay = args
+            keyword = None
         
-        headers = {
-            'User-Agent': random.choice(user_agents),
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-            'Connection': 'keep-alive',
+        start_time = time.time()
+        result = {
+            'url': url,
+            'success': False,
+            'content': None,
+            'title': None,
+            'links': [],
+            'response_time': 0,
+            'error': None
         }
         
-        response = session.get(real_url, headers=headers, timeout=timeout)
-        response_time = time.time() - start_time
-        result['response_time'] = response_time
+        # [v9.5.32] 预处理：如果是跳转链接，先解壳
+        try:
+            real_url = extract_real_url(url)
+            result['url'] = real_url
+        except Exception as e:
+            result['error'] = f"URL extraction failed: {str(e)}"
+            return result
         
-        # [v9.5.31] 核心修复：使用跳转后的最终 URL 进行判定
-        final_url = response.url
-        parsed_current = urlparse(final_url)
-        base_domain = parsed_current.netloc.lower()
+        try:
+            # 创建新的session
+            session = requests.Session()
+            
+            headers = {
+                'User-Agent': random.choice(user_agents),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                'Connection': 'keep-alive',
+            }
+            
+            response = session.get(real_url, headers=headers, timeout=timeout)
+            response_time = time.time() - start_time
+            result['response_time'] = response_time
         
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
+            # [v9.5.31] 核心修复：使用跳转后的最终 URL 进行判定
+            final_url = response.url
+            parsed_current = urlparse(final_url)
+            base_domain = parsed_current.netloc.lower()
             
-            title_tag = soup.find('title')
-            title = title_tag.get_text().strip() if title_tag else final_url
-            result['title'] = title
-            
-            # 只有当最终 URL 仍然是搜索引擎时，才判定为入口页
-            is_entry_point = (
-                "search" in final_url.lower() or 
-                "bing.com" in base_domain or
-                "duckduckgo.com" in base_domain or
-                "google." in base_domain
-            )
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.content, 'html.parser')
+                
+                title_tag = soup.find('title')
+                title = title_tag.get_text().strip() if title_tag else final_url
+                result['title'] = title
+                
+                # 只有当最终 URL 仍然是搜索引擎时，才判定为入口页
+                is_entry_point = (
+                    "search" in final_url.lower() or 
+                    "bing.com" in base_domain or
+                    "duckduckgo.com" in base_domain or
+                    "google." in base_domain
+                )
             
             is_relevant = True
             if keyword:
@@ -229,12 +240,16 @@ def fetch_url_worker(args):
                     if should_add:
                         result['links'].append(full_url)
             
-            result['success'] = True
-        else:
-            result['error'] = f"HTTP {response.status_code}"
-            
-    except Exception as e:
-        result['error'] = str(e)
+                result['success'] = True
+            else:
+                result['error'] = f"HTTP {response.status_code}"
+                
+        except Exception as e:
+            result['error'] = str(e)
+            result['response_time'] = time.time() - start_time
+    
+    except Exception as global_e:
+        result['error'] = str(global_e)
         result['response_time'] = time.time() - start_time
     
     time.sleep(random.uniform(0.5, 1.5))
@@ -243,7 +258,7 @@ def fetch_url_worker(args):
 class ConcurrentCrawler:
     """并发爬取管理器 - 支持多进程和多线程"""
     
-    def __init__(self, max_workers=None, use_processes=True, base_delay=1.0, max_delay=3.0):
+    def __init__(self, max_workers=None, use_processes=False, base_delay=1.0, max_delay=3.0):
         if max_workers is None:
             cpu_count = os.cpu_count() or 4
             if use_processes:
@@ -255,7 +270,7 @@ class ConcurrentCrawler:
         self.use_processes = use_processes
         self.base_delay = base_delay
         self.max_delay = max_delay
-        self.optimizer = CrawlOptimizer()
+        self.optimizer = CrawlOptimizer() if CrawlOptimizer else None
         
         if not use_processes:
             self.session = requests.Session()
@@ -278,7 +293,18 @@ class ConcurrentCrawler:
         ]
     
     def get_smart_recommendations(self, url: str) -> Dict:
-        return self.optimizer.analyze_website(url)
+        if self.optimizer:
+            return self.optimizer.analyze_website(url)
+        else:
+            # 降级到默认参数
+            return {
+                'site_type': 'unknown',
+                'description': 'Default parameters',
+                'recommended_depth': 2,
+                'recommended_pages': 20,
+                'estimated_pages': 40,
+                'confidence': 0.5
+            }
 
     def crawl_with_smart_params(self, 
                                start_urls: List[str],
