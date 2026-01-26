@@ -1911,6 +1911,43 @@ with st.sidebar:
                                                     status.update(label="❌ 导出失败", state="error")
                                                     st.error(f"失败: {e}")
 
+                                        # --- [v9.5.2] 恢复数据预览功能 ---
+                                        if sel_tables:
+                                            st.divider()
+                                            preview_target = st.selectbox("👁️ 预览已选表数据", sel_tables, key="omni_snap_preview_target")
+                                            
+                                            if preview_target:
+                                                p_tab1, p_tab2, p_tab3 = st.tabs(["📋 结构定义", "💾 数据样本 (20行)", "📊 统计概览"])
+                                                
+                                                with p_tab1:
+                                                    try:
+                                                        schema = conn_mgr.get_table_schema(selected_alias, preview_target, db_override=selected_db)
+                                                        if schema:
+                                                            st.dataframe(pd.DataFrame(schema), use_container_width=True, hide_index=True)
+                                                        else:
+                                                            st.info("暂无结构信息")
+                                                    except Exception as e: st.error(f"获取结构失败: {e}")
+                                                
+                                                with p_tab2:
+                                                    try:
+                                                        sample = conn_mgr.get_table_sample(selected_alias, preview_target, db_override=selected_db, limit=20)
+                                                        if sample:
+                                                            st.dataframe(pd.DataFrame(sample), use_container_width=True)
+                                                        else:
+                                                            st.info("表为空或无法读取")
+                                                    except Exception as e: st.error(f"采样失败: {e}")
+                                                
+                                                with p_tab3:
+                                                    try:
+                                                        stats = conn_mgr.get_table_stats(selected_alias, preview_target, db_override=selected_db)
+                                                        insights = conn_mgr.get_table_insights(selected_alias, preview_target, db_override=selected_db)
+                                                        
+                                                        m1, m2, m3 = st.columns(3)
+                                                        m1.metric("预估行数", f"{insights.get('row_count', 0):,}")
+                                                        m2.metric("物理大小", stats.get('size_mb', 'Unknown'))
+                                                        m3.metric("创建时间", stats.get('create_time', 'Unknown')[:10])
+                                                    except Exception as e: st.error(f"获取统计失败: {e}")
+
                                 elif snap_mode == "📝 自定义 SQL":
                                     sql_input = st.text_area("SQL 查询语句", height=150, placeholder="SELECT * FROM orders WHERE created_at > '2025-01-01'...", key="omni_snap_sql_v2")
                                     filename_hint = st.text_input("文件命名标识 (可选)", placeholder="例如: 2025_Q1_Sales", key="omni_snap_hint_v2")
