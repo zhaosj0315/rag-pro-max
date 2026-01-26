@@ -1,65 +1,38 @@
-# RAG Pro Max v9.5.1 企业级系统架构文档
+# RAG Pro Max v9.5.37 企业级系统架构文档
 
-**版本**: v9.5.1 (Omni-Source Unification Edition)  
+**版本**: v9.5.37 (Search Revolution Edition)  
 **更新日期**: 2026-01-26  
-**核心特性**: Omni-Ingestion, Database Snapshots, Fragment UI Isolation
+**核心特性**: Violent Discovery, Redirect Unwrapping, Staging Inspector
 
 ---
 
-## 🏗️ 工程治理架构 (Engineering Governance Architecture)
+## 🏗️ 网页抓取层级架构 (Smart Search Architecture)
 
-在 v9.3.0 中，系统引入了**“代码资产透视系统” (Codebase Cartography System)**，将代码维护从“人工经验”升级为“数据驱动”。
+在 v9.5.37 中，系统重写了搜索模式的调度核心，引入了 **「种子探测与获取分离」** 模式。
 
-### 1. 三维审计透视 (3D Audit Perspective)
-- **静态户籍档案 (Dimension 1)**: 基于 Python AST 解析器，自动生成所有类与函数的静态索引 (`CODE_INDEX.md`)，并智能识别缺失文档的模块 (`MISSING_DOCS.json`)。
-- **血缘依赖拓扑 (Dimension 2)**: 集成 `pydeps` 引擎，自动绘制模块间的调用依赖关系图 (`DEPENDENCY_GRAPH.svg`)，可视化展示系统耦合度。
-- **僵尸代码侦测 (Dimension 3)**: 利用 `vulture` 进行静态死代码分析，自动识别未引用的变量、函数与类，并输出高置信度清理报告。
+### 1. Level 0: 暴力探测层 (Violent Discovery)
+- **Physical Inlining**: 为了绕过 Python 多进程环境下的模块缓存陈旧问题，探测算法直接物理嵌入 `apppro.py`。
+- **Regex Extraction**: 放弃对脆弱 HTML 标签的选择性依赖，采用正则表达式扫描原始字节流，从混淆代码中暴力提取 `https://` 链接。
+- **Redirect Unwrapping**: 引入 `extract_real_url` 算法，在探测阶段直接剥离 Bing/DDG 跳转外壳，锁定目标终点。
 
-### 2. 自动化维护闭环 (Automated Maintenance Loop)
-系统建立了 `Audit -> Report -> Clean` 的自动化链路：
-- **Pre-Commit**: 每次提交前可运行 `audit_codebase.py` 刷新全景图。
-- **Auto-Cleanup**: 集成 `autoflake` 自动清理无用的 Import 引用。
-- **Safe-Delete**: 对 `unreachable code` 执行基于 AST 的精准剪枝。
-
----
-
-## 🏗️ 极致表现层隔离 (Presentation Layer Isolation)
-
-### 1. 全画布局部渲染架构 (Full-Canvas Fragment Architecture)
-在 v9.2.0 中，系统完成了从“组件级隔离”到“区域级隔离”的架构跃迁：
-- **Chat Interface Encapsulation**: 将整个对话交互区（History Render + Input Box + Response Stream）封装为单一的 `render_main_chat_interface` Fragment。
-- **Zero-Flicker Interaction**: 所有的点击（推荐问题）、提交（发送消息）与流式输出（AI 回答）均在 Fragment 内部闭环完成。外部容器（Sidebar, Header）在交互过程中保持静态，彻底消除了页面级重载带来的白屏闪烁。
-- **Direct Reply Pipeline**: 移除了中间态的 `st.rerun()`，实现了点击动作直接驱动后端队列处理（Queue Processing）的线性流水线，交互延迟降低至 0ms。
-
-### 2. 局部刷新隔离架构 (Legacy Fragment Integration)
-- **File Manager Isolation**: 知识库详情页的文件列表与操作区被独立封装，翻页与筛选不再触动主页面状态。
-- **Lifecycle Decoupling**: 利用 `@st.fragment` 装饰器，将工具栏切换、参数微调、数据摄入配置等高频交互组件的生命周期与主对话区解耦。
-
-### 3. 布局防抖与 CSS 预加载 (Layout Stabilization)
-- **Pre-Login Isolation**: 将全局布局 CSS（如 850px 侧边栏）后置于登录检查之后加载，防止登录页布局被非预期样式挤压。
-- **Anti-Flicker CSS**: 针对文件上传组件实施了 `display: none` 级别的预加载隐藏策略，消除了组件渲染时的尺寸跳动（CLS）。
+### 2. Level 1+: 饱和抓取层 (Document Crawling)
+- **Isolation Principle**: 搜索引擎结果页（L0）仅用于链接分发，内容会被强制清空，不计入深度配额。
+- **Bilingual Relevance**: 引入中英双语启发式匹配，确保高质量外文文档不因关键词缺失被误杀。
+- **Exponential Scale**: 严格执行 $n^{depth}$ 扩散，确保 2x5 布局下产出 30+ 份核心文档。
 
 ---
 
-## 🏗️ 业务层内核加固 (Service Layer Hardening)
-为了解决 Fragment 内部点击事件在全页刷新后丢失的问题，系统实现了一套**基于内容的稳定哈希算法**：
-- **Deterministic Keying**: 实时计算回答内容的哈希值，确保即时生成的按钮 Key 与持久化后的历史记录 Key **100% 对齐**。
-- **Interaction Seamlessness**: 确保了用户在点击即时出现的建议按钮时，系统能精准映射到后台处理队列，实现了交互的无缝衔接。
+## 🏗️ 全源归一化暂存架构 (Omni-Source Staging)
 
----
+### 1. Staging Inspector 工具链
+系统为 `task_staging_dir` 赋予了完整的生命周期管理能力：
+- **Unified 5 Sources**: 本地上传、目录扫描、文本粘贴、网页抓取、数据库快照。
+- **Audit Sidecars**: 每一份源文件均配有 `.meta` 伴生文件，记录物理来源标签。
+- **Scrollable Popover**: 采用限高滚动容器实现资产清单预览，解决 UI 溢出问题。
 
-## 🏗️ 业务层内核加固 (Service Layer Hardening)
-
-### 1. 纯对话模式深度解耦 (Decoupled Pure Chat)
-在 v9.1.0 中，系统彻底剥离了纯对话模式对底层知识库索引的依赖：
-- **Filesystem-Agnostic Execution**: 纯对话模式下直接跳过 `KnowledgeBaseLoader` 与磁盘扫描步骤，不再强制要求 `vector_db_storage` 路径存在。
-- **Bypass LLM Channel**: 建立专用 LLM 直连链路，绕过向量化检索步骤，通过 `Settings.llm` 容器实现高性能的无损流式输出。
-
-### 2. 网页抓取层级架构 (Precision Crawler Strategy)
-在 v8.9.0 中，系统重写了网页抓取逻辑的层级传播模型：
-- **Level-0 Seed Isolation**: 引入种子隔离层，确保主域名起始页不占用爬取名额。
-- **Exponential Depth Propagation**: 采用 $n^{depth}$ 扩散模型，平衡了抓取速度与文档关联广度。
-- **Unified Engine Interface**: 抽象了统一的 `crawl_recursive` 接口，解耦了同步（Requests）与异步（Aiohttp）底层实现。
+### 2. 物理自愈机制
+- **Pre-Write Check**: 在每一次 IO 操作前检查暂存目录完整性，实现 Session 级别的路径自愈。
+- **Direct Finder Integration**: 集成 macOS 系统命令，实现物理路径的秒级跳转定位。
 
 ### 3. 全源归一化摄入层 (Omni-Ingestion Architecture)
 在 v9.5.0 中，系统实现了**“一切皆源文件 (Everything is a Source File)”**的终极架构统一：

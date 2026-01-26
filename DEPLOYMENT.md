@@ -1,73 +1,22 @@
-# RAG Pro Max v9.5.1 企业级部署指南 (Omni-Source Unification)
+# RAG Pro Max v9.5.37 企业级部署指南 (Search Revolution)
 
-**版本**: v9.5.1  
+**版本**: v9.5.37  
 **更新日期**: 2026-01-26  
-**核心特性**: 全源摄入、数据库快照、管理员空间豁免
-
----
-
-## 🏢 环境要求与依赖
-
-### 1. 软件环境
-- **Python**: 3.10+ (推荐)
-- **数据库**: SQLite 3.x (系统内置)
-- **MCP 扩展支持**: 若需使用 GitHub、Exa 等扩展，需安装 `gemini-cli` 环境。
-
-### 2. 关键依赖安装
-```bash
-pip install -r requirements.txt
-
-# 验证数据分析核心组件
-python -c "import pandas, plotly, sqlite3; print('✅ Data Analytics Stack Ready')"
-```
-
----
-
-## 🚀 部署流程
-
-### 1. 初始化配置文件
-复制并编辑 `.env` 文件。v8.0.0+ 建议在此集中管理扩展密钥：
-
-```bash
-# 基础配置
-STREAM_PORT=8501
-
-# GitHub 扩展配置 (可选)
-# 必须使用 export 关键字，否则 MCP 进程可能无法读取
-export GITHUB_PERSONAL_ACCESS_TOKEN=your_pat_token
-export GITHUB_TOKEN=your_pat_token
-
-# Exa 搜索配置 (可选)
-export EXA_API_KEY=your_exa_key
-```
-
-### 2. 启动服务
-```bash
-# 推荐方式 (自动加载 .env)
-source .env && ./start.sh
-
-# 增强方式 (v8.8.0 推荐)
-./scripts/start_enhanced.sh
-
-# Docker 方式
-docker-compose up -d --build
-```
-
----
-
-## 🐳 Docker 镜像说明
-v9.5.1 官方镜像标签为 `ragpromax/rag-pro-max:v9.5.1`。
-请在 `docker-compose.yml` 中确保更新版本号。
+**核心特性**: 暴力抓取、暂存区治理、零白屏交互
 
 ---
 
 ## 🛠️ 运维与资产维护
 
-### 1. 物理目录结构与权限
-- **知识库数据**: `vector_db_storage/` (读写)
-- **并集暂存区**: `temp_uploads/` (**核心读写**)。v9.5.1 的 **Omni-Ingestion** 逻辑依赖此目录作为 PDF、网页与数据库快照 (CSV) 的统一汇聚点。若权限不足，将导致所有摄入功能失效。
-- **对话历史**: `chat_histories/` (读写)
-- **运行日志**: `app_logs/` (读写)
+### 1. 环境自检 (Diagnostics)
+在复杂的企业内网或代理环境下，若智能搜索失效，请运行诊断脚本：
+```bash
+# 真实模拟搜索逻辑，输出 HTML 源码与链接提取报告
+python3 scripts/maintenance/debug_search_live.py
+```
+若该脚本返回 `探测到 0 个链接`，请检查防火墙是否拦截了对 `bing.com` 或 `duckduckgo.com` 的请求。
+
+
 
 ### 2. 维护脚本 (v6.7.0 重构路径)
 所有维护动作应通过 `scripts/` 目录下的规范化路径执行：
