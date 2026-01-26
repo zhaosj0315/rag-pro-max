@@ -1813,7 +1813,7 @@ with st.sidebar:
                             # 3. 触发重命名逻辑
                             auto_trigger_naming()
                             st.toast("✅ 暂存区同步刷新成功")
-                            st.rerun()
+                            # [v9.5.17] 移除 st.rerun()，依靠 Fragment 局部刷新
 
                     with stat_col2:
                         if st.button("🧹 清空暂存", use_container_width=True, key="clean_staging_omni"):
@@ -1822,7 +1822,7 @@ with st.sidebar:
                             os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
                             st.session_state.uploaded_path = None
                             st.session_state.omni_last_upload_hash = None # [v9.5.12] 同时清空上传哈希
-                            st.rerun()
+                            # [v9.5.17] 移除 st.rerun()，依靠 Fragment 局部刷新
                     # --- 五大源标准 Tabs ---
                     omni_tabs = st.tabs(["📂 上传文件", "📁 扫描路径", "📝 文本粘贴", "🌐 网页摄入", "🗄️ 数据库快照"])
                     
@@ -2025,8 +2025,7 @@ with st.sidebar:
                                     st.session_state.uploaded_path = target_dir
                                     status_container.update(label=f"🎉 摄入完成！共捕获 {len(saved_files)} 个源文件", state="complete", expanded=False)
                                     st.toast(f"✅ 成功摄入 {len(saved_files)} 个源文件")
-                                    time.sleep(1)
-                                    st.rerun()
+                                    # [v9.5.17] 移除 st.rerun()，依靠 Fragment 局部刷新
                                 else:
                                     status_container.update(label="❌ 未能抓取到有效内容", state="error", expanded=True)
                             except Exception as e: 
@@ -2098,8 +2097,7 @@ with st.sidebar:
                                                     auto_trigger_naming()
                                                     st.session_state.uploaded_path = st.session_state.task_staging_dir
                                                     st.toast(f"✅ 已导出 {len(sel_tables)} 张表")
-                                                    time.sleep(1)
-                                                    st.rerun()
+                                                    # [v9.5.17] 移除 st.rerun()，依靠 Fragment 局部刷新
                                                 except Exception as e:
                                                     status.update(label="❌ 导出失败", state="error")
                                                     st.error(f"失败: {e}")
@@ -2173,8 +2171,7 @@ with st.sidebar:
                                                     # [v9.5.11] 自动命名
                                                     auto_trigger_naming()
                                                     st.session_state.uploaded_path = st.session_state.task_staging_dir
-                                                    time.sleep(1)
-                                                    st.rerun()
+                                                    # [v9.5.17] 移除 st.rerun()，依靠 Fragment 局部刷新
                                                 except Exception as e:
                                                     st.error(f"执行失败: {e}")
             elif current_kb_name and current_kb_name != "pure_chat":
