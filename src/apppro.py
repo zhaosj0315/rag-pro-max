@@ -1585,10 +1585,30 @@ with st.sidebar:
                     os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
                     st.session_state.staging_files_count = 0
                 
+                # [v9.5.11] 自动触发智能命名逻辑 (仅在名称为空时)
+                def auto_trigger_naming():
+                    curr_input = st.session_state.get('kb_name_input_main', '').strip()
+                    if not curr_input or curr_input in ["知识库", "文档知识库"]:
+                        staging_dir = st.session_state.get('task_staging_dir')
+                        if staging_dir and os.path.exists(staging_dir):
+                            files = [f for f in os.listdir(staging_dir) if not f.startswith('.') and not f.endswith('.meta')]
+                            if files:
+                                from src.utils.kb_utils import generate_smart_kb_name
+                                # 计算文件类型分布
+                                file_types = {}
+                                for f in files:
+                                    ext = os.path.splitext(f)[1].lower()
+                                    file_types[ext] = file_types.get(ext, 0) + 1
+                                suggested = generate_smart_kb_name(staging_dir, len(files), file_types, os.path.basename(staging_dir))
+                                if suggested:
+                                    st.session_state.upload_auto_name = suggested
+
                 # 辅助函数：同步文件到暂存区
                 def sync_to_staging(source_path, is_file=True, source_label="未知来源"):
                     import shutil
+                    from datetime import datetime
                     try:
+                        added_count = 0
                         if is_file:
                             fname = os.path.basename(source_path)
                             dest = os.path.join(st.session_state.task_staging_dir, fname)
@@ -1598,10 +1618,10 @@ with st.sidebar:
                                 with open(dest + ".meta", "w", encoding="utf-8") as f:
                                     f.write(f"Source: {source_label}\n")
                                     f.write(f"SyncTime: {datetime.now().isoformat()}\n")
+                                added_count = 1
                                 logger.info(f"📂 [{source_label}] 单文件同步成功: {fname}")
                         else:
                             # 目录同步 (支持递归)
-                            added_count = 0
                             for root, dirs, files in os.walk(source_path):
                                 rel_path = os.path.relpath(root, source_path)
                                 target_root = st.session_state.task_staging_dir if rel_path == "." else os.path.join(st.session_state.task_staging_dir, rel_path)
@@ -1621,6 +1641,22 @@ with st.sidebar:
                                             meta_f.write(f"SyncTime: {datetime.now().isoformat()}\n")
                                         added_count += 1
                             logger.info(f"📂 [{source_label}] 递归同步完成: 从 {source_path} 导入了 {added_count} 个文件")
+                        
+                        # [v9.5.8] 终端过程追踪报告
+                        if added_count > 0:
+                            files_in_staging = os.listdir(st.session_state.task_staging_dir)
+                            total_count = len([f for f in files_in_staging if not f.startswith('.') and not f.endswith('.meta')])
+                            print(f"\n[OMNI-INGESTION REPORT] {'-'*30}")
+                            print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                            print(f"Source: {source_label}")
+                            print(f"Status: SUCCESS")
+                            print(f"Files Added: {added_count}")
+                            print(f"Staging Total: {total_count} files now converged")
+                            print(f"{'-'*55}\n")
+                            
+                            # [v9.5.11] 成功同步后自动命名
+                            auto_trigger_naming()
+                            
                         return True
                     except Exception as e:
                         logger.error(f"❌ [{source_label}] 暂存同步失败: {e}")
@@ -1673,10 +1709,12 @@ with st.sidebar:
                         os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
                     
                     files_in_staging = os.listdir(st.session_state.task_staging_dir)
-                    staging_count = len([f for f in files_in_staging if not f.startswith('.')])
+                    # [v9.5.15] 修正计数：排除 .meta 审计文件，确保显示的数字是真实材料数
+                    staging_count = len([f for f in files_in_staging if not f.startswith('.') and not f.endswith('.meta')])
                     
                     # [v9.5.3] 优化布局：引入 Popover 查看详情
-                    stat_col1, stat_col_icon, stat_col2 = st.columns([2.5, 0.5, 1])
+                    # [v9.5.14] 引入“同步刷新”按钮
+                    stat_col1, stat_col_icon, stat_col_refresh, stat_col2 = st.columns([2.5, 0.4, 0.4, 0.7])
                     
                     with stat_col1:
                         stats_placeholder = st.empty()
@@ -1692,16 +1730,22 @@ with st.sidebar:
                     
                     with stat_col_icon:
                         with st.popover("📂", help="查看暂存区详情"):
+                            # [v9.5.13] UI 优化：固定标题，内容限高滚动
+                            st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+                            st.markdown("#### 📦 暂存区资产清单")
                             st.caption(f"📍 物理路径: `{st.session_state.task_staging_dir}`")
+                            
                             if files_in_staging:
-                                st.divider()
-                                # [v9.5.5] 增强分类显示
+                                # [v9.5.9] 深度分类与追踪展现
+                                grouped_files = {} # {source_label: [file_info, ...]}
+                                
                                 for f in sorted(files_in_staging):
                                     if f.startswith('.') or f.endswith('.meta'): continue
                                     fpath = os.path.join(st.session_state.task_staging_dir, f)
                                     
-                                    # 尝试获取来源
-                                    source_label = None
+                                    # 提取元数据
+                                    source_label = "外部导入"
+                                    sync_time = "未知时间"
                                     meta_path = fpath + ".meta"
                                     if os.path.exists(meta_path):
                                         try:
@@ -1709,33 +1753,67 @@ with st.sidebar:
                                                 for line in meta_f:
                                                     if line.startswith("Source:"):
                                                         source_label = line.split(":", 1)[1].strip()
-                                                        break
+                                                    elif line.startswith("SyncTime:"):
+                                                        # 仅保留 时:分
+                                                        sync_time = line.split(":", 1)[1].strip()[11:16]
                                         except: pass
-                                    
-                                    # 如果 meta 没拿到，则根据前缀推断并补全
-                                    if not source_label:
+                                    else:
+                                        # 降级推断
                                         if f.startswith('[DB]'): source_label = "数据库快照"
                                         elif f.startswith('[SQL]'): source_label = "自定义SQL"
                                         elif f.startswith('Web_'): source_label = "网页抓取"
                                         elif f.startswith('Search_'): source_label = "智能搜索"
                                         elif f.startswith('Pasted_'): source_label = "文本粘贴"
-                                        else: source_label = "外部文件"
                                     
-                                    size_str = f"{os.path.getsize(fpath)/1024:.1f} KB" if os.path.exists(fpath) else "Unknown"
+                                    if source_label not in grouped_files:
+                                        grouped_files[source_label] = []
                                     
-                                    # 使用图标增强感官
+                                    size_kb = os.path.getsize(fpath)/1024 if os.path.exists(fpath) else 0
+                                    grouped_files[source_label].append({
+                                        "name": f,
+                                        "size": f"{size_kb:.1f}k",
+                                        "time": sync_time
+                                    })
+
+                                # [v9.5.13] 使用 HTML 构建滚动容器，解决内容溢出顶部问题
+                                list_html = "<div style='max-height: 380px; overflow-y: auto; padding-right: 10px; border-top: 1px solid #eee; margin-top: 5px;'>"
+                                for label, files in grouped_files.items():
+                                    # 匹配图标
                                     icon = "📄"
-                                    if "数据库" in source_label or "SQL" in source_label: icon = "🗄️"
-                                    elif "网页" in source_label: icon = "🌐"
-                                    elif "搜索" in source_label: icon = "🔍"
-                                    elif "粘贴" in source_label: icon = "📝"
-                                    elif "上传" in source_label: icon = "📤"
-                                    elif "目录" in source_label: icon = "📁"
+                                    if "数据库" in label or "SQL" in label: icon = "🗄️"
+                                    elif "网页" in label: icon = "🌐"
+                                    elif "搜索" in label: icon = "🔍"
+                                    elif "粘贴" in label: icon = "📝"
+                                    elif "上传" in label: icon = "📤"
+                                    elif "目录" in label: icon = "📁"
                                     
-                                    # 一行化专业显示
-                                    st.markdown(f"**{icon} {source_label}** | `{f}` | <span style='color: #666;'>{size_str}</span>", unsafe_allow_html=True)
+                                    list_html += f"<div style='font-weight: bold; margin-top: 12px; margin-bottom: 6px; font-size: 0.9rem;'>{icon} {label} ({len(files)})</div>"
+                                    
+                                    for item in files:
+                                        list_html += (
+                                            f"<div style='font-size: 0.75rem; margin-left: 10px; border-left: 2px solid #f0f2f6; "
+                                            f"padding-left: 8px; color: #555; white-space: nowrap; overflow: hidden; "
+                                            f"text-overflow: ellipsis; line-height: 1.8;'>"
+                                            f"▫️ {item['name']} <span style='color: #bbb;'>({item['size']} | {item['time']})</span>"
+                                            f"</div>"
+                                        )
+                                list_html += "</div>"
+                                st.markdown(list_html, unsafe_allow_html=True)
                             else:
                                 st.info("暂存区为空")
+
+                    with stat_col_refresh:
+                        if st.button("🔄", help="强制同步并刷新暂存区", key="refresh_staging_omni"):
+                            # 1. 重置上传哈希，强制文件重新同步
+                            st.session_state.omni_last_upload_hash = None
+                            # 2. 如果路径输入框有内容且有效，重新扫描一次
+                            m_path = st.session_state.get('omni_path_input')
+                            if m_path and os.path.exists(m_path):
+                                sync_to_staging(m_path, is_file=False, source_label="同步刷新")
+                            # 3. 触发重命名逻辑
+                            auto_trigger_naming()
+                            st.toast("✅ 暂存区同步刷新成功")
+                            st.rerun()
 
                     with stat_col2:
                         if st.button("🧹 清空暂存", use_container_width=True, key="clean_staging_omni"):
@@ -1743,6 +1821,7 @@ with st.sidebar:
                             shutil.rmtree(st.session_state.task_staging_dir)
                             os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
                             st.session_state.uploaded_path = None
+                            st.session_state.omni_last_upload_hash = None # [v9.5.12] 同时清空上传哈希
                             st.rerun()
                     # --- 五大源标准 Tabs ---
                     omni_tabs = st.tabs(["📂 上传文件", "📁 扫描路径", "📝 文本粘贴", "🌐 网页摄入", "🗄️ 数据库快照"])
@@ -1758,13 +1837,22 @@ with st.sidebar:
                             disabled=not can_upload
                         )
                         if uploaded_files:
-                            with st.spinner("⚡ 同步中..."):
-                                from src.common.utils import save_uploaded_files
-                                batch_dir = save_uploaded_files(uploaded_files, "temp_uploads")
-                                if batch_dir:
-                                    sync_to_staging(batch_dir, is_file=False, source_label="文件上传")
-                                    st.session_state.uploaded_path = st.session_state.task_staging_dir
-                                    st.toast("✅ 已加入暂存区")
+                            # [v9.5.12] 引入哈希校验，防止重复触发同步
+                            import hashlib
+                            upload_hash = hashlib.md5("".join([f"{f.name}_{f.size}" for f in uploaded_files]).encode()).hexdigest()
+                            
+                            if st.session_state.get('omni_last_upload_hash') != upload_hash:
+                                with st.spinner("⚡ 同步中..."):
+                                    from src.common.utils import save_uploaded_files
+                                    batch_dir = save_uploaded_files(uploaded_files, "temp_uploads")
+                                    if batch_dir:
+                                        if sync_to_staging(batch_dir, is_file=False, source_label="文件上传"):
+                                            st.session_state.uploaded_path = st.session_state.task_staging_dir
+                                            st.session_state.omni_last_upload_hash = upload_hash # 记录哈希
+                                            st.toast("✅ 已加入暂存区")
+                                            # [v9.5.16] 移除 st.rerun()，依靠 Fragment 局部刷新，消除白屏闪烁
+                            else:
+                                st.caption("✨ 当前批次文件已在暂存区")
                     
                     # Tab 2: 本地路径
                     with omni_tabs[1]:
@@ -1774,7 +1862,7 @@ with st.sidebar:
                             if os.path.exists(manual_path):
                                 if sync_to_staging(manual_path, is_file=False, source_label="目录添加"):
                                     st.session_state.uploaded_path = st.session_state.task_staging_dir
-                                    st.rerun()
+                                    # [v9.5.16] 移除 st.rerun()，依靠 Fragment 局部刷新
                             else: st.error("路径不存在")
                     
                     # Tab 3: 文本粘贴
@@ -1791,8 +1879,22 @@ with st.sidebar:
                                 with open(fpath + ".meta", "w", encoding="utf-8") as meta_f:
                                     meta_f.write(f"Source: 文本粘贴\n")
                                     meta_f.write(f"SyncTime: {datetime.now().isoformat()}\n")
+                                
+                                # [v9.5.8] 终端过程追踪报告
+                                files_in_staging = os.listdir(st.session_state.task_staging_dir)
+                                total_count = len([f for f in files_in_staging if not f.startswith('.') and not f.endswith('.meta')])
+                                print(f"\n[OMNI-INGESTION REPORT] {'-'*30}")
+                                print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                                print(f"Source: 文本粘贴")
+                                print(f"Status: SUCCESS")
+                                print(f"Files Added: 1")
+                                print(f"Staging Total: {total_count} files now converged")
+                                print(f"{'-'*55}\n")
+
+                                # [v9.5.11] 自动命名
+                                auto_trigger_naming()
                                 st.session_state.uploaded_path = st.session_state.task_staging_dir
-                                st.rerun()
+                                # [v9.5.16] 移除 st.rerun()，依靠 Fragment 局部刷新
                     
                     # Tab 4: 网页摄入 (Omni-Version: 逻辑原样复用)
                     with omni_tabs[3]:
@@ -1907,6 +2009,19 @@ with st.sidebar:
                                             web_log(f"✅ 已保存: {result['title'][:30]}...")
 
                                 if saved_files:
+                                    # [v9.5.8] 终端过程追踪报告
+                                    files_in_staging = os.listdir(st.session_state.task_staging_dir)
+                                    total_count = len([f for f in files_in_staging if not f.startswith('.') and not f.endswith('.meta')])
+                                    print(f"\n[OMNI-INGESTION REPORT] {'-'*30}")
+                                    print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                                    print(f"Source: 网页摄入")
+                                    print(f"Status: SUCCESS")
+                                    print(f"Files Added: {len(saved_files)}")
+                                    print(f"Staging Total: {total_count} files now converged")
+                                    print(f"{'-'*55}\n")
+
+                                    # [v9.5.11] 自动命名
+                                    auto_trigger_naming()
                                     st.session_state.uploaded_path = target_dir
                                     status_container.update(label=f"🎉 摄入完成！共捕获 {len(saved_files)} 个源文件", state="complete", expanded=False)
                                     st.toast(f"✅ 成功摄入 {len(saved_files)} 个源文件")
@@ -1967,6 +2082,20 @@ with st.sidebar:
                                                         status.write(f"正在导出: {t}...")
                                                         exporter.export(selected_alias, selected_db, table_name=t)
                                                     status.update(label="✅ 快照生成完毕", state="complete", expanded=False)
+                                                    
+                                                    # [v9.5.8] 终端过程追踪报告
+                                                    files_in_staging = os.listdir(st.session_state.task_staging_dir)
+                                                    total_count = len([f for f in files_in_staging if not f.startswith('.') and not f.endswith('.meta')])
+                                                    print(f"\n[OMNI-INGESTION REPORT] {'-'*30}")
+                                                    print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                                                    print(f"Source: 数据库快照 (整表)")
+                                                    print(f"Status: SUCCESS")
+                                                    print(f"Files Added: {len(sel_tables)}")
+                                                    print(f"Staging Total: {total_count} files now converged")
+                                                    print(f"{'-'*55}\n")
+
+                                                    # [v9.5.11] 自动命名
+                                                    auto_trigger_naming()
                                                     st.session_state.uploaded_path = st.session_state.task_staging_dir
                                                     st.toast(f"✅ 已导出 {len(sel_tables)} 张表")
                                                     time.sleep(1)
@@ -2029,6 +2158,20 @@ with st.sidebar:
                                                     
                                                     fpath = exporter.export(selected_alias, selected_db, sql_query=sql_input, output_filename=final_name)
                                                     st.success(f"✅ 已导出: {os.path.basename(fpath)}")
+                                                    
+                                                    # [v9.5.8] 终端过程追踪报告
+                                                    files_in_staging = os.listdir(st.session_state.task_staging_dir)
+                                                    total_count = len([f for f in files_in_staging if not f.startswith('.') and not f.endswith('.meta')])
+                                                    print(f"\n[OMNI-INGESTION REPORT] {'-'*30}")
+                                                    print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                                                    print(f"Source: 数据库快照 (自定义SQL)")
+                                                    print(f"Status: SUCCESS")
+                                                    print(f"Files Added: 1")
+                                                    print(f"Staging Total: {total_count} files now converged")
+                                                    print(f"{'-'*55}\n")
+
+                                                    # [v9.5.11] 自动命名
+                                                    auto_trigger_naming()
                                                     st.session_state.uploaded_path = st.session_state.task_staging_dir
                                                     time.sleep(1)
                                                     st.rerun()
@@ -2470,14 +2613,20 @@ with st.sidebar:
                     )
                 with kb_name_col3:
                     if st.button("💡", help="智能建议名称", key="smart_name_btn_main"):
-                        if kb_name_input:
+                        # 如果已有名称且非默认，则执行日期优化
+                        if kb_name_input and kb_name_input not in ["知识库", "文档知识库"]:
                             from src.utils.kb_utils import generate_smart_kb_name
                             # 简单优化：追加日期
                             optimized = f"{kb_name_input}_{datetime.now().strftime('%m%d')}"
                             st.session_state.upload_auto_name = optimized
                             st.rerun()
                         else:
-                            st.toast("请先配置数据源或输入初步名称")
+                            # 如果为空或默认，则强制触发一次全量智能识别
+                            auto_trigger_naming()
+                            if st.session_state.get('upload_auto_name'):
+                                st.rerun()
+                            else:
+                                st.toast("暂存区为空，请先添加材料")
     
                 # 处理上传 (Stage 4.1 - 使用 UploadHandler)
                 if uploaded_files:
