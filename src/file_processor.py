@@ -417,7 +417,8 @@ def scan_directory_safe(input_dir: str, use_ocr: bool = True) -> Tuple[List, 'Fi
         try:
             for root, _, filenames in os.walk(directory):
                 for f in filenames:
-                    if not f.startswith('.'):
+                    # [v9.5.15] 修正：排除隐藏文件和 .meta 审计文件
+                    if not f.startswith('.') and not f.endswith('.meta'):
                         fp = os.path.join(root, f)
                         ext = Path(f).suffix.lower()
                         local_files.append((fp, f, ext))

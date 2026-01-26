@@ -208,7 +208,8 @@ class IndexBuilder:
         all_files = []
         for root, _, filenames in os.walk(source_path):
             for f in filenames:
-                if not f.startswith('.'):
+                # [v9.5.15] 修正：排除隐藏文件和 .meta 审计文件
+                if not f.startswith('.') and not f.endswith('.meta'):
                     all_files.append(os.path.join(root, f))
         
         total = len(all_files)
@@ -238,7 +239,8 @@ class IndexBuilder:
         file_map = {}
         for root, _, filenames in os.walk(source_path):
             for f in filenames:
-                if not f.startswith('.'):
+                # [v9.5.15] 修正：排除隐藏文件和 .meta 审计文件
+                if not f.startswith('.') and not f.endswith('.meta'):
                     fp = os.path.join(root, f)
                     info = get_file_info(fp, self.metadata_mgr)
                     info['doc_ids'] = []
