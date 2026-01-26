@@ -1661,6 +1661,16 @@ with st.sidebar:
                     except Exception as e:
                         logger.error(f"❌ [{source_label}] 暂存同步失败: {e}")
                         return False
+
+                # [v9.5.38] 统一投递反馈处理器
+                def handle_ingestion_success(source_label, count, details=""):
+                    msg = f"✅ [{source_label}] 已成功投递 {count} 个文件至暂存区"
+                    if details: msg += f" ({details})"
+                    st.toast(msg)
+                    # 自动触发命名建议
+                    auto_trigger_naming()
+                    # 标记路径
+                    st.session_state.uploaded_path = st.session_state.task_staging_dir
             # -----------------------------------------------------
     
             crawl_url = None
@@ -1862,9 +1872,8 @@ with st.sidebar:
                                     batch_dir = save_uploaded_files(uploaded_files, "temp_uploads")
                                     if batch_dir:
                                         if sync_to_staging(batch_dir, is_file=False, source_label="文件上传"):
-                                            st.session_state.uploaded_path = st.session_state.task_staging_dir
                                             st.session_state.omni_last_upload_hash = upload_hash # 记录哈希
-                                            st.toast("✅ 已加入暂存区")
+                                            handle_ingestion_success("文件上传", len(uploaded_files))
                                             # [v9.5.16] 移除 st.rerun()，依靠 Fragment 局部刷新，消除白屏闪烁
                             else:
                                 st.caption("✨ 当前批次文件已在暂存区")
@@ -1873,17 +1882,17 @@ with st.sidebar:
                     with omni_tabs[1]:
                         path_c1, path_c2 = st.columns([5, 1])
                         manual_path = path_c1.text_input("本地路径", placeholder="粘贴本地目录地址...", key="omni_path_input", label_visibility="collapsed")
-                        if path_c2.button("➕ 添加", use_container_width=True, key="omni_path_btn"):
+                        if path_c2.button("📥 镜像至暂存区", use_container_width=True, key="omni_path_btn"):
                             if os.path.exists(manual_path):
-                                if sync_to_staging(manual_path, is_file=False, source_label="目录添加"):
-                                    st.session_state.uploaded_path = st.session_state.task_staging_dir
+                                if sync_to_staging(manual_path, is_file=False, source_label="目录镜像"):
+                                    handle_ingestion_success("目录镜像", 1, os.path.basename(manual_path))
                                     # [v9.5.16] 移除 st.rerun()，依靠 Fragment 局部刷新
                             else: st.error("路径不存在")
                     
                     # Tab 3: 文本粘贴
                     with omni_tabs[2]:
                         st.session_state.paste_text_display = st.text_area("粘贴文本内容", height=150, placeholder="在此输入或粘贴文本...", label_visibility="collapsed", key="omni_paste_input")
-                        if st.button("📥 确认存入暂存区", use_container_width=True, key="omni_paste_btn"):
+                        if st.button("📥 保存文本至暂存区", use_container_width=True, key="omni_paste_btn"):
                             content = st.session_state.paste_text_display
                             if content.strip():
                                 safe_name = f"Pasted_{int(time.time())}.txt"
@@ -1906,9 +1915,7 @@ with st.sidebar:
                                 print(f"Staging Total: {total_count} files now converged")
                                 print(f"{'-'*55}\n")
 
-                                # [v9.5.11] 自动命名
-                                auto_trigger_naming()
-                                st.session_state.uploaded_path = st.session_state.task_staging_dir
+                                handle_ingestion_success("文本粘贴", 1)
                                 # [v9.5.16] 移除 st.rerun()，依靠 Fragment 局部刷新
                     
                     # Tab 4: 网页摄入 (Omni-Version: 逻辑原样复用)
@@ -1957,7 +1964,7 @@ with st.sidebar:
                             wf_exclude_patterns = [line.strip() for line in wf_exclude_text.split('\n') if line.strip()] if wf_exclude_text else []
 
                         # 执行按钮 (逻辑重定向到暂存区，代码保持原样)
-                        if st.button("🚀 立即获取并投递至暂存区", use_container_width=True, type="primary", key="omni_wf_run_main", disabled=not user_input):
+                        if st.button("📥 抓取并投递至暂存区", use_container_width=True, type="primary", key="omni_wf_run_main", disabled=not user_input):
                             # [v9.5.35] 强制重载核心爬虫模块，解决缓存失效问题
                             try:
                                 import importlib
@@ -2106,11 +2113,8 @@ with st.sidebar:
                                     print(f"Staging Total: {total_count} files now converged")
                                     print(f"{'-'*55}\n")
 
-                                    # [v9.5.11] 自动命名
-                                    auto_trigger_naming()
-                                    st.session_state.uploaded_path = target_dir
                                     status_container.update(label=f"🎉 摄入完成！共捕获 {len(saved_files)} 个源文件", state="complete", expanded=False)
-                                    st.toast(f"✅ 成功摄入 {len(saved_files)} 个源文件")
+                                    handle_ingestion_success("网页摄入", len(saved_files))
                                     # [v9.5.17] 移除 st.rerun()，依靠 Fragment 局部刷新
                                 else:
                                     status_container.update(label="❌ 未能抓取到有效内容", state="error", expanded=True)
@@ -2160,7 +2164,7 @@ with st.sidebar:
                                         with col_list:
                                             sel_tables = st.multiselect("选择数据表", tables, key="omni_snap_tables_v2", placeholder="选择要导出快照的表...")
                                         with col_action:
-                                            if st.button("🚀 生成快照", type="primary", use_container_width=True, disabled=not sel_tables, key="omni_snap_btn_table"):
+                                            if st.button("📥 导出并投递至暂存区", type="primary", use_container_width=True, disabled=not sel_tables, key="omni_snap_btn_table"):
                                                 status = st.status("📸 正在生成数据库快照...", expanded=True)
                                                 try:
                                                     for t in sel_tables:
@@ -2179,10 +2183,7 @@ with st.sidebar:
                                                     print(f"Staging Total: {total_count} files now converged")
                                                     print(f"{'-'*55}\n")
 
-                                                    # [v9.5.11] 自动命名
-                                                    auto_trigger_naming()
-                                                    st.session_state.uploaded_path = st.session_state.task_staging_dir
-                                                    st.toast(f"✅ 已导出 {len(sel_tables)} 张表")
+                                                    handle_ingestion_success("数据库快照", len(sel_tables))
                                                     # [v9.5.17] 移除 st.rerun()，依靠 Fragment 局部刷新
                                                 except Exception as e:
                                                     status.update(label="❌ 导出失败", state="error")
@@ -2229,7 +2230,7 @@ with st.sidebar:
                                     sql_input = st.text_area("SQL 查询语句", height=150, placeholder="SELECT * FROM orders WHERE created_at > '2025-01-01'...", key="omni_snap_sql_v2")
                                     filename_hint = st.text_input("文件命名标识 (可选)", placeholder="例如: 2025_Q1_Sales", key="omni_snap_hint_v2")
                                     
-                                    if st.button("🚀 执行并生成快照", type="primary", key="omni_snap_sql_run"):
+                                    if st.button("📥 执行并投递至暂存区", type="primary", key="omni_snap_sql_run"):
                                         if not sql_input.strip():
                                             st.error("请输入 SQL")
                                         else:
@@ -2254,9 +2255,7 @@ with st.sidebar:
                                                     print(f"Staging Total: {total_count} files now converged")
                                                     print(f"{'-'*55}\n")
 
-                                                    # [v9.5.11] 自动命名
-                                                    auto_trigger_naming()
-                                                    st.session_state.uploaded_path = st.session_state.task_staging_dir
+                                                    handle_ingestion_success("自定义SQL", 1)
                                                     # [v9.5.17] 移除 st.rerun()，依靠 Fragment 局部刷新
                                                 except Exception as e:
                                                     st.error(f"执行失败: {e}")
