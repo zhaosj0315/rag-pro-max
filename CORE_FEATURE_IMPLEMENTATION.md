@@ -1,12 +1,56 @@
 # RAG Pro Max 核心功能实现详述 (Core Feature Implementation)
 
-**版本**: v9.1.0 (Flagship Evolution)
+**版本**: v9.5.37 (Search Revolution Edition)
 **状态**: 关键性资产 (永久保存)
-**描述**: 本文档记录了 v9.1「极致性能」优化、v9.0「全能摄入」逻辑及 v8.9「精准抓取」架构的底层实现、协同算法及物理闭环规范。
+**描述**: 本文档记录了 v9.5「搜索革命」、v9.1「极致性能」及 v9.0「全能摄入」架构的底层实现、协同算法及物理闭环规范。
 
 ---
 
-## ⚡ 1. 极致 UI 性能优化 (UI Performance Hardening)
+## 🕷️ 1. 智能搜索暴力自愈算法 (Search Resilience)
+v9.5.37 针对搜索引擎的反爬与重定向墙，实装了“降维打击”式的抓取逻辑。
+
+### 暴力探测 (Violent Discovery)
+- **物理下沉实现**: `discovery_links_violently` 函数物理嵌入 `apppro.py`，彻底规避了多进程子进程对 `importlib.reload` 不敏感导致的旧逻辑残留问题。
+- **正则字符流扫描**: 绕过脆弱的 DOM 解析，直接利用 `re.findall(r'https?://[^
+	"'<>)]+')` 从原始响应体中打捞链接。
+
+### 重定向解壳 (Direct Unwrapping)
+- **解密 Bing 'a1' 包装**: 通过 `base64` 自动解码 Bing 跳转链接中的 `u=` 参数，实现零延迟直连目标网站。
+- **DDG/Google 适配**: 采用 `parse_qs` 精准提取 `uddg` 或 `url` 参数，绕过搜索引擎的中间跳转页，降低 70% 的请求失败率。
+
+### Level 0 种子策略
+- **职责隔离**: 搜索引擎页面被严格限制在 L0 层级。
+- **内容净化**: 强制清空 L0 层的 `content` 字段，确保知识库中只保留真实的文档，而非搜索列表。
+
+---
+
+## 📦 2. 暂存区治理中心 (Staging Inspector)
+v9.5.37 引入了物理暂存区的可视化管理工具链。
+
+### 核心实现
+- **四维工具链**:
+    - **预览 (Preview)**: 使用 `st.popover` 结合限高 CSS 容器，按来源分组展示文件列表。
+    - **定位 (Finder)**: 调用 `open -R` (macOS) 实现物理路径跳转。
+    - **刷新 (Refresh)**: 强制重置 `session_state.omni_last_upload_hash`，触发文件重扫描。
+    - **清理 (Clean)**: 执行 `shutil.rmtree` 并立即重建空目录。
+- **审计追踪**:
+    - **.meta 伴生**: 每次写入操作同步生成 `file.meta`，记录 `Source` 与 `SyncTime`。
+    - **Shielding**: 在 `IndexBuilder` 构建阶段，`_scan_files` 函数内置 `not f.endswith('.meta')` 过滤器，确保审计文件不进入索引。
+
+---
+
+## 📥 3. 全源归一化摄入 (Omni-Ingestion Implementation)
+v9.5.1 实现了“一切皆源文件”的终极架构，废弃了特殊的“数据库同步”模式。
+
+### 核心引擎：`DatabaseExporter`
+- **定位**: 位于 `src/processors/database_exporter.py`，是连接 SQL 世界与文件世界的桥梁。
+- **流式物料化 (Streaming Materialization)**:
+  - 采用 `pd.read_sql(..., chunksize=N)` 迭代器模式。
+  - 逐块将查询结果写入 CSV 文件，确保内存占用恒定，不随数据量线性增长。
+
+---
+
+## ⚡ 4. 极致 UI 性能优化 (UI Performance Hardening)
 v9.1.0 对表现层执行了深度手术，解决了 Streamlit 传统的刷新延迟痛点，实现了“零白屏”交互。
 
 ### 技术实现细节 (Technical Specs)
@@ -20,32 +64,8 @@ v9.1.0 对表现层执行了深度手术，解决了 Streamlit 传统的刷新�
 
 ---
 
-## 💬 2. 纯对话模式深度解耦 (Pure Chat Decoupling)
+## 💬 5. 纯对话模式深度解耦 (Pure Chat Decoupling)
 剥离了轻量级聊天对重型知识库引擎的硬编码依赖。
 
-- **Filesystem-Agnostic**: 识别 `active_kb_name == 
-## 📥 3. 全源归一化摄入 (Omni-Ingestion Implementation)
-v9.5.1 实现了“一切皆源文件”的终极架构，废弃了特殊的“数据库同步”模式。
-
-### 核心引擎：`DatabaseExporter`
-- **定位**: 位于 `src/processors/database_exporter.py`，是连接 SQL 世界与文件世界的桥梁。
-- **流式物料化 (Streaming Materialization)**:
-  - 采用 `pd.read_sql(..., chunksize=N)` 迭代器模式。
-  - 逐块将查询结果写入 CSV 文件，确保内存占用恒定，不随数据量线性增长。
-
----
-
-## 🕷️ 4. 智能搜索暴力自愈算法 (Search Resilience)
-v9.5.37 针对搜索引擎的反爬与重定向墙，实装了“降维打击”式的抓取逻辑。
-
-### 暴力探测 (Violent Discovery)
-- **物理下沉实现**: `discovery_links_violently` 函数物理嵌入 `apppro.py`，彻底规避了多进程子进程对 `importlib.reload` 不敏感导致的旧逻辑残留问题。
-- **正则字符流扫描**: 绕过脆弱的 DOM 解析，直接利用 `re.findall(r'https?://[^\s"\'<>)]+')` 从原始响应体中打捞链接。
-
-### 重定向解壳 (Direct Unwrapping)
-- **解密 Bing 'a1' 包装**: 通过 `base64` 自动解码 Bing 跳转链接中的 `u=` 参数，实现零延迟直连目标网站。
-- **DDG/Google 适配**: 采用 `parse_qs` 精准提取 `uddg` 或 `url` 参数，绕过搜索引擎的中间跳转页，降低 70% 的请求失败率。
-
-### Level 0 种子策略
-- **职责隔离**: 搜索引擎页面被严格限制在 L0 层级。
-- **内容净化**: 强制清空 L0 层的 `content` 字段，确保知识库中只保留真实的文档，而非搜索列表。
+- **Filesystem-Agnostic**: 识别 `active_kb_name == "pure_chat"` 信号，直接跳过 `KnowledgeBaseLoader`。
+- **Direct LLM Stream**: 复用 `Settings.llm.stream_chat` 接口，绕过 LlamaIndex 的 `Retriever` 和 `QueryEngine` 层，实现毫秒级首字响应。

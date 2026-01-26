@@ -1,6 +1,6 @@
 # RAG Pro Max REST API Documentation
 
-**Version**: v9.5.1 (aligned with `src/api/fastapi_server.py`)
+**Version**: v9.5.37 (aligned with `src/api/fastapi_server.py`)
 **Update Date**: 2026-01-26
 **Status**: Production Ready
 
@@ -25,7 +25,7 @@ GET /health
 {
   "status": "healthy",
   "timestamp": "2026-01-26T10:00:00",
-  "version": "9.5.1"
+  "version": "9.5.37"
 }
 ```
 
@@ -113,9 +113,13 @@ POST /query-multimodal
 
 ---
 
-## ⚠️ Limitations
+## ⚠️ Limitations & Roadmap
 
-*   **UI-Exclusive Features**: Advanced features like **Omni-Ingestion (Database Snapshots)**, **Internet Extraction**, and **Dual-Core Data Analysis** (SQL Generation) are currently available **only via the Streamlit UI** (`src/apppro.py`) and are not yet exposed via this REST API.
+*   **UI-Exclusive Features**: Advanced capabilities introduced in v9.5+ are currently **Streamlit UI exclusive** and NOT yet available via API:
+    *   **Omni-Ingestion**: Database snapshots, web crawling, and text pasting.
+    *   **Staging Area Management**: `.meta` auditing and staging area cleanup.
+    *   **Dual-Core Data Analysis**: Text-to-SQL generation and dashboarding.
+    *   **Deep Research**: Expert multi-role synthesis.
 *   **Authentication**: The current API server runs in a trusted environment mode (No Auth). Ensure network isolation in production.
 
 ---

@@ -2,7 +2,7 @@
 
 **版本**: v9.5.37 (Search Revolution Edition)  
 **更新日期**: 2026-01-26  
-**核心特性**: Violent Discovery, Redirect Unwrapping, Staging Inspector
+**核心特性**: Violent Discovery, Redirect Unwrapping, Staging Inspector, Meta-Shielding
 
 ---
 
@@ -11,14 +11,14 @@
 在 v9.5.37 中，系统重写了搜索模式的调度核心，引入了 **「种子探测与获取分离」** 模式。
 
 ### 1. Level 0: 暴力探测层 (Violent Discovery)
-- **Physical Inlining**: 为了绕过 Python 多进程环境下的模块缓存陈旧问题，探测算法直接物理嵌入 `apppro.py`。
+- **Physical Inlining**: 为了绕过 Python 多进程环境下的模块缓存陈旧问题，探测算法 (`discovery_links_violently`) 直接物理嵌入 `apppro.py`。
 - **Regex Extraction**: 放弃对脆弱 HTML 标签的选择性依赖，采用正则表达式扫描原始字节流，从混淆代码中暴力提取 `https://` 链接。
 - **Redirect Unwrapping**: 引入 `extract_real_url` 算法，在探测阶段直接剥离 Bing/DDG 跳转外壳，锁定目标终点。
 
 ### 2. Level 1+: 饱和抓取层 (Document Crawling)
 - **Isolation Principle**: 搜索引擎结果页（L0）仅用于链接分发，内容会被强制清空，不计入深度配额。
-- **Bilingual Relevance**: 引入中英双语启发式匹配，确保高质量外文文档不因关键词缺失被误杀。
-- **Exponential Scale**: 严格执行 $n^{depth}$ 扩散，确保 2x5 布局下产出 30+ 份核心文档。
+- **Concurrent Execution**: 采用 `ThreadPoolExecutor` (I/O 密集型) 替代多进程，彻底解决 macOS 下的 `ProcessPool` 崩溃问题。
+- **Markdown Normalization**: 所有 HTML 均通过 `HtmlToMarkdown` 转化为高纯度 `.md` 文件，保留标题层级结构。
 
 ---
 
@@ -27,47 +27,40 @@
 ### 1. Staging Inspector 工具链
 系统为 `task_staging_dir` 赋予了完整的生命周期管理能力：
 - **Unified 5 Sources**: 本地上传、目录扫描、文本粘贴、网页抓取、数据库快照。
-- **Audit Sidecars**: 每一份源文件均配有 `.meta` 伴生文件，记录物理来源标签。
-- **Scrollable Popover**: 采用限高滚动容器实现资产清单预览，解决 UI 溢出问题。
+- **Audit Sidecars**: 每一份源文件 (`file.ext`) 均配有 `.meta` 伴生文件 (`file.ext.meta`)，记录物理来源与采集时间。
+- **Meta-Shielding (审计屏蔽)**: 在 `IndexBuilder` 构建阶段，文件扫描器 (`_scan_files`) 内置了 `not f.endswith('.meta')` 过滤器。这确保了审计文件 **仅用于 UI 展示与溯源**，绝对不会进入向量索引或被误读为文档内容。
 
 ### 2. 物理自愈机制
 - **Pre-Write Check**: 在每一次 IO 操作前检查暂存目录完整性，实现 Session 级别的路径自愈。
-- **Direct Finder Integration**: 集成 macOS 系统命令，实现物理路径的秒级跳转定位。
+- **Direct Finder Integration**: 集成 macOS `open -R` 指令，实现物理路径的秒级跳转定位。
 
 ### 3. 全源归一化摄入层 (Omni-Ingestion Architecture)
-在 v9.5.0 中，系统实现了**“一切皆源文件 (Everything is a Source File)”**的终极架构统一：
+在 v9.5 系列中，系统实现了**“一切皆源文件 (Everything is a Source File)”**的终极架构统一：
 - **Staging Buffer (`task_staging_dir`)**: 作为所有非结构化数据的统一汇聚点，通过 `uuid` 隔离不同任务。
 - **Source Aggregators**: 
-    - **Upload Ingestor**: 处理 Streamlit 文件缓冲区流。
+    - **Upload Ingestor**: 处理 Streamlit 文件缓冲区流，具备 `md5` 哈希去重能力。
     - **Path Ingestor**: 执行 `os.walk` 递归文件扫描与物理镜像。
-    - **Paste Ingestor**: 实时文本持久化引擎。
+    - **Paste Ingestor**: 实时文本持久化引擎，生成 `Pasted_{Timestamp}.txt`。
     - **Web Ingestor**: 网页爬虫与智能搜索结果 Markdown 化。
     - **Database Exporter**: 数据库查询结果流式物料化 (CSV)。
 - **Atomic Dispatcher**: 将暂存区的“并集合集”一次性投递给 `IndexBuilder`，确保了构建原子性。
-- **Source-Agnostic Mirroring**: 所有的远程表在摄入阶段均会被转化为标准 `.csv` 片段，确保下游的 RAG 向量化与 SQL 影子库构建逻辑 **100% 复用**。
-
-### 4. 架构鲁棒性模式 (Robustness Patterns)
-- **Scope Safeguard**: 针对 Fragment 引入引发的作用域黑洞，实施了“全局初始化兜底”策略，确保 `btn_start` 等调度变量在任意生命周期阶段均可见。
-- **Conflict Resolution**: 解决了 Widget Key 与 Session State 的同步竞态，确保了状态机的单向一致性。
-- **Cache Buster (结构位移修复)**: 针对 Streamlit 热重载引发的内存陈旧问题，实施了“局部函数封装”策略，通过改变代码物理位置强制解释器重刷符号表。
-
 
 ---
 
-## 🧬 归一化摄入管线 (Normalized Ingestion Pipeline)
+## 🧬 构建管线与资产沉淀 (Pipeline & Assets)
 
-在 v8.8.0 中，表现层（Presentation Layer）经历了深度重构，实现了**入口逻辑的归一化**。
+构建过程严格遵循 **“物理归档优先”** 原则：
 
-- **全能单一入口**: 界面收敛为唯一的 **“⚡ 全源摄入”** 模式。
-- **五维数据源**: 文件、目录、文本、网页、数据库快照五位一体。
-- **万能附件 (Universal Attachment)**: 实现了全源文件上传入口，支持图片 OCR 与文档解析逻辑的深度复用。
-- **配置下沉**: 将“数据分析”从顶级导航下沉为 `IndexBuilder` 的配置参数 `enable_data_analysis`。
+1.  **索引构建**: `VectorStoreIndex` 处理有效文档，生成 `vector_store.json`。
+2.  **物理归档**: 执行 `shutil.copy2` 将暂存区有效文件（排除 `.meta`）全量镜像到 `raw_sources/`。
+3.  **模型锁定**: 生成 `.kb_info.json`，永久记录构建时使用的 Embedding 模型，防止未来模型不匹配。
+4.  **户籍登记**: 生成 `manifest.json`，记录所有权、摘要及文件指纹。
 
 ---
 
-## 🧬 双核组装与严选路由 (v8.1.0)
+## 🧬 双核组装与严选路由 (Iron-Gate Routing)
 
-在 v8.1.0 迭代中，系统确立了“能力预装 (Provisioning)”与“实时激活 (Activation)”相分离的顶层架构模式。
+在 v8.1.0 迭代中，系统确立了“能力预装”与“实时激活”相分离的顶层架构模式。
 
 ### 1. 意图严选路由 (Iron-Gate Routing)
 为了防止 SQL 引擎对定性查询的“逻辑干扰”，系统在提问主循环中实施了防御式网关：
@@ -75,15 +68,9 @@
 - **意图判定 (`manual_da_on`)**: 实时监听 Session State 中的数据分析开关。
 - **铁闸决策**: 只有当 `is_data_kb AND manual_da_on` 为真时，流量才允许流向逻辑核（SQL 推演）。否则，一律默认路由至语义核（RAG 检索）。
 
-### 2. 归一化摄入不变式 (Normalized Invariants)
-不论摄入源头如何变化，构建管线必须满足以下物理闭环：
-- **RAG 基准**: 必须生成 `docstore.json` 与 `index_store.json`。
-- **影子库可选**: 仅在用户勾选增强项时生成 `.db` 物理库。
-- **元数据归口**: 所有者与处理指纹必须统一写入 `manifest.json`。
-
 ---
 
-## 🏗️ 归一化摄入管线 (Normalized Ingestion Pipeline)
+## 🏗️ 归一化摄入管线图 (Pipeline Diagram)
 
 ```mermaid
 graph TD
@@ -91,16 +78,18 @@ graph TD
     B[🌐 网页/搜索] --> N
     C[🗄️ 数据库快照 (CSV)] --> N
     
-    N --> R[<b>RAG 核心管线 (必经)</b><br/>向量化固化]
-    R --> S{勾选: 智能分析?}
-    S -- "True" --> DA[<b>SQL 核心管线 (增强)</b><br/>物理建表 / 影子映射]
-    S -- "False" --> SKIP[跳过建模]
+    N --> S[暂存区 Staging Area]
+    S -.-> M[.meta 审计文件]
+    
+    S --> I[IndexBuilder]
+    M -- "Shielding" --> X[屏蔽过滤]
+    
+    I --> R[<b>RAG 核心管线</b><br/>向量化固化]
+    I --> P[<b>物理归档</b><br/>raw_sources/]
+    
+    R --> D{勾选: 智能分析?}
+    D -- "True" --> DA[<b>SQL 核心管线</b><br/>business_data.db]
     
     DA --> G[🛡️ 旗舰治理中心]
     R --> G
 ```
-
-### 1. 技术先进性结论
-- **高内聚**: RAG 逻辑与 SQL 逻辑物理独立，互不污染。
-- **可审计**: 通过 `Route Discovery` 日志，实现了系统决策的透明化。
-- **稳定性**: 架构极大地减少了由于“自作聪明”引发的逻辑死锁。

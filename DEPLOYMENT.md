@@ -16,13 +16,17 @@ python3 scripts/maintenance/debug_search_live.py
 ```
 若该脚本返回 `探测到 0 个链接`，请检查防火墙是否拦截了对 `bing.com` 或 `duckduckgo.com` 的请求。
 
+### 2. macOS 预览功能依赖
+系统使用 `qlmanage` 提供原生文件预览。请确保部署环境满足以下条件：
+- **操作系统**: macOS 12.0+ (Monterey 或更高版本)
+- **权限**: 运行 Streamlit 的终端需授予 "Accessibility" 或 "Automation" 权限（用于 AppleScript 置顶窗口）。
+- **Headless 模式**: 若在无头服务器（Linux Server）部署，预览按钮将自动降级或仅显示路径复制功能。
 
-
-### 2. 维护脚本 (v6.7.0 重构路径)
+### 3. 维护脚本 (Standard Maintenance)
 所有维护动作应通过 `scripts/` 目录下的规范化路径执行：
-- **全量材料维护**: `./scripts/cleanup_materials.sh`
+- **代码全景审计**: `python scripts/maintenance/audit_codebase.py`
+- **全量材料清理**: `./scripts/cleanup_materials.sh`
 - **知识库一致性诊断**: `python scripts/maintenance/diagnose_kb.py`
-- **故障自动修复**: `python scripts/maintenance/fix_existing_kb.py`
 
 ---
 
@@ -34,7 +38,14 @@ python3 scripts/maintenance/debug_search_live.py
 chmod -R 777 app_logs/
 ```
 
-### 2. 隐私脱敏
+### 2. 端口自愈
+系统内置了 `8501` (App) 和 `8899` (WebSSH) 端口的自动清理逻辑。若遇到 `Address already in use` 错误，可以直接运行：
+```bash
+# 强制终止残留进程
+lsof -ti:8501,8899 | xargs kill -9
+```
+
+### 3. 隐私脱敏
 系统导出的全量资产包已自动对 API 密钥进行脱敏处理，但建议在生产环境下禁用 `DEBUG` 模式。
 
 ---
