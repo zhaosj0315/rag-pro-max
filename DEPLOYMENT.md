@@ -1,8 +1,8 @@
-# RAG Pro Max v9.0.0 企业级部署指南 (Flagship Evolution)
+# RAG Pro Max v9.5.1 企业级部署指南 (Omni-Source Unification)
 
-**版本**: v9.0.0  
-**更新日期**: 2026-01-22  
-**核心特性**: 全能并集摄入、物理暂存区架构、管理员空间豁免
+**版本**: v9.5.1  
+**更新日期**: 2026-01-26  
+**核心特性**: 全源摄入、数据库快照、管理员空间豁免
 
 ---
 
@@ -56,7 +56,7 @@ docker-compose up -d --build
 ---
 
 ## 🐳 Docker 镜像说明
-v8.8.0 官方镜像标签为 `ragpromax/rag-pro-max:v8.8.0`。
+v9.5.1 官方镜像标签为 `ragpromax/rag-pro-max:v9.5.1`。
 请在 `docker-compose.yml` 中确保更新版本号。
 
 ---
@@ -65,7 +65,7 @@ v8.8.0 官方镜像标签为 `ragpromax/rag-pro-max:v8.8.0`。
 
 ### 1. 物理目录结构与权限
 - **知识库数据**: `vector_db_storage/` (读写)
-- **并集暂存区**: `temp_uploads/` (**核心读写**)。v9.0.0 的多源叠加逻辑依赖此目录进行文件镜像同步（shutil/os.walk）。若权限不足，将导致材料无法添加。
+- **并集暂存区**: `temp_uploads/` (**核心读写**)。v9.5.1 的 **Omni-Ingestion** 逻辑依赖此目录作为 PDF、网页与数据库快照 (CSV) 的统一汇聚点。若权限不足，将导致所有摄入功能失效。
 - **对话历史**: `chat_histories/` (读写)
 - **运行日志**: `app_logs/` (读写)
 

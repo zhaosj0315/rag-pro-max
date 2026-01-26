@@ -24,3 +24,20 @@ v9.1.0 对表现层执行了深度手术，解决了 Streamlit 传统的刷新�
 剥离了轻量级聊天对重型知识库引擎的硬编码依赖。
 
 - **Filesystem-Agnostic**: 识别 `active_kb_name == 
+## 📥 3. 全源归一化摄入 (Omni-Ingestion Implementation)
+v9.5.1 实现了“一切皆源文件”的终极架构，废弃了特殊的“数据库同步”模式。
+
+### 核心引擎：`DatabaseExporter`
+- **定位**: 位于 `src/processors/database_exporter.py`，是连接 SQL 世界与文件世界的桥梁。
+- **流式物料化 (Streaming Materialization)**:
+  - 采用 `pd.read_sql(..., chunksize=N)` 迭代器模式。
+  - 逐块将查询结果写入 CSV 文件，确保内存占用恒定，不随数据量线性增长。
+- **自定义 SQL 适配**:
+  - 支持直接执行用户输入的 Raw SQL。
+  - 自动为结果集生成带时间戳的 CSV 文件名 (`[SQL]QueryName_Timestamp.csv`)。
+- **元数据伴生**:
+  - 每次导出均会生成 `.meta` 伴生文件，记录 SQL 来源、执行时间与行数，为后续的数据血缘追踪提供物理依据。
+
+### 物理暂存区 (Staging Area)
+- **统一汇聚**: 无论是 PDF 上传、网页抓取还是数据库导出，所有产物最终都表现为 `task_staging_dir` 下的物理文件。
+- **原子化构建**: `IndexBuilder` 不再感知数据来源，仅需扫描暂存区即可完成混合索引构建，极大降低了系统复杂度。

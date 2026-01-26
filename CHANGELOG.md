@@ -1,5 +1,16 @@
 # Changelog
 
+## [v9.5.1] - 2026-01-26 (Omni-Ingestion Unification Edition)
+### ⚡ 全源摄入架构统一 (Omni-Ingestion Unification)
+- **数据库同步降维**: 彻底移除了独立的“🔌 数据库同步”侧边栏模式，将其能力完整降维融合至“⚡ 全源摄入”面板的 **Tab 5 (数据库快照)**。
+- **一切皆源文件 (Everything is a Source File)**: 实现了数据库查询的物理物料化。现在，无论是整表导出还是自定义 SQL 查询，均会先生成标准的 CSV 文件存入 `task_staging_dir` 暂存区，与 PDF、网页等异构材料实现原子化混合入库。
+- **自定义 SQL 支持**: 在 Omni 面板中新增了“📝 自定义 SQL”模式，支持用户直接编写 SQL 提取特定业务切片数据，填补了以往只能整表同步的灵活性空白。
+- **流式导出引擎**: 引入 `DatabaseExporter` 核心类，采用 Pandas Chunk 分块读取策略，有效防止了导出百万级大表时的内存溢出 (OOM) 风险。
+
+### 🛡️ 架构瘦身与清理
+- **死代码移除**: 物理删除了 `apppro.py` 中约 200 行冗余的旧版数据库同步 UI 代码。
+- **交互归一**: 统一了所有资料摄入的入口逻辑，现在只有唯一的 **“⚡ 全源摄入”** 模式，大幅降低了用户的认知负荷与操作路径。
+
 ## [v9.3.0] - 2026-01-24 (Codebase Governance Edition)
 ### 🗺️ 代码资产透视系统 (Codebase Cartography)
 - **上帝视角索引**: 新增 `scripts/maintenance/audit_codebase.py` 自动化审计工具。一键生成全项目静态索引 (`CODE_INDEX.md`)、血缘依赖图 (`DEPENDENCY_GRAPH.svg`) 及缺失文档清单 (`MISSING_DOCS.json`)。

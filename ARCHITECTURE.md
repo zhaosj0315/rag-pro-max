@@ -1,8 +1,8 @@
-# RAG Pro Max v9.3.0 企业级系统架构文档
+# RAG Pro Max v9.5.1 企业级系统架构文档
 
-**版本**: v9.3.0 (Codebase Governance Edition)  
-**更新日期**: 2026-01-24  
-**核心特性**: Codebase Cartography, Fragment UI Isolation, Seamless Chat Pipeline
+**版本**: v9.5.1 (Omni-Source Unification Edition)  
+**更新日期**: 2026-01-26  
+**核心特性**: Omni-Ingestion, Database Snapshots, Fragment UI Isolation
 
 ---
 
@@ -62,14 +62,15 @@
 - **Unified Engine Interface**: 抽象了统一的 `crawl_recursive` 接口，解耦了同步（Requests）与异步（Aiohttp）底层实现。
 
 ### 3. 全源归一化摄入层 (Omni-Ingestion Architecture)
-在 v9.0.0 中，系统引入了 **「物理暂存区 (Physical Staging Area)」** 架构，实现了前端交互与后端引擎的解耦：
+在 v9.5.0 中，系统实现了**“一切皆源文件 (Everything is a Source File)”**的终极架构统一：
 - **Staging Buffer (`task_staging_dir`)**: 作为所有非结构化数据的统一汇聚点，通过 `uuid` 隔离不同任务。
 - **Source Aggregators**: 
     - **Upload Ingestor**: 处理 Streamlit 文件缓冲区流。
     - **Path Ingestor**: 执行 `os.walk` 递归文件扫描与物理镜像。
     - **Paste Ingestor**: 实时文本持久化引擎。
+    - **Web Ingestor**: 网页爬虫与智能搜索结果 Markdown 化。
+    - **Database Exporter**: 数据库查询结果流式物料化 (CSV)。
 - **Atomic Dispatcher**: 将暂存区的“并集合集”一次性投递给 `IndexBuilder`，确保了构建原子性。
-- **Heterogeneous Drivers**: 封装了从 MySQL, Oracle 到 MaxCompute 的全量驱动逻辑。
 - **Source-Agnostic Mirroring**: 所有的远程表在摄入阶段均会被转化为标准 `.csv` 片段，确保下游的 RAG 向量化与 SQL 影子库构建逻辑 **100% 复用**。
 
 ### 4. 架构鲁棒性模式 (Robustness Patterns)
@@ -84,8 +85,8 @@
 
 在 v8.8.0 中，表现层（Presentation Layer）经历了深度重构，实现了**入口逻辑的归一化**。
 
-- **三大全能入口**: 界面收敛为文件、互联网、数据库三大核心支柱。
-- **智能路由**: 互联网模式下内置自动意图识别引擎 (Intent Recognition Engine)。
+- **全能单一入口**: 界面收敛为唯一的 **“⚡ 全源摄入”** 模式。
+- **五维数据源**: 文件、目录、文本、网页、数据库快照五位一体。
 - **万能附件 (Universal Attachment)**: 实现了全源文件上传入口，支持图片 OCR 与文档解析逻辑的深度复用。
 - **配置下沉**: 将“数据分析”从顶级导航下沉为 `IndexBuilder` 的配置参数 `enable_data_analysis`。
 
@@ -113,9 +114,9 @@
 
 ```mermaid
 graph TD
-    A[📂 文件上传 (含粘贴/路径)] --> N[归一化摄入中心]
-    B[🌐 互联网提取 (含爬虫/搜索)] --> N
-    C[🔌 数据库同步] --> N
+    A[📂 文件/目录/粘贴] --> N[归一化摄入中心]
+    B[🌐 网页/搜索] --> N
+    C[🗄️ 数据库快照 (CSV)] --> N
     
     N --> R[<b>RAG 核心管线 (必经)</b><br/>向量化固化]
     R --> S{勾选: 智能分析?}
