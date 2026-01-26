@@ -1590,31 +1590,35 @@ with st.sidebar:
                     import shutil
                     try:
                         if is_file:
-                            dest = os.path.join(st.session_state.task_staging_dir, os.path.basename(source_path))
+                            fname = os.path.basename(source_path)
+                            dest = os.path.join(st.session_state.task_staging_dir, fname)
                             if not os.path.exists(dest):
-                                # 使用 copy 而非 copy2，确保产生新的修改时间，防止被清理逻辑误杀
                                 shutil.copy(source_path, dest)
-                                logger.info(f"📂 [{source_label}] 单文件同步成功: {os.path.basename(source_path)}")
+                                # [v9.5.4] 写入元数据方便审计
+                                with open(dest + ".meta", "w", encoding="utf-8") as f:
+                                    f.write(f"Source: {source_label}\n")
+                                    f.write(f"SyncTime: {datetime.now().isoformat()}\n")
+                                logger.info(f"📂 [{source_label}] 单文件同步成功: {fname}")
                         else:
                             # 目录同步 (支持递归)
                             added_count = 0
                             for root, dirs, files in os.walk(source_path):
                                 rel_path = os.path.relpath(root, source_path)
-                                if rel_path == ".":
-                                    target_root = st.session_state.task_staging_dir
-                                else:
-                                    target_root = os.path.join(st.session_state.task_staging_dir, rel_path)
+                                target_root = st.session_state.task_staging_dir if rel_path == "." else os.path.join(st.session_state.task_staging_dir, rel_path)
                                 
                                 if not os.path.exists(target_root):
                                     os.makedirs(target_root)
                                     
                                 for file in files:
-                                    if file.startswith('.'): continue
+                                    if file.startswith('.') or file.endswith('.meta'): continue
                                     s = os.path.join(root, file)
                                     d = os.path.join(target_root, file)
                                     if not os.path.exists(d):
-                                        # 产生新的时间戳，绕过清理脚本
                                         shutil.copy(s, d)
+                                        # 写入元数据
+                                        with open(d + ".meta", "w", encoding="utf-8") as meta_f:
+                                            meta_f.write(f"Source: {source_label}\n")
+                                            meta_f.write(f"SyncTime: {datetime.now().isoformat()}\n")
                                         added_count += 1
                             logger.info(f"📂 [{source_label}] 递归同步完成: 从 {source_path} 导入了 {added_count} 个文件")
                         return True
@@ -1691,11 +1695,45 @@ with st.sidebar:
                             st.caption(f"📍 物理路径: `{st.session_state.task_staging_dir}`")
                             if files_in_staging:
                                 st.divider()
-                                for f in files_in_staging:
-                                    if f.startswith('.'): continue
+                                # [v9.5.5] 增强分类显示
+                                for f in sorted(files_in_staging):
+                                    if f.startswith('.') or f.endswith('.meta'): continue
                                     fpath = os.path.join(st.session_state.task_staging_dir, f)
+                                    
+                                    # 尝试获取来源
+                                    source_label = None
+                                    meta_path = fpath + ".meta"
+                                    if os.path.exists(meta_path):
+                                        try:
+                                            with open(meta_path, "r", encoding="utf-8") as meta_f:
+                                                for line in meta_f:
+                                                    if line.startswith("Source:"):
+                                                        source_label = line.split(":", 1)[1].strip()
+                                                        break
+                                        except: pass
+                                    
+                                    # 如果 meta 没拿到，则根据前缀推断并补全
+                                    if not source_label:
+                                        if f.startswith('[DB]'): source_label = "数据库快照"
+                                        elif f.startswith('[SQL]'): source_label = "自定义SQL"
+                                        elif f.startswith('Web_'): source_label = "网页抓取"
+                                        elif f.startswith('Search_'): source_label = "智能搜索"
+                                        elif f.startswith('Pasted_'): source_label = "文本粘贴"
+                                        else: source_label = "外部文件"
+                                    
                                     size_str = f"{os.path.getsize(fpath)/1024:.1f} KB" if os.path.exists(fpath) else "Unknown"
-                                    st.text(f"📄 {f} ({size_str})")
+                                    
+                                    # 使用图标增强感官
+                                    icon = "📄"
+                                    if "数据库" in source_label or "SQL" in source_label: icon = "🗄️"
+                                    elif "网页" in source_label: icon = "🌐"
+                                    elif "搜索" in source_label: icon = "🔍"
+                                    elif "粘贴" in source_label: icon = "📝"
+                                    elif "上传" in source_label: icon = "📤"
+                                    elif "目录" in source_label: icon = "📁"
+                                    
+                                    # 一行化专业显示
+                                    st.markdown(f"**{icon} {source_label}** | `{f}` | <span style='color: #666;'>{size_str}</span>", unsafe_allow_html=True)
                             else:
                                 st.info("暂存区为空")
 
@@ -1706,7 +1744,6 @@ with st.sidebar:
                             os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
                             st.session_state.uploaded_path = None
                             st.rerun()
-
                     # --- 五大源标准 Tabs ---
                     omni_tabs = st.tabs(["📂 上传文件", "📁 扫描路径", "📝 文本粘贴", "🌐 网页摄入", "🗄️ 数据库快照"])
                     
@@ -1747,8 +1784,13 @@ with st.sidebar:
                             content = st.session_state.paste_text_display
                             if content.strip():
                                 safe_name = f"Pasted_{int(time.time())}.txt"
-                                with open(os.path.join(st.session_state.task_staging_dir, safe_name), 'w', encoding='utf-8') as f:
+                                fpath = os.path.join(st.session_state.task_staging_dir, safe_name)
+                                with open(fpath, 'w', encoding='utf-8') as f:
                                     f.write(content)
+                                # [v9.5.7] 写入元数据方便审计
+                                with open(fpath + ".meta", "w", encoding="utf-8") as meta_f:
+                                    meta_f.write(f"Source: 文本粘贴\n")
+                                    meta_f.write(f"SyncTime: {datetime.now().isoformat()}\n")
                                 st.session_state.uploaded_path = st.session_state.task_staging_dir
                                 st.rerun()
                     
@@ -1852,6 +1894,12 @@ with st.sidebar:
                                             fpath = os.path.join(target_dir, fname)
                                             with open(fpath, 'w', encoding='utf-8') as f:
                                                 f.write(f"**URL:** {result['url']}\n\n# {result['title']}\n\n{result['content']}")
+                                            
+                                            # [v9.5.6] 写入元数据方便审计
+                                            with open(fpath + ".meta", "w", encoding="utf-8") as meta_f:
+                                                meta_f.write(f"Source: 智能搜索\n")
+                                                meta_f.write(f"URL: {result['url']}\n")
+                                                meta_f.write(f"SyncTime: {datetime.now().isoformat()}\n")
                                             
                                             from src.utils.file_system_utils import set_where_from_metadata
                                             set_where_from_metadata(fpath, result['url'])
