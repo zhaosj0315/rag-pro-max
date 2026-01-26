@@ -1714,7 +1714,8 @@ with st.sidebar:
                     
                     # [v9.5.3] 优化布局：引入 Popover 查看详情
                     # [v9.5.14] 引入“同步刷新”按钮
-                    stat_col1, stat_col_icon, stat_col_refresh, stat_col2 = st.columns([2.5, 0.4, 0.4, 0.7])
+                    # [v9.5.18] 引入“在 Finder 中显示”按钮
+                    stat_col1, stat_col_icon, stat_col_open, stat_col_refresh, stat_col2 = st.columns([2.5, 0.4, 0.4, 0.4, 0.7])
                     
                     with stat_col1:
                         stats_placeholder = st.empty()
@@ -1801,6 +1802,19 @@ with st.sidebar:
                                 st.markdown(list_html, unsafe_allow_html=True)
                             else:
                                 st.info("暂存区为空")
+
+                    with stat_col_open:
+                        if st.button("📍", help="在 Finder 中显示暂存区", key="open_staging_dir_btn"):
+                            path = st.session_state.task_staging_dir
+                            if os.path.exists(path):
+                                # [v9.5.19] 安全加固：使用系统标准 reveal_in_file_manager 替代 direct subprocess
+                                from src.utils.file_system_utils import reveal_in_file_manager
+                                if reveal_in_file_manager(path):
+                                    st.toast("📂 已在 Finder 中打开")
+                                else:
+                                    st.error("无法打开 Finder")
+                            else:
+                                st.error("暂存目录不存在")
 
                     with stat_col_refresh:
                         if st.button("🔄", help="强制同步并刷新暂存区", key="refresh_staging_omni"):
