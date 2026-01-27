@@ -1,81 +1,58 @@
-# RAG Pro Max v9.5.37 企业级系统架构文档
+# RAG Pro Max v9.5.38 Omni-Append Edition 架构白皮书
 
-**版本**: v9.5.37 (Search Revolution Edition)  
-**更新日期**: 2026-01-26  
-**核心特性**: Violent Discovery, Redirect Unwrapping, Staging Inspector, Meta-Shielding
-
----
-
-## 🏗️ 网页抓取层级架构 (Smart Search Architecture)
-
-在 v9.5.37 中，系统重写了搜索模式的调度核心，引入了 **「种子探测与获取分离」** 模式。
-
-### 1. Level 0: 暴力探测层 (Violent Discovery)
-- **Physical Inlining**: 为了绕过 Python 多进程环境下的模块缓存陈旧问题，探测算法 (`discovery_links_violently`) 直接物理嵌入 `apppro.py`。
-- **Regex Extraction**: 放弃对脆弱 HTML 标签的选择性依赖，采用正则表达式扫描原始字节流，从混淆代码中暴力提取 `https://` 链接。
-- **Redirect Unwrapping**: 引入 `extract_real_url` 算法，在探测阶段直接剥离 Bing/DDG 跳转外壳，锁定目标终点。
-
-### 2. Level 1+: 饱和抓取层 (Document Crawling)
-- **Isolation Principle**: 搜索引擎结果页（L0）仅用于链接分发，内容会被强制清空，不计入深度配额。
-- **Concurrent Execution**: 采用 `ThreadPoolExecutor` (I/O 密集型) 替代多进程，彻底解决 macOS 下的 `ProcessPool` 崩溃问题。
-- **Markdown Normalization**: 所有 HTML 均通过 `HtmlToMarkdown` 转化为高纯度 `.md` 文件，保留标题层级结构。
+**版本**: v9.5.38 (Omni-Append Edition)  
+**更新日期**: 2026-01-27  
+**核心特性**: Omni-Append, Precise Query, Grounding-Check Suggestions, Iron-Gate Routing
 
 ---
 
-## 🏗️ 全源归一化暂存架构 (Omni-Source Staging)
+## 🏗️ 顶层逻辑：三核驱动架构 (Triple-Core Drive)
 
-### 1. Staging Inspector 工具链
-系统为 `task_staging_dir` 赋予了完整的生命周期管理能力：
-- **Unified 5 Sources**: 本地上传、目录扫描、文本粘贴、网页抓取、数据库快照。
-- **Audit Sidecars**: 每一份源文件 (`file.ext`) 均配有 `.meta` 伴生文件 (`file.ext.meta`)，记录物理来源与采集时间。
-- **Meta-Shielding (审计屏蔽)**: 在 `IndexBuilder` 构建阶段，文件扫描器 (`_scan_files`) 内置了 `not f.endswith('.meta')` 过滤器。这确保了审计文件 **仅用于 UI 展示与溯源**，绝对不会进入向量索引或被误读为文档内容。
+在 v9.5.38 中，系统从传统的单核 RAG 演进为三核协同模式，所有流量受 `Iron-Gate Routing` 严选。
 
-### 2. 物理自愈机制
-- **Pre-Write Check**: 在每一次 IO 操作前检查暂存目录完整性，实现 Session 级别的路径自愈。
-- **Direct Finder Integration**: 集成 macOS `open -R` 指令，实现物理路径的秒级跳转定位。
+### 1. 语义核 (Semantic Core) - RAG Engine
+- **基础检索**: 基于 `vector_db_storage` 执行向量相似度检索。
+- **混合增强**: 支持 BM25 与向量重排序的混合路径。
 
-### 3. 全源归一化摄入层 (Omni-Ingestion Architecture)
-在 v9.5 系列中，系统实现了**“一切皆源文件 (Everything is a Source File)”**的终极架构统一：
-- **Unified Engine**: `src/ui/unified_ingestion.py` 是系统的唯一摄入入口，同时服务于 **Create Mode** 和 **Append Mode**。
-- **Dual Staging Buffers**: 
-    - **Global Buffer**: `temp_uploads` (用于创建新库)。
-    - **Append Buffer**: `vector_db_storage/<kb>/append_staging` (用于追加维护)，实现物理隔离。
-- **Source Aggregators**: 
-    - **Upload Ingestor**: 处理 Streamlit 文件缓冲区流，具备 `md5` 哈希去重能力。
-    - **Path Ingestor**: 执行 `os.walk` 递归文件扫描与物理镜像。
-    - **Paste Ingestor**: 实时文本持久化引擎，生成 `Pasted_{Timestamp}.txt`。
-    - **Web Ingestor**: 网页爬虫与智能搜索结果 Markdown 化。
-    - **Database Exporter**: 数据库查询结果流式物料化 (CSV)。
-- **Atomic Dispatcher**: 将暂存区的“并集合集”一次性投递给 `IndexBuilder`。支持两种策略：
-    - **Incremental (Default)**: 仅索引新文件，随后归档。
-    - **Full Rebuild**: 先归档，再对全量目录执行重建。
+### 2. 逻辑核 (Logical Core) - Data Analyst Engine
+- **SQL 推演**: 针对结构化物料（CSV/SQL），将自然语言转化为 SQL 并在本地 SQLite 中执行。
+- **铁闸准入**: 只有当 KB 包含 `business_schema.json` 且用户开启“数据分析”开关时才激活。
+
+### 3. 协同核 (Synergy Core) - Smart Agents
+- **Precise Query (精准提问)**: 替代了旧版的 Deep Thinking。在提问阶段，调用 LLM 对用户原始意图进行重写（Rewrite）与扩展，解决用户表达模糊的问题。
+- **Unified Suggestion Engine**: 负责生成“后续追问”。引入 **Grounding Check** 机制，生成的每一个问题都会预先跑一遍 RAG 检索，确保这些问题在当前库中是有答案的。
 
 ---
 
-## 🧬 构建管线与资产沉淀 (Pipeline & Assets)
+## 🏗️ 全源归一化摄入管线 (Omni-Ingestion Pipeline)
 
-构建过程严格遵循 **“物理归档优先”** 原则：
+### 1. 归一化摄入中心 (Unified Ingestor)
+- **入口统一**: `src/ui/unified_ingestion.py` 统筹 5 大源头：文件/目录、文本粘贴、网页抓取、数据库快照。
+- **暂存解耦**: 
+    - **Creation Staging**: `temp_uploads`。
+    - **Append Staging**: `vector_db_storage/<kb>/append_staging`。
 
-1.  **索引构建**: `VectorStoreIndex` 处理有效文档，生成 `vector_store.json`。
-2.  **物理归档**: 执行 `shutil.copy2` 将暂存区有效文件（排除 `.meta`）全量镜像到 `raw_sources/`。
-3.  **模型锁定**: 生成 `.kb_info.json`，永久记录构建时使用的 Embedding 模型，防止未来模型不匹配。
-4.  **户籍登记**: 生成 `manifest.json`，记录所有权、摘要及文件指纹。
-
----
-
-## 🧬 双核组装与严选路由 (Iron-Gate Routing)
-
-在 v8.1.0 迭代中，系统确立了“能力预装”与“实时激活”相分离的顶层架构模式。
-
-### 1. 意图严选路由 (Iron-Gate Routing)
-为了防止 SQL 引擎对定性查询的“逻辑干扰”，系统在提问主循环中实施了防御式网关：
-- **物理判定 (`is_data_kb`)**: 检查 KB 目录是否存在 `business_schema.json`。
-- **意图判定 (`manual_da_on`)**: 实时监听 Session State 中的数据分析开关。
-- **铁闸决策**: 只有当 `is_data_kb AND manual_da_on` 为真时，流量才允许流向逻辑核（SQL 推演）。否则，一律默认路由至语义核（RAG 检索）。
+### 2. 物理自愈与审计
+- **Meta-Shielding (审计屏蔽)**: 每一份源文件均配有 `.meta` 伴生文件记录溯源信息。`IndexBuilder` 内置过滤器，确保审计文件不进入向量索引。
+- **Atomic Commit (原子提交)**: 
+    - **Incremental Append**: 将暂存区文件移动至 `raw_sources/`，仅对差异部分进行增量索引。
+    - **Full Rebuild**: 物理合并后，触发全量 `NEW` 模式构建，彻底重置索引。
 
 ---
 
-## 🏗️ 归一化摄入管线图 (Pipeline Diagram)
+## 🏗️ 交互增强：归一化建议引擎 (Normalized Suggestion Engine)
+
+为了解决“僵尸建议”问题，v9.5.38 确立了 `UnifiedSuggestionEngine` 的正统地位：
+
+- **Multi-Strategy Model**:
+    1. **Custom Strategy**: 优先展示用户在 `manifest.json` 中预设的引导问题。
+    2. **LLM Strategy**: 结合对话历史，由大模型生成关联性问题。
+    3. **Source Strategy**: 从最近检索到的文档块中提取实体和关键词进行生成。
+- **Grounding Check (落地校验)**: 这是系统的核心防御。所有候选问题必须通过一次后台 RAG 模拟测试（`_can_answer_from_kb`），无法回答的问题将被丢弃。
+
+---
+
+## 🏗️ 归一化摄入管线图 (Updated Mermaid)
 
 ```mermaid
 graph TD
@@ -89,12 +66,13 @@ graph TD
     S --> I[IndexBuilder]
     M -- "Shielding" --> X[屏蔽过滤]
     
-    I --> R[<b>RAG 核心管线</b><br/>向量化固化]
-    I --> P[<b>物理归档</b><br/>raw_sources/]
+    I --> R[<b>RAG 核心管线</b>]
+    R --> PQ[Precise Query 提问增强]
     
-    R --> D{勾选: 智能分析?}
-    D -- "True" --> DA[<b>SQL 核心管线</b><br/>business_data.db]
+    PQ --> D{勾选: 数据分析?}
+    D -- "True" --> DA[<b>SQL 核心管线</b>]
+    D -- "False" --> RG[<b>语义检索管线</b>]
     
-    DA --> G[🛡️ 旗舰治理中心]
-    R --> G
+    RG --> SE[Unified Suggestion Engine]
+    SE -- "Grounding Check" --> F[三路高质后续追问]
 ```
