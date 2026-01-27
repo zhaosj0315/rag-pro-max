@@ -441,7 +441,7 @@ def render_omni_ingestion_tabs(target_dir, key_prefix="omni", can_upload=True, o
                             except Exception as e:
                                 st.error(str(e))
 
-def render_advanced_options(key_prefix="kb_adv", expanded=False, allow_reindex=True):
+def render_advanced_options(key_prefix="kb_adv", expanded=False, allow_reindex=True, allow_data_analysis=True):
     """
     渲染统一的高级选项面板 (五大核心选项)
     """
@@ -478,7 +478,12 @@ def render_advanced_options(key_prefix="kb_adv", expanded=False, allow_reindex=T
                 st.caption("ℹ️ 追加模式下不可重建索引")
 
         with opt_col2:
-            enable_data_analysis = st.checkbox("💎 智能数据分析", value=default_val, key=f"{key_prefix}_enable_data_analysis", help="自动识别真数据，构建物理库，启用SQL决策")
+            enable_data_analysis = False
+            if allow_data_analysis:
+                enable_data_analysis = st.checkbox("💎 智能数据分析", value=default_val, key=f"{key_prefix}_enable_data_analysis", help="自动识别真数据，构建物理库，启用SQL决策")
+            else:
+                st.caption("ℹ️ 追加模式暂不支持数据分析")
+                
             generate_summary = st.checkbox("📝 自动摘要生成", value=default_val, key=f"{key_prefix}_generate_summary", help="为每份文件生成AI摘要")
         
         # 更新状态提示

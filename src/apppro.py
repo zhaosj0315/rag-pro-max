@@ -1917,93 +1917,120 @@ with st.sidebar:
                 if files_in_staging:
                     # 高级选项 (Unified)
                     from src.ui.unified_ingestion import render_advanced_options
-                    # 禁用 Force Reindex 以保护现有索引
-                    append_opts = render_advanced_options(key_prefix="append", expanded=False, allow_reindex=False)
+                    # [v9.6] 允许强制重建索引 (满足 "借追加之机重刷全库" 的需求)
+                    append_opts = render_advanced_options(
+                        key_prefix="append", 
+                        expanded=False, 
+                        allow_reindex=True,
+                        allow_data_analysis=False
+                    )
 
-                    if st.button(f"🚀 确认追加 {len(files_in_staging)} 个文件到知识库", type="primary", use_container_width=True, key="omni_append_commit"):
-                        status_box = st.status("🚀 正在执行追加任务...", expanded=True)
+                    is_rebuild = append_opts.get('force_reindex', False)
+                    btn_text = "🔄 确认追加并重建索引" if is_rebuild else f"🚀 确认追加 {len(files_in_staging)} 个文件"
+
+                    if st.button(btn_text, type="primary", use_container_width=True, key="omni_append_commit"):
+                        status_box = st.status("🚀 正在执行任务...", expanded=True)
                         try:
-                            # Step 1: 调用 KBProcessor 进行索引 (直接针对 Staging 目录)
                             from src.kb.kb_processor import KBProcessor
                             from src.config import ConfigLoader
-                            
                             processor = KBProcessor()
                             config = ConfigLoader.load()
                             
-                            # 构造选项
-                            opts = {
-                                'embed_provider': config.get('embed_provider', 'HuggingFace (本地/极速)'),
-                                'embed_model': config.get('embed_model_hf', 'sentence-transformers/all-MiniLM-L6-v2'),
-                                'embed_key': config.get('embed_key', ''),
-                                'embed_url': config.get('embed_url', ''),
-                                'action_mode': 'APPEND',
-                                'use_ocr': append_opts['use_ocr'],
-                                'extract_metadata': append_opts['extract_metadata'],
-                                'generate_summary': append_opts['generate_summary'],
-                                'force_reindex': False
-                            }
-                            
-                            status_box.write("⚙️ 启动索引构建器...")
-                            success = processor.process_knowledge_base(current_kb_name, append_staging_dir, opts)
-                            
-                            if success:
-                                status_box.write("📦 正在归档源文件...")
-                                # Step 2: 归档文件到 raw_sources
-                                kb_root = os.path.join(os.path.abspath("vector_db_storage"), current_kb_name)
-                                raw_sources = os.path.join(kb_root, "raw_sources")
-                                if not os.path.exists(raw_sources): os.makedirs(raw_sources)
-                                
+                            kb_root = os.path.join(os.path.abspath("vector_db_storage"), current_kb_name)
+                            raw_sources = os.path.join(kb_root, "raw_sources")
+                            if not os.path.exists(raw_sources): os.makedirs(raw_sources)
+
+                            # --- Helper: Move Files ---
+                            def move_staging_to_raw():
+                                import shutil
                                 moved_mapping = {}
-                                
-                                # Filter out .meta files (processed as sidecars)
                                 primary_files = [f for f in files_in_staging if not f.endswith('.meta')]
-                                
                                 for f in primary_files:
                                     src = os.path.join(append_staging_dir, f)
-                                    # 避免重名
                                     dst_name = f
                                     if os.path.exists(os.path.join(raw_sources, f)):
                                         name, ext = os.path.splitext(f)
                                         dst_name = f"{name}_{int(time.time())}{ext}"
-                                    
                                     dst = os.path.join(raw_sources, dst_name)
                                     try:
                                         shutil.move(src, dst)
                                         moved_mapping[f] = dst
-                                        # 移动元数据
                                         if os.path.exists(src + ".meta"):
                                             shutil.move(src + ".meta", dst + ".meta")
-                                    except Exception as move_err:
-                                        logger.error(f"Move failed for {f}: {move_err}")
-                                
-                                # Step 3: 修正 Manifest 路径 (自愈逻辑)
-                                try:
-                                    from src.config.manifest_manager import ManifestManager
-                                    manifest_data = ManifestManager.load(kb_root)
-                                    if manifest_data and 'files' in manifest_data:
-                                        changed = False
-                                        for entry in manifest_data['files']:
-                                            fname = entry.get('name')
-                                            if fname in moved_mapping:
-                                                entry['path'] = moved_mapping[fname]
-                                                entry['parent_path'] = os.path.dirname(moved_mapping[fname])
-                                                changed = True
-                                        
-                                        if changed:
-                                            ManifestManager.save(kb_root, manifest_data['files'], manifest_data.get('embed_model'))
-                                            status_box.write("📝 清单路径已修正")
-                                except Exception as e:
-                                    logger.warning(f"Manifest patch failed: {e}")
+                                    except Exception as e:
+                                        logger.error(f"Move failed: {e}")
+                                return moved_mapping
 
-                                status_box.update(label="✅ 追加完成！", state="complete", expanded=False)
-                                st.success(f"成功追加 {len(files_in_staging)} 个文件")
+                            success = False
+                            
+                            if is_rebuild:
+                                # 策略 A: 全量重建
+                                status_box.write("📦 [Rebuild] 正在合并新文件到源目录...")
+                                move_staging_to_raw() # 先移动
+                                
+                                status_box.write("⚙️ [Rebuild] 启动全量索引构建...")
+                                opts = {
+                                    'embed_provider': config.get('embed_provider', 'HuggingFace (本地/极速)'),
+                                    'embed_model': config.get('embed_model_hf', 'sentence-transformers/all-MiniLM-L6-v2'),
+                                    'embed_key': config.get('embed_key', ''),
+                                    'embed_url': config.get('embed_url', ''),
+                                    'action_mode': 'NEW', # 强制 NEW 模式以触发重建
+                                    'use_ocr': append_opts['use_ocr'],
+                                    'extract_metadata': append_opts['extract_metadata'],
+                                    'generate_summary': append_opts['generate_summary'],
+                                    'force_reindex': True
+                                }
+                                success = processor.process_knowledge_base(current_kb_name, raw_sources, opts)
+                                
+                            else:
+                                # 策略 B: 增量追加 (原逻辑)
+                                status_box.write("⚙️ [Incremental] 启动增量索引构建...")
+                                opts = {
+                                    'embed_provider': config.get('embed_provider', 'HuggingFace (本地/极速)'),
+                                    'embed_model': config.get('embed_model_hf', 'sentence-transformers/all-MiniLM-L6-v2'),
+                                    'embed_key': config.get('embed_key', ''),
+                                    'embed_url': config.get('embed_url', ''),
+                                    'action_mode': 'APPEND',
+                                    'use_ocr': append_opts['use_ocr'],
+                                    'extract_metadata': append_opts['extract_metadata'],
+                                    'generate_summary': append_opts['generate_summary'],
+                                    'force_reindex': False
+                                }
+                                success = processor.process_knowledge_base(current_kb_name, append_staging_dir, opts)
+                                
+                                if success:
+                                    status_box.write("📦 [Incremental] 正在归档源文件...")
+                                    moved_map = move_staging_to_raw() # 后移动
+                                    
+                                    # 修正 Manifest
+                                    try:
+                                        from src.config.manifest_manager import ManifestManager
+                                        manifest_data = ManifestManager.load(kb_root)
+                                        if manifest_data and 'files' in manifest_data:
+                                            changed = False
+                                            for entry in manifest_data['files']:
+                                                fname = entry.get('name')
+                                                if fname in moved_map:
+                                                    entry['path'] = moved_map[fname]
+                                                    entry['parent_path'] = os.path.dirname(moved_map[fname])
+                                                    changed = True
+                                            if changed:
+                                                ManifestManager.save(kb_root, manifest_data['files'], manifest_data.get('embed_model'))
+                                                status_box.write("📝 清单路径已修正")
+                                    except Exception as e:
+                                        logger.warning(f"Manifest patch failed: {e}")
+
+                            if success:
+                                status_box.update(label="✅ 任务完成！", state="complete", expanded=False)
+                                st.success("操作成功")
                                 time.sleep(1.5)
                                 st.rerun()
                             else:
-                                status_box.update(label="❌ 追加失败", state="error")
+                                status_box.update(label="❌ 任务失败", state="error")
+                                
                         except Exception as e:
                             status_box.update(label=f"❌ 发生异常: {str(e)}", state="error")
-                            logger.error(f"Append failed: {e}")
+                            logger.error(f"Append/Rebuild failed: {e}")
     
             # 统一的数据源处理逻辑（仅针对 Web 抓取保留在外部，本地文件已在内部处理）
             # btn_start already initialized above
