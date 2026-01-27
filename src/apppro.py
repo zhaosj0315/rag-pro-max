@@ -1955,7 +1955,10 @@ with st.sidebar:
                                 
                                 moved_mapping = {}
                                 
-                                for f in files_in_staging:
+                                # Filter out .meta files (processed as sidecars)
+                                primary_files = [f for f in files_in_staging if not f.endswith('.meta')]
+                                
+                                for f in primary_files:
                                     src = os.path.join(append_staging_dir, f)
                                     # 避免重名
                                     dst_name = f
