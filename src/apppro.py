@@ -5953,19 +5953,19 @@ with st.container():
                     else:
                         st.error("同步失败")
 
-                    # --- 3. 功能开关 (Toggle) ---
-                    with c_deep:
-                        # 权限检查：精准提问
-                        from src.auth.permission_manager import permission_manager
-                        current_user = st.session_state.get('user', 'guest_user')
-                        can_precise = permission_manager.has_permission(current_user, "precise_query")
-                        
-                        render_isolated_toggle(
-                            "精准提问 (🔒)" if not can_precise else "精准提问", 
-                            'enable_query_optimization', 
-                            help="请联系管理员开启精准提问权限" if not can_precise else "启用智能查询优化",
-                            disabled=not can_precise
-                        )
+        # --- 3. 功能开关 (Toggle) ---
+        with c_deep:
+            # 权限检查：精准提问
+            from src.auth.permission_manager import permission_manager
+            current_user = st.session_state.get('user', 'guest_user')
+            can_precise = permission_manager.has_permission(current_user, "precise_query")
+            
+            render_isolated_toggle(
+                "精准提问 (🔒)" if not can_precise else "精准提问", 
+                'enable_query_optimization', 
+                help="请联系管理员开启精准提问权限" if not can_precise else "启用智能查询优化",
+                disabled=not can_precise
+            )
     
     with c_web:
         # 权限检查：联网搜索 (实时颗粒化)
