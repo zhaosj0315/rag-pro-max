@@ -5,6 +5,7 @@ import time
 import json
 import glob
 import re
+from src.ui.unified_ingestion import render_omni_ingestion_tabs, render_staging_area
 
 # 提前导入并行执行核心 (v6.9.7)
 from src.utils.parallel_executor import get_global_executor
@@ -1845,419 +1846,19 @@ with st.sidebar:
                             st.session_state.omni_last_upload_hash = None # [v9.5.12] 同时清空上传哈希
                             # [v9.5.17] 移除 st.rerun()，依靠 Fragment 局部刷新
                     # --- 五大源标准 Tabs ---
-                    omni_tabs = st.tabs(["📂 上传文件", "📁 扫描路径", "📝 文本粘贴", "🌐 网页摄入", "🗄️ 数据库快照"])
-                    
-                    # Tab 1: 文件上传
-                    with omni_tabs[0]:
-                        uploaded_files = st.file_uploader(
-                            "拖入文件", 
-                            accept_multiple_files=True, 
-                            key="uploader",
-                            label_visibility="collapsed",
-                            type=['pdf', 'docx', 'txt', 'md', 'xlsx', 'csv', 'pptx', 'jpg', 'png', 'jpeg'],
-                            disabled=not can_upload
-                        )
-                        if uploaded_files:
-                            # [v9.5.12] 引入哈希校验，防止重复触发同步
-                            import hashlib
-                            upload_hash = hashlib.md5("".join([f"{f.name}_{f.size}" for f in uploaded_files]).encode()).hexdigest()
-                            
-                            if st.session_state.get('omni_last_upload_hash') != upload_hash:
-                                with st.spinner("⚡ 同步中..."):
-                                    from src.common.utils import save_uploaded_files
-                                    batch_dir = save_uploaded_files(uploaded_files, "temp_uploads")
-                                    if batch_dir:
-                                        if sync_to_staging(batch_dir, is_file=False, source_label="文件上传"):
-                                            st.session_state.omni_last_upload_hash = upload_hash # 记录哈希
-                                            handle_ingestion_success("文件上传", len(uploaded_files))
-                                            # [v9.5.16] 移除 st.rerun()，依靠 Fragment 局部刷新，消除白屏闪烁
-                            else:
-                                st.caption("✨ 当前批次文件已在暂存区")
-                    
-                    # Tab 2: 本地路径
-                    with omni_tabs[1]:
-                        path_c1, path_c2 = st.columns([5, 1])
-                        manual_path = path_c1.text_input("本地路径", placeholder="粘贴本地目录地址...", key="omni_path_input", label_visibility="collapsed")
-                        if path_c2.button("📥 镜像至暂存区", use_container_width=True, key="omni_path_btn"):
-                            if os.path.exists(manual_path):
-                                if sync_to_staging(manual_path, is_file=False, source_label="目录镜像"):
-                                    handle_ingestion_success("目录镜像", 1, os.path.basename(manual_path))
-                                    # [v9.5.16] 移除 st.rerun()，依靠 Fragment 局部刷新
-                            else: st.error("路径不存在")
-                    
-                    # Tab 3: 文本粘贴
-                    with omni_tabs[2]:
-                        st.session_state.paste_text_display = st.text_area("粘贴文本内容", height=150, placeholder="在此输入或粘贴文本...", label_visibility="collapsed", key="omni_paste_input")
-                        if st.button("📥 保存文本至暂存区", use_container_width=True, key="omni_paste_btn"):
-                            content = st.session_state.paste_text_display
-                            if content.strip():
-                                safe_name = f"Pasted_{int(time.time())}.txt"
-                                fpath = os.path.join(st.session_state.task_staging_dir, safe_name)
-                                with open(fpath, 'w', encoding='utf-8') as f:
-                                    f.write(content)
-                                # [v9.5.7] 写入元数据方便审计
-                                with open(fpath + ".meta", "w", encoding="utf-8") as meta_f:
-                                    meta_f.write(f"Source: 文本粘贴\n")
-                                    meta_f.write(f"SyncTime: {datetime.now().isoformat()}\n")
-                                
-                                # [v9.5.8] 终端过程追踪报告
-                                files_in_staging = os.listdir(st.session_state.task_staging_dir)
-                                total_count = len([f for f in files_in_staging if not f.startswith('.') and not f.endswith('.meta')])
-                                print(f"\n[OMNI-INGESTION REPORT] {'-'*30}")
-                                print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                                print(f"Source: 文本粘贴")
-                                print(f"Status: SUCCESS")
-                                print(f"Files Added: 1")
-                                print(f"Staging Total: {total_count} files now converged")
-                                print(f"{'-'*55}\n")
+                    # --- 五大源标准 Tabs (Refactored) ---
+                    # 定义回调以保持原有的副作用逻辑
+                    def on_ingestion_success(source_label, count):
+                        # 原 handle_ingestion_success 已经包含了 toast, auto_trigger_naming, uploaded_path setting
+                        # 我们可以直接调用本地的 handle_ingestion_success
+                        handle_ingestion_success(source_label, count)
 
-                                handle_ingestion_success("文本粘贴", 1)
-                                # [v9.5.16] 移除 st.rerun()，依靠 Fragment 局部刷新
-                    
-                    # Tab 4: 网页摄入 (Omni-Version: 逻辑原样复用)
-                    with omni_tabs[3]:
-                        # --- 1:1 复制原互联网提取模式的 UI 逻辑 ---
-                        try:
-                            from src.config.unified_sites import get_industry_list
-                            industries = get_industry_list()
-                            with st.expander("⚙️ 行业上下文 (影响搜索结果)", expanded=False):
-                                sel_ind = st.selectbox("行业领域", industries, key="omni_wf_industry_context", label_visibility="collapsed")
-                        except:
-                            sel_ind = "🔧 技术开发"
-                        selected_industry = sel_ind
-
-                        # 统一输入框与智能识别 (完全保留原版布局)
-                        c_input, c_btn = st.columns([7, 1])
-                        with c_input:
-                            user_input = st.text_input("网址或关键词", placeholder="输入 URL (https://...) 或 搜索关键词", label_visibility="collapsed", key="omni_wf_user_input")
-                        with c_btn:
-                            st.button("🧠", help="AI 智能分析", key="omni_wf_smart_analyze_btn", use_container_width=True)
-
-                        # 智能识别变量 (保持原版命名)
-                        crawl_url = None
-                        search_keyword = None
-                        if user_input:
-                            if user_input.strip().lower().startswith(('http://', 'https://')):
-                                crawl_url = user_input.strip()
-                                st.caption(f"🔗 已识别为网址")
-                            else:
-                                search_keyword = user_input.strip()
-                                st.caption(f"🔍 已识别为搜索关键词")
-
-                        # 统一参数行 (完全保留原版 4列布局)
-                        c_p1, c_p2, c_p3, c_p4 = st.columns(4)
-                        with c_p1:
-                            wf_crawl_depth = st.number_input("递归深度", 1, 10, 2, key="omni_wf_crawl_depth")
-                        with c_p2:
-                            wf_max_pages = st.number_input("最大页数", 1, 1000, 5, key="omni_wf_max_pages")
-                        with c_p3:
-                            wf_parser_type = st.selectbox("解析器", ["default", "article", "documentation"], key="omni_wf_parser_type")
-                        with c_p4:
-                            wf_quality_threshold = st.number_input("质量阈值 (0=关)", 0.0, 100.0, 45.0, 5.0, key="omni_wf_quality_threshold")
-
-                        with st.expander("🚫 排除链接", expanded=False):
-                            wf_exclude_text = st.text_area("每行一个", height=68, placeholder="*/admin/*", key="omni_wf_exclude_patterns")
-                            wf_exclude_patterns = [line.strip() for line in wf_exclude_text.split('\n') if line.strip()] if wf_exclude_text else []
-
-                        # 执行按钮 (逻辑重定向到暂存区，代码保持原样)
-                        if st.button("📥 抓取并投递至暂存区", use_container_width=True, type="primary", key="omni_wf_run_main", disabled=not user_input):
-                            # [v9.5.35] 强制重载核心爬虫模块，解决缓存失效问题
-                            try:
-                                import importlib
-                                import src.processors.concurrent_crawler
-                                importlib.reload(src.processors.concurrent_crawler)
-                                st.toast("📡 爬虫引擎热重载成功")
-                            except: pass
-
-                            status_container = st.status("🕷️ 正在执行全量摄入...", expanded=True)
-                            
-                            def web_log(msg, *args):
-                                status_container.write(msg)
-                                logger.info(f"🌐 [网页摄入] {msg}")
-
-                            # [v9.5.36] 暴力探测函数：物理下沉至主文件，绕过模块缓存
-                            def discovery_links_violently(urls, keyword):
-                                import requests
-                                import re
-                                from bs4 import BeautifulSoup
-                                from urllib.parse import urljoin, urlparse
-                                
-                                all_initial_links = []
-                                headers = {
-                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                                }
-                                
-                                for u in urls:
-                                    try:
-                                        web_log(f"🕵️ 正在暴力探测: {u[:60]}...")
-                                        resp = requests.get(u, headers=headers, timeout=15)
-                                        if resp.status_code == 200:
-                                            html_text = resp.text
-                                            # 1. 正则暴力提取 (最高优先级)
-                                            raw_http_links = re.findall(r'https?://[^\s"\'<>)]+', html_text)
-                                            # 2. BeautifulSoup 补充
-                                            soup = BeautifulSoup(resp.content, 'html.parser')
-                                            bs_links = [urljoin(u, a['href']) for a in soup.find_all('a', href=True)]
-                                            
-                                            combined = list(set(raw_http_links + bs_links))
-                                            web_log(f"   📊 原始链接数: {len(combined)}")
-                                            
-                                            # 过滤
-                                            base_domain = urlparse(u).netloc.lower()
-                                            for link in combined:
-                                                parsed_link = urlparse(link)
-                                                # 允许跳转链接 (bing.com/ck, ddg.com/l)
-                                                if "bing.com/ck/a" in link.lower() or "duckduckgo.com/l/" in link.lower():
-                                                    all_initial_links.append(link)
-                                                # 允许非搜索域名的链接
-                                                elif parsed_link.netloc and parsed_link.netloc.lower() != base_domain:
-                                                    if not any(x in link.lower() for x in ['microsoft.com', 'google.com', 'apple.com']):
-                                                        all_initial_links.append(link)
-                                    except Exception as e:
-                                        web_log(f"   ⚠️ 探测异常: {e}")
-                                
-                                return list(set(all_initial_links))
-
-                            try:
-                                target_dir = st.session_state.task_staging_dir
-                                saved_files = []
-                                
-                                if crawl_url:
-                                    # --- 原 URL 抓取逻辑 ---
-                                    from src.processors.enhanced_web_crawler import run_async_crawl
-                                    saved_files = run_async_crawl(
-                                        start_url=crawl_url, 
-                                        max_depth=wf_crawl_depth, 
-                                        max_pages=wf_max_pages,
-                                        parser_type=wf_parser_type, 
-                                        output_dir=target_dir, 
-                                        exclude_patterns=wf_exclude_patterns,
-                                        status_callback=web_log
-                                    )
-                                else:
-                                    # --- [v9.5.36] 物理重构的智能搜索逻辑 ---
-                                    from src.processors.concurrent_crawler import ConcurrentCrawler
-                                    from urllib.parse import quote
-                                    
-                                    q = quote(search_keyword)
-                                    search_engines = [
-                                        f"https://www.bing.com/search?q={q}", 
-                                        f"https://html.duckduckgo.com/html/?q={q}"
-                                    ]
-                                    
-                                    web_log(f"🔍 启动关键词搜索: {search_keyword}")
-                                    
-                                    # [Step 0] 暴力探测初始链接
-                                    initial_docs = discovery_links_violently(search_engines, search_keyword)
-                                    
-                                    if not initial_docs:
-                                        web_log("❌ [L0] 未能探测到任何有效初始链接，任务中止")
-                                    else:
-                                        web_log(f"✅ [L0] 探测完成，锁定 {len(initial_docs)} 个高价值目标")
-                                        
-                                        # [Step 1+] 进入深度抓取环节 - 使用线程模式避免 __main__ 错误
-                                        crawler = ConcurrentCrawler(max_workers=3, use_processes=False)
-                                        crawl_results = crawler.crawl_with_depth(
-                                            initial_docs, 
-                                            max_depth=wf_crawl_depth - 1 if wf_crawl_depth > 1 else 1, 
-                                            max_pages_per_level=wf_max_pages, 
-                                            keyword=None, # [v9.5.37] 强制设为 None，防止内部再次触发不稳定的搜索引擎探测逻辑
-                                            progress_callback=web_log
-                                        )
-                                        
-                                        # [v9.5.31] 物理路径自愈
-                                        if not os.path.exists(target_dir):
-                                            os.makedirs(target_dir, exist_ok=True)
-
-                                        # 保存结果
-                                        for i, result in enumerate(crawl_results):
-                                            if not result.get('success') or not result.get('content') or len(result.get('content', '')) < 100:
-                                                continue
-                                            
-                                            # 过滤列表
-                                            blacklist = ['bing.com', 'duckduckgo.com', 'google.com', 'baidu.com', 'zhihu.com/search']
-                                            if any(domain in result.get('url', '').lower() for domain in blacklist):
-                                                continue
-                                                    
-                                            fname = f"Search_{int(time.time())}_{i}.md"
-                                            fpath = os.path.join(target_dir, fname)
-                                            
-                                            try:
-                                                with open(fpath, 'w', encoding='utf-8') as f:
-                                                    f.write(f"**URL:** {result['url']}\n\n# {result.get('title', '无标题')}\n\n{result['content']}")
-                                                
-                                                if os.path.exists(fpath):
-                                                    with open(fpath + ".meta", "w", encoding="utf-8") as meta_f:
-                                                        meta_f.write(f"Source: 智能搜索\nSyncTime: {datetime.now().isoformat()}\n")
-                                                    
-                                                    from src.utils.file_system_utils import set_where_from_metadata
-                                                    set_where_from_metadata(fpath, result['url'])
-                                                    saved_files.append(fpath)
-                                                    web_log(f"✅ 已存入: {result.get('title', '未知')[:25]}...")
-                                            except: pass
-
-                                if saved_files:
-                                    # [v9.5.8] 终端过程追踪报告
-                                    files_in_staging = os.listdir(st.session_state.task_staging_dir)
-                                    total_count = len([f for f in files_in_staging if not f.startswith('.') and not f.endswith('.meta')])
-                                    print(f"\n[OMNI-INGESTION REPORT] {'-'*30}")
-                                    print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                                    print(f"Source: 网页摄入")
-                                    print(f"Status: SUCCESS")
-                                    print(f"Files Added: {len(saved_files)}")
-                                    print(f"Staging Total: {total_count} files now converged")
-                                    print(f"{'-'*55}\n")
-
-                                    status_container.update(label=f"🎉 摄入完成！共捕获 {len(saved_files)} 个源文件", state="complete", expanded=False)
-                                    handle_ingestion_success("网页摄入", len(saved_files))
-                                    # [v9.5.17] 移除 st.rerun()，依靠 Fragment 局部刷新
-                                else:
-                                    status_container.update(label="❌ 未能抓取到有效内容", state="error", expanded=True)
-                            except Exception as e: 
-                                error_msg = str(e)
-                                if "'__main__'" in error_msg:
-                                    error_msg = "网页摄入模块初始化失败，请重启应用后重试"
-                                status_container.update(label=f"❌ 摄入失败: {error_msg}", state="error", expanded=True)
-                                logger.error(f"Web ingestion failed: {e}")
-
-                    # Tab 5: 数据库快照 (Omni-Version: 融合高级版)
-                    with omni_tabs[4]:
-                        from src.processors.database_exporter import DatabaseExporter
-                        from src.auth.connection_manager import ConnectionManager
-                        import pandas as pd
-                        
-                        conn_mgr = ConnectionManager()
-                        curr_user = st.session_state.get('user', 'guest_user')
-                        curr_role = st.session_state.get('role', 'guest')
-                        
-                        saved_conns = conn_mgr.load_connections() if curr_role == 'admin' else conn_mgr.get_connections_for_user(curr_user)
-                        
-                        if not saved_conns:
-                            st.info("ℹ️ 暂无可用连接，请在 [👤 我的 -> 🔌 数据连接] 中配置")
-                        else:
-                            c_conn, c_db = st.columns([1, 1])
-                            with c_conn:
-                                selected_alias = st.selectbox("1. 数据源", list(saved_conns.keys()), key="omni_snap_alias_v2")
-                                conn_conf = saved_conns[selected_alias]
-                                st.caption(f"🔗 {conn_conf.get('host')} ({conn_conf.get('type')})")
-                            
-                            with c_db:
-                                dbs = conn_mgr.get_database_list(selected_alias)
-                                default_db = conn_conf.get('database')
-                                db_idx = dbs.index(default_db) if default_db in dbs else 0
-                                selected_db = st.selectbox("2. 数据库", dbs, index=db_idx, key="omni_snap_db_v2")
-
-                            if selected_db:
-                                st.divider()
-                                snap_mode = st.radio("快照模式", ["📋 数据表选择", "📝 自定义 SQL"], horizontal=True, label_visibility="collapsed", key="omni_snap_mode_radio")
-                                
-                                exporter = DatabaseExporter(st.session_state.task_staging_dir)
-                                
-                                if snap_mode == "📋 数据表选择":
-                                    tables = conn_mgr.get_table_list(selected_alias, db_override=selected_db)
-                                    if not tables:
-                                        st.warning("📭 该库为空")
-                                    else:
-                                        col_list, col_action = st.columns([3, 1])
-                                        with col_list:
-                                            sel_tables = st.multiselect("选择数据表", tables, key="omni_snap_tables_v2", placeholder="选择要导出快照的表...")
-                                        with col_action:
-                                            if st.button("📥 导出并投递至暂存区", type="primary", use_container_width=True, disabled=not sel_tables, key="omni_snap_btn_table"):
-                                                status = st.status("📸 正在生成数据库快照...", expanded=True)
-                                                try:
-                                                    for t in sel_tables:
-                                                        status.write(f"正在导出: {t}...")
-                                                        exporter.export(selected_alias, selected_db, table_name=t)
-                                                    status.update(label="✅ 快照生成完毕", state="complete", expanded=False)
-                                                    
-                                                    # [v9.5.8] 终端过程追踪报告
-                                                    files_in_staging = os.listdir(st.session_state.task_staging_dir)
-                                                    total_count = len([f for f in files_in_staging if not f.startswith('.') and not f.endswith('.meta')])
-                                                    print(f"\n[OMNI-INGESTION REPORT] {'-'*30}")
-                                                    print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                                                    print(f"Source: 数据库快照 (整表)")
-                                                    print(f"Status: SUCCESS")
-                                                    print(f"Files Added: {len(sel_tables)}")
-                                                    print(f"Staging Total: {total_count} files now converged")
-                                                    print(f"{'-'*55}\n")
-
-                                                    handle_ingestion_success("数据库快照", len(sel_tables))
-                                                    # [v9.5.17] 移除 st.rerun()，依靠 Fragment 局部刷新
-                                                except Exception as e:
-                                                    status.update(label="❌ 导出失败", state="error")
-                                                    st.error(f"失败: {e}")
-
-                                        # --- [v9.5.2] 恢复数据预览功能 ---
-                                        if sel_tables:
-                                            st.divider()
-                                            preview_target = st.selectbox("👁️ 预览已选表数据", sel_tables, key="omni_snap_preview_target")
-                                            
-                                            if preview_target:
-                                                p_tab1, p_tab2, p_tab3 = st.tabs(["📋 结构定义", "💾 数据样本 (20行)", "📊 统计概览"])
-                                                
-                                                with p_tab1:
-                                                    try:
-                                                        schema = conn_mgr.get_table_schema(selected_alias, preview_target, db_override=selected_db)
-                                                        if schema:
-                                                            st.dataframe(pd.DataFrame(schema), use_container_width=True, hide_index=True)
-                                                        else:
-                                                            st.info("暂无结构信息")
-                                                    except Exception as e: st.error(f"获取结构失败: {e}")
-                                                
-                                                with p_tab2:
-                                                    try:
-                                                        sample = conn_mgr.get_table_sample(selected_alias, preview_target, db_override=selected_db, limit=20)
-                                                        if sample:
-                                                            st.dataframe(pd.DataFrame(sample), use_container_width=True)
-                                                        else:
-                                                            st.info("表为空或无法读取")
-                                                    except Exception as e: st.error(f"采样失败: {e}")
-                                                
-                                                with p_tab3:
-                                                    try:
-                                                        stats = conn_mgr.get_table_stats(selected_alias, preview_target, db_override=selected_db)
-                                                        insights = conn_mgr.get_table_insights(selected_alias, preview_target, db_override=selected_db)
-                                                        
-                                                        m1, m2, m3 = st.columns(3)
-                                                        m1.metric("预估行数", f"{insights.get('row_count', 0):,}")
-                                                        m2.metric("物理大小", stats.get('size_mb', 'Unknown'))
-                                                        m3.metric("创建时间", stats.get('create_time', 'Unknown')[:10])
-                                                    except Exception as e: st.error(f"获取统计失败: {e}")
-
-                                elif snap_mode == "📝 自定义 SQL":
-                                    sql_input = st.text_area("SQL 查询语句", height=150, placeholder="SELECT * FROM orders WHERE created_at > '2025-01-01'...", key="omni_snap_sql_v2")
-                                    filename_hint = st.text_input("文件命名标识 (可选)", placeholder="例如: 2025_Q1_Sales", key="omni_snap_hint_v2")
-                                    
-                                    if st.button("📥 执行并投递至暂存区", type="primary", key="omni_snap_sql_run"):
-                                        if not sql_input.strip():
-                                            st.error("请输入 SQL")
-                                        else:
-                                            with st.spinner("⏳ 查询并导出中..."):
-                                                try:
-                                                    final_name = None
-                                                    if filename_hint.strip():
-                                                        timestamp = int(time.time())
-                                                        final_name = f"[SQL]{filename_hint}_{timestamp}.csv"
-                                                    
-                                                    fpath = exporter.export(selected_alias, selected_db, sql_query=sql_input, output_filename=final_name)
-                                                    st.success(f"✅ 已导出: {os.path.basename(fpath)}")
-                                                    
-                                                    # [v9.5.8] 终端过程追踪报告
-                                                    files_in_staging = os.listdir(st.session_state.task_staging_dir)
-                                                    total_count = len([f for f in files_in_staging if not f.startswith('.') and not f.endswith('.meta')])
-                                                    print(f"\n[OMNI-INGESTION REPORT] {'-'*30}")
-                                                    print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                                                    print(f"Source: 数据库快照 (自定义SQL)")
-                                                    print(f"Status: SUCCESS")
-                                                    print(f"Files Added: 1")
-                                                    print(f"Staging Total: {total_count} files now converged")
-                                                    print(f"{'-'*55}\n")
-
-                                                    handle_ingestion_success("自定义SQL", 1)
-                                                    # [v9.5.17] 移除 st.rerun()，依靠 Fragment 局部刷新
-                                                except Exception as e:
-                                                    st.error(f"执行失败: {e}")
+                    render_omni_ingestion_tabs(
+                        target_dir=st.session_state.task_staging_dir,
+                        key_prefix="omni_create",
+                        can_upload=can_upload,
+                        on_success=on_ingestion_success
+                    )
             elif current_kb_name and current_kb_name != "pure_chat":
                 # 管理模式 - 使用一行化布局 (1x2 紧凑布局)
                 manage_title_col1, manage_title_col2 = st.columns([4, 1])
@@ -2294,155 +1895,114 @@ with st.sidebar:
                 
                 target_path = "" # 管理模式不需要手动指定路径，使用KB原有路径
                 
-                uploaded_files = st.file_uploader(
-                    "追加文件到当前知识库", 
-                    accept_multiple_files=True, 
-                    key="uploader_append",
-                    label_visibility="collapsed"
+                # --- Omni-Append Workstation (v2.0) ---
+                append_staging_dir = os.path.join(os.path.abspath("vector_db_storage"), current_kb_name, "append_staging")
+                
+                # 1. 全源采集矩阵
+                render_omni_ingestion_tabs(
+                    target_dir=append_staging_dir,
+                    key_prefix="omni_append",
+                    can_upload=True,
+                    on_success=lambda s, c: st.toast(f"✅ [{s}] 已暂存 {c} 个文件")
                 )
                 
-                # 添加更新知识库按钮
-                if uploaded_files:
-                    # 添加文件上传成功提示
-                    st.success(f"✅ 文件上传成功！共选择了 {len(uploaded_files)} 个文件")
-                    
-                    # 导入进度显示组件
-                    from src.ui.document_progress import doc_progress
-                    
-                    # 显示文件处理进度
-                    st.markdown("### 📄 文件处理进度")
-                    doc_progress.start_processing(uploaded_files)
-                    
-                    # 文档质量评估
-                    if st.checkbox("📊 启用文档质量评估", value=False, key="enable_quality_assessment"):
-                        st.markdown("### 📋 文档质量评估")
-                        from src.utils.document_quality_assessor import show_quality_assessment, quality_assessor
-                        
-                        # 对每个上传的文件进行质量评估
-                        for uploaded_file in uploaded_files:
-                            if uploaded_file.type.startswith('text/') or uploaded_file.name.endswith(('.txt', '.md')):
-                                try:
-                                    content = str(uploaded_file.read(), "utf-8")
-                                    uploaded_file.seek(0)  # 重置文件指针
-                                    
-                                    with st.expander(f"📄 {uploaded_file.name} - 质量评估"):
-                                        show_quality_assessment(content, uploaded_file.name)
-                                except Exception as e:
-                                    st.warning(f"⚠️ 无法评估 {uploaded_file.name}: {str(e)}")
-                            elif uploaded_file.name.endswith('.pdf'):
-                                try:
-                                    with st.expander(f"📄 {uploaded_file.name} - PDF质量评估"):
-                                        assessment_result = quality_assessor.assess_pdf_file(uploaded_file)
-                                        
-                                        # 显示评估结果
-                                        col1, col2, col3 = st.columns(3)
-                                        
-                                        with col1:
-                                            score = assessment_result['scores']['overall']
-                                            if score >= 80:
-                                                st.success(f"📊 总体评分: {score:.1f}")
-                                            elif score >= 60:
-                                                st.warning(f"📊 总体评分: {score:.1f}")
-                                            else:
-                                                st.error(f"📊 总体评分: {score:.1f}")
-                                        
-                                        with col2:
-                                            st.info(f"🏆 质量等级: {assessment_result['grade']}")
-                                        
-                                        with col3:
-                                            st.info(f"📄 字数: {assessment_result['word_count']}")
-                                        
-                                        # 详细评分
-                                        st.markdown("**📋 详细评分**")
-                                        col1, col2 = st.columns(2)
-                                        
-                                        with col1:
-                                            st.metric("📖 可读性", f"{assessment_result['scores']['readability']:.1f}")
-                                            st.metric("💡 内容密度", f"{assessment_result['scores']['content_density']:.1f}")
-                                        
-                                        with col2:
-                                            st.metric("🏗️ 结构性", f"{assessment_result['scores']['structure']:.1f}")
-                                            st.metric("✏️ 语言质量", f"{assessment_result['scores']['language_quality']:.1f}")
-                                        
-                                        # 改进建议
-                                        if assessment_result['suggestions']:
-                                            st.markdown("**💡 改进建议**")
-                                            for suggestion in assessment_result['suggestions']:
-                                                st.write(f"• {suggestion}")
-                                                st.write(f"• {suggestion}")
-                                                
-                                except Exception as e:
-                                    st.error(f"❌ PDF评估失败 {uploaded_file.name}: {str(e)}")
-                            else:
-                                st.info(f"📄 {uploaded_file.name} - 暂不支持此文件类型的质量评估")
-                    
-                    # 高级选项 (复用新建模式的逻辑)
-                    with st.expander("🔧 高级选项 (本次更新有效)", expanded=st.session_state.kb_adv_expanded_update):
-                        @st.fragment
-                        def render_update_kb_options():
-                            # 布局优化：全选 + 状态提示在一行
-                            h_col1, h_col2 = st.columns([1.5, 2.5])
-                            with h_col1:
-                                select_all = st.checkbox("✅ 一键全选", value=False, key="kb_adv_select_all_update", help="开启/关闭所有高级选项")
-                            with h_col2:
-                                status_placeholder = st.empty()
-                            
-                            default_val = select_all
-                            
-                            opt_col1, opt_col2, opt_col3 = st.columns(3)
-                            with opt_col1:
-                                use_ocr = st.checkbox("🔍 OCR识别", value=default_val, key="kb_use_ocr_update", help="识别PDF中的图片文字")
-                            with opt_col2:
-                                use_meta = st.checkbox("📊 元数据", value=default_val, key="kb_extract_metadata_update", help="提取文件分类、关键词")
-                            with opt_col3:
-                                use_sum = st.checkbox("📝 生成摘要", value=default_val, key="kb_generate_summary_update", help="生成AI摘要")
-                            
-                            # 更新状态提示
-                            options = []
-                            if use_ocr: options.append("OCR")
-                            if use_meta: options.append("元数据")
-                            if use_sum: options.append("摘要")
-                            
-                            if options:
-                                status_placeholder.caption(f"🔧 启用: {'|'.join(options)}")
-                            else:
-                                status_placeholder.caption("⚡ 快速模式：已关闭高级选项")
-                        
-                        render_update_kb_options()
-    
-                    st.info("💡 上传后请点击下方 '更新知识库' 按钮")
-                    if st.button("🔄 更新知识库", type="primary", use_container_width=True, key="update_kb_btn"):
-                        # 立即处理上传，确保路径存在 (Failsafe)
+                st.divider()
+                
+                # 2. 暂存区管控
+                render_staging_area(append_staging_dir, key_prefix="omni_append")
+                
+                # 3. 执行追加
+                files_in_staging = [f for f in os.listdir(append_staging_dir) if not f.startswith('.')] if os.path.exists(append_staging_dir) else []
+                
+                if files_in_staging:
+                    # 高级选项
+                    with st.expander("🔧 高级处理选项 (本次有效)", expanded=False):
+                        ac1, ac2, ac3 = st.columns(3)
+                        use_ocr = ac1.checkbox("🔍 OCR识别", value=False, key="append_ocr", help="对图片/PDF进行文字识别")
+                        use_meta = ac2.checkbox("📊 元数据", value=False, key="append_meta", help="提取分类标签和关键词")
+                        use_sum = ac3.checkbox("📝 生成摘要", value=False, key="append_sum", help="生成AI摘要")
+
+                    if st.button(f"🚀 确认追加 {len(files_in_staging)} 个文件到知识库", type="primary", use_container_width=True, key="omni_append_commit"):
+                        status_box = st.status("🚀 正在执行追加任务...", expanded=True)
                         try:
-                            from src.processors.upload_handler import UploadHandler
-                            # UPLOAD_DIR is global/imported
-                            handler = UploadHandler(UPLOAD_DIR, logger)
-                            with st.spinner("正在预处理文件..."):
-                                result = handler.process_uploads(uploaded_files)
-                                st.session_state.uploaded_path = os.path.abspath(result.batch_dir)
-                                st.session_state.last_processed_path = st.session_state.uploaded_path
-                                # Update hash to prevent double processing downstream
-                                import hashlib
-                                upload_hash = hashlib.md5("".join([f"{f.name}_{f.size}" for f in uploaded_files]).encode()).hexdigest()
-                                st.session_state.last_upload_hash = upload_hash
+                            # Step 1: 调用 KBProcessor 进行索引 (直接针对 Staging 目录)
+                            from src.kb.kb_processor import KBProcessor
+                            from src.config import ConfigLoader
+                            
+                            processor = KBProcessor()
+                            config = ConfigLoader.load()
+                            
+                            # 构造选项
+                            opts = {
+                                'embed_provider': config.get('embed_provider', 'HuggingFace (本地/极速)'),
+                                'embed_model': config.get('embed_model_hf', 'sentence-transformers/all-MiniLM-L6-v2'),
+                                'embed_key': config.get('embed_key', ''),
+                                'embed_url': config.get('embed_url', ''),
+                                'action_mode': 'APPEND',
+                                'use_ocr': use_ocr,
+                                'extract_metadata': use_meta,
+                                'generate_summary': use_sum,
+                                'force_reindex': False
+                            }
+                            
+                            status_box.write("⚙️ 启动索引构建器...")
+                            success = processor.process_knowledge_base(current_kb_name, append_staging_dir, opts)
+                            
+                            if success:
+                                status_box.write("📦 正在归档源文件...")
+                                # Step 2: 归档文件到 raw_sources
+                                kb_root = os.path.join(os.path.abspath("vector_db_storage"), current_kb_name)
+                                raw_sources = os.path.join(kb_root, "raw_sources")
+                                if not os.path.exists(raw_sources): os.makedirs(raw_sources)
+                                
+                                moved_mapping = {}
+                                
+                                for f in files_in_staging:
+                                    src = os.path.join(append_staging_dir, f)
+                                    # 避免重名
+                                    dst_name = f
+                                    if os.path.exists(os.path.join(raw_sources, f)):
+                                        name, ext = os.path.splitext(f)
+                                        dst_name = f"{name}_{int(time.time())}{ext}"
+                                    
+                                    dst = os.path.join(raw_sources, dst_name)
+                                    try:
+                                        shutil.move(src, dst)
+                                        moved_mapping[f] = dst
+                                        # 移动元数据
+                                        if os.path.exists(src + ".meta"):
+                                            shutil.move(src + ".meta", dst + ".meta")
+                                    except Exception as move_err:
+                                        logger.error(f"Move failed for {f}: {move_err}")
+                                
+                                # Step 3: 修正 Manifest 路径 (自愈逻辑)
+                                try:
+                                    from src.config.manifest_manager import ManifestManager
+                                    manifest_data = ManifestManager.load(kb_root)
+                                    if manifest_data and 'files' in manifest_data:
+                                        changed = False
+                                        for entry in manifest_data['files']:
+                                            fname = entry.get('name')
+                                            if fname in moved_mapping:
+                                                entry['path'] = moved_mapping[fname]
+                                                entry['parent_path'] = os.path.dirname(moved_mapping[fname])
+                                                changed = True
+                                        
+                                        if changed:
+                                            ManifestManager.save(kb_root, manifest_data['files'], manifest_data.get('embed_model'))
+                                            status_box.write("📝 清单路径已修正")
+                                except Exception as e:
+                                    logger.warning(f"Manifest patch failed: {e}")
+
+                                status_box.update(label="✅ 追加完成！", state="complete", expanded=False)
+                                st.success(f"成功追加 {len(files_in_staging)} 个文件")
+                                time.sleep(1.5)
+                                st.rerun()
+                            else:
+                                status_box.update(label="❌ 追加失败", state="error")
                         except Exception as e:
-                            logger.error(f"Immediate upload processing failed: {e}")
-                        
-                        btn_start = True
-                        action_mode = "APPEND"
-                        st.session_state.sidebar_state = "collapsed"
-                        st.markdown("""
-                        <style>
-                        [data-testid="stSidebar"] {
-                            width: 2.5rem !important;
-                            min-width: 2.5rem !important;
-                            max-width: 2.5rem !important;
-                        }
-                        [data-testid="stSidebar"] > div {
-                            overflow: hidden !important;
-                        }
-                        </style>
-                        """, unsafe_allow_html=True)
+                            status_box.update(label=f"❌ 发生异常: {str(e)}", state="error")
+                            logger.error(f"Append failed: {e}")
     
             # 统一的数据源处理逻辑（仅针对 Web 抓取保留在外部，本地文件已在内部处理）
             # btn_start already initialized above
