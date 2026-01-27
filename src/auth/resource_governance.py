@@ -17,10 +17,10 @@ USER_CONFIG_PATH = "config/users.json"
 ROLE_TEMPLATE_PATH = "config/role_templates.json"
 
 ALL_PERMISSIONS_MAP = {
-    "chat": "🗨️ 基础对话", "kb_create": "➕ 创建库", "kb_delete_own": "🗑️ 删除个人库",
+    "chat": "🗨️ 基础对话", "kb_create": "➕ 创建库", "kb_append": "📥 追加知识", "kb_delete_own": "🗑️ 删除个人库",
     "kb_rename": "✏️ 重命名库", "kb_rebuild_index": "🔄 重建索引", "upload_files": "📤 上传文件", 
     "paste_text": "📝 粘贴文本", "use_crawler": "🌐 网页爬虫", "smart_search": "🔍 联网搜索", 
-    "deep_research": "🧠 深度研究", "data_analysis": "📊 数据分析", "summary_gen": "✨ AI 摘要", 
+    "precise_query": "🎯 精准提问", "deep_research": "🧠 深度研究", "data_analysis": "📊 数据分析", "summary_gen": "✨ AI 摘要", 
     "download_knowledge_base": "📥 资产下载", "kb_export_report": "📝 导出报告",
     "kb_export_full": "🏗️ 全量镜像", "kb_filesystem_access": "📂 系统访问",
     "manage_system_config": "🛠️ 系统配置", "view_stats": "📊 查看监控"

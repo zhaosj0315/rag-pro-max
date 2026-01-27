@@ -1896,23 +1896,32 @@ with st.sidebar:
                 target_path = "" # 管理模式不需要手动指定路径，使用KB原有路径
                 
                 # --- Omni-Append Workstation (v2.0) ---
-                append_staging_dir = os.path.join(os.path.abspath("vector_db_storage"), current_kb_name, "append_staging")
-                
-                # 1. 全源采集矩阵
-                render_omni_ingestion_tabs(
-                    target_dir=append_staging_dir,
-                    key_prefix="omni_append",
-                    can_upload=True,
-                    on_success=lambda s, c: st.toast(f"✅ [{s}] 已暂存 {c} 个文件")
-                )
-                
-                st.divider()
-                
-                # 2. 暂存区管控
-                render_staging_area(append_staging_dir, key_prefix="omni_append")
-                
-                # 3. 执行追加
-                files_in_staging = [f for f in os.listdir(append_staging_dir) if not f.startswith('.')] if os.path.exists(append_staging_dir) else []
+                # 权限检查
+                from src.auth.permission_manager import permission_manager
+                current_user = st.session_state.get('user', 'guest_user')
+                can_append = permission_manager.has_permission(current_user, "kb_append")
+
+                if not can_append:
+                    st.info("🔒 权限不足：您当前角色无法执行追加操作")
+                    files_in_staging = [] # 阻断后续逻辑
+                else:
+                    append_staging_dir = os.path.join(os.path.abspath("vector_db_storage"), current_kb_name, "append_staging")
+                    
+                    # 1. 全源采集矩阵
+                    render_omni_ingestion_tabs(
+                        target_dir=append_staging_dir,
+                        key_prefix="omni_append",
+                        can_upload=True,
+                        on_success=lambda s, c: st.toast(f"✅ [{s}] 已暂存 {c} 个文件")
+                    )
+                    
+                    st.divider()
+                    
+                    # 2. 暂存区管控
+                    render_staging_area(append_staging_dir, key_prefix="omni_append")
+                    
+                    # 3. 执行追加
+                    files_in_staging = [f for f in os.listdir(append_staging_dir) if not f.startswith('.')] if os.path.exists(append_staging_dir) else []
                 
                 if files_in_staging:
                     # 高级选项 (Unified)
@@ -1929,6 +1938,39 @@ with st.sidebar:
                     btn_text = "🔄 确认追加并重建索引" if is_rebuild else f"🚀 确认追加 {len(files_in_staging)} 个文件"
 
                     if st.button(btn_text, type="primary", use_container_width=True, key="omni_append_commit"):
+                        # 注入日志样式优化 (v2.0)
+                        st.markdown("""
+                        <style>
+                        /* 优化 Status 容器内的日志显示 */
+                        div[data-testid="stStatusWidget"] div[data-testid="stMarkdown"] p {
+                            font-family: 'SF Mono', 'Segoe UI Mono', 'Roboto Mono', monospace;
+                            font-size: 0.85rem;
+                            white-space: pre-wrap !important; 
+                            word-break: break-word !important;
+                            line-height: 1.6;
+                            margin-bottom: 0px;
+                        }
+                        /* 限制最大高度并允许滚动 */
+                        div[data-testid="stStatusWidget"] details > div {
+                            max-height: 500px;
+                            overflow-y: auto !important;
+                            background-color: #fafafa;
+                            border: 1px solid #eee;
+                            border-radius: 6px;
+                            padding: 12px;
+                            box-shadow: inset 0 1px 3px rgba(0,0,0,0.02);
+                        }
+                        /* 滚动条美化 */
+                        div[data-testid="stStatusWidget"] details > div::-webkit-scrollbar {
+                            width: 6px;
+                        }
+                        div[data-testid="stStatusWidget"] details > div::-webkit-scrollbar-thumb {
+                            background-color: #ddd;
+                            border-radius: 3px;
+                        }
+                        </style>
+                        """, unsafe_allow_html=True)
+                        
                         status_box = st.status("🚀 正在执行任务...", expanded=True)
                         try:
                             from src.kb.kb_processor import KBProcessor
@@ -5644,7 +5686,7 @@ for msg_idx, msg in enumerate(state.get_messages()):
                         click_btn(q)
             else:
                 # 兜底：如果没推荐，显示一个小提示
-                st.caption("暂无更多推荐，您可以尝试开启'深度思考'或'联网搜索'来获取更深入的追问。")
+                st.caption("暂无更多推荐，您可以尝试开启'精准提问'或'联网搜索'来获取更深入的追问。")
 
         suggestions_fragment()
 
@@ -5911,10 +5953,20 @@ with st.container():
                     else:
                         st.error("同步失败")
 
-    # --- 3. 功能开关 (Toggle) ---
-    with c_deep:
-        render_isolated_toggle("深度思考", 'enable_query_optimization', help="启用智能查询优化")
-
+                    # --- 3. 功能开关 (Toggle) ---
+                    with c_deep:
+                        # 权限检查：精准提问
+                        from src.auth.permission_manager import permission_manager
+                        current_user = st.session_state.get('user', 'guest_user')
+                        can_precise = permission_manager.has_permission(current_user, "precise_query")
+                        
+                        render_isolated_toggle(
+                            "精准提问 (🔒)" if not can_precise else "精准提问", 
+                            'enable_query_optimization', 
+                            help="请联系管理员开启精准提问权限" if not can_precise else "启用智能查询优化",
+                            disabled=not can_precise
+                        )
+    
     with c_web:
         # 权限检查：联网搜索 (实时颗粒化)
         from src.auth.permission_manager import permission_manager
@@ -6505,17 +6557,17 @@ if st.session_state.get('is_processing') and final_prompt:
             # 单知识库查询模式（原逻辑）
             logger.start_operation("查询", f"知识库: {active_kb_name}")
         
-        # 查询改写 (v1.6) - 深度思考自动优化
+        # 查询改写 (v1.6) - 精准提问自动优化
         if st.session_state.get('enable_query_optimization', False):
-            logger.info(f"🧠 DEBUG: 深度思考功能已启用，开始自动优化查询")
-            logger.info("🧠 深度思考(查询优化)已激活")
+            logger.info(f"🧠 DEBUG: 精准提问功能已启用，开始自动优化查询")
+            logger.info("🧠 精准提问(查询优化)已激活")
             query_rewriter = QueryRewriter(Settings.llm)
             should_rewrite, reason = query_rewriter.should_rewrite(final_prompt)
             logger.info(f"🧠 DEBUG: should_rewrite={should_rewrite}, reason={reason}")
             
             if should_rewrite:
                 logger.info(f"💡 DEBUG: 检测到需要改写查询")
-                logger.info(f"💡 深度思考: 检测到需要改写查询 - {reason}")
+                logger.info(f"💡 精准提问: 检测到需要改写查询 - {reason}")
                 rewritten_query = query_rewriter.suggest_rewrite(final_prompt)
                 logger.info(f"💡 DEBUG: 优化后的查询: {rewritten_query}")
                 
@@ -6525,22 +6577,22 @@ if st.session_state.get('is_processing') and final_prompt:
                     
                     # 显示优化信息并自动使用优化后的查询
                     with st.chat_message("assistant", avatar="🤖"):
-                        st.info(f"💡 **深度思考优化**\n\n原问题：{final_prompt}\n\n优化后：{rewritten_query}\n\n✅ 自动使用优化后的查询进行回答")
+                        st.info(f"💡 **精准提问优化**\n\n原问题：{final_prompt}\n\n优化后：{rewritten_query}\n\n✅ 自动使用优化后的查询进行回答")
                     
                     # 直接使用优化后的查询
                     final_prompt = rewritten_query
                     logger.success(final_prompt)
                     logger.success(original_prompt)
                     logger.success(final_prompt)
-                    logger.info(f"✅ 深度思考: 自动使用优化后的查询 - {rewritten_query}")
+                    logger.info(f"✅ 精准提问: 自动使用优化后的查询 - {rewritten_query}")
                     
                     # 确保后续所有地方都使用优化后的查询
                     st.session_state.current_optimized_query = final_prompt
             else:
                 logger.info(f"🧠 DEBUG: 查询清晰，无需改写")
-                logger.info(f"🧠 深度思考: 查询清晰，无需改写 ({reason})")
+                logger.info(f"🧠 精准提问: 查询清晰，无需改写 ({reason})")
         else:
-            logger.info(f"🧠 DEBUG: 深度思考功能未启用")
+            logger.info(f"🧠 DEBUG: 精准提问功能未启用")
         
         logger.info(final_prompt)
 

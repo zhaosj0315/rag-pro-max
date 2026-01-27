@@ -13,6 +13,7 @@
         "permissions": [
             "chat",
             "kb_create",
+            "kb_append",
             "kb_delete_own",
             "kb_rename",
             "kb_filesystem_access",
@@ -21,6 +22,7 @@
             "paste_text",
             "use_crawler",
             "smart_search",
+            "precise_query",
             "summary_gen",
             "kb_export_report",
             "data_analysis",
@@ -40,6 +42,7 @@
             "paste_text",
             "use_crawler",
             "smart_search",
+            "precise_query",
             "deep_research",
             "data_analysis",
             "summary_gen",
@@ -54,7 +57,9 @@
         "description": "专注已有知识库的深度对话与资产导出",
         "permissions": [
             "chat",
+            "kb_append",
             "smart_search",
+            "precise_query",
             "summary_gen",
             "kb_export_report",
             "kb_export_full",

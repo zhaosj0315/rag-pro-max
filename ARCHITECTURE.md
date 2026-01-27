@@ -46,7 +46,9 @@
     - **Paste Ingestor**: 实时文本持久化引擎，生成 `Pasted_{Timestamp}.txt`。
     - **Web Ingestor**: 网页爬虫与智能搜索结果 Markdown 化。
     - **Database Exporter**: 数据库查询结果流式物料化 (CSV)。
-- **Atomic Dispatcher**: 将暂存区的“并集合集”一次性投递给 `IndexBuilder`，确保了构建原子性。
+- **Atomic Dispatcher**: 将暂存区的“并集合集”一次性投递给 `IndexBuilder`。支持两种策略：
+    - **Incremental (Default)**: 仅索引新文件，随后归档。
+    - **Full Rebuild**: 先归档，再对全量目录执行重建。
 
 ---
 

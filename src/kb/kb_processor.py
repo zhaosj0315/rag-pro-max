@@ -64,6 +64,39 @@ class KBProcessor:
         except:
             logger.success(f"✅ 嵌入模型已设置: {embed_model}")
         
+        # 注入日志样式优化 (v2.0)
+        st.markdown("""
+        <style>
+        /* 优化 Status 容器内的日志显示 */
+        div[data-testid="stStatusWidget"] div[data-testid="stMarkdown"] p {
+            font-family: 'SF Mono', 'Segoe UI Mono', 'Roboto Mono', monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap !important;
+            word-break: break-word !important; 
+            line-height: 1.6;
+            margin-bottom: 0px;
+        }
+        /* 滚动容器优化 */
+        div[data-testid="stStatusWidget"] details > div {
+            max-height: 500px;
+            overflow-y: auto !important;
+            background-color: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 6px;
+            padding: 12px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.02);
+        }
+        /* 滚动条美化 */
+        div[data-testid="stStatusWidget"] details > div::-webkit-scrollbar {
+            width: 6px;
+        }
+        div[data-testid="stStatusWidget"] details > div::-webkit-scrollbar-thumb {
+            background-color: #ddd;
+            border-radius: 3px;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
         logger.log("INFO", f"开始处理知识库: {kb_name}", stage="知识库处理")
         
         # UI 状态容器
@@ -71,20 +104,41 @@ class KBProcessor:
         prog_bar = status_container.progress(0)
         status_container.write(f"⏱️ 开始时间: {datetime.now().strftime('%H:%M:%S')}")
         
-        # 回调函数：更新 UI
+        # 回调函数：更新 UI (v2.0 结构化HTML)
         def status_callback(msg_type, *args):
             if msg_type == "step":
                 step_num, step_desc = args
-                status_container.write(f"📂 [步骤{step_num}/6] {step_desc}")
+                # 步骤: 蓝色轻背景，强视觉引导
+                html = f"""
+                <div style="background-color: #e3f2fd; padding: 5px 10px; border-radius: 4px; border-left: 3px solid #2196f3; margin: 10px 0 5px 0;">
+                    <span style="font-weight: 600; color: #0d47a1;">📂 步骤 {step_num}/6:</span> 
+                    <span style="color: #1565c0;">{step_desc}</span>
+                </div>
+                """
+                status_container.markdown(html, unsafe_allow_html=True)
                 logger.info(f"📂 [步骤 {step_num}/6] {step_desc}")
                 prog_bar.progress(step_num * 15)
+                
             elif msg_type == "info":
                 info_msg = args[0]
-                status_container.write(f"   {info_msg}")
+                # 信息: 增加左边距，区分层级
+                icon = "🔹" if any(k in info_msg for k in ["正在", "开始"]) else "ℹ️"
+                color = "#2e7d32" if "✅" in info_msg else "#444"
+                
+                html = f"""<div style="margin-left: 8px; color: {color}; line-height: 1.5;">{icon} {info_msg}</div>"""
+                status_container.markdown(html, unsafe_allow_html=True)
                 logger.info(f"   {info_msg}")
+                
             elif msg_type == "warning":
                 warn_msg = args[0]
-                status_container.write(f"   ⚠️  {warn_msg}")
+                # 警告: 橙色轻背景
+                html = f"""
+                <div style="background-color: #fff3e0; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ff9800; margin: 4px 0;">
+                    <span style="font-weight: 600; color: #e65100;">⚠️ 警告:</span> 
+                    <span style="color: #ef6c00;">{warn_msg}</span>
+                </div>
+                """
+                status_container.markdown(html, unsafe_allow_html=True)
                 logger.warning(f"   ⚠️  {warn_msg}")
         
         # 验证源路径
