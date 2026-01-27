@@ -1,5 +1,19 @@
 # Changelog
 
+## [v9.5.38] - 2026-01-27 (Omni-Append Edition)
+### 🚀 全源追加引擎 (Omni-Append Engine)
+- **体验统一 (Unified Experience)**: 彻底消除“创建”与“维护”的能力落差。现在，追加知识库时也能享受到完整的 5 大采集源（上传/扫描/粘贴/网页/数据库）与暂存区机制。
+- **追加暂存区 (Append Staging Area)**: 引入独立的追加缓冲区。采集的材料不会立即入库，而是先进入暂存区等待检阅，确保“所见即所得”。
+- **原子化提交 (Atomic Commit)**: 实现了“索引优先、归档殿后”的原子提交逻辑，并自动修正 `manifest.json` 路径，确保系统稳健。
+
+### 🔧 高级选项复用架构 (Unified Advanced Options)
+- **DRY 原则**: 将 OCR、元数据、摘要等高级处理逻辑封装为 `render_advanced_options` 统一组件。
+- **智能安全锁**: 在追加模式下，系统会自动禁用“强制重建索引”选项，从物理层面杜绝误删已有索引的风险。
+
+### 🛠️ 架构重构
+- **全能采集组件**: 新增 `src/ui/unified_ingestion.py`，接管所有资料摄入 UI。
+- **逻辑解耦**: `src/apppro.py` 瘦身成功，不再包含冗余的上传逻辑。
+
 ## [v9.5.37] - 2026-01-26 (Search Revolution Edition)
 ### 🕷️ 智能搜索技术革命 (Smart Search Breakthrough)
 - **Level 0 暴力探测 (Violent Discovery)**: 彻底重构抓取架构，将搜索引擎定义为 L0 种子层。放弃 HTML 解析器，采用正则表达式直接扫描原始 HTTP 字节流，物理绕过 WAF 结构混淆。

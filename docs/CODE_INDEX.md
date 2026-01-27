@@ -352,6 +352,18 @@
 
 ---
 
+### 📄 src/ui/unified_ingestion.py
+**📝 描述**: 全能采集统一组件 - 负责所有资料摄入的 UI 与暂存逻辑
+
+- **⚡ Functions**:
+  - `def sync_to_staging`: 同步文件或目录到暂存区
+  - `def handle_ingestion_success`: 统一的成功反馈处理器
+  - `def render_staging_area`: 渲染暂存区状态栏与管理工具
+  - `def render_omni_ingestion_tabs`: 渲染五大源全能摄入面板 (可复用)
+  - `def render_advanced_options`: 渲染统一的高级选项面板 (五大核心选项)
+
+---
+
 ### 📄 src/ui/user_experience_enhanced.py
 **📝 描述**: 增强的用户体验组件
 

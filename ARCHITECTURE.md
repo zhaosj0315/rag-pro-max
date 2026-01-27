@@ -36,7 +36,10 @@
 
 ### 3. 全源归一化摄入层 (Omni-Ingestion Architecture)
 在 v9.5 系列中，系统实现了**“一切皆源文件 (Everything is a Source File)”**的终极架构统一：
-- **Staging Buffer (`task_staging_dir`)**: 作为所有非结构化数据的统一汇聚点，通过 `uuid` 隔离不同任务。
+- **Unified Engine**: `src/ui/unified_ingestion.py` 是系统的唯一摄入入口，同时服务于 **Create Mode** 和 **Append Mode**。
+- **Dual Staging Buffers**: 
+    - **Global Buffer**: `temp_uploads` (用于创建新库)。
+    - **Append Buffer**: `vector_db_storage/<kb>/append_staging` (用于追加维护)，实现物理隔离。
 - **Source Aggregators**: 
     - **Upload Ingestor**: 处理 Streamlit 文件缓冲区流，具备 `md5` 哈希去重能力。
     - **Path Ingestor**: 执行 `os.walk` 递归文件扫描与物理镜像。
