@@ -1915,12 +1915,10 @@ with st.sidebar:
                 files_in_staging = [f for f in os.listdir(append_staging_dir) if not f.startswith('.')] if os.path.exists(append_staging_dir) else []
                 
                 if files_in_staging:
-                    # 高级选项
-                    with st.expander("🔧 高级处理选项 (本次有效)", expanded=False):
-                        ac1, ac2, ac3 = st.columns(3)
-                        use_ocr = ac1.checkbox("🔍 OCR识别", value=False, key="append_ocr", help="对图片/PDF进行文字识别")
-                        use_meta = ac2.checkbox("📊 元数据", value=False, key="append_meta", help="提取分类标签和关键词")
-                        use_sum = ac3.checkbox("📝 生成摘要", value=False, key="append_sum", help="生成AI摘要")
+                    # 高级选项 (Unified)
+                    from src.ui.unified_ingestion import render_advanced_options
+                    # 禁用 Force Reindex 以保护现有索引
+                    append_opts = render_advanced_options(key_prefix="append", expanded=False, allow_reindex=False)
 
                     if st.button(f"🚀 确认追加 {len(files_in_staging)} 个文件到知识库", type="primary", use_container_width=True, key="omni_append_commit"):
                         status_box = st.status("🚀 正在执行追加任务...", expanded=True)
@@ -1939,9 +1937,9 @@ with st.sidebar:
                                 'embed_key': config.get('embed_key', ''),
                                 'embed_url': config.get('embed_url', ''),
                                 'action_mode': 'APPEND',
-                                'use_ocr': use_ocr,
-                                'extract_metadata': use_meta,
-                                'generate_summary': use_sum,
+                                'use_ocr': append_opts['use_ocr'],
+                                'extract_metadata': append_opts['extract_metadata'],
+                                'generate_summary': append_opts['generate_summary'],
                                 'force_reindex': False
                             }
                             
@@ -2488,63 +2486,15 @@ with st.sidebar:
             st.write("")
 
             # 高级选项
-            with st.expander("🔧 高级选项", expanded=st.session_state.kb_adv_expanded):
-                
-                @st.fragment
-                def render_create_kb_options():
-                    # 布局优化：全选 + 状态提示在一行
-                    h_col1, h_col2 = st.columns([1.5, 2.5])
-                    with h_col1:
-                        select_all = st.checkbox("✅ 一键全选", value=False, key="kb_adv_select_all", help="开启/关闭所有高级选项")
-                    with h_col2:
-                        status_placeholder = st.empty()
-                    
-                    # 根据一键全选状态设置默认值
-                    default_val = select_all
-
-                    # [v8.6.9 重构] 五大核心高级选项：全对齐、全透明、全全选
-                    from src.auth.permission_manager import permission_manager
-                    current_user = st.session_state.get('user', 'guest_user')
-                    can_rebuild = permission_manager.has_permission(current_user, "kb_rebuild_index")
-
-                    # 布局优化：采用 3x2 紧凑矩阵
-                    opt_col1, opt_col2 = st.columns(2)
-                    
-                    with opt_col1:
-                        use_ocr = st.checkbox("🔍 OCR文字识别", value=default_val, key="kb_use_ocr", help="识别图片或PDF中的文字")
-                        extract_metadata = st.checkbox("📊 元数据提取", value=default_val, key="kb_extract_metadata", help="自动提取文件分类、关键词")
-                        # 维护项紧跟其后，移除横杠
-                        if can_rebuild:
-                            force_reindex = st.checkbox("🔄 强制重建索引", value=default_val, key="kb_force_reindex", help="物理删除旧索引，触发全量重建（慎用）")
-                        else:
-                            st.checkbox("🔄 强制重建索引 (🔒)", value=False, disabled=True, help="无重建索引权限")
-                            force_reindex = False
-                            if "kb_force_reindex" in st.session_state:
-                                st.session_state.kb_force_reindex = False
-
-                    with opt_col2:
-                        # [v8.6.9 修复] 一键全选现在包含数据分析
-                        enable_data_analysis = st.checkbox("💎 智能数据分析", value=default_val, key="kb_enable_data_analysis", help="自动识别真数据，构建物理库，启用SQL决策")
-                        generate_summary = st.checkbox("📝 自动摘要生成", value=default_val, key="kb_generate_summary", help="为每份文件生成AI摘要")
-                    
-                    # 保存到session state (仅同步 Key 不一致的项)
-                    st.session_state.use_ocr = use_ocr
-                    st.session_state.generate_summary = generate_summary
-
-                    # 更新状态提示
-                    options = []
-                    if force_reindex: options.append("重建")
-                    if use_ocr: options.append("OCR")
-                    if enable_data_analysis: options.append("分析")
-                    if extract_metadata: options.append("元数据")
-                    if generate_summary: options.append("摘要")
-                    
-                    if options:
-                        status_placeholder.caption(f"🔧 启用: {'|'.join(options)}")
-                    else:
-                        status_placeholder.caption("⚡ 快速模式：已关闭高级选项")
-                
-                render_create_kb_options()
+            # --- Advanced Options (Unified) ---
+            from src.ui.unified_ingestion import render_advanced_options
+            
+            # Use 'kb' prefix to match original keys (kb_use_ocr, etc.)
+            adv_options = render_advanced_options(key_prefix="kb", expanded=st.session_state.kb_adv_expanded)
+            
+            # Sync specific keys required by legacy button handlers
+            st.session_state.use_ocr = adv_options['use_ocr']
+            st.session_state.generate_summary = adv_options['generate_summary']
 
 
             st.write("")

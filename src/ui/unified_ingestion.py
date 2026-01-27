@@ -440,3 +440,64 @@ def render_omni_ingestion_tabs(target_dir, key_prefix="omni", can_upload=True, o
                                 _handle_local_success("自定义SQL", 1)
                             except Exception as e:
                                 st.error(str(e))
+
+def render_advanced_options(key_prefix="kb_adv", expanded=False, allow_reindex=True):
+    """
+    渲染统一的高级选项面板 (五大核心选项)
+    """
+    with st.expander("🔧 高级选项", expanded=expanded):
+        # 布局优化：全选 + 状态提示在一行
+        h_col1, h_col2 = st.columns([1.5, 2.5])
+        with h_col1:
+            select_all = st.checkbox("✅ 一键全选", value=False, key=f"{key_prefix}_select_all", help="开启/关闭所有高级选项")
+        with h_col2:
+            status_placeholder = st.empty()
+        
+        default_val = select_all
+
+        # 权限检查
+        from src.auth.permission_manager import permission_manager
+        current_user = st.session_state.get('user', 'guest_user')
+        can_rebuild = permission_manager.has_permission(current_user, "kb_rebuild_index")
+
+        # 布局优化：3x2 紧凑矩阵
+        opt_col1, opt_col2 = st.columns(2)
+        
+        with opt_col1:
+            use_ocr = st.checkbox("🔍 OCR文字识别", value=default_val, key=f"{key_prefix}_use_ocr", help="识别图片或PDF中的文字")
+            extract_metadata = st.checkbox("📊 元数据提取", value=default_val, key=f"{key_prefix}_extract_metadata", help="自动提取文件分类、关键词")
+            
+            # 维护项
+            force_reindex = False
+            if allow_reindex:
+                if can_rebuild:
+                    force_reindex = st.checkbox("🔄 强制重建索引", value=default_val, key=f"{key_prefix}_force_reindex", help="物理删除旧索引，触发全量重建（慎用）")
+                else:
+                    st.checkbox("🔄 强制重建索引 (🔒)", value=False, disabled=True, help="无重建索引权限")
+            else:
+                st.caption("ℹ️ 追加模式下不可重建索引")
+
+        with opt_col2:
+            enable_data_analysis = st.checkbox("💎 智能数据分析", value=default_val, key=f"{key_prefix}_enable_data_analysis", help="自动识别真数据，构建物理库，启用SQL决策")
+            generate_summary = st.checkbox("📝 自动摘要生成", value=default_val, key=f"{key_prefix}_generate_summary", help="为每份文件生成AI摘要")
+        
+        # 更新状态提示
+        options = []
+        if force_reindex: options.append("重建")
+        if use_ocr: options.append("OCR")
+        if enable_data_analysis: options.append("分析")
+        if extract_metadata: options.append("元数据")
+        if generate_summary: options.append("摘要")
+        
+        if options:
+            status_placeholder.caption(f"🔧 启用: {'|'.join(options)}")
+        else:
+            status_placeholder.caption("⚡ 快速模式：已关闭高级选项")
+            
+        return {
+            "use_ocr": use_ocr,
+            "extract_metadata": extract_metadata,
+            "force_reindex": force_reindex,
+            "enable_data_analysis": enable_data_analysis,
+            "generate_summary": generate_summary
+        }
