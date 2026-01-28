@@ -1098,37 +1098,37 @@ with st.sidebar:
 
     with tab_main:
         # 知识库控制台标题与一键配置完全一行化
-        console_col1, console_col2, console_col3 = st.columns([4, 1, 0.5])
+        # [v2.7.7 UI优化] 将打开目录按钮上移，节省一行空间
+        default_output_path = os.path.join(os.getcwd(), "vector_db_storage")
+        if not os.path.exists(default_output_path):
+            os.makedirs(default_output_path)
+        output_base = default_output_path
+
+        console_col1, console_col2, console_col3, console_col4 = st.columns([3.5, 0.7, 1.3, 0.5])
         with console_col1:
             st.markdown("**💠 知识库控制台**")
         with console_col2:
+            if st.button("📂", help=f"打开存储目录: {output_base}", use_container_width=True, key="open_storage_dir_inline"):
+                if output_base and os.path.exists(output_base):
+                    import webbrowser, urllib.parse
+                    try:
+                        # 兼容 macOS/Windows/Linux 的通用打开逻辑
+                        from src.utils.file_system_utils import reveal_in_file_manager
+                        reveal_in_file_manager(output_base)
+                    except: 
+                        st.toast("❌ 无法打开目录")
+        with console_col3:
             if st.button("⚡ 一键配置", use_container_width=True, key="quick_config_inline"):
                 ConfigLoader.quick_setup()
                 st.success("✅ 已使用默认配置！")
                 time.sleep(1)
                 st.rerun()
-        with console_col3:
+        with console_col4:
             st.markdown("❓", help="可手动配置，适合高级用户")
         
         if "model_list" not in st.session_state: st.session_state.model_list = []
 
-        # 存储根目录完全一行化
-        storage_col1, storage_col2, storage_col3 = st.columns([0.6, 5.9, 0.5])
-        with storage_col1:
-            st.markdown("**路径:**")
-        with storage_col2:
-            default_output_path = os.path.join(os.getcwd(), "vector_db_storage")
-            output_base = st.text_input("知识库存储路径", value=default_output_path, help="知识库文件的保存位置", label_visibility="collapsed")
-        with storage_col3:
-            if st.button("📂", help="打开存储目录", use_container_width=True, key="open_storage_dir"):
-                if output_base and os.path.exists(output_base):
-                    import webbrowser, urllib.parse
-                    try:
-                        file_url = 'file://' + urllib.parse.quote(os.path.abspath(output_base))
-                        webbrowser.open(file_url)
-                        st.toast("✅ 已打开")
-                    except: pass
-        if not output_base: output_base = default_output_path
+        # (已移除路径输入行)
             
         existing_kbs = (setattr(kb_manager, "base_path", output_base), kb_manager.list_all())[1]
 

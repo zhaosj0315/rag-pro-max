@@ -13,6 +13,7 @@ def sync_to_staging(target_dir, source, is_file=True, source_label="Unknown"):
     """
     同步文件或目录到暂存区
     """
+    count = 0
     try:
         if not os.path.exists(target_dir):
             os.makedirs(target_dir, exist_ok=True)
@@ -22,6 +23,7 @@ def sync_to_staging(target_dir, source, is_file=True, source_label="Unknown"):
             fname = os.path.basename(source)
             dest = os.path.join(target_dir, fname)
             shutil.copy2(source, dest)
+            count = 1
         else:
             # 目录/批量模式
             if os.path.isdir(source):
@@ -45,11 +47,12 @@ def sync_to_staging(target_dir, source, is_file=True, source_label="Unknown"):
                             meta_f.write(f"Source: {source_label}\n")
                             meta_f.write(f"OriginalPath: {src_file}\n")
                             meta_f.write(f"SyncTime: {datetime.now().isoformat()}\n")
-        return True
+                        count += 1
+        return count
     except Exception as e:
         st.error(f"同步失败: {e}")
         logger.error(f"Sync failed: {e}")
-        return False
+        return 0
 
 def handle_ingestion_success(source_name, count, details=""):
     st.toast(f"✅ [{source_name}] 已成功摄入 {count} 个文件")
@@ -228,9 +231,10 @@ def render_omni_ingestion_tabs(target_dir, key_prefix="omni", can_upload=True, o
                 with st.spinner("⚡ 同步中..."):
                     batch_dir = save_uploaded_files(uploaded_files, "temp_uploads")
                     if batch_dir:
-                        if sync_to_staging(target_dir, batch_dir, is_file=False, source_label="文件上传"):
+                        count = sync_to_staging(target_dir, batch_dir, is_file=False, source_label="文件上传")
+                        if count > 0:
                             st.session_state[last_hash_key] = upload_hash
-                            _handle_local_success("文件上传", len(uploaded_files))
+                            _handle_local_success("文件上传", count)
             else:
                 st.caption("✨ 当前批次文件已在暂存区")
     
@@ -240,8 +244,9 @@ def render_omni_ingestion_tabs(target_dir, key_prefix="omni", can_upload=True, o
         manual_path = path_c1.text_input("本地路径", placeholder="粘贴本地目录地址...", key=f"{key_prefix}_path_input", label_visibility="collapsed")
         if path_c2.button("📥 镜像", use_container_width=True, key=f"{key_prefix}_path_btn"):
             if os.path.exists(manual_path):
-                if sync_to_staging(target_dir, manual_path, is_file=False, source_label="目录镜像"):
-                    _handle_local_success("目录镜像", 1)
+                count = sync_to_staging(target_dir, manual_path, is_file=False, source_label="目录镜像")
+                if count > 0:
+                    _handle_local_success("目录镜像", count)
             else: st.error("路径不存在")
     
     # Tab 3: 文本粘贴
