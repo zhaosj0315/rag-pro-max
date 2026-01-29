@@ -447,6 +447,86 @@ def render_omni_ingestion_tabs(target_dir, key_prefix="omni", can_upload=True, o
                                 st.error(str(e))
 
 @st.fragment
+def _render_advanced_options_content(key_prefix, allow_reindex, allow_data_analysis, can_rebuild):
+    """
+    高级选项内部内容渲染 (Fragment 隔离，防止全量 Rerun 卡顿)
+    """
+    # Select All Logic with Callback
+    def toggle_all():
+        val = st.session_state.get(f"{key_prefix}_select_all", False)
+        st.session_state[f"{key_prefix}_use_ocr"] = val
+        st.session_state[f"{key_prefix}_extract_metadata"] = val
+        st.session_state[f"{key_prefix}_generate_summary"] = val
+        if allow_data_analysis:
+            st.session_state[f"{key_prefix}_enable_data_analysis"] = val
+        if allow_reindex and can_rebuild:
+            st.session_state[f"{key_prefix}_force_reindex"] = val
+
+    # 预计算状态，避免使用 st.empty 造成闪烁
+    # 注意：此时 session_state 已经被 callback 更新（如果有触发）
+    # 或者如果没有触发 callback，也是最新的
+    
+    # 辅助获取当前值的函数 (默认 False)
+    def get_val(suffix):
+        return st.session_state.get(f"{key_prefix}_{suffix}", False)
+
+    options_labels = []
+    if allow_reindex and can_rebuild and get_val("force_reindex"): options_labels.append("重建")
+    if get_val("use_ocr"): options_labels.append("OCR")
+    if allow_data_analysis and get_val("enable_data_analysis"): options_labels.append("分析")
+    if get_val("extract_metadata"): options_labels.append("元数据")
+    if get_val("generate_summary"): options_labels.append("摘要")
+    
+    status_text = f"🔧 启用: {'|'.join(options_labels)}" if options_labels else "⚡ 快速模式：已关闭高级选项"
+
+    # 布局优化：全选 + 状态提示在一行
+    h_col1, h_col2 = st.columns([1.5, 2.5])
+    with h_col1:
+        # Checkbox 状态会自动同步 session_state
+        select_all = st.checkbox("✅ 一键全选", value=False, key=f"{key_prefix}_select_all", on_change=toggle_all, help="开启/关闭所有高级选项")
+    with h_col2:
+        # 直接渲染文本，无占位符，无延迟
+        st.caption(status_text)
+    
+    # 布局调整：两行 (3 + 2)
+    # Row 1: OCR, Metadata, Summary
+    r1_c1, r1_c2, r1_c3 = st.columns(3)
+    
+    with r1_c1:
+        use_ocr = st.checkbox("🔍 OCR文字识别", value=False, key=f"{key_prefix}_use_ocr", help="识别图片或PDF中的文字")
+    with r1_c2:
+        extract_metadata = st.checkbox("📊 元数据提取", value=False, key=f"{key_prefix}_extract_metadata", help="自动提取文件分类、关键词")
+    with r1_c3:
+        generate_summary = st.checkbox("📝 自动摘要生成", value=False, key=f"{key_prefix}_generate_summary", help="为每份文件生成AI摘要")
+
+    # Row 2: Data Analysis, Reindex (Empty 3rd col)
+    r2_c1, r2_c2, r2_c3 = st.columns(3)
+    
+    with r2_c1:
+        enable_data_analysis = False
+        if allow_data_analysis:
+            enable_data_analysis = st.checkbox("💎 智能数据分析", value=False, key=f"{key_prefix}_enable_data_analysis", help="自动识别真数据，构建物理库，启用SQL决策")
+        else:
+            st.caption("ℹ️ 追加模式暂不支持数据分析")
+    
+    with r2_c2:
+        force_reindex = False
+        if allow_reindex:
+            if can_rebuild:
+                force_reindex = st.checkbox("🔄 强制重建索引", value=False, key=f"{key_prefix}_force_reindex", help="物理删除旧索引，触发全量重建（慎用）")
+            else:
+                st.checkbox("🔄 强制重建索引 (🔒)", value=False, disabled=True, help="无重建索引权限")
+        else:
+            st.caption("ℹ️ 追加模式下不可重建索引")
+
+    return {
+        "use_ocr": use_ocr,
+        "extract_metadata": extract_metadata,
+        "force_reindex": force_reindex,
+        "enable_data_analysis": enable_data_analysis,
+        "generate_summary": generate_summary
+    }
+
 def render_advanced_options(key_prefix="kb_adv", expanded=False, allow_reindex=True, allow_data_analysis=True):
     """
     渲染统一的高级选项面板 (五大核心选项)
@@ -457,72 +537,5 @@ def render_advanced_options(key_prefix="kb_adv", expanded=False, allow_reindex=T
         current_user = st.session_state.get('user', 'guest_user')
         can_rebuild = permission_manager.has_permission(current_user, "kb_rebuild_index")
 
-        # Select All Logic with Callback
-        def toggle_all():
-            val = st.session_state.get(f"{key_prefix}_select_all", False)
-            st.session_state[f"{key_prefix}_use_ocr"] = val
-            st.session_state[f"{key_prefix}_extract_metadata"] = val
-            st.session_state[f"{key_prefix}_generate_summary"] = val
-            if allow_data_analysis:
-                st.session_state[f"{key_prefix}_enable_data_analysis"] = val
-            if allow_reindex and can_rebuild:
-                st.session_state[f"{key_prefix}_force_reindex"] = val
-
-        # 布局优化：全选 + 状态提示在一行
-        h_col1, h_col2 = st.columns([1.5, 2.5])
-        with h_col1:
-            select_all = st.checkbox("✅ 一键全选", value=False, key=f"{key_prefix}_select_all", on_change=toggle_all, help="开启/关闭所有高级选项")
-        with h_col2:
-            status_placeholder = st.empty()
-        
-        # 布局调整：两行 (3 + 2)
-        # Row 1: OCR, Metadata, Summary
-        r1_c1, r1_c2, r1_c3 = st.columns(3)
-        
-        with r1_c1:
-            use_ocr = st.checkbox("🔍 OCR文字识别", value=False, key=f"{key_prefix}_use_ocr", help="识别图片或PDF中的文字")
-        with r1_c2:
-            extract_metadata = st.checkbox("📊 元数据提取", value=False, key=f"{key_prefix}_extract_metadata", help="自动提取文件分类、关键词")
-        with r1_c3:
-            generate_summary = st.checkbox("📝 自动摘要生成", value=False, key=f"{key_prefix}_generate_summary", help="为每份文件生成AI摘要")
-
-        # Row 2: Data Analysis, Reindex (Empty 3rd col)
-        r2_c1, r2_c2, r2_c3 = st.columns(3)
-        
-        with r2_c1:
-            enable_data_analysis = False
-            if allow_data_analysis:
-                enable_data_analysis = st.checkbox("💎 智能数据分析", value=False, key=f"{key_prefix}_enable_data_analysis", help="自动识别真数据，构建物理库，启用SQL决策")
-            else:
-                st.caption("ℹ️ 追加模式暂不支持数据分析")
-        
-        with r2_c2:
-            force_reindex = False
-            if allow_reindex:
-                if can_rebuild:
-                    force_reindex = st.checkbox("🔄 强制重建索引", value=False, key=f"{key_prefix}_force_reindex", help="物理删除旧索引，触发全量重建（慎用）")
-                else:
-                    st.checkbox("🔄 强制重建索引 (🔒)", value=False, disabled=True, help="无重建索引权限")
-            else:
-                st.caption("ℹ️ 追加模式下不可重建索引")
-
-        # 更新状态提示
-        options = []
-        if force_reindex: options.append("重建")
-        if use_ocr: options.append("OCR")
-        if enable_data_analysis: options.append("分析")
-        if extract_metadata: options.append("元数据")
-        if generate_summary: options.append("摘要")
-        
-        if options:
-            status_placeholder.caption(f"🔧 启用: {'|'.join(options)}")
-        else:
-            status_placeholder.caption("⚡ 快速模式：已关闭高级选项")
-            
-        return {
-            "use_ocr": use_ocr,
-            "extract_metadata": extract_metadata,
-            "force_reindex": force_reindex,
-            "enable_data_analysis": enable_data_analysis,
-            "generate_summary": generate_summary
-        }
+        # 委托给 Fragment 处理内部逻辑
+        return _render_advanced_options_content(key_prefix, allow_reindex, allow_data_analysis, can_rebuild)
