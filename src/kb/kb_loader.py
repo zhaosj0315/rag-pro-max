@@ -34,9 +34,16 @@ class KnowledgeBaseLoader:
             if os.path.exists(kb_info_file):
                 with open(kb_info_file, 'r') as f:
                     kb_info = json.load(f)
+                    
+                    # 优先直接读取保存的维度
+                    if 'embedding_dim' in kb_info and isinstance(kb_info['embedding_dim'], int):
+                        return kb_info['embedding_dim']
+                        
                     model = kb_info.get('embedding_model', '')
                     # 根据模型名推断维度
-                    if 'small' in model:
+                    if 'MiniLM' in model:
+                        return 384
+                    elif 'small' in model:
                         return 512
                     elif 'base' in model:
                         return 768
@@ -111,24 +118,46 @@ class KnowledgeBaseLoader:
         try:
             logger.log("INFO", f"开始加载知识库: {kb_name}", stage="知识库加载")
             
-            # 检测知识库的向量维度
-            kb_dim = self.get_kb_embedding_dim(db_path)
-            if kb_dim:
-                model_map = {
-                    512: "sentence-transformers/all-MiniLM-L6-v2",
-                    768: "BAAI/bge-base-zh-v1.5", 
-                    1024: "BAAI/bge-m3"
-                }
+            # 策略 1: 优先尝试直接读取绑定的模型名称
+            required_model = None
+            kb_info_file = os.path.join(db_path, ".kb_info.json")
+            if os.path.exists(kb_info_file):
+                try:
+                    with open(kb_info_file, 'r') as f:
+                        kb_info = json.load(f)
+                        stored_model = kb_info.get('embedding_model')
+                        # 简单的有效性检查
+                        if stored_model and isinstance(stored_model, str) and len(stored_model) > 3:
+                            required_model = stored_model
+                except: pass
+
+            # 策略 2: 如果没有模型名，则根据维度推断
+            if not required_model:
+                kb_dim = self.get_kb_embedding_dim(db_path)
+                if kb_dim:
+                    model_map = {
+                        384: "sentence-transformers/all-MiniLM-L6-v2",
+                        512: "sentence-transformers/all-MiniLM-L6-v2",
+                        768: "BAAI/bge-base-zh-v1.5", 
+                        1024: "BAAI/bge-m3"
+                    }
+                    
+                    if kb_dim in model_map:
+                        required_model = model_map[kb_dim]
+            
+            # 执行模型切换
+            if required_model and embed_model != required_model:
+                logger.warning(f"⚠️ 知识库绑定模型: {required_model}，自动切换（当前: {embed_model}）")
+                embed_model = required_model
                 
-                if kb_dim in model_map:
-                    required_model = model_map[kb_dim]
-                    if embed_model != required_model:
-                        logger.warning(f"⚠️ 知识库维度: {kb_dim}D，自动切换模型: {required_model}")
-                        embed_model = required_model
-                        embed = load_embedding_model(embed_provider, embed_model, embed_key, embed_url)
-                        if embed:
-                            from llama_index.core import Settings
-                            Settings.embed_model = embed
+                # [Fix] 强制修正 provider
+                if "sentence-transformers" in required_model or "bge" in required_model or "m3" in required_model:
+                    embed_provider = "HuggingFace (本地/极速)"
+                
+                embed = load_embedding_model(embed_provider, embed_model, embed_key, embed_url)
+                if embed:
+                    from llama_index.core import Settings
+                    Settings.embed_model = embed
             
             # 检查知识库大小
             vector_files = glob.glob(os.path.join(db_path, "**/*.json"), recursive=True)

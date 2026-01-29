@@ -529,7 +529,9 @@ class IndexBuilder:
                     embed_dim = len(test_embedding)
                 except:
                     # 根据模型名称推断维度
-                    if "small" in embed_model_name.lower():
+                    if "MiniLM" in embed_model_name:
+                        embed_dim = 384
+                    elif "small" in embed_model_name.lower():
                         embed_dim = 512
                     elif "base" in embed_model_name.lower():
                         embed_dim = 768

@@ -13,7 +13,13 @@ logger = LogManager()
 
 
 def get_kb_embedding_dim(db_path):
-    """检测知识库的向量维度"""
+    """检测知识库的向量维度 (Legacy: 仅返回维度)"""
+    info = get_kb_model_info(db_path)
+    return info.get('dim')
+
+def get_kb_model_info(db_path):
+    """获取知识库的模型信息 (名称和维度)"""
+    result = {'name': None, 'dim': None}
     try:
         # 尝试读取 .kb_info.json
         kb_info_file = os.path.join(db_path, ".kb_info.json")
@@ -21,29 +27,39 @@ def get_kb_embedding_dim(db_path):
             with open(kb_info_file, 'r') as f:
                 kb_info = json.load(f)
                 model = kb_info.get('embedding_model', '')
+                result['name'] = model
+                
+                # 优先直接读取保存的维度
+                if 'embedding_dim' in kb_info and isinstance(kb_info['embedding_dim'], int):
+                    result['dim'] = kb_info['embedding_dim']
+                    return result
+
                 # 根据模型名推断维度
-                if 'small' in model:
-                    return 512
+                if 'MiniLM' in model:
+                    result['dim'] = 384
+                elif 'small' in model:
+                    result['dim'] = 512
                 elif 'base' in model:
-                    return 768
+                    result['dim'] = 768
                 elif 'm3' in model:
-                    return 1024
+                    result['dim'] = 1024
         
-        # 尝试从向量文件推断
-        import glob
-        vector_files = glob.glob(os.path.join(db_path, "**/*.json"), recursive=True)
-        if vector_files:
-            # 简单启发式：根据文件大小推断
-            total_size = sum(os.path.getsize(f) for f in vector_files) / (1024 * 1024)
-            if total_size < 50:
-                return 512  # 小模型
-            elif total_size < 200:
-                return 768  # 中模型
-            else:
-                return 1024  # 大模型
+        # 尝试从向量文件推断 (如果 json 读取失败或没有维度)
+        if result['dim'] is None:
+            import glob
+            vector_files = glob.glob(os.path.join(db_path, "**/*.json"), recursive=True)
+            if vector_files:
+                # 简单启发式：根据文件大小推断
+                total_size = sum(os.path.getsize(f) for f in vector_files) / (1024 * 1024)
+                if total_size < 50:
+                    result['dim'] = 512  # 小模型
+                elif total_size < 200:
+                    result['dim'] = 768  # 中模型
+                else:
+                    result['dim'] = 1024  # 大模型
     except:
         pass
-    return None
+    return result
 
 
 

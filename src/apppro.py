@@ -569,6 +569,7 @@ from src.ui.mobile_adapter import MobileAdapter
 # 引入工具函数
 from src.utils.app_utils import (
     get_kb_embedding_dim,
+    get_kb_model_info,
     remove_file_from_manifest
 )
 
@@ -1002,7 +1003,7 @@ st.markdown("""
     }
 
 
-    /* 极致压缩上传组件 (全局预加载防止闪烁 - 增强版) */
+    /* 极致压缩上传组件 (优化版 - 交互修复 V2) */
     [data-testid="stFileUploader"] {
         padding-bottom: 0px !important;
         margin-bottom: 0px !important;
@@ -1011,31 +1012,77 @@ st.markdown("""
         margin-top: 0px !important;
         padding-top: 0px !important;
     }
-    /* 核心区域控制 */
+    
+    /* 核心 Dropzone - 设为相对定位作为锚点 */
     [data-testid="stFileUploaderDropzone"] {
-        padding: 6px 10px !important;
-        min-height: 0px !important; /* 核心：覆盖默认的 min-height */
+        padding: 8px 10px !important;
+        min-height: 40px !important;
         height: auto !important;
         align-items: center !important;
         gap: 10px !important;
+        cursor: pointer !important;
+        position: relative !important;
+        background-color: transparent !important;
     }
-    /* 彻底隐藏图标与说明文字 */
+
+    /* 隐藏冗余图标与说明文字 */
     [data-testid="stFileUploaderDropzone"] svg, 
-    [data-testid="stFileUploaderDropzone"] small,
-    [data-testid="stFileUploaderDropzone"] [data-testid="stBaseButton-header"] {
+    [data-testid="stFileUploaderDropzone"] small {
         display: none !important;
     }
+    
+    /* 恢复按钮文字并美化 */
+    [data-testid="stFileUploaderDropzone"] [data-testid="stBaseButton-header"] {
+        display: block !important;
+        font-size: 0.9rem !important;
+        color: #444 !important;
+        font-weight: 500 !important;
+    }
+    
     /* 隐藏顶部 Label */
     [data-testid="stFileUploader"] label {
         display: none !important;
     }
-    /* 紧凑化按钮 */
+    
+    /* 按钮视觉层 - 禁止拦截点击 */
     [data-testid="stFileUploaderDropzone"] button {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 100% !important;
+        min-height: 36px !important;
         margin: 0 !important;
-        padding-top: 4px !important;
-        padding-bottom: 4px !important;
-        min-height: 0px !important;
-        height: auto !important;
+        padding: 4px 0 !important;
+        border: 1px dashed #bbb !important;
+        background-color: #fcfcfc !important;
+        pointer-events: none !important; /* 关键：让点击穿透到 Input */
+        z-index: 1 !important;
+        border-radius: 6px !important;
+    }
+    
+    /* 强制 Input 覆盖整个区域并接收点击 */
+    [data-testid="stFileUploaderDropzone"] input[type="file"] {
+        display: block !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        opacity: 0 !important;
+        z-index: 99 !important;
+        cursor: pointer !important;
+    }
+    
+    /* 悬停反馈 (作用于父容器) */
+    [data-testid="stFileUploaderDropzone"]:hover button {
+        background-color: #fff !important;
+        border-color: #ff4b4b !important;
+        color: #ff4b4b !important;
+    }
+    
+    /* 确保 BaseButton-header 继承颜色变化 */
+    [data-testid="stFileUploaderDropzone"]:hover [data-testid="stBaseButton-header"] {
+        color: #ff4b4b !important;
     }
 </style>""", unsafe_allow_html=True)
 
@@ -6414,29 +6461,44 @@ if st.session_state.get('is_processing') and final_prompt:
         if active_kb_name and active_kb_name != "pure_chat":  # 只有在单知识库模式且非Pure Chat下才检测维度
             db_path = os.path.join(output_base, active_kb_name)
             
-            # 始终检测维度，确保模型匹配
-            kb_dim = get_kb_embedding_dim(db_path)
+            # [Core Fix] 优先获取绑定的模型信息
+            kb_info = get_kb_model_info(db_path)
+            kb_dim = kb_info.get('dim')
+            required_model = None
             
-            # 维度映射
-            model_map = {
-                512: "sentence-transformers/all-MiniLM-L6-v2",
-                768: "BAAI/bge-large-zh-v1.5",
-                1024: "BAAI/bge-m3"
-            }
+            # 策略 1: 直接使用绑定的模型名称 (如果有效)
+            stored_model = kb_info.get('name')
+            if stored_model and isinstance(stored_model, str) and len(stored_model) > 3:
+                required_model = stored_model
             
-            # 如果检测到维度，强制切换
-            if kb_dim and kb_dim in model_map:
-                required_model = model_map[kb_dim]
-                if embed_model != required_model:
-                    logger.info(f"🔄 强制切换模型: {embed_model} → {required_model} (维度: {kb_dim}D)")
-                    embed_model = required_model
-                    embed = load_embedding_model(embed_provider, embed_model, embed_key, embed_url)
-                    if embed:
-                        Settings.embed_model = embed
-                        logger.info(f"✅ 模型已切换")
+            # 策略 2: 如果没有模型名，退化为维度推断
+            if not required_model and kb_dim:
+                # 维度映射
+                model_map = {
+                    384: "sentence-transformers/all-MiniLM-L6-v2",
+                    512: "sentence-transformers/all-MiniLM-L6-v2",
+                    768: "BAAI/bge-large-zh-v1.5",
+                    1024: "BAAI/bge-m3"
+                }
+                if kb_dim in model_map:
+                    required_model = model_map[kb_dim]
+            
+            # 执行切换
+            if required_model and embed_model != required_model:
+                logger.info(f"🔄 强制切换模型: {embed_model} → {required_model} (Source: {'Metadata' if stored_model else 'Inference'})")
+                embed_model = required_model
+                
+                # [Fix] 强制修正 provider，防止 OpenAI Provider 加载本地模型导致维度错误 (1536 vs 384)
+                if "sentence-transformers" in required_model or "bge" in required_model or "m3" in required_model:
+                    embed_provider = "HuggingFace (本地/极速)"
+                
+                embed = load_embedding_model(embed_provider, embed_model, embed_key, embed_url)
+                if embed:
+                    Settings.embed_model = embed
+                    logger.info(f"✅ 模型已切换")
             else:
                 # 维度检测失败时，不强制切换，但记录日志
-                if not kb_dim:
+                if not kb_dim and not required_model:
                     logger.warning(embed_model)
         
         logger.separator("知识库查询")

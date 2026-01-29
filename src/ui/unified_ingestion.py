@@ -446,51 +446,66 @@ def render_omni_ingestion_tabs(target_dir, key_prefix="omni", can_upload=True, o
                             except Exception as e:
                                 st.error(str(e))
 
+@st.fragment
 def render_advanced_options(key_prefix="kb_adv", expanded=False, allow_reindex=True, allow_data_analysis=True):
     """
     渲染统一的高级选项面板 (五大核心选项)
     """
     with st.expander("🔧 高级选项", expanded=expanded):
-        # 布局优化：全选 + 状态提示在一行
-        h_col1, h_col2 = st.columns([1.5, 2.5])
-        with h_col1:
-            select_all = st.checkbox("✅ 一键全选", value=False, key=f"{key_prefix}_select_all", help="开启/关闭所有高级选项")
-        with h_col2:
-            status_placeholder = st.empty()
-        
-        default_val = select_all
-
         # 权限检查
         from src.auth.permission_manager import permission_manager
         current_user = st.session_state.get('user', 'guest_user')
         can_rebuild = permission_manager.has_permission(current_user, "kb_rebuild_index")
 
-        # 布局优化：3x2 紧凑矩阵
-        opt_col1, opt_col2 = st.columns(2)
+        # Select All Logic with Callback
+        def toggle_all():
+            val = st.session_state.get(f"{key_prefix}_select_all", False)
+            st.session_state[f"{key_prefix}_use_ocr"] = val
+            st.session_state[f"{key_prefix}_extract_metadata"] = val
+            st.session_state[f"{key_prefix}_generate_summary"] = val
+            if allow_data_analysis:
+                st.session_state[f"{key_prefix}_enable_data_analysis"] = val
+            if allow_reindex and can_rebuild:
+                st.session_state[f"{key_prefix}_force_reindex"] = val
+
+        # 布局优化：全选 + 状态提示在一行
+        h_col1, h_col2 = st.columns([1.5, 2.5])
+        with h_col1:
+            select_all = st.checkbox("✅ 一键全选", value=False, key=f"{key_prefix}_select_all", on_change=toggle_all, help="开启/关闭所有高级选项")
+        with h_col2:
+            status_placeholder = st.empty()
         
-        with opt_col1:
-            use_ocr = st.checkbox("🔍 OCR文字识别", value=default_val, key=f"{key_prefix}_use_ocr", help="识别图片或PDF中的文字")
-            extract_metadata = st.checkbox("📊 元数据提取", value=default_val, key=f"{key_prefix}_extract_metadata", help="自动提取文件分类、关键词")
-            
-            # 维护项
+        # 布局调整：两行 (3 + 2)
+        # Row 1: OCR, Metadata, Summary
+        r1_c1, r1_c2, r1_c3 = st.columns(3)
+        
+        with r1_c1:
+            use_ocr = st.checkbox("🔍 OCR文字识别", value=False, key=f"{key_prefix}_use_ocr", help="识别图片或PDF中的文字")
+        with r1_c2:
+            extract_metadata = st.checkbox("📊 元数据提取", value=False, key=f"{key_prefix}_extract_metadata", help="自动提取文件分类、关键词")
+        with r1_c3:
+            generate_summary = st.checkbox("📝 自动摘要生成", value=False, key=f"{key_prefix}_generate_summary", help="为每份文件生成AI摘要")
+
+        # Row 2: Data Analysis, Reindex (Empty 3rd col)
+        r2_c1, r2_c2, r2_c3 = st.columns(3)
+        
+        with r2_c1:
+            enable_data_analysis = False
+            if allow_data_analysis:
+                enable_data_analysis = st.checkbox("💎 智能数据分析", value=False, key=f"{key_prefix}_enable_data_analysis", help="自动识别真数据，构建物理库，启用SQL决策")
+            else:
+                st.caption("ℹ️ 追加模式暂不支持数据分析")
+        
+        with r2_c2:
             force_reindex = False
             if allow_reindex:
                 if can_rebuild:
-                    force_reindex = st.checkbox("🔄 强制重建索引", value=default_val, key=f"{key_prefix}_force_reindex", help="物理删除旧索引，触发全量重建（慎用）")
+                    force_reindex = st.checkbox("🔄 强制重建索引", value=False, key=f"{key_prefix}_force_reindex", help="物理删除旧索引，触发全量重建（慎用）")
                 else:
                     st.checkbox("🔄 强制重建索引 (🔒)", value=False, disabled=True, help="无重建索引权限")
             else:
                 st.caption("ℹ️ 追加模式下不可重建索引")
 
-        with opt_col2:
-            enable_data_analysis = False
-            if allow_data_analysis:
-                enable_data_analysis = st.checkbox("💎 智能数据分析", value=default_val, key=f"{key_prefix}_enable_data_analysis", help="自动识别真数据，构建物理库，启用SQL决策")
-            else:
-                st.caption("ℹ️ 追加模式暂不支持数据分析")
-                
-            generate_summary = st.checkbox("📝 自动摘要生成", value=default_val, key=f"{key_prefix}_generate_summary", help="为每份文件生成AI摘要")
-        
         # 更新状态提示
         options = []
         if force_reindex: options.append("重建")
