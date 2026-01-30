@@ -1,8 +1,8 @@
-# RAG Pro Max v9.5.38 Omni-Append Edition 架构白皮书
+# RAG Pro Max v9.7.0 Unified Governance & Monitoring Edition 架构白皮书
 
-**版本**: v9.5.38 (Omni-Append Edition)  
-**更新日期**: 2026-01-27  
-**核心特性**: Omni-Append, Precise Query, Grounding-Check Suggestions, Iron-Gate Routing
+**版本**: v9.7.0 (Unified Governance & Monitoring Edition)  
+**更新日期**: 2026-01-30  
+**核心特性**: Governance & Monitoring Fusion, Panoramic Log System, Minimalist UI, Omni-Append
 
 ---
 
@@ -21,6 +21,26 @@
 ### 3. 协同核 (Synergy Core) - Smart Agents
 - **Precise Query (精准提问)**: 替代了旧版的 Deep Thinking。在提问阶段，调用 LLM 对用户原始意图进行重写（Rewrite）与扩展，解决用户表达模糊的问题。
 - **Unified Suggestion Engine**: 负责生成“后续追问”。引入 **Grounding Check** 机制，生成的每一个问题都会预先跑一遍 RAG 检索，确保这些问题在当前库中是有答案的。
+
+---
+
+## 🏗️ 系统管理与监控架构 (System Management & Monitoring)
+
+v9.7.0 引入了极其严格的“治理优先”架构，将所有敏感的系统级操作与监控功能从前台剥离，降维收纳至后台资源治理中心。
+
+### 1. 资源治理中心 (Resource Governance Hub)
+- **定位**: 系统的最高管理权力中心，仅 Admin 角色可见。
+- **模块融合**:
+    - **Asset Governance**: 知识库的物理管理（删除、迁移、重命名）。
+    - **Real-time Monitoring**: 实时系统负载监控（CPU/Mem/Response），采用 JS 驱动的 5秒倒计时机制。
+    - **Intelligent Scheduling**: 核心调度参数与并发控制。
+    - **Panoramic Logs**: 行为审计与系统日志的深度融合。
+
+### 2. 全景日志系统 (Panoramic Log System)
+- **Dual-View Architecture**: 采用双视图设计。
+    - **View A (Audit)**: 基于 `AuditLogger` 的结构化行为追踪（Who, When, What）。
+    - **View B (System)**: 基于 `CompactLogDisplay` 的底层运行日志（Error, Warning, Info）。
+- **Strategic Dashboard**: 顶层集成了战略仪表盘，提供流量趋势与资产概况的宏观视角。
 
 ---
 

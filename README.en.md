@@ -1,13 +1,23 @@
 # RAG Pro Max - Enterprise Intelligent Document Q&A and Data Analysis System
 
-**Current Version**: v9.5.37-stable (Search Revolution Edition)  
-![Version](https://img.shields.io/badge/version-v9.5.37-purple)
+**Current Version**: v9.7.0 (Unified Governance & Monitoring Edition)  
+![Version](https://img.shields.io/badge/version-v9.7.0-purple)
 
-RAG Pro Max v9.5.37 introduces the **"Search Revolution"**. With Violent Link Discovery and Automatic Redirect Unwrapping, the system ensures 100% web crawling success rates, paired with a full-featured Staging Area Inspector for a professional data orchestration experience.
+RAG Pro Max v9.7.0 introduces **"Unified Governance & Monitoring"**. The system completely reconstructs the monitoring and scheduling architecture, migrating them from the frontend to the backend **Resource Governance Center**, achieving strict permission isolation. Combined with the **Panoramic Log System**, it provides a "God Mode" view from user behavior to system kernel.
 
 ---
 
-## 🚀 v9.5.37 Key Features
+## 🚀 v9.7.0 Key Features
+
+### 🛡️ Governance & Monitoring Fusion
+- **Monitoring Reduction**: Completely removed the **"📊 Monitor"** entry from the main sidebar, purifying the frontend.
+- **Backend Integration**: Migrated **"Real-time System Monitoring"** and **"Intelligent Scheduling"** to the backend **"Resource Governance"** panel.
+- **Strict Isolation**: Only Admin roles can view system load and scheduling policies.
+- **Panoramic Log System**: Deeply integrated **"Behavior Audit"** and **"System Terminal Logs"**, adding a strategic dashboard and dual-view switching.
+
+### 🎨 Minimalist Monitoring UI
+- **Single-Line Stream**: Reconstructed the monitoring panel header into a **single-line 5-column layout**, consolidating title, countdown, refresh stats, progress, and buttons.
+- **Visual Noise Reduction**: Physically removed redundant bottom controls; trend charts now expand by default.
 
 ### 🕷️ Smart Search Revolution
 - **Violent Discovery Engine**: Uses regex-based raw HTML scanning to bypass module caching and WAF obfuscation.

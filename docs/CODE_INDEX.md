@@ -1,16 +1,24 @@
 # 🗺️ RAG Pro Max 代码全典 (Code Index)
 
-> **审计状态**: 已同步至 v9.5.38 (Omni-Append Edition)  
+> **审计状态**: 已同步至 v9.7.0 (Unified Governance Edition)  
 > **外部审计员备注**: 严禁将 [OBSOLETE] 模块用于生产逻辑。
 
 ## 目录结构
 
 ### 📄 src/apppro.py
 - **📝 核心逻辑**: 系统主入口，集成了三核路由 (`Iron-Gate Routing`) 与 UI 渲染。
+- **🏗️ 架构变更**: [v9.7.0] 移除了所有前端监控逻辑 (`tab_monitor`)，将其降维迁移至后台治理中心。
 - **⚡ 关键函数**:
   - `def suggestions_fragment`: [v9.5.38] 追问组件，调用 `UnifiedSuggestionEngine` 实现高质后续追问。
   - `def process_knowledge_base_logic`: 处理知识库逻辑 (使用 `IndexBuilder`)。
   - `def enhanced_web_search`: 增强的联网搜索功能。
+
+### 📄 src/auth/resource_governance.py
+- **📝 描述**: **[CORE]** 全域资源治理中心。v9.7.0 之后，此处是系统唯一的管理与监控中枢。
+- **⚡ 关键集成**:
+  - **Monitoring Integration**: 融合了 `RealtimeMonitor` 面板，提供单行 5 列的极简监控视图。
+  - **Scheduling Control**: 接管了智能调度器的前端交互逻辑。
+  - **Panoramic Logs**: 集成了审计与终端日志的双视图管理。
 
 ---
 
