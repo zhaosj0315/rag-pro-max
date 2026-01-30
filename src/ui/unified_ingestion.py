@@ -252,9 +252,7 @@ def render_omni_ingestion_tabs(target_dir, key_prefix="omni", can_upload=True, o
     # Tab 3: 文本粘贴
     with tabs[2]:
         paste_key = f"{key_prefix}_paste_input"
-        if paste_key not in st.session_state:
-            st.session_state[paste_key] = ""
-            
+        
         content = st.text_area("粘贴文本内容", height=150, placeholder="在此输入或粘贴文本...", label_visibility="collapsed", key=paste_key)
         
         if st.button("📥 保存文本", use_container_width=True, key=f"{key_prefix}_paste_btn"):

@@ -112,8 +112,8 @@ def render_resource_governance_v19():
         })
 
     st.markdown("### 💎 全域资源与账户访问安全治理 (旗舰版)")
-    tab_dist, tab_users, tab_roles, tab_conns, tab_db_users, tab_audit, tab_term, tab_logs, tab_progress = st.tabs([
-        "🛡️ 资源深度治理", "👤 账户与访问安全", "🎭 权限矩阵定义", "🔌 数据源连接", "🗄️ 数据库用户", "📜 系统行为审计", "💻 全能终端控制", "📋 终端日志", "📈 进度追踪"
+    tab_dist, tab_users, tab_roles, tab_conns, tab_db_users, tab_sys_logs, tab_term, tab_sched, tab_progress = st.tabs([
+        "🛡️ 资源深度治理", "👤 账户与访问安全", "🎭 权限矩阵定义", "🔌 数据源连接", "🗄️ 数据库用户", "📜 系统全景日志", "💻 全能终端控制", "⚙️ 智能调度", "📈 进度追踪"
     ])
 
     # --- Tab 1: 资源深度治理 (功能完全找回版) ---
@@ -523,73 +523,103 @@ def render_resource_governance_v19():
         from src.ui.db_admin_ui import DBAdminUI
         DBAdminUI.render()
 
-    # --- Tab 6: 行为审计 (全功能回归融合版) ---
-    with tab_audit:
-        st.caption("全量行为链路追踪：支持高性能分页查询与多维逻辑穿透")
+    # --- Tab 6: 系统全景日志 (Fused: Audit + Logs) ---
+    with tab_sys_logs:
+        st.caption("🛡️ 全局审计与监控仪表盘：融合行为追踪与系统运行日志，提供一站式可观测性。")
+        
+        # 加载审计数据
         raw_logs = AuditLogger.get_logs(limit=5000)
-        if not raw_logs: st.info("暂无审计记录")
-        else:
-            df_logs = pd.DataFrame(raw_logs); df_logs['timestamp'] = pd.to_datetime(df_logs['timestamp'])
+        df_logs = pd.DataFrame(raw_logs) if raw_logs else pd.DataFrame()
+        if not df_logs.empty:
+            df_logs['timestamp'] = pd.to_datetime(df_logs['timestamp'])
             for col in ['level', 'resource_id', 'cost_ms']:
                 if col not in df_logs.columns: df_logs[col] = (0 if col == 'cost_ms' else ('INFO' if col == 'level' else None))
-            
-            # 1. 战略可视化
-            with st.container(border=True):
-                v1, v2 = st.columns([3, 2])
-                with v1:
+
+        # 1. 顶层战略概览 (Top Dashboard)
+        with st.container(border=True):
+            dash_c1, dash_c2 = st.columns([1.5, 1])
+            with dash_c1:
+                st.markdown("**📈 行为流量趋势**")
+                if not df_logs.empty:
                     df_logs['hour'] = df_logs['timestamp'].dt.floor('h')
                     df_logs['rw'] = df_logs['level'].map({"CRITICAL":50,"WARNING":10,"INFO":1}).fillna(1)
                     ts = df_logs.groupby('hour')['rw'].sum().reset_index()
-                    st.area_chart(ts.set_index('hour'), color="#ff4b4b" if ts['rw'].max()>100 else "#29b5e8", height=150)
-                with v2:
-                    st.bar_chart(df_logs['action_type'].value_counts(), color="#6366f1", height=150)
-
-            # 2. 全量回归过滤器
-            st.divider()
-            with st.container(border=True):
-                st.markdown("**🔍 审计穿透过滤器 (全量恢复)**")
-                c1, c2, c3 = st.columns([1.5, 1, 1])
-                min_d, max_d = df_logs['timestamp'].min().date(), df_logs['timestamp'].max().date()
-                sel_range = c1.date_input("🕒 观察窗口", value=(min_d, max_d), key="v12_aud_range")
-                sel_u = c2.multiselect("👤 用户", sorted(df_logs['user'].unique().tolist()), key="v12_aud_u")
-                sel_l = c3.multiselect("🚨 风险", ["INFO", "WARNING", "CRITICAL"], key="v12_aud_l")
-                
-                c4, c5, c6 = st.columns([1, 1, 1.5])
-                sel_t = c4.multiselect("📂 分类", sorted(df_logs['action_type'].unique().tolist()), key="v12_aud_t")
-                sel_s = c5.multiselect("🚦 状态", sorted(df_logs['status'].unique().tolist()), key="v12_aud_s")
-                search_q = c6.text_input("📝 内容/IP/ID 穿透", key="v12_aud_q")
-
-            f_df = df_logs.copy()
-            if len(sel_range) == 2: f_df = f_df[(f_df['timestamp'].dt.date >= sel_range[0]) & (f_df['timestamp'].dt.date <= sel_range[1])]
-            if sel_u: f_df = f_df[f_df['user'].isin(sel_u)]
-            if sel_l: f_df = f_df[f_df['level'].isin(sel_l)]
-            if sel_t: f_df = f_df[f_df['action_type'].isin(sel_t)]
-            if sel_s: f_df = f_df[f_df['status'].isin(sel_s)]
-            if search_q: f_df = f_df[f_df.apply(lambda row: search_q.lower() in str(row.values).lower(), axis=1)]
-
-            # 3. 分页控制回归
-            st.divider()
-            p_col1, p_col2, p_col3 = st.columns([2, 3, 2])
-            rpp = p_col1.selectbox("每页显示", [10, 20, 50, 100], index=1, key="v12_rpp")
-            total_pages = max(1, (len(f_df)+rpp-1)//rpp)
-            curr_p = p_col2.number_input(f"页码 (共 {total_pages} 页)", 1, total_pages, 1, key="v12_currp")
-            with p_col3:
-                st.write(""); st.write(""); st.markdown(f"共 {len(f_df)} 条记录")
-
-            # 4. 流水表
-            display_df = f_df.iloc[(curr_p-1)*rpp : curr_p*rpp]
-            level_styles = {"INFO": ("#f8fafc", "#64748b", "🔵"), "WARNING": ("#fff7ed", "#9a3412", "🟠"), "CRITICAL": ("#fef2f2", "#991b1b", "🔴")}
-            table_html = "<table style='width:100%; border-collapse:collapse; font-size:11px;'><thead><tr style='background:#f8fafc; text-align:left'><th>时间/风险</th><th>用户</th><th>详情</th><th>资源/IP</th></tr></thead><tbody>"
-            for _, r in display_df.iterrows():
-                bg, fg, icon = level_styles.get(r['level'], level_styles["INFO"])
-                table_html += f"<tr style='background:{bg}; color:{fg}; border-bottom:1px solid #eee'><td>{r['timestamp'].strftime('%m-%d %H:%M')}<br>{icon} {r['level']}</td><td style='font-weight:700'>{r['user']}</td><td><b>{r['action']}</b><br>{r['details']}</td><td>{r['resource_id'] or '-'}<br><small>{r['ip']}</small></td></tr>"
-            st.markdown(table_html + "</tbody></table>", unsafe_allow_html=True)
+                    st.area_chart(ts.set_index('hour'), color="#ff4b4b" if ts['rw'].max()>100 else "#29b5e8", height=180)
+                else:
+                    st.info("暂无流量数据")
             
-            # 5. CSV 导出回归
-            csv = f_df.to_csv(index=False).encode('utf-8-sig')
-            st.download_button("📥 导出全量审计流水 (CSV)", data=csv, file_name=f"audit_{datetime.now().strftime('%Y%m%d')}.csv", key="v12_csv")
+            with dash_c2:
+                st.markdown("**📂 日志资产概况**")
+                # 调用日志统计 (轻量级)
+                from src.utils.compact_log_display import CompactLogDisplay
+                log_display = CompactLogDisplay()
+                log_files = log_display._get_log_files()
+                l_c1, l_c2 = st.columns(2)
+                l_c1.metric("系统日志文件", len(log_files))
+                total_size = sum(f.stat().st_size for f in log_files if f.exists())
+                l_c2.metric("物理占用", format_size(total_size))
+                
+                if not df_logs.empty:
+                    st.divider()
+                    st.caption(f"👥 审计记录: {len(df_logs)} 条 | 👤 活跃用户: {len(df_logs['user'].unique())}")
 
-    # --- Tab 6: 终端控制 ---
+        st.divider()
+
+        # 2. 双视图切换 (Dual View)
+        sub_t1, sub_t2 = st.tabs(["👤 用户行为审计", "🖥️ 系统终端日志"])
+
+        # --- Sub 1: 行为审计 (原 tab_audit 逻辑) ---
+        with sub_t1:
+            if df_logs.empty:
+                st.info("暂无审计记录")
+            else:
+                # 过滤器
+                with st.expander("🔍 深度穿透过滤器", expanded=False):
+                    c1, c2, c3 = st.columns([1.5, 1, 1])
+                    min_d, max_d = df_logs['timestamp'].min().date(), df_logs['timestamp'].max().date()
+                    sel_range = c1.date_input("🕒 观察窗口", value=(min_d, max_d), key="v19_aud_range")
+                    sel_u = c2.multiselect("👤 用户", sorted(df_logs['user'].unique().tolist()), key="v19_aud_u")
+                    sel_l = c3.multiselect("🚨 风险", ["INFO", "WARNING", "CRITICAL"], key="v19_aud_l")
+                    
+                    c4, c5, c6 = st.columns([1, 1, 1.5])
+                    sel_t = c4.multiselect("📂 分类", sorted(df_logs['action_type'].unique().tolist()), key="v19_aud_t")
+                    sel_s = c5.multiselect("🚦 状态", sorted(df_logs['status'].unique().tolist()), key="v19_aud_s")
+                    search_q = c6.text_input("📝 内容/IP/ID 穿透", key="v19_aud_q")
+
+                f_df = df_logs.copy()
+                if len(sel_range) == 2: f_df = f_df[(f_df['timestamp'].dt.date >= sel_range[0]) & (f_df['timestamp'].dt.date <= sel_range[1])]
+                if sel_u: f_df = f_df[f_df['user'].isin(sel_u)]
+                if sel_l: f_df = f_df[f_df['level'].isin(sel_l)]
+                if sel_t: f_df = f_df[f_df['action_type'].isin(sel_t)]
+                if sel_s: f_df = f_df[f_df['status'].isin(sel_s)]
+                if search_q: f_df = f_df[f_df.apply(lambda row: search_q.lower() in str(row.values).lower(), axis=1)]
+
+                # 流水表
+                st.dataframe(
+                    f_df[['timestamp', 'level', 'user', 'action', 'details', 'resource_id', 'ip']], 
+                    use_container_width=True, 
+                    hide_index=True,
+                    column_config={
+                        "timestamp": st.column_config.DatetimeColumn("时间", format="MM-DD HH:mm:ss", width="small"),
+                        "level": st.column_config.TextColumn("风险", width="small"),
+                        "user": st.column_config.TextColumn("用户", width="small"),
+                        "action": "操作动作",
+                        "details": "详情",
+                        "ip": "来源IP"
+                    }
+                )
+                
+                # CSV 导出
+                csv = f_df.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📥 导出审计流水 (CSV)", data=csv, file_name=f"audit_{datetime.now().strftime('%Y%m%d')}.csv", key="v19_csv")
+
+        # --- Sub 2: 终端日志 (原 tab_logs 逻辑) ---
+        with sub_t2:
+            from src.utils.compact_log_display import render_compact_log_management
+            # 复用现有的日志渲染逻辑
+            render_compact_log_management(key_prefix="admin_sys_logs")
+
+    # --- Tab 7: 终端控制 ---
     with tab_term:
         st.caption("🚀 本地 SSH 终端 (WebSSH) - 全能指挥通道")
         c_svc, c_h, c_ext = st.columns([1.5, 3, 1])
@@ -601,12 +631,18 @@ def render_resource_governance_v19():
         with c_ext: st.markdown(f'<a href="http://localhost:8899" target="_blank" style="text-decoration:none;"><button style="width:100%; cursor:pointer; padding:8px; background:#2196f3; color:white; border:none; border-radius:6px; font-weight:600;">🚀 弹出窗口</button></a>', unsafe_allow_html=True)
         components.html(f'<iframe src="http://localhost:8899" style="width:100%; height:{t_h}px; border:1px solid #333; border-radius:8px; background:black;"></iframe>', height=t_h+20)
 
-    # --- Tab 8: 终端日志 (New) ---
-    with tab_logs:
-        from src.utils.compact_log_display import render_compact_log_management
-        render_compact_log_management(key_prefix="admin_logs")
+    # --- Tab 9: 智能调度 (Moved from Monitor) ---
+    with tab_sched:
+        try:
+            from src.core.v23_integration import get_v23_integration
+            v23 = get_v23_integration()
+            v23.render_scheduler_panel()
+        except ImportError:
+            st.error("❌ 无法加载智能调度模块")
+        except Exception as e:
+            st.error(f"❌ 调度面板加载失败: {e}")
 
-    # --- Tab 9: 进度追踪 (New) ---
+    # --- Tab 10: 进度追踪 (New) ---
     with tab_progress:
         from src.ui.progress_tracker import render_progress_panel
         render_progress_panel(key_prefix="admin_prog")

@@ -21,9 +21,6 @@ class RealtimeMonitor:
     def render_realtime_monitor(self):
         """渲染实时监控界面 - 使用JavaScript实现倒计时每秒更新"""
         
-        st.markdown("### 📊 实时系统监控")
-        st.info("💡 此监控使用JavaScript倒计时，不会影响知识库构建和对话功能")
-        
         # 使用session state存储监控数据
         current_time = time.time()
         
@@ -68,25 +65,36 @@ class RealtimeMonitor:
         st.session_state.monitor_data['history']['response_time'].append(response_time)
         st.session_state.monitor_data['history']['active_sessions'].append(active_sessions)
         
-        # 显示倒计时 - 使用JavaScript更新
-        st.markdown(f"""
-        <div id="countdown-display">
-            <h2>⏰ 倒计时: <span id="countdown-value">{int(countdown)}</span> 秒</h2>
-        </div>
-        """, unsafe_allow_html=True)
+        # 使用列布局合并所有核心控制与状态 [v2.4.3]
+        header_cols = st.columns([2.5, 1.5, 1.5, 2.5, 1.2])
+        with header_cols[0]:
+            st.markdown("### 📊 实时系统监控")
+        with header_cols[1]:
+            st.markdown(f"""
+            <div id="countdown-display" style="margin-top: 18px;">
+                <span style="font-size: 1rem; font-weight: 600;">⏰ 倒计时: <span id="countdown-value">{int(countdown)}</span>s</span>
+            </div>
+            """, unsafe_allow_html=True)
+        with header_cols[2]:
+            st.markdown(f"""
+            <div style="margin-top: 18px; font-size: 1rem; font-weight: 600;">
+                📊 刷新: {refresh_count}次
+            </div>
+            """, unsafe_allow_html=True)
+        with header_cols[3]:
+            # 这里的 margin-top 是为了和文字对齐
+            st.markdown('<div style="margin-top: 22px;">', unsafe_allow_html=True)
+            st.progress(progress / 100)
+            st.markdown('</div>', unsafe_allow_html=True)
+        with header_cols[4]:
+            st.markdown('<div style="margin-top: 12px;">', unsafe_allow_html=True)
+            if st.button("🔄 刷新", key="manual_refresh_top"):
+                st.session_state.monitor_data['start_time'] = current_time
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
         
-        # 显示刷新统计
-        st.markdown(f"📊 已刷新: **{refresh_count}** 次")
-        
-        # 显示进度条
-        st.progress(progress / 100)
-        
-        # 添加图表选项
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.markdown("### 📈 历史趋势图表")
-        with col2:
-            show_charts = st.checkbox("显示图表", value=True, help="显示系统指标的历史趋势")
+        # 默认始终显示图表 [v2.4.2]
+        show_charts = True
         
         if show_charts and len(st.session_state.monitor_data['history']['timestamps']) > 1:
             # 创建图表
@@ -166,18 +174,6 @@ class RealtimeMonitor:
             with col4:
                 st.metric("平均会话", f"{df['active_sessions'].mean():.0f}",
                          f"{df['active_sessions'].iloc[-1] - df['active_sessions'].mean():.0f}")
-        
-        # 显示其他信息
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.write(f"📊 已刷新: {refresh_count} 次")
-        
-        with col2:
-            st.progress(progress / 100, text=f"进度: {int(progress)}%")
-            if st.button("🔄 立即刷新", key="manual_refresh"):
-                st.session_state.monitor_data['start_time'] = current_time
-                st.success("✅ 手动刷新完成！")
         
         # 显示监控数据
         st.markdown("---")
