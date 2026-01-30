@@ -112,8 +112,8 @@ def render_resource_governance_v19():
         })
 
     st.markdown("### 💎 全域资源与账户访问安全治理 (旗舰版)")
-    tab_dist, tab_users, tab_roles, tab_conns, tab_db_users, tab_sys_logs, tab_term, tab_sched, tab_progress = st.tabs([
-        "🛡️ 资源深度治理", "👤 账户与访问安全", "🎭 权限矩阵定义", "🔌 数据源连接", "🗄️ 数据库用户", "📜 系统全景日志", "💻 全能终端控制", "⚙️ 智能调度", "📈 进度追踪"
+    tab_dist, tab_users, tab_roles, tab_conns, tab_db_users, tab_sys_logs, tab_term, tab_monitor, tab_sched, tab_progress = st.tabs([
+        "🛡️ 资源深度治理", "👤 账户与访问安全", "🎭 权限矩阵定义", "🔌 数据源连接", "🗄️ 数据库用户", "📜 系统全景日志", "💻 全能终端控制", "📊 实时系统监控", "⚙️ 智能调度", "📈 进度追踪"
     ])
 
     # --- Tab 1: 资源深度治理 (功能完全找回版) ---
@@ -630,6 +630,17 @@ def render_resource_governance_v19():
         with c_h: t_h = st.slider("窗口高度", 400, 2000, 600, 100, key="v12_term_h")
         with c_ext: st.markdown(f'<a href="http://localhost:8899" target="_blank" style="text-decoration:none;"><button style="width:100%; cursor:pointer; padding:8px; background:#2196f3; color:white; border:none; border-radius:6px; font-weight:600;">🚀 弹出窗口</button></a>', unsafe_allow_html=True)
         components.html(f'<iframe src="http://localhost:8899" style="width:100%; height:{t_h}px; border:1px solid #333; border-radius:8px; background:black;"></iframe>', height=t_h+20)
+
+    # --- Tab 8: 实时系统监控 (Moved from Main Sidebar) ---
+    with tab_monitor:
+        try:
+            from src.utils.realtime_monitor import RealtimeMonitor
+            monitor = RealtimeMonitor()
+            monitor.render_realtime_monitor()
+        except ImportError:
+            st.error("❌ 无法加载实时监控模块")
+        except Exception as e:
+            st.error(f"❌ 监控面板加载失败: {e}")
 
     # --- Tab 9: 智能调度 (Moved from Monitor) ---
     with tab_sched:

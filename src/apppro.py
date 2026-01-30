@@ -1120,7 +1120,7 @@ if __name__ == "__main__":
     
         # 横向标签页布局 (v3.4: 管理为先)
         # [v6.9.3] 侧边栏架构彻底净化修复
-        tab_labels = ["🏠 主页", "🎭 角色", "⚙️ 配置", "📊 监控", "❓ 帮助", "👤 我的"]
+        tab_labels = ["🏠 主页", "🎭 角色", "⚙️ 配置", "❓ 帮助", "👤 我的"]
         is_admin = (st.session_state.get('role') == 'admin')
     
         tabs = st.tabs(tab_labels)
@@ -1129,11 +1129,10 @@ if __name__ == "__main__":
         tab_main = tabs[0]
         tab_roles = tabs[1]
         tab_config = tabs[2]
-        tab_monitor = tabs[3]
-        tab_help = tabs[4]
+        tab_help = tabs[3]
     
         # 渲染 用户/管理 统一 Tab
-        with tabs[5]:
+        with tabs[4]:
             from src.ui.user_profile_ui import UserProfileUI
             UserProfileUI.render()
 
@@ -2797,16 +2796,7 @@ if __name__ == "__main__":
             from src.ui.sidebar_config import SidebarConfig
             advanced_config = SidebarConfig._render_advanced_config()
 
-        with tab_monitor:
-            # v2.3.0: 智能监控面板
-            try:
-                from src.core.v23_integration import get_v23_integration
-                v23 = get_v23_integration()
-                v23.render_monitoring_tab()
-            except ImportError:
-                # 降级到v1.5.1性能监控面板
-                perf_monitor.render_panel()
-    
+
         with tab_help:
             # [v6.6.8] 核心逻辑挂载：调用统一侧边栏组件的帮助渲染器
             try:
