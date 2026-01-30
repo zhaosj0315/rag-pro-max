@@ -158,23 +158,6 @@ class RealtimeMonitor:
                         row=i, col=j
                     )
             
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # 显示统计摘要
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("平均CPU", f"{df['cpu_usage'].mean():.1f}%", 
-                         f"{df['cpu_usage'].iloc[-1] - df['cpu_usage'].mean():.1f}%")
-            with col2:
-                st.metric("平均内存", f"{df['memory_usage'].mean():.1f}%",
-                         f"{df['memory_usage'].iloc[-1] - df['memory_usage'].mean():.1f}%")
-            with col3:
-                st.metric("平均响应", f"{df['response_time'].mean():.2f}s",
-                         f"{df['response_time'].iloc[-1] - df['response_time'].mean():.2f}s")
-            with col4:
-                st.metric("平均会话", f"{df['active_sessions'].mean():.0f}",
-                         f"{df['active_sessions'].iloc[-1] - df['active_sessions'].mean():.0f}")
-        
         # 显示监控数据
         st.markdown("---")
         self._display_current_metrics_simple()
