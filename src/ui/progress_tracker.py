@@ -231,7 +231,7 @@ def get_progress_tracker() -> ProgressTracker:
         _progress_tracker = ProgressTracker()
     return _progress_tracker
 
-def render_progress_panel():
+def render_progress_panel(key_prefix: str = "default"):
     """渲染进度面板 - 显示系统任务和历史记录"""
     
     st.markdown("### 📊 任务进度追踪")
@@ -311,7 +311,7 @@ def render_progress_panel():
         
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🚀 创建示例任务", help="创建一个示例文件处理任务"):
+            if st.button("🚀 创建示例任务", key=f"{key_prefix}_create_task", help="创建一个示例文件处理任务"):
                 # 创建示例任务
                 task_id = tracker.create_task(
                     name="文档处理任务",
@@ -323,7 +323,7 @@ def render_progress_panel():
                 st.rerun()
         
         with col2:
-            if st.button("📊 查看历史任务", help="显示已完成的任务历史"):
+            if st.button("📊 查看历史任务", key=f"{key_prefix}_view_history", help="显示已完成的任务历史"):
                 if tracker.completed_tasks:
                     st.info(f"📋 共有 {len(tracker.completed_tasks)} 个已完成任务")
                 else:

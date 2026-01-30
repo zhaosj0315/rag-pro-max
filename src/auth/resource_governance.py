@@ -112,8 +112,8 @@ def render_resource_governance_v19():
         })
 
     st.markdown("### 💎 全域资源与账户访问安全治理 (旗舰版)")
-    tab_dist, tab_users, tab_roles, tab_conns, tab_db_users, tab_audit, tab_term = st.tabs([
-        "🛡️ 资源深度治理", "👤 账户与访问安全", "🎭 权限矩阵定义", "🔌 数据源连接", "🗄️ 数据库用户", "📜 系统行为审计", "💻 全能终端控制"
+    tab_dist, tab_users, tab_roles, tab_conns, tab_db_users, tab_audit, tab_term, tab_logs, tab_progress = st.tabs([
+        "🛡️ 资源深度治理", "👤 账户与访问安全", "🎭 权限矩阵定义", "🔌 数据源连接", "🗄️ 数据库用户", "📜 系统行为审计", "💻 全能终端控制", "📋 终端日志", "📈 进度追踪"
     ])
 
     # --- Tab 1: 资源深度治理 (功能完全找回版) ---
@@ -600,6 +600,16 @@ def render_resource_governance_v19():
         with c_h: t_h = st.slider("窗口高度", 400, 2000, 600, 100, key="v12_term_h")
         with c_ext: st.markdown(f'<a href="http://localhost:8899" target="_blank" style="text-decoration:none;"><button style="width:100%; cursor:pointer; padding:8px; background:#2196f3; color:white; border:none; border-radius:6px; font-weight:600;">🚀 弹出窗口</button></a>', unsafe_allow_html=True)
         components.html(f'<iframe src="http://localhost:8899" style="width:100%; height:{t_h}px; border:1px solid #333; border-radius:8px; background:black;"></iframe>', height=t_h+20)
+
+    # --- Tab 8: 终端日志 (New) ---
+    with tab_logs:
+        from src.utils.compact_log_display import render_compact_log_management
+        render_compact_log_management(key_prefix="admin_logs")
+
+    # --- Tab 9: 进度追踪 (New) ---
+    with tab_progress:
+        from src.ui.progress_tracker import render_progress_panel
+        render_progress_panel(key_prefix="admin_prog")
 
 def format_size(size):
     for unit in ['B', 'KB', 'MB', 'GB']:

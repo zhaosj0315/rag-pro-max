@@ -13,8 +13,9 @@ from typing import List, Dict
 class CompactLogDisplay:
     """紧凑日志显示器"""
     
-    def __init__(self, log_dir: str = "app_logs"):
+    def __init__(self, log_dir: str = "app_logs", key_prefix: str = "log_display"):
         self.log_dir = Path(log_dir)
+        self.key_prefix = key_prefix
         self.max_lines_preview = 3  # 预览显示的最大行数
         self.max_char_per_line = 80  # 每行最大字符数
     
@@ -93,13 +94,13 @@ class CompactLogDisplay:
             # 操作按钮
             col1, col2, col3 = st.columns(3)
             with col1:
-                if st.button("📖 查看全部", key=f"view_full_{log_file.name}"):
+                if st.button("📖 查看全部", key=f"{self.key_prefix}_view_full_{log_file.name}"):
                     self._show_full_log(log_file)
             with col2:
-                if st.button("🗑️ 清空", key=f"clear_{log_file.name}"):
+                if st.button("🗑️ 清空", key=f"{self.key_prefix}_clear_{log_file.name}"):
                     self._clear_log_file(log_file)
             with col3:
-                if st.button("💾 下载", key=f"download_{log_file.name}"):
+                if st.button("💾 下载", key=f"{self.key_prefix}_download_{log_file.name}"):
                     self._download_log_file(log_file)
     
     def _get_log_files(self) -> List[Path]:
@@ -162,7 +163,7 @@ class CompactLogDisplay:
                 filter_level = st.selectbox(
                     "过滤级别",
                     ["全部", "ERROR", "WARNING", "INFO", "DEBUG"],
-                    key=f"filter_{log_file.name}"
+                    key=f"{self.key_prefix}_filter_{log_file.name}"
                 )
                 
                 # 过滤日志内容
@@ -176,7 +177,7 @@ class CompactLogDisplay:
                     "日志内容",
                     content,
                     height=400,
-                    key=f"log_content_{log_file.name}"
+                    key=f"{self.key_prefix}_log_content_{log_file.name}"
                 )
         except Exception as e:
             st.error(f"读取日志失败: {e}")
@@ -202,16 +203,16 @@ class CompactLogDisplay:
                 data=content,
                 file_name=log_file.name,
                 mime="text/plain",
-                key=f"download_btn_{log_file.name}"
+                key=f"{self.key_prefix}_download_btn_{log_file.name}"
             )
         except Exception as e:
             st.error(f"下载失败: {e}")
 
-def render_compact_log_management():
+def render_compact_log_management(key_prefix: str = "default"):
     """渲染紧凑的日志管理界面"""
     
     # 创建紧凑日志显示器
-    log_display = CompactLogDisplay()
+    log_display = CompactLogDisplay(key_prefix=key_prefix)
     
     # 渲染紧凑日志
     log_display.render_compact_logs()
@@ -223,16 +224,22 @@ def render_compact_log_management():
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("🗑️ 清空所有日志", type="secondary"):
-            if st.confirm("确定要清空所有日志吗？"):
-                _clear_all_logs()
+        if st.button("🗑️ 清空所有日志", type="secondary", key=f"{key_prefix}_clear_all"):
+            if st.session_state.get(f"{key_prefix}_confirm_clear", False):
+                 _clear_all_logs()
+                 st.session_state[f"{key_prefix}_confirm_clear"] = False
+                 st.rerun()
+            else:
+                 if st.button("⚠️ 确认清空?", key=f"{key_prefix}_confirm_btn"):
+                     st.session_state[f"{key_prefix}_confirm_clear"] = True
+                     st.rerun()
     
     with col2:
-        if st.button("📦 打包下载", type="secondary"):
+        if st.button("📦 打包下载", type="secondary", key=f"{key_prefix}_package_all"):
             _package_all_logs()
     
     with col3:
-        if st.button("🔄 刷新", type="primary"):
+        if st.button("🔄 刷新", type="primary", key=f"{key_prefix}_refresh_all"):
             st.rerun()
 
 def _clear_all_logs():
