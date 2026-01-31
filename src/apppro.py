@@ -1255,28 +1255,6 @@ if __name__ == "__main__":
                 os.makedirs(default_output_path)
             output_base = default_output_path
 
-            console_col1, console_col2, console_col3, console_col4 = st.columns([3.5, 0.7, 1.3, 0.5])
-            with console_col1:
-                st.markdown("**💠 知识库控制台**")
-            with console_col2:
-                if st.button("📂", help=f"打开存储目录: {output_base}", use_container_width=True, key="open_storage_dir_inline"):
-                    if output_base and os.path.exists(output_base):
-                        import webbrowser, urllib.parse
-                        try:
-                            # 兼容 macOS/Windows/Linux 的通用打开逻辑
-                            from src.utils.file_system_utils import reveal_in_file_manager
-                            reveal_in_file_manager(output_base)
-                        except: 
-                            st.toast("❌ 无法打开目录")
-            with console_col3:
-                if st.button("⚡ 一键配置", use_container_width=True, key="quick_config_inline"):
-                    ConfigLoader.quick_setup()
-                    st.success("✅ 已使用默认配置！")
-                    time.sleep(1)
-                    st.rerun()
-            with console_col4:
-                st.markdown("❓", help="可手动配置，适合高级用户")
-        
             if "model_list" not in st.session_state: st.session_state.model_list = []
 
             # (已移除路径输入行)
@@ -1395,38 +1373,51 @@ if __name__ == "__main__":
             # [UI Optimization] 知识库选择与自动启动独立渲染 (无感加载)
             @st.fragment
             def render_kb_selector_and_autostart():
-                select_col1, select_col2, select_col3 = st.columns([0.6, 5.9, 0.5])
-                with select_col1:
-                    st.markdown("**选择:**")
-                with select_col2:
-                    st.session_state.selected_nav = st.selectbox("选择知识库或对话模式", nav_options, index=default_idx, label_visibility="collapsed")
+                # 统一控制台布局：[标题(1.7) | 选择框(3.9) | 刷新(0.6) | 文件夹(0.6) | 配置(0.6)]
+                c_title, c_select, c_refresh, c_open, c_config = st.columns([1.7, 3.9, 0.6, 0.6, 0.6])
+                
+                with c_title:
+                    # 使用 HTML 调整垂直对齐
+                    st.markdown("<div style='margin-top: 5px; font-weight: 600;'>💠 知识库控制台</div>", unsafe_allow_html=True)
+                
+                with c_select:
+                    st.session_state.selected_nav = st.selectbox("选择知识库", nav_options, index=default_idx, label_visibility="collapsed")
                     selected_nav = st.session_state.selected_nav
                 
                     # 自动启动纯对话模式 (v2.7.6) - 简化版本
                     if selected_nav == "💬 纯对话模式 (Pure Chat)" and st.session_state.get('current_kb_id') != "pure_chat":
-                        # 纯对话模式不需要加载任何知识库，直接设置为纯对话状态
-                        st.session_state.chat_engine = "pure_chat"  # 使用字符串标识，避免加载复杂组件
+                        st.session_state.chat_engine = "pure_chat"
                         st.session_state.current_kb_id = "pure_chat"
-                        st.toast("✅ 纯对话模式已启动 - 直接与AI对话")
+                        st.toast("✅ 纯对话模式已启动")
                         st.rerun()
     
-                    # 处理复选框点击逻辑 - 只有当用户手动更改选择时才触发
+                    # 处理复选框点击逻辑
                     if selected_nav != st.session_state.get('current_nav') and (selected_nav.startswith("☐") or selected_nav.startswith("☑️")):
-                        # 提取知识库名称 (支持带统计信息的格式)
                         kb_name = selected_nav.split("📂 ")[1].split(" (")[0].strip() if "📂 " in selected_nav else ""
                         if kb_name:
-                            # 切换复选框状态
                             current_state = st.session_state.get(f"kb_check_{kb_name}", False)
                             new_state = not current_state
                             st.session_state[f"kb_check_{kb_name}"] = new_state
-                        
-                            # 关键修复：立即更新 current_nav 字符串，确保下次 rerun 时 index 匹配正确
                             new_symbol = "☑️" if new_state else "☐"
                             st.session_state.current_nav = f"{new_symbol} 📂 {kb_name}"
                             st.rerun()
-                with select_col3:
-                    if st.button("🔄", help="刷新知识库列表", use_container_width=True, key="refresh_kb_list"):
+
+                with c_refresh:
+                    if st.button("🔄", help="刷新列表", use_container_width=True, key="refresh_kb_list"):
                         st.rerun()
+                
+                with c_open:
+                    if st.button("📂", help=f"定位目录: {output_base}", use_container_width=True, key="open_storage_dir_inline"):
+                        if output_base and os.path.exists(output_base):
+                            from src.utils.file_system_utils import reveal_in_file_manager
+                            reveal_in_file_manager(output_base)
+                        else: st.toast("❌ 无法打开")
+
+                with c_config:
+                    if st.button("⚡", help="一键恢复默认配置", use_container_width=True, key="quick_config_inline"):
+                        ConfigLoader.quick_setup()
+                        st.success("✅ 已重置")
+                        time.sleep(0.5); st.rerun()
     
                 # 自动启动系统逻辑 (替代原有的启动按钮)
                 # 纯对话模式已在上方 selectbox 处理，此处处理知识库模式
@@ -1594,8 +1585,8 @@ if __name__ == "__main__":
                         is_active = (sess_id == st.session_state.get('current_session_id'))
                         is_pinned = sess.get('pinned', False)
                     
-                        # 使用列布局放置操作按钮 [标题(6), 置顶(1), 分享(1), 重命名(1), 删除(1)]
-                        c_title, c_pin, c_share, c_edit, c_del = st.columns([5.5, 1.2, 1.2, 1.2, 1.2])
+                        # 使用列布局放置操作按钮 [标题(4.5), 置顶(1.1), 分享(1.1), 刷新(1.1), 重命名(1.1), 删除(1.1)]
+                        c_title, c_pin, c_share, c_refresh, c_edit, c_del = st.columns([4.5, 1.1, 1.1, 1.1, 1.1, 1.1])
                     
                         with c_title:
                             icon = "📌" if is_pinned else ("📂" if is_active else "📄")
@@ -1637,6 +1628,20 @@ if __name__ == "__main__":
                                 s_id = ShareManager.create_share(current_active_kb, share_msgs, st.session_state.get('user', 'admin'))
                                 st.session_state.last_share_id = s_id
                                 st.toast(f"✅ 分享链接已生成")
+
+                        with c_refresh:
+                            if st.button("🔄", key=f"sess_refresh_{safe_sess_id}", help="根据第一条消息刷新标题"):
+                                # 加载消息以获取第一条
+                                msgs = HistoryManager.load_session(current_active_kb, sess_id)
+                                first_q = next((m['content'] for m in msgs if m['role'] == 'user'), None)
+                                if first_q:
+                                    # 截取前20个字符
+                                    new_title = first_q[:20].strip()
+                                    HistoryManager.rename_session(current_active_kb, sess_id, new_title)
+                                    st.toast(f"✅ 标题已更新: {new_title}")
+                                    st.rerun()
+                                else:
+                                    st.warning("该会话没有用户消息，无法生成标题")
                             
                         with c_edit:
                             if st.button("✏️", key=f"sess_edit_{safe_sess_id}", help="重命名"):
@@ -2808,9 +2813,8 @@ if __name__ == "__main__":
                 with st.container(border=True):
                     # 顶部信息栏已移除（用户反馈冗余）
                 
-                    # 底部：操作栏 (优化为 4 + 1 布局)
-                    op_row1 = st.columns(4)
-                    op_row2 = st.columns(1)
+                    # 底部：操作栏 (优化为 2 列布局)
+                    op_row1 = st.columns(2)
                 
                     # 第一行：常用操作
                     with op_row1[0]:
@@ -2823,58 +2827,8 @@ if __name__ == "__main__":
                                 st.toast("✅ 已撤销")
                                 time.sleep(0.5)
                                 st.rerun()
-                
+                    
                     with op_row1[1]:
-                        if st.button("➕ 新对话", use_container_width=True, disabled=len(state.get_messages()) == 0, help="保存当前记录并开始新对话"):
-                            # --- Reset Model to Persistent Config ---
-                            current_user = st.session_state.get('user')
-                            if current_user:
-                                u_conf = ConfigLoader.load_for_user(current_user)
-                                # Reset logic: Clear session overrides, force reload from config
-                                st.session_state.pop('selected_model', None)
-                                
-                                from src.utils.model_manager import get_llm_from_config
-                                new_llm = get_llm_from_config(u_conf)
-                                if new_llm:
-                                    from llama_index.core import Settings
-                                    Settings.llm = new_llm
-                            # ----------------------------------------
-
-                            import uuid
-                            # 生成新会话ID
-                            new_id = str(uuid.uuid4())[:8]
-                            # 切换到新会话 (旧会话已自动保存)
-                            st.session_state.current_session_id = new_id
-                            st.session_state.messages = []
-                            st.session_state.suggestions_history = []
-                            # 初始化存储
-                            if current_kb_name:
-                                HistoryManager.save_session(current_kb_name, [], new_id)
-                        
-                            st.toast("✅ 已开启新会话，旧记录可在左侧历史中查看")
-                            time.sleep(0.5)
-                            st.rerun()
-                
-                    with op_row1[2]:
-                        export_content = ""
-                        if len(state.get_messages()) > 0:
-                            export_content = f"# 对话记录 - {current_kb_name}\n\n**导出时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n\n"
-                            for i, msg in enumerate(st.session_state.messages, 1):
-                                role = "👤 用户" if msg["role"] == "user" else "🤖 助手"
-                                export_content += f"## {role} ({i})\n\n{msg['content']}\n\n"
-                    
-                        if st.button("🔄 刷新标题", use_container_width=True, help="根据对话内容重新生成标题"):
-                            if len(st.session_state.messages) > 0:
-                                first_q = st.session_state.messages[0]['content'][:20]
-                                st.session_state.custom_titles[current_kb_name] = first_q
-                                st.toast("✅ 标题已根据首个问题更新")
-                                st.rerun()
-                    
-                        # [Audit] 记录对话导出点击准备行为
-                        safe_kb_name = sanitize_filename(current_kb_name) if current_kb_name else "chat"
-                        st.download_button("📥 导出", export_content, file_name=f"chat_{safe_kb_name}_{datetime.now().strftime('%Y%m%d')}.md", mime="text/markdown", use_container_width=True, disabled=len(state.get_messages()) == 0)
-
-                    with op_row1[3]:
                         # 删除权限检查 (颗粒化)
                         from src.auth.permission_manager import permission_manager
                         current_user = st.session_state.get('user', 'guest_user')
@@ -2883,10 +2837,6 @@ if __name__ == "__main__":
                         if st.button("🗑️ 删除", use_container_width=True, type="primary", disabled=not current_kb_name or not can_delete, help="永久删除该知识库" if can_delete else "🔒 您没有删除知识库的权限"):
                             st.session_state.confirm_delete = True
                             st.rerun()
-
-                    # 第二行：视图与窗口
-                    with op_row2[0]:
-                        st.link_button("🔀 打开新窗口", "http://localhost:8501", use_container_width=True, help="在浏览器新标签页打开")
             
                 # 删除确认对话框 (放在卡片外，避免嵌套问题)
                 if st.session_state.get('confirm_delete', False):
