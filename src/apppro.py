@@ -6198,6 +6198,43 @@ if __name__ == "__main__":
     """, unsafe_allow_html=True)
 
     with st.container():
+        # [v9.9.0] 语音交互模块
+        audio_val = st.audio_input("🎙️ 语音指令 (Voice Command)", key="voice_input_widget")
+        if audio_val:
+            import hashlib
+            # 计算哈希防重
+            audio_bytes = audio_val.getvalue()
+            audio_hash = hashlib.md5(audio_bytes).hexdigest()
+            
+            if st.session_state.get('last_voice_hash') != audio_hash:
+                st.session_state.last_voice_hash = audio_hash
+                from src.services.voice_service import get_voice_service
+                
+                with st.spinner("🎧 正在聆听并转译..."):
+                    try:
+                        voice_text = get_voice_service().transcribe(audio_val)
+                        if voice_text:
+                            st.toast(f"🗣️ 识别结果: {voice_text}")
+                            # 构造查询并加入队列 (复用附件逻辑)
+                            final_query = voice_text
+                            
+                            # 拼接附件 (如果存在)
+                            if st.session_state.temp_attachments['image_text']:
+                                final_query = f"[图片内容]\n{st.session_state.temp_attachments['image_text']}\n\n[语音指令]\n{voice_text}"
+                            elif st.session_state.temp_attachments['file_content']:
+                                final_query = f"[文件内容]\n{st.session_state.temp_attachments['file_content']}\n\n[语音指令]\n{voice_text}"
+                            
+                            # 将语音识别结果作为用户提问存入队列
+                            st.session_state.question_queue.append(final_query)
+                            
+                            # 提交后清理附件状态，防止下次重复携带
+                            st.session_state.temp_attachments = {'image_text': None, 'file_content': None, 'file_names': []}
+                            st.rerun()
+                        else:
+                            st.warning("未能识别到有效语音")
+                    except Exception as e:
+                        st.error(f"语音服务异常: {e}")
+
         # 合并为一个上传入口
         uploaded_attachment = st.file_uploader(
             "📎 上传附件 (图片OCR / 文档内容)", 
