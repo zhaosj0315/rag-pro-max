@@ -1896,7 +1896,23 @@ if __name__ == "__main__":
                         if not can_upload:
                             st.warning("🔒 权限不足：您当前的角色没有数据摄入权限。")
                     
-                        # --- 公共暂存状态栏 (置顶) ---
+                        # --- 五大源标准 Tabs (Refactored) ---
+                        # 定义回调以保持原有的副作用逻辑
+                        def on_ingestion_success(source_label, count):
+                            # 原 handle_ingestion_success 已经包含了 toast, auto_trigger_naming, uploaded_path setting
+                            # 我们可以直接调用本地的 handle_ingestion_success
+                            handle_ingestion_success(source_label, count)
+
+                        render_omni_ingestion_tabs(
+                            target_dir=st.session_state.task_staging_dir,
+                            key_prefix="omni_create",
+                            can_upload=can_upload,
+                            on_success=on_ingestion_success
+                        )
+
+                        st.divider()
+
+                        # --- 公共暂存状态栏 (统一放置在下方) ---
                         if not os.path.exists(st.session_state.task_staging_dir):
                             os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
                     
@@ -1907,7 +1923,7 @@ if __name__ == "__main__":
                         # [v9.5.3] 优化布局：引入 Popover 查看详情
                         # [v9.5.14] 引入“同步刷新”按钮
                         # [v9.5.18] 引入“在 Finder 中显示”按钮
-                        stat_col1, stat_col_icon, stat_col_open, stat_col_refresh, stat_col2 = st.columns([2.5, 0.4, 0.4, 0.4, 0.7])
+                        stat_col1, stat_col_icon, stat_col_open, stat_col_refresh, stat_col2 = st.columns([2.8, 0.4, 0.4, 0.4, 0.4])
                     
                         with stat_col1:
                             stats_placeholder = st.empty()
@@ -2023,27 +2039,13 @@ if __name__ == "__main__":
                                 # [v9.5.17] 移除 st.rerun()，依靠 Fragment 局部刷新
 
                         with stat_col2:
-                            if st.button("🧹 清空暂存", use_container_width=True, key="clean_staging_omni"):
+                            if st.button("🧹", help="清空暂存区", use_container_width=True, key="clean_staging_omni"):
                                 import shutil
                                 shutil.rmtree(st.session_state.task_staging_dir)
                                 os.makedirs(st.session_state.task_staging_dir, exist_ok=True)
                                 st.session_state.uploaded_path = None
                                 st.session_state.omni_last_upload_hash = None # [v9.5.12] 同时清空上传哈希
                                 # [v9.5.17] 移除 st.rerun()，依靠 Fragment 局部刷新
-                        # --- 五大源标准 Tabs ---
-                        # --- 五大源标准 Tabs (Refactored) ---
-                        # 定义回调以保持原有的副作用逻辑
-                        def on_ingestion_success(source_label, count):
-                            # 原 handle_ingestion_success 已经包含了 toast, auto_trigger_naming, uploaded_path setting
-                            # 我们可以直接调用本地的 handle_ingestion_success
-                            handle_ingestion_success(source_label, count)
-
-                        render_omni_ingestion_tabs(
-                            target_dir=st.session_state.task_staging_dir,
-                            key_prefix="omni_create",
-                            can_upload=can_upload,
-                            on_success=on_ingestion_success
-                        )
                 elif current_kb_name and current_kb_name != "pure_chat":
                     # 管理模式 - 使用一行化布局 (1x2 紧凑布局)
                     manage_title_col1, manage_title_col2 = st.columns([4, 1])

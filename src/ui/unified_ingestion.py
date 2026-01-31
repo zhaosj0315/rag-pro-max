@@ -68,7 +68,7 @@ def render_staging_area(target_dir, key_prefix="omni"):
     files_in_staging = os.listdir(target_dir)
     staging_count = len([f for f in files_in_staging if not f.startswith('.') and not f.endswith('.meta')])
     
-    stat_col1, stat_col_icon, stat_col_open, stat_col_refresh, stat_col2 = st.columns([2.5, 0.4, 0.4, 0.4, 0.7])
+    stat_col1, stat_col_icon, stat_col_open, stat_col_refresh, stat_col2 = st.columns([2.8, 0.4, 0.4, 0.4, 0.4])
     
     with stat_col1:
         stats_placeholder = st.empty()
@@ -172,12 +172,13 @@ def render_staging_area(target_dir, key_prefix="omni"):
             path_input_key = f"{key_prefix}_path_input"
             m_path = st.session_state.get(path_input_key)
             if m_path and os.path.exists(m_path):
+                from .unified_ingestion import sync_to_staging as local_sync
                 sync_to_staging(target_dir, m_path, is_file=False, source_label="同步刷新")
             
             st.toast("✅ 暂存区同步刷新成功")
 
     with stat_col2:
-        if st.button("🧹 清空", use_container_width=True, key=f"{key_prefix}_clean_btn"):
+        if st.button("🧹", help="清空暂存区", use_container_width=True, key=f"{key_prefix}_clean_btn"):
             try:
                 shutil.rmtree(target_dir)
                 os.makedirs(target_dir, exist_ok=True)
