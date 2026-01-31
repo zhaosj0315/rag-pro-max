@@ -5420,14 +5420,39 @@ if __name__ == "__main__":
                                     st.session_state.file_page += 1
     
                 file_manager_fragment()
-    # 创建模式的欢迎界面
+    # 创建模式的欢迎界面 (Visual Hierarchy Upgrade v5 - Ultra Compact)
     if is_create_mode:
         st.markdown("""
-        <div class="welcome-box">
-            <h2>👋 欢迎使用知识库</h2>
-            <p>请在左侧 <b>侧边栏</b> 配置数据源 (支持粘贴路径或拖拽文件)，点击 <b>🚀 立即创建</b> 开始。</p>
-        </div>
-        """, unsafe_allow_html=True)
+<div class="welcome-box" style="text-align: center; padding: 1rem; background: #fff; border: 1px solid #eee; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 0.8rem;">
+<div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 1.2rem;">
+<span style="font-size: 1.2rem;">🚀</span>
+<span style="font-weight: 600; color: #2c3e50; font-size: 1.1rem;">快速上手指南</span>
+<span style="color: #95a5a6; font-size: 0.9rem; margin-left: 0.5rem;">— 三步开启 AI 知识库</span>
+</div>
+<div style="display: flex; flex-direction: row; gap: 1.2rem; justify-content: center; width: 100%; max-width: 900px; align-items: flex-start;">
+<div style="flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center;">
+<div style="background: #e3f2fd; color: #1976d2; width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 0.5rem;">📦</div>
+<div style="font-size: 0.95rem; font-weight: 600; color: #333; margin-bottom: 0.2rem;">1. 配置数据源</div>
+<div style="font-size: 0.85rem; color: #777; line-height: 1.3;">左侧选择来源</div>
+</div>
+<div style="color: #eee; font-size: 1.2rem; margin-top: 0.3rem;">→</div>
+<div style="flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center;">
+<div style="background: #f3e5f5; color: #d81b60; width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 0.5rem;">⚙️</div>
+<div style="font-size: 0.95rem; font-weight: 600; color: #333; margin-bottom: 0.2rem;">2. 调整选项</div>
+<div style="font-size: 0.85rem; color: #777; line-height: 1.3;">开启高级功能</div>
+</div>
+<div style="color: #eee; font-size: 1.2rem; margin-top: 0.3rem;">→</div>
+<div style="flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center;">
+<div style="background: #e8f5e9; color: #2e7d32; width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 0.5rem;">🚀</div>
+<div style="font-size: 0.95rem; font-weight: 600; color: #333; margin-bottom: 0.2rem;">3. 立即创建</div>
+<div style="font-size: 0.85rem; color: #777; line-height: 1.3;">系统自动构建</div>
+</div>
+</div>
+<div style="margin-top: 1.2rem; padding-top: 0.8rem; border-top: 1px dashed #f5f5f5; font-size: 0.8rem; color: #bbb;">
+💡 支持 PDF, Word, Excel, Markdown, CSV, Python, HTML 等多格式混合导入
+</div>
+</div>
+""", unsafe_allow_html=True)
 
 
     # --- 融合 ChatOllama 风格：会话顶栏 (v2.7.6) ---
@@ -6342,8 +6367,22 @@ if __name__ == "__main__":
     """, unsafe_allow_html=True)
 
     with st.container():
-        # [v9.9.0] 语音交互模块
-        audio_val = st.audio_input("🎙️ 语音指令 (Voice Command)", key="voice_input_widget")
+        # [v9.9.0] 语音交互模块 & 文件上传并排布局
+        c_voice, c_upload = st.columns([1, 1])
+        
+        with c_voice:
+            audio_val = st.audio_input("🎙️ 语音指令 (Voice Command)", key="voice_input_widget")
+            
+        with c_upload:
+            # 合并为一个上传入口
+            uploaded_attachment = st.file_uploader(
+                "📎 上传附件 (图片OCR / 文档内容)", 
+                type=['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'pdf', 'docx', 'txt', 'md', 'csv', 'xlsx', 'xls', 'pptx', 'ppt', 'json', 'html', 'xml', 'py', 'js', 'sql', 'log'],
+                key="universal_attach",
+                label_visibility="collapsed",
+                help="支持上传图片(自动OCR)或文档(自动提取内容)以辅助提问"
+            )
+
         if audio_val:
             import hashlib
             # 计算哈希防重
@@ -6378,15 +6417,6 @@ if __name__ == "__main__":
                             st.warning("未能识别到有效语音")
                     except Exception as e:
                         st.error(f"语音服务异常: {e}")
-
-        # 合并为一个上传入口
-        uploaded_attachment = st.file_uploader(
-            "📎 上传附件 (图片OCR / 文档内容)", 
-            type=['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'pdf', 'docx', 'txt', 'md', 'csv', 'xlsx', 'xls', 'pptx', 'ppt', 'json', 'html', 'xml', 'py', 'js', 'sql', 'log'],
-            key="universal_attach",
-            label_visibility="collapsed",
-            help="支持上传图片(自动OCR)或文档(自动提取内容)以辅助提问"
-        )
     
         # 通用处理逻辑
         if uploaded_attachment and uploaded_attachment.name not in st.session_state.temp_attachments['file_names']:
