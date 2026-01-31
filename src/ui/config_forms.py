@@ -12,6 +12,8 @@ from .model_selectors import (
     render_hf_embedding_selector
 )
 from src.services.unified_config_service import save_config, load_config
+from src.services.user_config_manager import UserConfigManager
+from src.config import ConfigLoader
 from src.utils.model_manager import set_global_llm_model
 
 
@@ -297,7 +299,10 @@ def _render_remote_model_selector(url: str, key: str, saved_model: str, prefix: 
 
 def _save_and_apply_config(config_data: dict, provider: str, model: str, key: str, url: str, defaults: dict, only_chat_settings: bool = False, **kwargs):
     """辅助函数：保存并应用配置"""
-    existing_config = load_config("rag_config")
+    username = st.session_state.get('user')
+    
+    # 加载当前用户的配置
+    existing_config = ConfigLoader.load_for_user(username)
     existing_config.update(config_data)
     
     # 确保 system_prompt 被包含
@@ -309,7 +314,14 @@ def _save_and_apply_config(config_data: dict, provider: str, model: str, key: st
 
     # 同样处理 chat_history_limit (虽然它不直接影响 set_global_llm_model，但为了完整性)
     
-    if save_config(existing_config, "rag_config"):
+    # 保存到用户专属配置
+    save_success = False
+    if username:
+        save_success = UserConfigManager.save_user_config(username, existing_config)
+    else:
+        save_success = save_config(existing_config, "rag_config")
+
+    if save_success:
         # 如果只是保存对话设置，我们可能不需要重新初始化整个 LLM，
         # 但为了让 System Prompt 生效，通常需要重新初始化 LLM (LlamaIndex 的 LLM 对象通常是不可变的配置)
         

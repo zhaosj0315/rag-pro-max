@@ -185,7 +185,8 @@ class RAGEngine:
         return self.index.as_query_engine(
             similarity_top_k=similarity_top_k,
             streaming=streaming,
-            text_qa_template=qa_prompt_tmpl
+            text_qa_template=qa_prompt_tmpl,
+            llm=self.llm_model
         )
 
     def get_chat_engine(
@@ -215,7 +216,8 @@ class RAGEngine:
             memory=ChatMemoryBuffer.from_defaults(token_limit=2000),
             similarity_top_k=similarity_top_k,
             streaming=streaming,
-            system_prompt="你是一个精准的知识库助手，请务必仅基于提供的上下文和知识回答问题。如果知识库中没有相关信息，请明确指出。回答应清晰、简洁、专业。"
+            system_prompt="你是一个精准的知识库助手，请务必仅基于提供的上下文和知识回答问题。如果知识库中没有相关信息，请明确指出。回答应清晰、简洁、专业。",
+            llm=self.llm_model
         )
     
     def query(

@@ -3,6 +3,7 @@
 """
 from typing import Dict, Any
 from src.services.unified_config_service import load_config, save_config
+from src.services.user_config_manager import UserConfigManager
 
 class ConfigLoader:
     """配置加载器"""
@@ -11,6 +12,11 @@ class ConfigLoader:
     def load() -> Dict[str, Any]:
         """加载配置 (rag_config)"""
         return load_config("rag_config")
+
+    @staticmethod
+    def load_for_user(username: str) -> Dict[str, Any]:
+        """为特定用户加载配置"""
+        return UserConfigManager.load_user_config(username)
     
     @staticmethod
     def save(config: Dict[str, Any]) -> bool:

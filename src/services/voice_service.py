@@ -20,11 +20,9 @@ class VoiceService:
     def _initialize(self):
         """初始化语音服务，延迟加载模型"""
         self.logger = logging.getLogger(__name__)
-        # [v9.9.2] 回退至 small 以保证毫秒级响应速度
+        # [v9.9.3] 极致纯净模式：移除所有引导词，回归原生识别
         self.model_size = os.getenv("WHISPER_MODEL_SIZE", "small") 
         self.device = "cpu"
-        # 预设专业术语提示词，引导模型正确识别
-        self.initial_prompt = "这是一个关于 RAG Pro Max AI 知识库、数据分析、SQL、向量检索和人工智能的对话系统。请准确识别：知识库、RAG、数据库。"
         
         self.logger.info(f"🎙️ VoiceService initialized (Target Model: {self.model_size})")
 
@@ -39,7 +37,7 @@ class VoiceService:
             self.logger.info(f"📥 Loading Whisper model '{self.model_size}'...")
             start_time = time.time()
             
-            # 使用 int8 量化，速度极快
+            # 使用 int8 量化，确保速度
             self._model = WhisperModel(
                 self.model_size, 
                 device=self.device, 
@@ -65,12 +63,11 @@ class VoiceService:
             return ""
 
         try:
-            # [v9.9.2 Optimization] 注入 initial_prompt 以提升 small 模型的专业词汇命中率
+            # [v9.9.3] 移除 initial_prompt，确保原样输出
             segments, info = model.transcribe(
                 audio_file, 
                 beam_size=5, 
                 language="zh",
-                initial_prompt=self.initial_prompt, # 关键优化
                 vad_filter=True 
             )
             

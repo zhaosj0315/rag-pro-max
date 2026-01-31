@@ -288,6 +288,59 @@ def load_llm_model(provider: str, model_name: str, api_key: str = "", api_url: s
     return None
 
 
+def get_llm_from_config(config: dict):
+    """
+    从配置字典中创建 LLM 实例
+    """
+    provider = config.get('llm_provider', 'Ollama')
+    model = ""
+    key = ""
+    url = ""
+    extra = {}
+
+    # 自定义 Provider
+    custom_providers = config.get("custom_llm_providers", {})
+    if provider in custom_providers:
+        cp = custom_providers[provider]
+        model = cp.get('model', '')
+        url = cp.get('url', '')
+        key = cp.get('key', '')
+    
+    # 内置 Provider
+    elif provider == 'OpenAI':
+        model = config.get('llm_model_openai', 'gpt-3.5-turbo')
+        url = config.get('llm_url_openai', 'https://api.openai.com/v1')
+        key = config.get('llm_key', '')
+    elif provider == 'OpenAI-Compatible':
+        model = config.get('llm_model_other', '')
+        url = config.get('llm_url_other', '')
+        key = config.get('llm_key_other', '')
+    elif provider == 'Azure OpenAI':
+        model = config.get('azure_deployment', '')
+        url = config.get('azure_endpoint', '')
+        key = config.get('azure_key', '')
+        extra['api_version'] = config.get('azure_api_version', '2023-05-15')
+    elif provider == 'Anthropic':
+        model = config.get('config_anthropic_model', '')
+        key = config.get('anthropic_key', '')
+    elif provider == 'Moonshot':
+        model = config.get('config_moonshot_model', '')
+        key = config.get('moonshot_key', '')
+        url = "https://api.moonshot.cn/v1"
+    elif provider == 'Gemini':
+        model = config.get('config_gemini_model', '')
+        key = config.get('gemini_key', '')
+    elif provider == 'Groq':
+        model = config.get('config_groq_model', '')
+        key = config.get('groq_key', '')
+        url = "https://api.groq.com/openai/v1"
+    else: # Ollama or Default
+        model = config.get('llm_model_ollama', 'gpt-oss:20b')
+        url = config.get('llm_url_ollama', 'http://localhost:11434')
+    
+    return load_llm_model(provider, model, key, url, **extra)
+
+
 def set_global_embedding_model(provider: str, model_name: str, api_key: str = "", api_url: str = ""):
     """
     设置全局嵌入模型（Settings.embed_model）
