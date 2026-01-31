@@ -6,6 +6,7 @@ import re
 from typing import List, Dict, Any
 from datetime import datetime
 from src.processors.schema_enhancer import SchemaEnhancer
+from src.processors.structure_parser import StructureParser
 
 class DataAnalystEngine:
     def __init__(self, kb_path: str, logger=None):
@@ -15,6 +16,7 @@ class DataAnalystEngine:
         self.schema_path = os.path.join(kb_path, "business_schema.json")
         self.blueprint_path = os.path.join(kb_path, "business_blueprint.json")
         self.memory_path = os.path.join(kb_path, "business_sql_memory.json")
+        self.structure_parser = StructureParser()
 
     def _load_memory(self) -> List[Dict]:
         if os.path.exists(self.memory_path):
@@ -1149,7 +1151,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         except: return {}
 
     def smart_ingest_file(self, file_path: str, conn: sqlite3.Connection, model_client) -> Dict[str, Any]:
-        """[双轨构建] 智能判断并处理单个文件"""
+        """[双轨构建] 智能判断并处理单个文件 (DA-ECP V4.5)"""
         name = os.path.basename(file_path).lower()
         print(f"\n🔍 [嗅探] 正在分析文件特征: {name}")
         
@@ -1163,46 +1165,82 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             # 清洗列名
             df.columns = [re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fa5]', '_', str(c)).strip() for c in df.columns]
             
-            # 2. 智能仲裁 (v6.9.6 Fix: 优先检查文件名)
+            # 2. 智能仲裁 (优先使用 StructureParser)
             file_type = "DATA"
-            # 强信号关键词
-            schema_hints = ['表结构', '数据字典', 'schema', 'dictionary', 'blueprint', '字段定义', '表定义']
-            if any(k in name for k in schema_hints):
-                print(f"📁 [文件名命中] 识别到 Schema 关键词 '{[k for k in schema_hints if k in name][0]}' -> 强制切换建筑师模式")
+            
+            # A. 规则判定
+            if self.structure_parser.is_data_dictionary(df):
+                print(f"📐 [特征命中] StructureParser 判定为数据字典 -> 启动建筑师模式")
                 file_type = "SCHEMA"
-            elif model_client:
+            elif any(k in name for k in ['表结构', '数据字典', 'schema', 'dictionary', 'blueprint']):
+                print(f"📁 [文件名命中] 识别到 Schema 关键词 -> 强制切换建筑师模式")
+                file_type = "SCHEMA"
+            elif model_client and len(df) < 50: # 小文件交给 LLM 二次确认
                 file_type = self._classify_content(df, model_client)
             
             # 3. 双轨分流
             if file_type == "DATA":
-                print(f"📦 [仲裁结果] 判定为【实体数据】 -> 启动搬运工模式")
+                print(f"📦 [仲裁结果] 判定为【实体数据】 -> 启动全息搬运工模式 (Micro-Profiling)")
                 t_name = re.sub(r'[^a-zA-Z0-9_]', '_', os.path.splitext(name)[0])
                 df.to_sql(t_name, conn, index=False, if_exists='replace')
                 print(f"✅ [入库] 成功写入表 '{t_name}' ({len(df)} 行)")
                 
+                # --- Micro-Profiling (微观画像) ---
+                cols_meta = []
+                for col in df.columns:
+                    col_info = {"name": col, "type": str(df[col].dtype)}
+                    
+                    # 1. 空值率
+                    null_rate = df[col].isnull().mean()
+                    if null_rate > 0:
+                        col_info["null_rate"] = float(f"{null_rate:.4f}")
+                        
+                    # 2. 数值统计 (Range)
+                    if pd.api.types.is_numeric_dtype(df[col]):
+                        desc = df[col].describe()
+                        col_info["stats"] = {
+                            "min": float(desc['min']),
+                            "max": float(desc['max']),
+                            "avg": float(desc['mean']),
+                            "p50": float(desc['50%'])
+                        }
+                    
+                    # 3. 枚举提取 (Low Cardinality)
+                    # 规则: 字符串类型, 去重数 < 50, 且去重数 < 总行数的 20%
+                    if pd.api.types.is_string_dtype(df[col]) or pd.api.types.is_object_dtype(df[col]):
+                        unique_vals = df[col].dropna().unique()
+                        if 0 < len(unique_vals) < 50 and len(unique_vals) < len(df) * 0.2:
+                            # 转换为 list 并截断 (防止过长)
+                            col_info["enums"] = [str(v)[:50] for v in unique_vals]
+                            print(f"   🔹 [Enum] 提取枚举 '{col}': {col_info['enums']}")
+                            
+                    cols_meta.append(col_info)
+
                 # 返回元数据供 Schema 注册
                 return {
-                    t_name: {"cols": [{"name": c, "type": str(t)} for c, t in df.dtypes.items()]}
+                    t_name: {
+                        "cols": cols_meta,
+                        "row_count": len(df),
+                        "type": "solid" # 标记为实表
+                    }
                 }
                 
             else:
-                print(f"📐 [仲裁结果] 判定为【结构定义】 -> 启动建筑师模式 (理解->建模->模拟)")
+                print(f"📐 [仲裁结果] 判定为【结构定义】 -> 启动建筑师模式 (Structure Parsing)")
                 
-                # A. 理解图纸
-                parse_res = self._parse_schema_file(df, model_client)
+                # A. 理解图纸 (使用新版解析器)
+                parse_res = self.structure_parser.parse(df, name)
                 
-                # 兼容多种返回格式 (v6.9.3)
-                extracted_tables = {}
-                if "tables" in parse_res:
-                    extracted_tables = parse_res["tables"]
-                elif "table_name" in parse_res and "cols" in parse_res:
-                    # 旧版格式兼容
-                    t_name = parse_res.get('table_name', 'analyzed_table')
-                    extracted_tables[t_name] = parse_res
+                # 兼容旧逻辑
+                if not parse_res:
+                    # 尝试旧版解析逻辑
+                    parse_res = self._parse_schema_file(df, model_client)
 
+                # 提取 tables
+                extracted_tables = parse_res.get("tables", {})
+                
                 if not extracted_tables:
                     print("⚠️ [警告] 无法解析 Schema 结构，降级为普通入库")
-                    # 降级处理
                     t_name = "raw_" + re.sub(r'[^a-zA-Z0-9_]', '_', os.path.splitext(name)[0])
                     df.to_sql(t_name, conn, index=False, if_exists='replace')
                     return {}
@@ -1230,14 +1268,15 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                     cursor.execute(f"DROP TABLE IF EXISTS \"{t_name}\"") # 覆盖模式
                     cursor.execute(create_sql)
                     
-                    # C. 注册元数据 (JIT Construction)
+                    # C. 注册元数据 (Virtual Table)
                     final_meta[t_name] = {
                         "cols": cols,
                         "desc": t_desc,
+                        "type": "virtual", # 标记为虚表
                         "is_virtual": True
                     }
                 
-                print(f"💤 [延迟] 已成功从字典提取 {len(final_meta)} 个表结构，等待查询触发造数...")
+                print(f"✅ [语义建模] 成功从字典提取 {len(final_meta)} 个业务实体定义，逻辑结构已固化。")
                 return final_meta
 
         except Exception as e:
@@ -1256,6 +1295,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             conn = sqlite3.connect(self.db_path)
             physical_tables = {}
             semantic_docs = []
+            unified_schema = {"tables": {}, "macro_context": "", "relationships": [], "glossary": {}}
             
             if status_callback: status_callback(f"📊 正在提取元数据并推演业务血缘...")
             
@@ -1280,24 +1320,54 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             
             modeling_summary = "多维业务分析"
             if model_client and physical_tables:
-                print("\n🧬 [血缘] 正在推演表与表之间的逻辑关联 (Bloodline Inference)...")
-                if self.logger: self.logger.info("🧬 [Bloodline] 正在推演表与表之间的逻辑关联...")
-                # 升级 Prompt：专注于关系和业务流转
-                prompt_lineage = f"""分析以下数据表的定义，推导它们之间的“业务血缘关系”。
+                print("\n🧬 [血缘] 正在根据物理特征与语义推演逻辑关联 (DA-ECP V4.5)...")
+                if self.logger: self.logger.info("🧬 [Bloodline] 正在执行深度业务血缘推演...")
+                
+                # 构建更丰富的上下文给 LLM
+                # 只传递关键元数据，避免 Token 溢出
+                lineage_ctx = {}
+                for t, info in physical_tables.items():
+                    lineage_ctx[t] = {
+                        "desc": info.get("desc"),
+                        "cols": [{"name": c['name'], "enums": c.get('enums', []), "stats": c.get('stats', {})} for c in info.get('cols', [])[:10]]
+                    }
 
-表结构定义:
-{json.dumps(physical_tables, ensure_ascii=False)}
+                prompt_lineage = f"""你是一个资深首席数据架构师。请根据以下表的画像信息，推演它们之间的“业务关联图谱”。
+
+数据表画像:
+{json.dumps(lineage_ctx, ensure_ascii=False)}
 
 要求:
-1. 识别外键关系 (如 orders.user_id -> users.id)
-2. 描述业务流转方向 (如 用户 -> 下单 -> 支付)
-3. 生成一段宏观的业务场景描述
+1. 识别潜在的外键关系 (例如: table_a.uid 与 table_b.user_id 极其相似)。
+2. 为晦涩的字段名生成业务同义词。
+3. 描述核心业务流转路径。
+4. 返回标准 JSON 格式。
 
-请输出一段清晰的业务逻辑摘要。"""
-                modeling_summary = model_client.complete(prompt_lineage).text.strip()
-                print(f"📝 [摘要] 业务血缘: {modeling_summary[:100]}...")
+返回格式：
+{{
+  "relationships": [
+    {{"source": "table.col", "target": "table.col", "type": "one_to_many", "desc": "关系描述"}}
+  ],
+  "glossary": {{
+    "gmv": ["销售额", "流水", "总价"]
+  }},
+  "business_summary": "一段宏观业务逻辑描述"
+}}
 
-            unified_schema = {"tables": physical_tables, "macro_context": modeling_summary}
+只返回 JSON。"""
+                try:
+                    res = model_client.complete(prompt_lineage).text
+                    lineage_res = self._extract_json(res)
+                    if lineage_res:
+                        unified_schema["relationships"] = lineage_res.get("relationships", [])
+                        unified_schema["glossary"] = lineage_res.get("glossary", {})
+                        modeling_summary = lineage_res.get("business_summary", modeling_summary)
+                        print(f"   ✅ [关联锁定] 识别到 {len(unified_schema.get('relationships', []))} 组跨表关联")
+                except Exception as e:
+                    print(f"   ⚠️ [血缘推演跳过] {e}")
+
+            unified_schema["macro_context"] = modeling_summary
+            unified_schema["tables"] = physical_tables
             
             if semantic_docs and model_client:
                 print(f"🔍 [建模] 正在从 {len(semantic_docs)} 个逻辑文档中深度提取表结构定义...")

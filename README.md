@@ -1,13 +1,19 @@
 # RAG Pro Max - 企业级智能文档问答与数据分析系统
 
-**当前版本**: v9.7.0 (Unified Governance & Monitoring Edition)  
-![Version](https://img.shields.io/badge/version-v9.7.0-blue)
+**当前版本**: v9.8.0 (Data Analysis Enhanced Construction Protocol)  
+![Version](https://img.shields.io/badge/version-v9.8.0-blue)
 
-RAG Pro Max v9.7.0 带来了 **「全域治理与全景监控 (Unified Governance & Monitoring)」** 的深度变革。系统彻底重构了监控与调度体系，将其从前台剥离并降维集成至后台 **资源治理中心**，实现了极其严格的权限隔离。同时，通过 **系统全景日志** 的双流融合，为您提供从用户行为到系统内核的“上帝视角”观测能力。
+RAG Pro Max v9.8.0 引入了 **「DA-ECP V4.5 (Data Analysis Enhanced Construction Protocol)」**，这是一次关于系统 "如何理解数据" 的认知升级。我们将数据分析的核心逻辑从 "问答时" 前置到了 "构建时"，通过 **微观画像 (Micro-Profiling)** 和 **结构解析 (Structure Parsing)** 技术，让知识库在建立之初就拥有了对业务数据的深度语义理解能力，真正实现了 "Construction as Understanding"。
 
 ---
 
-## 🚀 v9.7.0 核心特性
+## 🚀 v9.8.0 核心特性
+
+### 🧠 DA-ECP V4.5 协议 (Enhanced Construction Protocol)
+- **构建即理解**: 在知识库构建阶段，系统不仅处理文本，更主动解析结构化数据的 **"业务蓝图"**。通过 `StructureParser`，系统能读懂数据字典文件 (Excel/CSV)，将其转化为逻辑表结构。
+- **动静分离架构**: 确立了 **"构建时固化逻辑，问答时按需造数"** 的黄金法则。构建阶段专注解析与语义建模，绝不预生成冗余数据；问答阶段则基于固化的逻辑蓝图，按需进行精准的 JIT (Just-In-Time) 数据仿真。
+- **微观画像**: 针对实体数据表，系统自动提取枚举分布、数值极值及空值率等统计特征，为 SQL 决策引擎提供丰富的上下文依据。
+- **全息终端日志**: 重构了构建过程的终端反馈，使用 "图标 + 颜色标签" 实时展示文件仲裁结果与语义建模进度，让复杂的后台逻辑透明可见。
 
 ### 🛡️ 治理与监控一体化 (Governance & Monitoring Fusion)
 - **监控入口降维**: 彻底移除主界面侧边栏的 **"📊 监控"** 入口，将 **"实时系统监控"** 与 **"智能调度"** 功能完整迁移至后台 **"资源治理"** 面板。
