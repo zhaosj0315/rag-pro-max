@@ -1,48 +1,50 @@
 # 数据分析：双核联动开发流程与架构设计规范 (Data Analysis Workflow)
 
-**版本**: v9.5.37 (Omni-Source Unification Edition)
-**核心原则**: 语义底座 + 结构化增强 (Shadow Mapping)，物理必闭环。
+**版本**: v9.8.0 (DA-ECP V4.5 Edition)
+**核心原则**: 构建即理解 (Construction as Understanding) + 动静分离 (JIT Generation)。
 
 ---
 
 ## 一、 业务架构 (Business Architecture)
 
-在 v9.5.37 架构下，数据分析能力已进化为 **“全域全源归一化 (Omni-Source Agnostic)”** 的智能引擎。
+在 v9.8.0 架构下，数据分析能力升级为 **DA-ECP V4.5 (Data Analysis Enhanced Construction Protocol)**，实现了从“被动解析”到“主动建模”的认知跃迁。
 
 ### 1. 场景双核联动
 - **语义层 (Base Layer)**: 100% 的材料经过 RAG 切片与向量化。
-- **逻辑层 (Augmented Layer)**:
-  - **物理底座**: SQLite 影子库。
-  - **知识图谱**: 增强版 `business_schema.json`，支持 9 种以上异构数据库镜像导入。
+- **逻辑层 (Cognitive Layer)**:
+  - **物理底座**: SQLite 影子库 (支持 Solid/Virtual 混合态)。
+  - **知识图谱**: 增强版 `business_schema.json`，包含微观画像 (Stats/Enums) 与血缘关系。
 
 ---
 
-## 三、 开发与构建流程 (v9.5.37 全源版)
+## 三、 开发与构建流程 (DA-ECP V4.5 标准)
 
-### 1. 资料摄入与并集暂存 (Data Ingestion)
-在 v9.5.37 中，数据分析的第一步即为“多源材料汇聚”：
-- **混合输入**: 支持同时拖入 CSV、粘贴 SQL 定义、添加本地目录以及 **数据库快照 (Tab 5)**。
-- **暂存核验**: 系统在 **📦 待处理暂存区** 实时统计已收集的结构化源。
-- **高级开启**: 点击「高级选项」，勾选 **“💎 智能数据分析”** 激活 SQL 引擎。
+### 1. 全源嗅探与仲裁 (Sniffing & Arbitration)
+构建开始时，`DataAnalystEngine` 对每个文件进行特征嗅探：
+- **Solid Table (实体数据)**: 判定为真实业务记录 (CSV/Excel)。
+- **Virtual Table (虚拟定义的)**: 判定为数据字典或 Schema 定义文档。
+- **Terminal Feedback**: 终端通过图标 `📦` (Solid) 和 `📐` (Virtual) 实时反馈仲裁结果。
 
-### 阶段 2：智能探测与分流 (Detection & Branching)
-1. **意图检查**: 系统自动探测能力并强制开启分析开关。
-2. **真数据判定**: 扫描 `raw_sources/`，计算数值密度。
+### 2. 双轨并行处理 (Dual-Track Processing)
+- **Track A: 全息搬运 (Micro-Profiling)**
+    - 针对 **Solid Tables**。
+    - **动作**: 入库的同时，计算字段级特征（空值率、Min/Max/Avg、枚举值分布）。
+    - **产出**: 包含丰富统计元数据的物理表定义。
+- **Track B: 建筑师模式 (Structure Parsing)**
+    - 针对 **Virtual Tables**。
+    - **动作**: 调用 `StructureParser` 提取表名、字段名、类型及注释。
+    - **产出**: 仅在 SQLite 中创建空表结构 (Schema Only)，绝不生成模拟数据。
 
-### 阶段 3：结构化影子映射 (Shadow Solidification)
-1. **建模固化**: `df.to_sql()` 生成物理影子表。
-2. **Schema 深度增强 (Schema Enhancement)**:
-   - **物理画像**: 识别 PK、Enums、空值率。
-   - **血缘推演**: 自动构建 `join_graph` 关联网络。
+### 3. 语义建模与固化 (Semantic Modeling & Solidification)
+- **血缘推演**: LLM 基于提取的画像，推演表与表之间的 Join 关系。
+- **蓝图固化**: 将所有实体定义、统计特征及关联关系写入 `business_schema.json`。
+- **动静分离**: 构建结束时，`business_data.db` 仅包含必要的实体数据和空的虚拟表结构。
 
-### 阶段 4：双核协同响应 (Dual-Core Inference)
-1. **意图严选路由 (Iron-Gate Routing)**:
-   - 系统实时监听 `manual_da_on` (UI开关) 与 `is_data_kb` (物理特征)。
-   - **决策**: 只有两者均为真时，流量才会路由至 `DataAnalystEngine` 进行 SQL 推演。否则，默认走 RAG 语义检索。
-2. **逻辑推演**:
-   - **查图谱**: 优先查阅 `join_graph`。
-   - **原子拆解**: Filter -> Join -> Aggregation。
-   - **质量诊断**: 零值自愈 + 幻觉排查。
+### 4. 问答时：JIT 动态造数 (Just-In-Time Generation)
+当用户提问触发分析意图时：
+1. **完整性检查**: 系统检查涉及的表是否为空 (Virtual Table)。
+2. **按需造数**: 若为空，则基于 Schema 定义和用户问题上下文，现场生成 30 条高相关性的模拟数据。
+3. **实证分析**: 执行 SQL 查询，验证逻辑并返回结果。
 
 ---
 

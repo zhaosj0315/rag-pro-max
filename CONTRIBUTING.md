@@ -1,8 +1,20 @@
 # 贡献指南 (Contributing Guide)
 
-**版本**: v9.5.37 (Search Revolution Edition)
-**更新日期**: 2026-01-26  
+**版本**: v9.8.0 (DA-ECP Edition)
+**更新日期**: 2026-01-31  
 **架构标准**: 归一化并集摄入、单例并行执行、逻辑唯一性
+
+## v9.8.0 DA-ECP 开发标准 (Construction as Understanding)
+
+### 1. 结构化解析 (Structure Parsing)
+- **解析器优先**: 处理 Excel/CSV 时，必须优先调用 `StructureParser.is_data_dictionary(df)` 进行仲裁。
+- **零数据原则**: 对于被判定为 Schema 的文件，严禁执行 `df.to_sql(index=True)`，仅允许执行 `CREATE TABLE`。
+
+### 2. JIT 造数规范 (Just-In-Time Generation)
+- **触发时机**: 数据生成逻辑必须封装在 `_ensure_sandbox_ready` 中，严禁在 `process_files` (构建阶段) 调用。
+- **上下文注入**: 生成数据时，必须将 `query_context` 传递给 LLM，确保生成的数据与用户问题（如时间范围、特定枚举值）强相关。
+
+---
 
 ## v9.5.37 核心架构标准 (New)
 

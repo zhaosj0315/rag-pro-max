@@ -1,22 +1,26 @@
-# RAG Pro Max v9.7.0 Unified Governance & Monitoring Edition 架构白皮书
+# RAG Pro Max v9.8.0 Unified Governance & Monitoring Edition 架构白皮书
 
-**版本**: v9.7.0 (Unified Governance & Monitoring Edition)  
-**更新日期**: 2026-01-30  
-**核心特性**: Governance & Monitoring Fusion, Panoramic Log System, Minimalist UI, Omni-Append
+**版本**: v9.8.0 (DA-ECP V4.5 Edition)  
+**更新日期**: 2026-01-31  
+**核心特性**: DA-ECP V4.5, Governance & Monitoring Fusion, Panoramic Log System, Omni-Append
 
 ---
 
 ## 🏗️ 顶层逻辑：三核驱动架构 (Triple-Core Drive)
 
-在 v9.5.38 中，系统从传统的单核 RAG 演进为三核协同模式，所有流量受 `Iron-Gate Routing` 严选。
+在 v9.8.0 中，系统演进为三核协同模式，其中逻辑核迎来了 DA-ECP V4.5 (构建即理解) 的重大升级。
 
 ### 1. 语义核 (Semantic Core) - RAG Engine
 - **基础检索**: 基于 `vector_db_storage` 执行向量相似度检索。
 - **混合增强**: 支持 BM25 与向量重排序的混合路径。
 
-### 2. 逻辑核 (Logical Core) - Data Analyst Engine
-- **SQL 推演**: 针对结构化物料（CSV/SQL），将自然语言转化为 SQL 并在本地 SQLite 中执行。
-- **铁闸准入**: 只有当 KB 包含 `business_schema.json` 且用户开启“数据分析”开关时才激活。
+### 2. 逻辑核 (Logical Core) - Data Analyst Engine (DA-ECP V4.5)
+- **构建即理解 (Construction as Understanding)**: 摒弃了旧版仅在问答时解析的滞后模式，将数据理解前置到构建阶段。
+    - **Micro-Profiling**: 对实体数据表 (Solid Tables) 进行微观画像，自动提取空值率、数值分布及枚举值。
+    - **Structure Parsing**: 引入 `StructureParser`，直接解析数据字典 (Virtual Tables)，只提取逻辑结构，不存储冗余数据。
+- **动静分离架构 (Static-Dynamic Separation)**:
+    - **Static Build**: 构建时仅产出 `business_schema.json` (业务蓝图) 和 `business_data.db` (物理空壳)。
+    - **Dynamic JIT**: 问答时根据问题意图，按需触发 **JIT (Just-In-Time) 造数**，实现“无数造数、有数用数”的智能闭环。
 
 ### 3. 协同核 (Synergy Core) - Smart Agents
 - **Precise Query (精准提问)**: 替代了旧版的 Deep Thinking。在提问阶段，调用 LLM 对用户原始意图进行重写（Rewrite）与扩展，解决用户表达模糊的问题。

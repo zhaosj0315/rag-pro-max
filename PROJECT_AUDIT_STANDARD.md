@@ -1,8 +1,14 @@
 # RAG Pro Max 项目里程碑全量审计标准 (Audit Standard)
 
-**版本**: v9.5.37 (Search Revolution Edition)
+**版本**: v9.8.0 (DA-ECP Edition)
 **适用范围**: 每次主版本升级 (Major/Minor Update)
 **执行官**: 项目审计员 (或自动化 Agent)
+
+## 5. DA-ECP V4.5 协议闭环 (Deep Understanding)
+- [ ] **全息日志**: 构建过程中终端是否显示了 `📦` (Solid) 和 `📐` (Virtual) 图标？
+- [ ] **动静分离**: 构建完成后，`business_data.db` 是否**未包含**虚拟表的模拟数据？
+- [ ] **JIT 触发**: 在回答涉及虚拟表的问题时，日志中是否出现了 `🎲 正在为 X 个表生成虚拟数据`？
+- [ ] **Schema 完整性**: `business_schema.json` 是否包含 `stats`, `enums` 和 `is_virtual` 字段？
 
 ## 1. 需求与交互闭环 (UX Alignment)
 - [ ] **全源一致性**: 检查侧边栏是否已彻底移除独立的“数据库同步”入口，确保所有摄入操作均通过 Omni 面板完成。

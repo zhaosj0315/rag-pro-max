@@ -1,7 +1,11 @@
 # RAG Pro Max 系统鲁棒性与自愈策略规范
 
-**状态**: v9.5.37 生效中
+**状态**: v9.8.0 生效中
 **核心指标**: 7x24h 稳定性、现场恢复、静默修复
+
+## 6. 数据分析 JIT 自愈 (Data Analysis JIT Rescue)
+- **发现**: 当用户查询触发 SQL 执行时，检测到目标表 (Virtual Table) 在物理数据库中为空或不存在。
+- **自愈**: 拦截 SQL 执行错误，触发 `_ensure_sandbox_ready` 机制。系统自动根据 Schema 定义和当前 Query 上下文，调用 LLM 现场生成 30+ 条模拟数据并注入数据库，随后重试 SQL 查询，实现对用户的“无感修复”。
 
 ## 1. 物理目录自愈 (Staging Auto-Heal)
 - **发现**: 页面刷新或系统清理可能导致 `task_staging_dir` 物理路径缺失。

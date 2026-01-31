@@ -95,6 +95,21 @@
     "file": "src/ui/crawl_progress.py"
   },
   {
+    "type": "file",
+    "name": "src/ui/db_admin_ui.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "DBAdminUI",
+    "file": "src/ui/db_admin_ui.py"
+  },
+  {
+    "type": "method",
+    "name": "DBAdminUI.render",
+    "file": "src/ui/db_admin_ui.py"
+  },
+  {
     "type": "class",
     "name": "DocumentProcessingProgress",
     "file": "src/ui/document_progress.py"
@@ -128,6 +143,16 @@
     "type": "file",
     "name": "src/ui/scroll_buttons.py",
     "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/ui/unified_ingestion.py",
+    "context": ""
+  },
+  {
+    "type": "function",
+    "name": "handle_ingestion_success",
+    "file": "src/ui/unified_ingestion.py"
   },
   {
     "type": "file",
@@ -396,6 +421,56 @@
   },
   {
     "type": "file",
+    "name": "src/utils/mysql_manager.py",
+    "context": ""
+  },
+  {
+    "type": "class",
+    "name": "MySQLManager",
+    "file": "src/utils/mysql_manager.py"
+  },
+  {
+    "type": "method",
+    "name": "MySQLManager.connect",
+    "file": "src/utils/mysql_manager.py"
+  },
+  {
+    "type": "method",
+    "name": "MySQLManager.close",
+    "file": "src/utils/mysql_manager.py"
+  },
+  {
+    "type": "method",
+    "name": "MySQLManager.get_users",
+    "file": "src/utils/mysql_manager.py"
+  },
+  {
+    "type": "method",
+    "name": "MySQLManager.get_databases",
+    "file": "src/utils/mysql_manager.py"
+  },
+  {
+    "type": "method",
+    "name": "MySQLManager.create_user",
+    "file": "src/utils/mysql_manager.py"
+  },
+  {
+    "type": "method",
+    "name": "MySQLManager.grant_privileges",
+    "file": "src/utils/mysql_manager.py"
+  },
+  {
+    "type": "method",
+    "name": "MySQLManager.drop_user",
+    "file": "src/utils/mysql_manager.py"
+  },
+  {
+    "type": "method",
+    "name": "MySQLManager.get_grants",
+    "file": "src/utils/mysql_manager.py"
+  },
+  {
+    "type": "file",
     "name": "src/utils/ocr_optimizer.py",
     "context": ""
   },
@@ -457,6 +532,11 @@
   {
     "type": "file",
     "name": "src/utils/vectorization_wrapper.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/utils/web_fetcher.py",
     "context": ""
   },
   {
@@ -541,6 +621,11 @@
   },
   {
     "type": "file",
+    "name": "src/processors/database_exporter.py",
+    "context": ""
+  },
+  {
+    "type": "file",
     "name": "src/processors/db_ingestor.py",
     "context": ""
   },
@@ -552,6 +637,11 @@
   {
     "type": "file",
     "name": "src/processors/schema_enhancer.py",
+    "context": ""
+  },
+  {
+    "type": "file",
+    "name": "src/processors/structure_parser.py",
     "context": ""
   },
   {

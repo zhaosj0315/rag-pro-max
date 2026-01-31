@@ -1,8 +1,24 @@
-# RAG Pro Max v9.7.0 企业级测试指南
+# RAG Pro Max v9.8.0 企业级测试指南
 
-**版本**: v9.7.0 (Unified Governance Edition)
-**更新日期**: 2026-01-30  
-**核心基准**: 资源治理、全景日志、权限隔离
+**版本**: v9.8.0 (DA-ECP V4.5 Edition)
+**更新日期**: 2026-01-31  
+**核心基准**: DA-ECP V4.5、资源治理、全景日志
+
+---
+
+## 🧪 v9.8.0 DA-ECP V4.5 深度理解专项测试
+
+### 1. 结构化解析与造数测试 (Structure & JIT Test)
+- **脚本**: `tests/verify_deep_understanding.py`
+- **场景**: 模拟上传 "真实数据表" 和 "数据字典文件" 的混合场景。
+- **预期**:
+    1. **StructureParser**: 正确识别并解析数据字典，不将其作为普通数据入库。
+    2. **Micro-Profiling**: 正确提取实体表的 `enums` 和 `stats`。
+    3. **Schema Enrichment**: 生成的 `business_schema.json` 中包含完整的表结构和推演出的血缘关系。
+- **运行命令**:
+    ```bash
+    python3 tests/verify_deep_understanding.py
+    ```
 
 ---
 

@@ -1,6 +1,7 @@
 src/api/fastapi_server.py:216: unused variable 'background_tasks' (100% confidence)
-src/apppro.py:4450: redundant if-condition (100% confidence)
+src/apppro.py:4541: redundant if-condition (100% confidence)
 src/chat/unified_suggestion_engine.py:223: unused variable 'allow_generic' (100% confidence)
+src/core/v23_integration.py:40: unused import 'render_monitoring_dashboard' (90% confidence)
 src/documents/document_manager.py:354: redundant if-condition (100% confidence)
 src/processors/async_web_crawler.py:50: unused variable 'exc_tb' (100% confidence)
 src/processors/async_web_crawler.py:50: unused variable 'exc_type' (100% confidence)

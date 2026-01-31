@@ -1,8 +1,26 @@
 # RAG Pro Max 核心功能实现详述 (Core Feature Implementation)
 
-**版本**: v9.5.37 (Search Revolution Edition)
+**版本**: v9.8.0 (DA-ECP V4.5 Edition)
 **状态**: 关键性资产 (永久保存)
-**描述**: 本文档记录了 v9.5「搜索革命」、v9.1「极致性能」及 v9.0「全能摄入」架构的底层实现、协同算法及物理闭环规范。
+**描述**: 本文档记录了 v9.8「构建即理解」、v9.5「搜索革命」及 v9.1「极致性能」架构的底层实现、协同算法及物理闭环规范。
+
+---
+
+## 🧠 6. DA-ECP V4.5 协议实现 (Data Analysis Enhanced Construction Protocol)
+v9.8.0 彻底重构了数据分析的构建层，实现了“构建即理解”的核心范式。
+
+### 核心组件：`StructureParser`
+- **定位**: `src/processors/structure_parser.py`
+- **启发式识别**: 基于表头特征（如 "字段名", "Type", "Comment"）和列内容指纹（如 "INT", "VARCHAR"）自动判定文件是否为数据字典。
+- **逻辑提取**: 将非结构化的 Excel/CSV 字典解析为标准的 JSON Schema 对象。
+
+### 核心组件：`DataAnalystEngine` (v4.5 Upgrade)
+- **双轨入库 (Dual-Track Ingestion)**:
+    - **Solid Track**: 对实体数据执行 `df.describe()` 和 `unique()`，生成微观画像 (Micro-Profiling)。
+    - **Virtual Track**: 对字典文件仅执行 `CREATE TABLE`，不执行 `INSERT`，实现零冗余。
+- **JIT 造数引擎**:
+    - **触发器**: `_ensure_sandbox_ready` 检测到目标表为空。
+    - **上下文注入**: 将用户 Question 作为约束条件注入 LLM Prompt，确保生成的模拟数据能命中查询条件（如“华东”+“金牌”）。
 
 ---
 

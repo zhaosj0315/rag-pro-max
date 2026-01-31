@@ -1,14 +1,19 @@
-# RAG Pro Max v9.7.0 企业级部署指南 (Unified Governance)
+# RAG Pro Max v9.8.0 企业级部署指南 (DA-ECP Edition)
 
-**版本**: v9.7.0  
-**更新日期**: 2026-01-30  
-**核心特性**: 全域治理、全景日志、权限隔离
+**版本**: v9.8.0  
+**更新日期**: 2026-01-31  
+**核心特性**: DA-ECP V4.5、全域治理、全景日志
 
 ---
 
 ## 🛠️ 运维与资产维护
 
-### 1. 权限配置 (Permission Config)
+### 1. DA-ECP 资产持久化 (DA-ECP Persistence)
+v9.8.0 的数据分析引擎会生成核心的 `business_data.db` (物理底座) 和 `business_schema.json` (逻辑蓝图)。
+- **严禁删除**: 这两个文件是 "Construction as Understanding" 的核心产物，删除将导致知识库丧失分析能力。
+- **备份策略**: 建议对 `vector_db_storage` 进行整库备份，以确保数据与逻辑的一致性。
+
+### 2. 权限配置 (Permission Config)
 v9.7.0 引入了严格的权限隔离。部署后请立即检查 `config/users.json`，确保管理员账号拥有 `view_stats`, `manage_system_config` 等核心治理权限。
 - **监控入口**: 普通用户无法访问监控面板，仅 Admin 可见。
 - **调度控制**: 资源调度器已迁移至后台，需 Admin 权限操作。
