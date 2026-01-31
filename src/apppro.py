@@ -1080,14 +1080,28 @@ if __name__ == "__main__":
             margin-bottom: 0.3rem !important;
             border: 1px solid rgba(0,0,0,0.05) !important;
         }
-        /* 欢迎页面 */
+        /* 欢迎页面 (Visual Hierarchy Upgrade) */
         .welcome-box {
-            padding: 1.5rem !important;
-            border-radius: 10px !important;
-            background: rgba(255,75,75,0.02) !important;
-            border: 1px solid rgba(255,75,75,0.1) !important;
+            padding: 2.5rem !important;
+            border-radius: 12px !important;
+            background: #ffffff !important;
+            border: 1px solid #e0e0e0 !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
             text-align: center !important;
-            margin: 1rem 0 !important;
+            margin: 2rem 0 !important;
+        }
+        
+        .welcome-box h2 {
+            color: #333 !important;
+            font-weight: 600 !important;
+            margin-bottom: 1rem !important;
+            font-size: 1.8rem !important;
+        }
+        
+        .welcome-box p {
+            color: #666 !important;
+            font-size: 1.1rem !important;
+            line-height: 1.6 !important;
         }
     
         /* 进度条 */
