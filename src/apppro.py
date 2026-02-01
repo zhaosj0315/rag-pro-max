@@ -6006,9 +6006,7 @@ def render_data_analysis_controls(can_analyze, default_da):
     # 状态同步与联动
     if new_da != current_da:
         st.session_state.is_data_analysis_mode = new_da
-        # Fragment 内部自动刷新，无需 rerun
-        # 如果是开启操作，我们可能希望强制刷新一下 fragment 以显示 checkbox
-        st.rerun() 
+        # Fragment 会自动检测到 widget 变化并重运行自身，无需手动 rerun 
         
     # [v9.9.5 Feature] 模拟数据子选项 (联动显示)
     if st.session_state.is_data_analysis_mode:
