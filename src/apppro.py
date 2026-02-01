@@ -5957,6 +5957,63 @@ def render_isolated_toggle(label, key, help=None, disabled=False, default_val=Fa
         st.session_state[key] = new_val
         # Fragment 会自动处理重绘，无需 rerun
 
+@st.fragment
+def render_fragment_toggle(label, key, help=None, disabled=False, default_val=False):
+    """
+    通用 Toggle 组件 (带 Fragment)，用于不需要外部联动的独立开关。
+    点击时仅局部刷新，不会导致全页白屏。
+    """
+    # 确保 Key 存在
+    if key not in st.session_state:
+        st.session_state[key] = default_val
+    
+    current = st.session_state[key]
+    # 使用独立的 widget key 防止冲突
+    widget_key = f"widget_frag_{key}"
+    
+    # 渲染 Toggle
+    new_val = st.toggle(label, value=current, disabled=disabled, help=help, key=widget_key)
+    
+    # 同步状态
+    if new_val != current:
+        st.session_state[key] = new_val
+        # Fragment 自动处理刷新
+
+@st.fragment
+def render_data_analysis_controls(can_analyze, default_da):
+    """
+    专门的数据分析控制组 (Fragment 封装)
+    将 Toggle 和 Checkbox 封装在同一个局部刷新单元中，
+    既避免全页白屏，又能实现联动显示。
+    """
+    # 确保 Key 存在
+    if 'is_data_analysis_mode' not in st.session_state:
+        st.session_state.is_data_analysis_mode = default_da
+        
+    current_da = st.session_state.is_data_analysis_mode
+    label = "数据分析 (🔒)" if not can_analyze else "数据分析"
+    
+    # 渲染主开关
+    # 使用独立的 widget key，但状态绑定到 session_state
+    new_da = st.toggle(
+        label, 
+        value=current_da, 
+        disabled=not can_analyze, 
+        help="请联系管理员开启数据分析权限" if not can_analyze else "手动触发宏观数据分析与推演 (v4.5)", 
+        key="widget_da_toggle_isolated"
+    )
+    
+    # 状态同步与联动
+    if new_da != current_da:
+        st.session_state.is_data_analysis_mode = new_da
+        # Fragment 内部自动刷新，无需 rerun
+        # 如果是开启操作，我们可能希望强制刷新一下 fragment 以显示 checkbox
+        st.rerun() 
+        
+    # [v9.9.5 Feature] 模拟数据子选项 (联动显示)
+    if st.session_state.is_data_analysis_mode:
+        st.checkbox("🎲 模拟数据", key="enable_data_simulation", help="强制生成模拟数据进行回答 (即使表不存在)", value=False)
+
 # 极简工具栏：模型与设置
 if __name__ == "__main__":
     with st.container():
@@ -6170,7 +6227,7 @@ if __name__ == "__main__":
                 current_user = st.session_state.get('user', 'guest_user')
                 can_precise = permission_manager.has_permission(current_user, "precise_query")
             
-                render_isolated_toggle(
+                render_fragment_toggle(
                     "精准提问 (🔒)" if not can_precise else "精准提问", 
                     'enable_query_optimization', 
                     help="请联系管理员开启精准提问权限" if not can_precise else "启用智能查询优化",
@@ -6183,7 +6240,7 @@ if __name__ == "__main__":
             current_user = st.session_state.get('user', 'guest_user')
             can_search = permission_manager.has_permission(current_user, "smart_search")
         
-            render_isolated_toggle(
+            render_fragment_toggle(
                 "🌐 联网搜索 (🔒)" if not can_search else "联网搜索",
                 'enable_web_search',
                 disabled=not can_search,
@@ -6196,7 +6253,7 @@ if __name__ == "__main__":
             current_user = st.session_state.get('user', 'guest_user')
             can_research = permission_manager.has_permission(current_user, "deep_research")
         
-            render_isolated_toggle(
+            render_fragment_toggle(
                 "智能研究 (🔒)" if not can_research else "智能研究",
                 'enable_deep_research',
                 disabled=not can_research,
@@ -6216,13 +6273,9 @@ if __name__ == "__main__":
                 schema_p = os.path.join(output_base, active_kb_name, "business_schema.json")
                 default_da = os.path.exists(schema_p)
             
-            render_isolated_toggle(
-                "数据分析 (🔒)" if not can_analyze else "数据分析",
-                'is_data_analysis_mode',
-                disabled=not can_analyze,
-                help="请联系管理员开启数据分析权限" if not can_analyze else "手动触发宏观数据分析与推演 (v4.5)",
-                default_val=default_da
-            )
+            # [v9.9.7 UI Refactor] 使用专门的 Fragment 渲染数据分析控制组
+            # 这确保了 Toggle 和 Checkbox 的联动不会导致全页白屏
+            render_data_analysis_controls(can_analyze, default_da)
 
         # --- 4. 操作按钮 (Popover/Button) ---
         if st.session_state.get('is_processing'):
@@ -7046,7 +7099,12 @@ if __name__ == "__main__":
                                     # [v6.4.5] 同步输出到终端日志
                                     logger.info(msg, stage="Strategic Analysis")
                             
-                                analysis_res = da_engine.execute_analysis(final_prompt, llm, status_callback=da_status_callback)
+                                analysis_res = da_engine.execute_analysis(
+                                    final_prompt, 
+                                    llm, 
+                                    status_callback=da_status_callback,
+                                    enable_simulation=st.session_state.get('enable_data_simulation', False)
+                                )
                             
                                 if analysis_res.get("success", False):
                                     # 1. 核心推演报告流式预览

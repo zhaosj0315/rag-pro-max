@@ -247,7 +247,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
                 self.logger.error(f"生成虚拟数据致命错误: {e}")
             return False
 
-    def _create_missing_table(self, table_name: str, schemas: Dict, model_client, cursor) -> bool:
+    def _create_missing_table(self, table_name: str, schemas: Dict, model_client, cursor, query_context: str = "") -> bool:
         """动态创建缺失的表"""
         try:
             # 根据表名推断可能的结构
@@ -283,7 +283,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             print(f"🏗️ [Dynamic Schema] 创建表: {create_sql}")
             
             # 生成数据
-            return self._generate_mock_data(table_name, table_info, schemas, model_client, cursor)
+            return self._generate_mock_data(table_name, table_info, schemas, model_client, cursor, query_context=query_context)
             
         except Exception as e:
             print(f"❌ [Dynamic Schema] 创建表 '{table_name}' 失败: {e}")
@@ -353,7 +353,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         except Exception as e:
             return False
 
-    def _ensure_sandbox_ready(self, schemas: Dict[str, Any], model_client, status_callback=None, target_tables: List[str] = None, conn=None, query_context: str = "") -> Dict[str, str]:
+    def _ensure_sandbox_ready(self, schemas: Dict[str, Any], model_client, status_callback=None, target_tables: List[str] = None, conn=None, query_context: str = "", enable_simulation: bool = False) -> Dict[str, str]:
         should_close = False
         if conn is None:
             conn = sqlite3.connect(self.db_path)
@@ -570,7 +570,7 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
             except: pass
         return {}
 
-    def execute_analysis(self, query: str, model_client, context_text: str = "", status_callback=None) -> Dict[str, Any]:
+    def execute_analysis(self, query: str, model_client, context_text: str = "", status_callback=None, enable_simulation: bool = False) -> Dict[str, Any]:
         now = datetime.now().strftime("%H:%M:%S")
         # --- 终端强制输出: 任务启动 ---
         print("\n" + "="*60)
@@ -695,31 +695,24 @@ INSERT INTO {table_name} VALUES ('value3', 'value4', 456);"""
         
         print(f"📁 [建模] 锁定业务范围: {rel_tables}")
         
-        # [v6.7.0 Fix] 判定是否为仿真模式：只要涉及的表中有一个是虚拟表，整体判定为仿真模式
-        # [v6.9.0 Fix] 增强判定：如果表中没有任何数据，也视为仿真模式（自动启动救护逻辑）
+        # [v9.9.5 Feature] 严格控制仿真模式：仅当 enable_simulation 为 True 时开启
+        # 即使检测到虚拟表或空表，如果不开启 simulation 也不进行自动造数，而是使用已有材料（虽然可能为空）
+        is_simulated = enable_simulation
+        
         session_conn = sqlite3.connect(self.db_path, timeout=60)
         
-        def check_table_empty(t_name, conn):
-            try:
-                # 尝试直接查询计数
-                c = conn.cursor()
-                # 处理可能存在的引号
-                safe_t = f'"{t_name}"' if '"' not in t_name else t_name
-                count = c.execute(f"SELECT count(*) FROM {safe_t}").fetchone()[0]
-                return count == 0
-            except:
-                return True # 如果查询失败，保守认为可能是没数据的空表/新表
-
-        tables_empty_status = {t: check_table_empty(t, session_conn) for t in rel_tables if t in full_schemas.get('tables', {})}
-        is_simulated = any(full_schemas.get('tables', {}).get(t, {}).get('is_virtual', False) for t in rel_tables) or any(tables_empty_status.values())
-        
         if is_simulated:
-            print(f"🎭 [仿真模式] 激活。检测到虚拟表或空表: {[t for t, empty in tables_empty_status.items() if empty]}")
+            print(f"🎭 [仿真模式] 激活。原因: 用户显式开启仿真")
         
         try:
-            # 原则：如果是数据分析模式，且涉及范围内的表在数据库中不存在或为空，必须先完成“无数造数”的闭环
-            if status_callback: status_callback("🛡️ 正在确保业务底座完整性...")
-            mapping = self._ensure_sandbox_ready(full_schemas, model_client, status_callback, rel_tables, conn=session_conn, query_context=query)
+            # 原则：只有在开启仿真模式时，才进入“无数造数”的闭环。
+            # 如果不开启仿真，系统将只查询物理数据库中的现有数据。
+            if is_simulated:
+                if status_callback: status_callback("🛡️ 正在执行意图对齐造数 (仿真模式)...")
+                mapping = self._ensure_sandbox_ready(full_schemas, model_client, status_callback, rel_tables, conn=session_conn, query_context=query, enable_simulation=True)
+            else:
+                # 非仿真模式，仅执行基础表名映射
+                mapping = self._ensure_sandbox_ready(full_schemas, model_client, status_callback, rel_tables, conn=session_conn, query_context=query, enable_simulation=False)
             
             # 重新获取子架构（使用映射后的物理表名）
             sub_schema = {}
