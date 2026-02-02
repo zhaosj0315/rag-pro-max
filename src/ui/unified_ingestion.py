@@ -68,43 +68,50 @@ def render_staging_area(target_dir, key_prefix="omni"):
     files_in_staging = os.listdir(target_dir)
     staging_count = len([f for f in files_in_staging if not f.startswith('.') and not f.endswith('.meta')])
     
-    # [UI] 注入工具栏专属样式：统一图标尺寸与对齐，并极致压缩垂直间距
+    # [UI] 注入工具栏专属样式：针对辅助信息行进行极致微缩处理
     st.markdown("""
     <style>
-    /* 强制统一暂存区工具栏按钮尺寸与图标大小 */
+    /* 极致微缩暂存区图标按钮 */
+    div[data-testid="column"]:has(button[key*="_btn"]) button,
     div[data-testid="column"] button {
-        min-height: 28px !important; /* 缩小高度 */
-        height: 28px !important;
-        min-width: 28px !important;
-        width: 28px !important;
+        min-height: 22px !important; 
+        height: 22px !important;
+        min-width: 22px !important;
+        width: 22px !important;
         padding: 0px !important;
         margin: 0px !important;
         line-height: 1 !important;
-        font-size: 14px !important;
-        border: 1px solid #eee !important; /* 增加轻微边框以增强按钮感 */
+        font-size: 11px !important; /* 极小字号 */
+        border: 1px solid #f0f0f0 !important; /* 极淡边框 */
         background-color: transparent !important;
-        color: #666 !important;
+        color: #999 !important; /* 极淡颜色 */
+        box-shadow: none !important;
     }
     div[data-testid="column"] button:hover {
-        border-color: #ccc !important;
-        color: #333 !important;
-        background-color: #f9f9f9 !important;
+        border-color: #e0e0e0 !important;
+        color: #666 !important;
+        background-color: #f5f5f5 !important;
+    }
+    /* 针对 Popover 按钮的特殊微缩 */
+    div[data-testid="stPopover"] > button {
+        min-height: 22px !important;
+        height: 22px !important;
+        padding: 0px 4px !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    # [UI] 增加分隔列 (c_sep) 以区分查看与操作功能
-    # 调整比例，进一步压缩空间
-    stat_col1, stat_col_icon, c_sep, stat_col_open, stat_col_refresh, stat_col2 = st.columns([5.5, 0.5, 0.1, 0.5, 0.5, 0.5], gap="small")
+    # [UI] 极致紧凑布局
+    stat_col1, stat_col_icon, c_sep, stat_col_open, stat_col_refresh, stat_col2 = st.columns([5.8, 0.4, 0.1, 0.4, 0.4, 0.4], gap="small")
     
     with stat_col1:
         stats_placeholder = st.empty()
-        # 极简风格：灰色调，去除高亮背景，缩小字号
+        # 极简辅助风格：极细文字
         stats_placeholder.markdown(
-            f"""<div style='display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #666;'>
-                <span>📦 待处理暂存区:</span>
-                <span style='font-family: monospace; font-weight: 600; color: #444;'>{staging_count}</span>
-                <span style='color: #999; font-size: 0.8rem;'>个文件</span>
+            f"""<div style='display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: #999; margin-top: 2px;'>
+                <span>📦 暂存区:</span>
+                <span style='font-family: monospace; font-weight: normal; color: #666;'>{staging_count}</span>
+                <span>files</span>
             </div>""", unsafe_allow_html=True
         )
     
