@@ -870,7 +870,7 @@ if __name__ == "__main__":
         /* 2. 唯一滚动入口 */
         [data-testid="stAppViewContainer"] {
             overflow-y: auto !important;
-            overflow-x: hidden !important;
+            overflow-x: auto !important;
             height: 100vh !important;
         }
     
@@ -1053,10 +1053,14 @@ if __name__ == "__main__":
         }
     
 
-        /* 减少间距 */
+        /* 减少间距并强制自适应 */
         .block-container {
             padding-top: 0.75rem !important;
             padding-bottom: 1rem !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
         }
 
         .element-container {
@@ -1387,8 +1391,8 @@ if __name__ == "__main__":
             # [UI Optimization] 知识库选择与自动启动独立渲染 (无感加载)
             @st.fragment
             def render_kb_selector_and_autostart():
-                # 统一控制台布局：[标题(1.7) | 选择框(3.9) | 刷新(0.6) | 文件夹(0.6) | 配置(0.6)]
-                c_title, c_select, c_refresh, c_open, c_config = st.columns([1.7, 3.9, 0.6, 0.6, 0.6])
+                # 统一控制台布局：[标题(1.7) | 选择框(3.9) | 刷新(0.4) | 文件夹(0.4) | 配置(0.4) | 卸载(0.4)]
+                c_title, c_select, c_refresh, c_open, c_config, c_unload = st.columns([1.7, 3.9, 0.4, 0.4, 0.4, 0.4])
                 
                 with c_title:
                     # 使用 HTML 调整垂直对齐
@@ -1432,6 +1436,18 @@ if __name__ == "__main__":
                         ConfigLoader.quick_setup()
                         st.success("✅ 已重置")
                         time.sleep(0.5); st.rerun()
+
+                with c_unload:
+                    if st.button("🔓", help="卸载知识库（释放内存）", use_container_width=True, key="unload_kb_inline"):
+                        # 仅在非创建模式且已加载时执行
+                        if st.session_state.get('chat_engine'):
+                            st.session_state.chat_engine = None
+                            st.session_state.current_kb_id = None
+                            cleanup_memory()
+                            st.toast("✅ 知识库已卸载，内存已释放")
+                            st.rerun()
+                        else:
+                            st.toast("ℹ️ 当前未加载知识库")
     
                 # 自动启动系统逻辑 (替代原有的启动按钮)
                 # 纯对话模式已在上方 selectbox 处理，此处处理知识库模式
@@ -1492,15 +1508,6 @@ if __name__ == "__main__":
             render_kb_selector_and_autostart()
             selected_nav = st.session_state.selected_nav
             # 知识库搜索/过滤已按用户要求移除
-
-            # 卸载知识库按钮（释放内存）
-            if not (selected_nav == "➕ 新建知识库...") and st.session_state.get('chat_engine') is not None:
-                if st.button("🔓 卸载知识库（释放内存）", use_container_width=True, help="释放当前知识库占用的内存资源"):
-                    st.session_state.chat_engine = None
-                    st.session_state.current_kb_id = None
-                    cleanup_memory()
-                    st.toast("✅ 知识库已卸载，内存已释放")
-                    st.rerun()
 
             # --- 会话历史 (Session History) v2.7.3 ---
             # 提取当前的 active_kb_name (如果已选择)
