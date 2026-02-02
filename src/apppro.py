@@ -1405,12 +1405,12 @@ if __name__ == "__main__":
             # [UI Optimization] 知识库选择与自动启动独立渲染 (无感加载)
             @st.fragment
             def render_kb_selector_and_autostart():
-                # 统一控制台布局：[标题(1.7) | 选择框(3.7) | 刷新(0.4) | 文件夹(0.4) | 分隔(0.1) | 配置(0.4) | 卸载(0.4)]
-                c_title, c_select, c_refresh, c_open, c_sep, c_config, c_unload = st.columns([1.7, 3.7, 0.4, 0.4, 0.1, 0.4, 0.4])
+                # 统一控制台布局：[标题(1.2) | 选择框(4.2) | 刷新(0.4) | 文件夹(0.4) | 分隔(0.1) | 配置(0.4) | 卸载(0.4)]
+                c_title, c_select, c_refresh, c_open, c_sep, c_config, c_unload = st.columns([1.2, 4.2, 0.4, 0.4, 0.1, 0.4, 0.4], gap="small")
                 
                 with c_title:
                     # 使用 HTML 调整垂直对齐
-                    st.markdown("<div style='margin-top: 5px; font-weight: 600;'>💠 知识库控制台</div>", unsafe_allow_html=True)
+                    st.markdown("<div style='margin-top: 5px; font-weight: 600; white-space: nowrap;'>💠 知识库控制台</div>", unsafe_allow_html=True)
                 
                 with c_select:
                     st.session_state.selected_nav = st.selectbox("选择知识库", nav_options, index=default_idx, label_visibility="collapsed")
@@ -6315,12 +6315,21 @@ if __name__ == "__main__":
     </style>
     """, unsafe_allow_html=True)
 
+    # 注入 CSS 去除 AudioInput 顶部间距
+    st.markdown("""
+    <style>
+    div[data-testid="stAudioInput"] {
+        margin-top: 0px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     with st.container():
         # [v9.9.0] 语音交互模块 & 文件上传并排布局
-        c_voice, c_upload = st.columns([1, 1])
+        c_voice, c_upload = st.columns([1, 3])
         
         with c_voice:
-            audio_val = st.audio_input("🎙️ 语音指令 (Voice Command)", key="voice_input_widget")
+            audio_val = st.audio_input("🎙️ 语音指令", key="voice_input_widget", label_visibility="collapsed")
             
         with c_upload:
             # 合并为一个上传入口
