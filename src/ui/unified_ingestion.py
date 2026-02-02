@@ -68,34 +68,43 @@ def render_staging_area(target_dir, key_prefix="omni"):
     files_in_staging = os.listdir(target_dir)
     staging_count = len([f for f in files_in_staging if not f.startswith('.') and not f.endswith('.meta')])
     
-    # [UI] 注入工具栏专属样式：统一图标尺寸与对齐
+    # [UI] 注入工具栏专属样式：统一图标尺寸与对齐，并极致压缩垂直间距
     st.markdown("""
     <style>
     /* 强制统一暂存区工具栏按钮尺寸与图标大小 */
     div[data-testid="column"] button {
-        min-height: 32px !important;
-        height: 32px !important;
-        min-width: 32px !important;  /* 强制方形 */
-        width: 32px !important;      /* 强制方形 */
+        min-height: 28px !important; /* 缩小高度 */
+        height: 28px !important;
+        min-width: 28px !important;
+        width: 28px !important;
         padding: 0px !important;
         margin: 0px !important;
         line-height: 1 !important;
-        font-size: 16px !important;  /* 统一图标(emoji)字号 */
+        font-size: 14px !important;
+        border: 1px solid #eee !important; /* 增加轻微边框以增强按钮感 */
+        background-color: transparent !important;
+        color: #666 !important;
+    }
+    div[data-testid="column"] button:hover {
+        border-color: #ccc !important;
+        color: #333 !important;
+        background-color: #f9f9f9 !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
     # [UI] 增加分隔列 (c_sep) 以区分查看与操作功能
-    # 调整比例 [5.5, 0.5...] 以压缩图标间距，gap="small" 进一步收紧
+    # 调整比例，进一步压缩空间
     stat_col1, stat_col_icon, c_sep, stat_col_open, stat_col_refresh, stat_col2 = st.columns([5.5, 0.5, 0.1, 0.5, 0.5, 0.5], gap="small")
     
     with stat_col1:
         stats_placeholder = st.empty()
+        # 极简风格：灰色调，去除高亮背景，缩小字号
         stats_placeholder.markdown(
-            f"""<div style='display: flex; align-items: center; gap: 8px;'>
-                <span style='font-weight: 600; color: #1f77b4;'>📦 待处理暂存区:</span>
-                <span style='background: #e1f5fe; color: #01579b; padding: 2px 10px; border-radius: 12px; font-weight: bold; font-family: monospace;'>{staging_count}</span>
-                <span style='color: #666; font-size: 0.85rem;'>个文件已就绪</span>
+            f"""<div style='display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #666;'>
+                <span>📦 待处理暂存区:</span>
+                <span style='font-family: monospace; font-weight: 600; color: #444;'>{staging_count}</span>
+                <span style='color: #999; font-size: 0.8rem;'>个文件</span>
             </div>""", unsafe_allow_html=True
         )
     
