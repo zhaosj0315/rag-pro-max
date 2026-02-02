@@ -71,19 +71,23 @@ def render_staging_area(target_dir, key_prefix="omni"):
     # [UI] 注入工具栏专属样式：统一图标尺寸与对齐
     st.markdown("""
     <style>
-    /* 强制统一暂存区工具栏按钮尺寸 */
+    /* 强制统一暂存区工具栏按钮尺寸与图标大小 */
     div[data-testid="column"] button {
         min-height: 32px !important;
         height: 32px !important;
+        min-width: 32px !important;  /* 强制方形 */
+        width: 32px !important;      /* 强制方形 */
         padding: 0px !important;
         margin: 0px !important;
         line-height: 1 !important;
+        font-size: 16px !important;  /* 统一图标(emoji)字号 */
     }
     </style>
     """, unsafe_allow_html=True)
 
     # [UI] 增加分隔列 (c_sep) 以区分查看与操作功能
-    stat_col1, stat_col_icon, c_sep, stat_col_open, stat_col_refresh, stat_col2 = st.columns([2.7, 0.4, 0.1, 0.4, 0.4, 0.4])
+    # 调整比例 [5.5, 0.5...] 以压缩图标间距，gap="small" 进一步收紧
+    stat_col1, stat_col_icon, c_sep, stat_col_open, stat_col_refresh, stat_col2 = st.columns([5.5, 0.5, 0.1, 0.5, 0.5, 0.5], gap="small")
     
     with stat_col1:
         stats_placeholder = st.empty()
@@ -207,7 +211,7 @@ def render_staging_area(target_dir, key_prefix="omni"):
                     st.session_state[hash_key] = None
                 
                 # 特别处理：如果是主创建流程，清除 uploaded_path
-                if key_prefix == "create" or key_prefix == "omni":
+                if key_prefix in ["create", "omni", "omni_create"]:
                     st.session_state.uploaded_path = None
                 
                 st.toast("🗑️ 暂存区已清空")
