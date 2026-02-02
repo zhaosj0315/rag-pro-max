@@ -68,7 +68,22 @@ def render_staging_area(target_dir, key_prefix="omni"):
     files_in_staging = os.listdir(target_dir)
     staging_count = len([f for f in files_in_staging if not f.startswith('.') and not f.endswith('.meta')])
     
-    stat_col1, stat_col_icon, stat_col_open, stat_col_refresh, stat_col2 = st.columns([2.8, 0.4, 0.4, 0.4, 0.4])
+    # [UI] 注入工具栏专属样式：统一图标尺寸与对齐
+    st.markdown("""
+    <style>
+    /* 强制统一暂存区工具栏按钮尺寸 */
+    div[data-testid="column"] button {
+        min-height: 32px !important;
+        height: 32px !important;
+        padding: 0px !important;
+        margin: 0px !important;
+        line-height: 1 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # [UI] 增加分隔列 (c_sep) 以区分查看与操作功能
+    stat_col1, stat_col_icon, c_sep, stat_col_open, stat_col_refresh, stat_col2 = st.columns([2.7, 0.4, 0.1, 0.4, 0.4, 0.4])
     
     with stat_col1:
         stats_placeholder = st.empty()
@@ -153,6 +168,10 @@ def render_staging_area(target_dir, key_prefix="omni"):
             else:
                 st.markdown("#### 📦 暂存区资产清单")
                 st.info("暂存区为空")
+
+    with c_sep:
+        # [UI] 垂直分割线
+        st.markdown("<div style='border-left: 1px solid #e0e0e0; height: 24px; margin: 4px auto;'></div>", unsafe_allow_html=True)
 
     with stat_col_open:
         if st.button("📍", help="在 Finder 中显示暂存区", key=f"{key_prefix}_open_btn"):

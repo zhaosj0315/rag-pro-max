@@ -945,6 +945,12 @@ if __name__ == "__main__":
             max-width: 850px !important;
         }
 
+        /* [UI] 压缩侧边栏内的列间距，减少图标间空间浪费 */
+        section[data-testid="stSidebar"] [data-testid="column"] {
+            padding-left: 0.2rem !important;
+            padding-right: 0.2rem !important;
+        }
+
         /* 隐藏并禁用侧边栏缩放手柄（彻底解决左下角左右拖动问题） */
         [data-testid="stSidebarResizer"] {
             display: none !important;
@@ -1058,9 +1064,17 @@ if __name__ == "__main__":
             padding-top: 0.75rem !important;
             padding-bottom: 1rem !important;
             max-width: 100% !important;
-            width: 100% !important;
+            width: auto !important; /* 强制自适应，覆盖可能的固定宽度 */
             padding-left: 1rem !important;
             padding-right: 1rem !important;
+            overflow-x: hidden !important; /* 防止内部内容撑开导致整体溢出 */
+        }
+        
+        /* [关键修复] 强制主内容区域适应剩余空间 */
+        [data-testid="stMain"] {
+            width: auto !important;
+            flex: 1 1 auto !important;
+            overflow-x: hidden !important;
         }
 
         .element-container {
@@ -1391,8 +1405,8 @@ if __name__ == "__main__":
             # [UI Optimization] 知识库选择与自动启动独立渲染 (无感加载)
             @st.fragment
             def render_kb_selector_and_autostart():
-                # 统一控制台布局：[标题(1.7) | 选择框(3.9) | 刷新(0.4) | 文件夹(0.4) | 配置(0.4) | 卸载(0.4)]
-                c_title, c_select, c_refresh, c_open, c_config, c_unload = st.columns([1.7, 3.9, 0.4, 0.4, 0.4, 0.4])
+                # 统一控制台布局：[标题(1.7) | 选择框(3.7) | 刷新(0.4) | 文件夹(0.4) | 分隔(0.1) | 配置(0.4) | 卸载(0.4)]
+                c_title, c_select, c_refresh, c_open, c_sep, c_config, c_unload = st.columns([1.7, 3.7, 0.4, 0.4, 0.1, 0.4, 0.4])
                 
                 with c_title:
                     # 使用 HTML 调整垂直对齐
@@ -1430,6 +1444,10 @@ if __name__ == "__main__":
                             from src.utils.file_system_utils import reveal_in_file_manager
                             reveal_in_file_manager(output_base)
                         else: st.toast("❌ 无法打开")
+                
+                # 分隔占位
+                with c_sep:
+                    st.empty()
 
                 with c_config:
                     if st.button("⚡", help="一键恢复默认配置", use_container_width=True, key="quick_config_inline"):
@@ -1601,13 +1619,15 @@ if __name__ == "__main__":
                         sess_id = sess['id']
                         # 为每个会话生成一个专门的编号
                         display_idx = total_sess - i
-                        label = f"#{display_idx} {sess['title']}"
+                        # [UI] 标题截断优化：增加长度以利用节省出的空间
+                        title_short = sess['title'][:20] + "..." if len(sess['title']) > 20 else sess['title']
+                        label = f"#{display_idx} {title_short}"
                     
                         is_active = (sess_id == st.session_state.get('current_session_id'))
                         is_pinned = sess.get('pinned', False)
                     
-                        # 使用列布局放置操作按钮 [标题(4.5), 置顶(1.1), 分享(1.1), 刷新(1.1), 重命名(1.1), 删除(1.1)]
-                        c_title, c_pin, c_share, c_refresh, c_edit, c_del = st.columns([4.5, 1.1, 1.1, 1.1, 1.1, 1.1])
+                        # [UI] 极致压缩图标占比 [标题(6.5), 置顶(0.7), 分享(0.7), 刷新(0.7), 重命名(0.7), 删除(0.7)]
+                        c_title, c_pin, c_share, c_refresh, c_edit, c_del = st.columns([6.5, 0.7, 0.7, 0.7, 0.7, 0.7])
                     
                         with c_title:
                             icon = "📌" if is_pinned else ("📂" if is_active else "📄")
@@ -2517,6 +2537,7 @@ if __name__ == "__main__":
                             exclude_patterns = [line.strip() for line in exclude_text.split('\n') if line.strip()] if exclude_text else []
     
                     # --- [v8.6.9] 归一化名称录入与建议区 (全模式共享) ---
+                    st.divider() # [UI] 视觉分隔：区分暂存区操作与身份定义
                     kb_name_col1, kb_name_col2, kb_name_col3 = st.columns([1.2, 4, 0.5])
                     with kb_name_col1:
                         st.markdown("<div style='margin-top: 6px;'><b>知识库名称</b></div>", unsafe_allow_html=True)
@@ -2857,7 +2878,8 @@ if __name__ == "__main__":
                         current_user = st.session_state.get('user', 'guest_user')
                         can_delete = permission_manager.has_permission(current_user, "kb_delete_own")
                     
-                        if st.button("🗑️ 删除", use_container_width=True, type="primary", disabled=not current_kb_name or not can_delete, help="永久删除该知识库" if can_delete else "🔒 您没有删除知识库的权限"):
+                        # [UI] 视觉降噪：删除按钮改为次级样式，避免视觉抢占
+                        if st.button("🗑️ 删除", use_container_width=True, type="secondary", disabled=not current_kb_name or not can_delete, help="永久删除该知识库" if can_delete else "🔒 您没有删除知识库的权限"):
                             st.session_state.confirm_delete = True
                             st.rerun()
             
