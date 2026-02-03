@@ -6516,7 +6516,14 @@ if __name__ == "__main__":
                 # 清理附件
                 st.session_state.temp_attachments = {'image_text': None, 'file_content': None, 'file_names': []}
             elif not st.session_state.chat_engine:
-                st.error("请先点击左侧【🚀 执行处理】启动系统")
+                # [v9.8.2] 隐式纯对话模式：未选择 KB 时自动降级为 LLM 直连
+                active_kb_name = "pure_chat"
+                st.session_state.chat_engine = "pure_chat"
+                st.session_state.current_kb_id = "pure_chat"
+                
+                st.session_state.question_queue.append(final_query)
+                st.session_state.temp_attachments = {'image_text': None, 'file_content': None, 'file_names': []}
+                st.toast("💬 已自动切换至纯对话模式")
             else:
                 st.session_state.question_queue.append(final_query)
                 # 清理附件
