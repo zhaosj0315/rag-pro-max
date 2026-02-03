@@ -17,7 +17,7 @@
 - [ ] **零白屏**: 验证所有开关与配置切换是否均为 Fragment 局部刷新。
 
 ## 2. 代码与文档闭环 (Documentation Consistency)
-- [ ] `version.json` 中的版本号 (v9.5.37) 与 `README.md` 是否 100% 对应？
+- [ ] `version.json` 中的版本号 (v9.8.0) 与 `README.md` 是否 100% 对应？
 - [ ] `USER_MANUAL.md` 是否已更新“暂存区治理中心”的四维操作指引？
 - [ ] 核心架构图 (`ARCHITECTURE.md`) 是否已包含“Level 0 暴力探测”逻辑？
 
