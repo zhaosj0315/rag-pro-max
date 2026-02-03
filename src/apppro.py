@@ -3488,12 +3488,42 @@ if __name__ == "__main__":
         margin-top: 0.25rem;
     }
 
-    /* 紧凑按钮 */
+    /* 极致压缩主容器边距，确保一屏全显 (v9.8.1) */
+    .block-container {
+        padding-top: 0.8rem !important;
+        padding-bottom: 0rem !important;
+        max-width: 95% !important;
+    }
+
+    /* 压缩聊天消息块的垂直占用空间 */
+    div[data-testid="stChatMessage"] {
+        padding-top: 0.2rem !important;
+        padding-bottom: 0.2rem !important;
+        margin-bottom: 0.2rem !important;
+    }
+
+    /* 优化 Status 容器高度 */
+    div[data-testid="stStatusWidget"] {
+        margin-bottom: 0.2rem !important;
+    }
+
+    /* 极致压缩语音输入、上传组件和 Toggle 开关 */
+    div[data-testid="stAudioInput"] {
+        margin-bottom: -20px !important;
+    }
+    div[data-testid="stFileUploader"] {
+        margin-top: -10px !important;
+        margin-bottom: -25px !important;
+    }
+    /* 压缩 Toggle 容器 */
+    div[data-testid="stCheckbox"], div[data-testid="stToggle"] {
+        margin-bottom: -10px !important;
+    }
+
+    /* 紧凑按钮高度 */
     .stButton > button {
         height: 1.8rem;
-        padding: 0.2rem 0.4rem;
-        font-size: 11px;
-        margin-bottom: 0.2rem;
+        font-size: 12px;
     }
 
     /* 紧凑输入框 */
@@ -3527,27 +3557,19 @@ if __name__ == "__main__":
 
     # 首次使用引导
     if not st.session_state.first_time_guide_shown and len(existing_kbs) == 0:
-        st.info("""
-        ### 👋 欢迎使用 RAG Pro Max！
+        st.markdown("""
+        <div style="background-color: rgba(28, 131, 225, 0.1); border-left: 5px solid #1c83e1; padding: 10px 15px; border-radius: 5px; margin-bottom: 15px;">
+            <h4 style="margin: 0 0 8px 0;">👋 欢迎使用 RAG Pro Max！</h4>
+            <div style="display: flex; gap: 20px; font-size: 0.85rem;">
+                <div><b>1️⃣ 配置 LLM</b><br><span style="color: #666;">侧边栏设置模型</span></div>
+                <div><b>2️⃣ 创建知识库</b><br><span style="color: #666;">上传文档入库</span></div>
+                <div><b>3️⃣ 开始对话</b><br><span style="color: #666;">在下方直接提问</span></div>
+            </div>
+            <div style="margin-top: 8px; font-size: 0.75rem; color: #888;">💡 支持 PDF, DOCX, TXT, MD, XLSX, CSV 等</div>
+        </div>
+        """, unsafe_allow_html=True)
     
-        **快速开始指南：**
-    
-        1️⃣ **配置 LLM**（左侧边栏）
-        - 选择 Ollama（本地）或 OpenAI（云端）
-        - 输入 API 信息
-    
-        2️⃣ **创建知识库**
-        - 点击 "➕ 新建知识库..."
-        - 输入名称，上传文档
-    
-        3️⃣ **开始对话**
-        - 选择知识库
-        - 在下方输入问题
-    
-        💡 **提示**：支持 PDF、DOCX、TXT、MD 等多种格式
-        """)
-    
-        if st.button("✅ 我知道了，开始使用", use_container_width=True):
+        if st.button("✅ 我知道了，立即开始", use_container_width=True):
             st.session_state.first_time_guide_shown = True
             st.rerun()
 
@@ -5498,7 +5520,7 @@ if __name__ == "__main__":
                         from src.chat import HistoryManager
                         HistoryManager.save_session(active_kb_name, [], new_id)
                         st.rerun()
-        st.divider()
+        # st.divider() # [v9.8.1] 移除冗余分隔线，节省垂直空间以实现一屏全显
 
     # 自动摘要 (仅在知识库首次加载且无历史消息时触发，排除纯对话模式)
     if active_kb_name and active_kb_name != "pure_chat" and st.session_state.chat_engine and not st.session_state.messages and not st.session_state.get('skip_auto_summary'):

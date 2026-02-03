@@ -1,5 +1,14 @@
 # Changelog
 
+## [v9.8.1] - 2026-02-03 (UI Optimization Edition)
+### 🎨 极致布局优化 (Single-Screen Display)
+- **首屏全显**: 针对登录后的初始对话页进行了深度垂直空间压缩。
+- **引导页重构**: 将笨重的欢迎信息 (`st.info`) 替换为紧凑型 HTML 块，节省了约 40% 的首屏高度。
+- **组件微缩**: 
+    - 降低了主容器 `padding-top` 至 `0.8rem`。
+    - 压缩了语音输入 (`st.audio_input`)、文件上传 (`st.file_uploader`) 和 `Toggle` 开关的垂直间距。
+- **去冗余**: 移除了空对话状态下的 `st.divider()` 分隔线。
+
 ## [v9.8.0] - 2026-01-31 (Data Analysis Enhanced Construction Protocol)
 ### 🧠 构建即理解 (Construction as Understanding)
 - **DA-ECP V4.5 协议**: 引入了全新的知识库构建协议，将 "数据理解" 过程从问答阶段前置到构建阶段。
