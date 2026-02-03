@@ -1,5 +1,12 @@
 # Changelog
 
+## [v9.9.0] - 2026-02-03 (Pure Chat Multi-Session Edition)
+### 💬 纯对话多会话隔离 (Pure Chat Multi-Session Isolation)
+- **用户级物理隔离 (User Isolation)**: 彻底重构了纯对话模式的 ID 生成逻辑。现在采用 `{username}_pure_chat` 格式，确保不同用户的纯对话历史物理隔离，互不可见。
+- **全功能会话管理 (Full Session Management)**: 纯对话模式现已支持完整的会话生命周期管理。用户可以像在知识库中一样，点击“➕ 新建会话”开启多个并行的纯对话线程。
+- **UI 状态同步 (Seamless UI Sync)**: 修复了隐式纯对话触发时的 UI 割裂问题。现在，当用户未选知识库直接提问时，侧边栏会自动切换至“纯对话模式”并展开当前的历史列表。
+- **隐式会话恢复 (Implicit Session Recovery)**: 优化了“随手一问”的体验。系统会自动将隐式触发的对话归档为默认会话，并支持后续的重命名、置顶与分享操作。
+
 ## [v9.8.2] - 2026-02-03 (Implicit Chat Edition)
 ### 💬 交互逻辑突破 (Implicit Chat Mode)
 - **默认即对话**: 打通了从“未选择知识库”到“纯对话模式”的自动路由。

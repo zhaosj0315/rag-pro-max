@@ -1,13 +1,18 @@
 # RAG Pro Max - Enterprise Intelligent Document Q&A and Data Analysis System
 
-**Current Version**: v9.8.0 (DA-ECP V4.5 Edition)  
-![Version](https://img.shields.io/badge/version-v9.8.0-purple)
+**Current Version**: v9.9.0 (Pure Chat Multi-Session Edition)  
+![Version](https://img.shields.io/badge/version-v9.9.0-purple)
 
-RAG Pro Max v9.8.0 introduces the **"DA-ECP V4.5 (Data Analysis Enhanced Construction Protocol)"**. We have shifted the core logic of data understanding from "Query Time" to "Build Time". Through **Micro-Profiling** and **Structure Parsing**, the system achieves deep semantic understanding of business data right at the inception of the Knowledge Base, truly realizing "Construction as Understanding".
+RAG Pro Max v9.9.0 introduces the **"Pure Chat Multi-Session Isolation"** mechanism, thoroughly enabling persistent management for Pure Chat mode and optimizing implicit trigger logic with seamless UI synchronization. The system is now both a professional analysis workbench and a fully functional personalized AI assistant.
 
 ---
 
-## 🚀 v9.8.0 Key Features
+## 🚀 v9.9.x Key Features
+
+### 💬 Pure Chat Multi-Session Isolation
+- **User-Level Physical Isolation**: Abandoned the singleton pattern; Pure Chat history is now strictly isolated based on `{user}_pure_chat`. Records from different accounts are mutually invisible.
+- **Full Session Management**: Pure Chat mode is now a "First-Class Citizen". It supports multi-threaded parallel sessions (New/Switch) and possesses complete renaming, pinning, deleting, and sharing capabilities.
+- **Implicit Routing Self-Healing**: When a user asks a question without selecting a Knowledge Base, the system not only downgrades to direct connection mode but also instantly synchronizes the sidebar UI, archiving the current dialogue as a default session to ensure "casual queries" are safely recorded.
 
 ### 🧠 DA-ECP V4.5 Protocol (Enhanced Construction)
 - **Construction as Understanding**: During the build phase, the system not only processes text but actively parses the **"Business Blueprint"** of structured data. Through `StructureParser`, it understands data dictionary files (Excel/CSV) and converts them into logical table structures.

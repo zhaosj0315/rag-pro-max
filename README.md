@@ -1,13 +1,18 @@
 # RAG Pro Max - 企业级智能文档问答与数据分析系统
 
-**当前版本**: v9.8.2 (Implicit Chat Edition)  
-![Version](https://img.shields.io/badge/version-v9.8.2-blue)
+**当前版本**: v9.9.0 (Pure Chat Multi-Session Edition)  
+![Version](https://img.shields.io/badge/version-v9.9.0-blue)
 
-RAG Pro Max v9.8.2 在 **DA-ECP V4.5** 数据分析协议的基础上，带来了交互体验的重大突破。我们实现了 **"默认即对话" (Implicit Chat)** 的无感路由，并对首屏布局进行了 **极致的一屏全显 (Single-Screen Display)** 优化，让系统既是专业的分析工作台，也是即开即用的 AI 助手。
+RAG Pro Max v9.9.0 引入了 **"纯对话多会话隔离" (User-Isolated Multi-Session)** 机制，彻底打通了纯对话模式下的持久化管理，并对隐式触发逻辑进行了深度 UI 同步优化。现在，系统既是专业的分析工作台，也是功能完备的个性化 AI 助手。
 
 ---
 
-## 🚀 v9.8.x 核心特性
+## 🚀 v9.9.x 核心特性
+
+### 💬 纯对话多会话隔离 (Pure Chat Multi-Session Isolation)
+- **用户级物理隔离**: 摒弃了单例模式，纯对话历史现已基于 `{user}_pure_chat` 进行严格物理隔离。不同账号的纯对话记录互不可见。
+- **全功能会话管理**: 纯对话模式现已升格为“一等公民”。支持多线程并行会话（新建/切换），并拥有完整的重命名、置顶、删除及分享能力。
+- **隐式路由自愈**: 当用户未选知识库直接提问时，系统不仅自动降级为直连模式，还会即时同步侧边栏 UI，将本次对话自动归档为默认会话，确保“随手一问”也能被安全记录。
 
 ### 💬 交互革命 (Interaction Breakthrough)
 - **隐式对话模式**: 彻底打破了 "先选库再提问" 的硬性约束。在未选择知识库时，直接输入问题即可自动切换至 LLM 直连模式。

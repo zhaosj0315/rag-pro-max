@@ -6,6 +6,27 @@
 
 ---
 
+## 🧪 v9.9.0 纯对话多会话专项测试 (Pure Chat Multi-Session Test)
+
+### 1. 用户隔离测试 (User Isolation Test)
+- **场景**: 模拟两个不同用户 (User A, User B) 使用纯对话模式。
+- **操作**: 
+    1. 登录 User A，进入纯对话模式，新建会话并提问 "Hello A"。
+    2. 登录 User B，进入纯对话模式。
+- **预期**:
+    1. User A 的侧边栏历史列表中应出现该会话，且 ID 格式包含 `userA_pure_chat`。
+    2. User B 的侧边栏历史列表应为空（或仅显示 User B 自己的历史），**绝不可见** User A 的会话。
+
+### 2. 隐式路由测试 (Implicit Routing Test)
+- **场景**: 刚进入系统，不点击侧边栏任何按钮。
+- **操作**: 直接在右侧对话框输入 "Testing implicit mode"。
+- **预期**:
+    1. 系统无报错，正常返回回答。
+    2. 侧边栏自动高亮 "💬 纯对话模式"。
+    3. 历史会话列表自动展开，并显示以 "Testing implicit..." 命名的默认会话。
+
+---
+
 ## 🧪 v9.8.0 DA-ECP V4.5 深度理解专项测试
 
 ### 1. 结构化解析与造数测试 (Structure & JIT Test)

@@ -7,6 +7,10 @@
 - **发现**: 当用户查询触发 SQL 执行时，检测到目标表 (Virtual Table) 在物理数据库中为空或不存在。
 - **自愈**: 拦截 SQL 执行错误，触发 `_ensure_sandbox_ready` 机制。系统自动根据 Schema 定义和当前 Query 上下文，调用 LLM 现场生成 30+ 条模拟数据并注入数据库，随后重试 SQL 查询，实现对用户的“无感修复”。
 
+## 7. 隐式对话路由自愈 (Implicit Chat Routing)
+- **发现**: 用户在未选择任何知识库（或 Session 初始化未完成）的情况下直接在输入框提问。
+- **自愈**: 系统自动捕获该异常状态，将当前会话降级为 **Pure Chat** 模式。同时，自动生成用户隔离的 Session ID 并同步侧边栏 UI，确保用户的提问不会丢失，且能被无缝归档。
+
 ## 1. 物理目录自愈 (Staging Auto-Heal)
 - **发现**: 页面刷新或系统清理可能导致 `task_staging_dir` 物理路径缺失。
 - **自愈**: 系统在执行 `os.listdir` 或写入文件前，执行 `os.path.exists` 校验，若缺失则静默重建目录，防止程序因 `FileNotFoundError` 崩溃。

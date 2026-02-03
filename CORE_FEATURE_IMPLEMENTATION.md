@@ -1,8 +1,8 @@
 # RAG Pro Max 核心功能实现详述 (Core Feature Implementation)
 
-**版本**: v9.8.0 (DA-ECP V4.5 Edition)
+**版本**: v9.9.0 (Pure Chat Multi-Session Edition)
 **状态**: 关键性资产 (永久保存)
-**描述**: 本文档记录了 v9.8「构建即理解」、v9.5「搜索革命」及 v9.1「极致性能」架构的底层实现、协同算法及物理闭环规范。
+**描述**: 本文档记录了 v9.9「纯对话多会话隔离」、v9.8「构建即理解」及 v9.5「搜索革命」架构的底层实现、协同算法及物理闭环规范。
 
 ---
 
@@ -83,7 +83,12 @@ v9.1.0 对表现层执行了深度手术，解决了 Streamlit 传统的刷新�
 ---
 
 ## 💬 5. 纯对话模式深度解耦 (Pure Chat Decoupling)
-剥离了轻量级聊天对重型知识库引擎的硬编码依赖。
+剥离了轻量级聊天对重型知识库引擎的硬编码依赖，并在 v9.9.0 中实现了用户级隔离。
 
-- **Filesystem-Agnostic**: 识别 `active_kb_name == "pure_chat"` 信号，直接跳过 `KnowledgeBaseLoader`。
-- **Direct LLM Stream**: 复用 `Settings.llm.stream_chat` 接口，绕过 LlamaIndex 的 `Retriever` 和 `QueryEngine` 层，实现毫秒级首字响应。
+- **Filesystem-Agnostic**: 识别 `active_kb_name` 是否包含 `pure_chat` 关键字，直接跳过 `KnowledgeBaseLoader`。
+- **User Isolation Strategy**:
+    - **ID Generation**: 采用 `{username}_pure_chat` 动态生成 KB ID。这确保了 `HistoryManager` 在扫描 `chat_histories/` 目录时，能够基于文件名精确区分不同用户的纯对话历史。
+    - **Logic Consistency**: 复用现有的 `HistoryManager` 类，无需修改底层存储代码即可支持纯对话的增删改查。
+- **UI State Synchronization**: 在隐式触发（直接提问）逻辑中，强制同步 `st.session_state.selected_nav`，确保侧边栏实时响应当前的对话上下文。
+
+---

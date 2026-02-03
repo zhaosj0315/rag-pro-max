@@ -1,8 +1,8 @@
-# RAG Pro Max v9.8.0 Unified Governance & Monitoring Edition 架构白皮书
+# RAG Pro Max v9.9.0 Pure Chat Multi-Session Edition 架构白皮书
 
-**版本**: v9.8.0 (DA-ECP V4.5 Edition)  
-**更新日期**: 2026-01-31  
-**核心特性**: DA-ECP V4.5, Governance & Monitoring Fusion, Panoramic Log System, Omni-Append
+**版本**: v9.9.0 (Pure Chat Multi-Session Edition)  
+**更新日期**: 2026-02-03  
+**核心特性**: User-Isolated Pure Chat, DA-ECP V4.5, Governance & Monitoring Fusion
 
 ---
 
@@ -25,6 +25,12 @@
 ### 3. 协同核 (Synergy Core) - Smart Agents
 - **Precise Query (精准提问)**: 替代了旧版的 Deep Thinking。在提问阶段，调用 LLM 对用户原始意图进行重写（Rewrite）与扩展，解决用户表达模糊的问题。
 - **Unified Suggestion Engine**: 负责生成“后续追问”。引入 **Grounding Check** 机制，生成的每一个问题都会预先跑一遍 RAG 检索，确保这些问题在当前库中是有答案的。
+
+### 4. 会话管理架构 (Session Management Architecture)
+- **Unified Persistence Layer (统一持久层)**: v9.9.0 打通了知识库会话与纯对话的底层存储。
+    - **Knowledge Base Chat**: 存储于 `chat_histories/{user}_{kb_id}_@uuid.json`。
+    - **Pure Chat**: 升级为有状态存储，路径为 `chat_histories/{user}_pure_chat_@uuid.json`，实现用户级物理隔离与多线程管理。
+- **Implicit Routing (隐式路由)**: 实现了“无状态请求”到“有状态会话”的自动升级。未携带上下文的请求会自动触发 `PureChat` 实例，并同步 UI 状态。
 
 ---
 
