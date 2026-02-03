@@ -1063,11 +1063,39 @@ if __name__ == "__main__":
         .block-container {
             padding-top: 0.75rem !important;
             padding-bottom: 1rem !important;
-            max-width: 100% !important;
+            max-width: none !important; /* [UI] 核心修复：解除最大宽度限制，允许内容全宽铺展 */
             width: auto !important; /* 强制自适应，覆盖可能的固定宽度 */
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
+            padding-left: 2rem !important; /* 适度增加内边距，避免贴边 */
+            padding-right: 2rem !important;
             overflow-x: hidden !important; /* 防止内部内容撑开导致整体溢出 */
+        }
+        
+        /* [UI] 极致全宽：强制所有内层容器和特定组件利用 100% 宽度 */
+        [data-testid="stVerticalBlock"] > div,
+        [data-testid="stStatusWidget"],
+        [data-testid="stExpander"],
+        [data-testid="stForm"],
+        div.element-container {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        
+        /* [UI] 针对状态进度框的专项全宽优化 */
+        div[data-testid="stStatusWidget"] details {
+            width: 100% !important;
+        }
+
+        /* [UI] 针对文件上传器的宽度优化 */
+        div[data-testid="stFileUploader"] {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        
+        /* [UI] 强制聊天气泡与内容容器充分利用横向空间 */
+        [data-testid="stChatMessage"], 
+        [data-testid="stChatMessageContent"] {
+            width: 100% !important;
+            max-width: 100% !important;
         }
         
         /* [关键修复] 强制主内容区域适应剩余空间 */
@@ -5327,7 +5355,7 @@ if __name__ == "__main__":
 <span style="font-weight: 600; color: #2c3e50; font-size: 1.1rem;">快速上手指南</span>
 <span style="color: #95a5a6; font-size: 0.9rem; margin-left: 0.5rem;">— 三步开启 AI 知识库</span>
 </div>
-<div style="display: flex; flex-direction: row; gap: 1.2rem; justify-content: center; width: 100%; max-width: 900px; align-items: flex-start;">
+<div style="display: flex; flex-direction: row; gap: 1.2rem; justify-content: center; width: 100%; max-width: none; align-items: flex-start;">
 <div style="flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center;">
 <div style="background: #e3f2fd; color: #1976d2; width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 0.5rem;">📦</div>
 <div style="font-size: 0.95rem; font-weight: 600; color: #333; margin-bottom: 0.2rem;">1. 配置数据源</div>

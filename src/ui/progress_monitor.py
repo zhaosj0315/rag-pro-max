@@ -110,7 +110,8 @@ class ProgressMonitor:
         
         # 显示进度条
         with container.container():
-            col1, col2 = st.columns([3, 1])
+            # [UI Optimization] 增大左侧信息区域比例，利用全宽空间
+            col1, col2 = st.columns([5, 1])
             
             with col1:
                 st.write(f"{status_icons.get(task_info.status, '🔄')} **{task_info.task_name}**")
