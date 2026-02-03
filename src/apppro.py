@@ -2407,9 +2407,9 @@ if __name__ == "__main__":
     
                     # --- [v8.6.9] 归一化名称录入与建议区 (全模式共享) ---
                     st.divider() # [UI] 视觉分隔：区分暂存区操作与身份定义
-                    kb_name_col1, kb_name_col2, kb_name_col3 = st.columns([1.2, 4, 0.5])
+                    kb_name_col1, kb_name_col2, kb_name_col3 = st.columns([1.0, 4.2, 0.5], gap="small")
                     with kb_name_col1:
-                        st.markdown("<div style='margin-top: 6px;'><b>知识库名称</b></div>", unsafe_allow_html=True)
+                        st.markdown("<div style='margin-top: 5px; white-space: nowrap;'><b>知识库名称</b></div>", unsafe_allow_html=True)
                     with kb_name_col2:
                         # 获取建议值 (优先级：手动输入 > 自动建议)
                         current_name_val = st.session_state.get('upload_auto_name', "")
