@@ -1445,11 +1445,19 @@ if __name__ == "__main__":
                     selected_nav = st.session_state.selected_nav
                 
                     # 自动启动纯对话模式 (v2.7.6) - 简化版本
-                    if selected_nav == "💬 纯对话模式 (Pure Chat)" and st.session_state.get('current_kb_id') != "pure_chat":
-                        st.session_state.chat_engine = "pure_chat"
-                        st.session_state.current_kb_id = "pure_chat"
-                        st.toast("✅ 纯对话模式已启动")
-                        st.rerun()
+                    # [v9.9.0] 增强: 纯对话模式增加用户隔离前缀 (user_pure_chat) 以支持多会话
+                    is_pure_mode = (selected_nav == "💬 纯对话模式 (Pure Chat)")
+                    
+                    if is_pure_mode:
+                        # 构造带用户隔离的 ID
+                        current_u = st.session_state.get('user', 'guest')
+                        pure_chat_id = f"{current_u}_pure_chat"
+                        
+                        if st.session_state.get('current_kb_id') != pure_chat_id:
+                            st.session_state.chat_engine = "pure_chat"
+                            st.session_state.current_kb_id = pure_chat_id
+                            st.toast("✅ 纯对话模式已启动")
+                            st.rerun()
     
                     # 处理复选框点击逻辑
                     if selected_nav != st.session_state.get('current_nav') and (selected_nav.startswith("☐") or selected_nav.startswith("☑️")):
@@ -1560,7 +1568,11 @@ if __name__ == "__main__":
             current_active_kb = None
             # 局部判断是否为创建模式，避免 NameError
             _is_creating = (selected_nav == "➕ 新建知识库...")
-            if not _is_creating and "📂 " in selected_nav:
+            
+            if selected_nav == "💬 纯对话模式 (Pure Chat)":
+                current_u = st.session_state.get('user', 'guest')
+                current_active_kb = f"{current_u}_pure_chat"
+            elif not _is_creating and "📂 " in selected_nav:
                  current_active_kb = selected_nav.split("📂 ")[1].split(" (")[0].strip()
         
             if current_active_kb:
@@ -1612,21 +1624,38 @@ if __name__ == "__main__":
                         st.query_params["sess_id"] = new_id # 同步到 URL
                     
                         # --- [逻辑对齐] 注入初始状态 (Initial State) ---
-                        kb_path = os.path.join("vector_db_storage", current_active_kb)
-                        from src.config.manifest_manager import ManifestManager
-                        manifest = ManifestManager.load(kb_path)
-                    
+                        # [v9.9.0] 增强: 纯对话模式不需要加载 Manifest
                         initial_msg = []
-                        summary = manifest.get('summary', "👋 知识库已就绪，您可以开始提问了。")
-                        sug = manifest.get('suggestions', [])
-                    
-                        # 构造初始欢迎消息
-                        initial_msg.append({
-                            "role": "assistant", 
-                            "content": f"### 📊 知识库初始化完成\n\n{summary}",
-                            "suggestions": sug,
-                            "is_initial": True
-                        })
+                        sug = []
+                        
+                        if "pure_chat" in current_active_kb:
+                            initial_msg.append({
+                                "role": "assistant",
+                                "content": "### 💬 纯对话模式\n\n您好！我是您的 AI 助手。在这个模式下，我不会引用任何知识库文档，完全基于我的训练知识与您交流。\n\n您可以问我任何问题！",
+                                "suggestions": ["帮我写一段 Python 代码", "解释一下量子纠缠", "写一首关于春天的诗"],
+                                "is_initial": True
+                            })
+                            sug = initial_msg[0]["suggestions"]
+                        else:
+                            kb_path = os.path.join("vector_db_storage", current_active_kb)
+                            from src.config.manifest_manager import ManifestManager
+                            manifest = ManifestManager.load(kb_path)
+                        
+                            summary = manifest.get('summary', "👋 知识库已就绪，您可以开始提问了。")
+                            # 优先从历史最后一条消息获取建议
+                            sug = manifest.get('suggestions', [])
+                            if st.session_state.messages:
+                                last_msg = st.session_state.messages[-1]
+                                if isinstance(last_msg, dict) and last_msg.get('suggestions'):
+                                    sug = last_msg['suggestions']
+                        
+                            # 构造初始欢迎消息
+                            initial_msg.append({
+                                "role": "assistant", 
+                                "content": f"### 📊 知识库初始化完成\n\n{summary}",
+                                "suggestions": sug,
+                                "is_initial": True
+                            })
                     
                         st.session_state.messages = initial_msg
                         st.session_state.suggestions_history = sug
@@ -1765,7 +1794,8 @@ if __name__ == "__main__":
                 st.info(f"🔍 已选择 {len(selected_kbs)} 个知识库: {', '.join(selected_kbs)}")
             else:
                 if selected_nav == "💬 纯对话模式 (Pure Chat)":
-                    current_kb_name = "pure_chat"
+                    current_u = st.session_state.get('user', 'guest')
+                    current_kb_name = f"{current_u}_pure_chat"
                 else:
                     # 兼容带统计信息的格式
                     raw_name = selected_nav.split("📂 ")[1] if "📂 " in selected_nav else ""
@@ -3623,7 +3653,10 @@ if __name__ == "__main__":
             st.session_state.current_nav = f"📂 {st.session_state.current_kb_id}"
 
     # 知识库加载逻辑 - 跳过多知识库模式的单一加载 (及纯对话模式)
-    if active_kb_name and st.session_state.chat_engine is None and active_kb_name != "multi_kb_mode" and active_kb_name != "pure_chat":
+    # [v9.9.0] 增强: 兼容带用户前缀的纯对话模式 ID
+    is_pure_chat_active = active_kb_name and "pure_chat" in active_kb_name
+    
+    if active_kb_name and st.session_state.chat_engine is None and active_kb_name != "multi_kb_mode" and not is_pure_chat_active:
         from src.kb.kb_loader import KnowledgeBaseLoader
     
         kb_loader = KnowledgeBaseLoader(output_base)
@@ -3640,7 +3673,7 @@ if __name__ == "__main__":
             cleanup_memory()
         else:
             st.error(error_msg)
-    elif active_kb_name == "pure_chat" and st.session_state.chat_engine is None:
+    elif is_pure_chat_active and st.session_state.chat_engine is None:
         st.session_state.chat_engine = "pure_chat" 
 
     # 按钮处理
@@ -6510,20 +6543,28 @@ if __name__ == "__main__":
                     st.session_state.question_queue.append(final_query)
                     # 清理附件
                     st.session_state.temp_attachments = {'image_text': None, 'file_content': None, 'file_names': []}
-            elif active_kb_name == "pure_chat":
+            elif active_kb_name and "pure_chat" in active_kb_name:
                 # 纯对话模式 - 直接处理，无需知识库
                 st.session_state.question_queue.append(final_query)
                 # 清理附件
                 st.session_state.temp_attachments = {'image_text': None, 'file_content': None, 'file_names': []}
             elif not st.session_state.chat_engine:
                 # [v9.8.2] 隐式纯对话模式：未选择 KB 时自动降级为 LLM 直连
-                active_kb_name = "pure_chat"
+                # [v9.9.0] 增强: 使用用户隔离 ID 并同步 UI 状态
+                current_u = st.session_state.get('user', 'guest')
+                pure_chat_id = f"{current_u}_pure_chat"
+                
+                active_kb_name = pure_chat_id
                 st.session_state.chat_engine = "pure_chat"
-                st.session_state.current_kb_id = "pure_chat"
+                st.session_state.current_kb_id = pure_chat_id
+                
+                # 同步侧边栏 UI 状态
+                st.session_state.selected_nav = "💬 纯对话模式 (Pure Chat)"
+                st.session_state.current_nav = "💬 纯对话模式 (Pure Chat)"
                 
                 st.session_state.question_queue.append(final_query)
                 st.session_state.temp_attachments = {'image_text': None, 'file_content': None, 'file_names': []}
-                st.toast("💬 已自动切换至纯对话模式")
+                st.toast("💬 已自动切换至纯对话模式并记录历史")
             else:
                 st.session_state.question_queue.append(final_query)
                 # 清理附件
@@ -6678,7 +6719,8 @@ if __name__ == "__main__":
         
             # 强制检测知识库维度并切换模型（静默处理，不显示加载）
             # 优化：只在首次或切换知识库时检测，避免每次问答都重复
-            if active_kb_name and active_kb_name != "pure_chat":  # 只有在单知识库模式且非Pure Chat下才检测维度
+            # [v9.9.0] 增强: 兼容带用户前缀的纯对话模式 ID
+            if active_kb_name and "pure_chat" not in active_kb_name:  # 只有在单知识库模式且非Pure Chat下才检测维度
                 db_path = os.path.join(output_base, active_kb_name)
             
                 # [Core Fix] 优先获取绑定的模型信息
