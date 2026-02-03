@@ -1,15 +1,19 @@
 # RAG Pro Max - 企业级智能文档问答与数据分析系统
 
-**当前版本**: v9.8.0 (Data Analysis Enhanced Construction Protocol)  
-![Version](https://img.shields.io/badge/version-v9.8.0-blue)
+**当前版本**: v9.8.2 (Implicit Chat Edition)  
+![Version](https://img.shields.io/badge/version-v9.8.2-blue)
 
-RAG Pro Max v9.8.0 引入了 **「DA-ECP V4.5 (Data Analysis Enhanced Construction Protocol)」**，这是一次关于系统 "如何理解数据" 的认知升级。我们将数据分析的核心逻辑从 "问答时" 前置到了 "构建时"，通过 **微观画像 (Micro-Profiling)** 和 **结构解析 (Structure Parsing)** 技术，让知识库在建立之初就拥有了对业务数据的深度语义理解能力，真正实现了 "Construction as Understanding"。
+RAG Pro Max v9.8.2 在 **DA-ECP V4.5** 数据分析协议的基础上，带来了交互体验的重大突破。我们实现了 **"默认即对话" (Implicit Chat)** 的无感路由，并对首屏布局进行了 **极致的一屏全显 (Single-Screen Display)** 优化，让系统既是专业的分析工作台，也是即开即用的 AI 助手。
 
 ---
 
-## 🚀 v9.8.0 核心特性
+## 🚀 v9.8.x 核心特性
 
-### 🧠 DA-ECP V4.5 协议 (Enhanced Construction Protocol)
+### 💬 交互革命 (Interaction Breakthrough)
+- **隐式对话模式**: 彻底打破了 "先选库再提问" 的硬性约束。在未选择知识库时，直接输入问题即可自动切换至 LLM 直连模式。
+- **一屏全显**: 针对登录后的首屏进行了深度 CSS 压缩与重构，消除了冗余滚动，核心功能区一目了然。
+
+### 🧠 DA-ECP V4.5 协议 (Data Analysis)
 - **构建即理解**: 在知识库构建阶段，系统不仅处理文本，更主动解析结构化数据的 **"业务蓝图"**。通过 `StructureParser`，系统能读懂数据字典文件 (Excel/CSV)，将其转化为逻辑表结构。
 - **动静分离架构**: 确立了 **"构建时固化逻辑，问答时按需造数"** 的黄金法则。构建阶段专注解析与语义建模，绝不预生成冗余数据；问答阶段则基于固化的逻辑蓝图，按需进行精准的 JIT (Just-In-Time) 数据仿真。
 - **微观画像**: 针对实体数据表，系统自动提取枚举分布、数值极值及空值率等统计特征，为 SQL 决策引擎提供丰富的上下文依据。
