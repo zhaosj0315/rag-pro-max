@@ -1064,9 +1064,9 @@ if __name__ == "__main__":
             padding-top: 0.75rem !important;
             padding-bottom: 1rem !important;
             max-width: none !important; /* [UI] 核心修复：解除最大宽度限制，允许内容全宽铺展 */
-            width: auto !important; /* 强制自适应，覆盖可能的固定宽度 */
-            padding-left: 2rem !important; /* 适度增加内边距，避免贴边 */
-            padding-right: 2rem !important;
+            width: 100% !important; /* 强制自适应，覆盖可能的固定宽度 */
+            padding-left: 1rem !important; /* 极致压缩两侧边距，增加有效可视区域 */
+            padding-right: 1rem !important;
             overflow-x: hidden !important; /* 防止内部内容撑开导致整体溢出 */
         }
         
