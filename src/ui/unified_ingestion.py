@@ -185,6 +185,53 @@ def render_staging_area(target_dir, key_prefix="omni"):
                         )
                 full_html += "</div></div>"
                 st.markdown(full_html, unsafe_allow_html=True)
+
+                # [v9.9.0 Fix] 找回数据预览功能
+                st.divider()
+                st.markdown("#### 👁️ 数据快照预览")
+                
+                # 筛选可预览的文本类文件 (CSV, TXT, MD, JSON, LOG)
+                previewable_exts = ('.csv', '.txt', '.md', '.json', '.log', '.sql')
+                preview_files = [f for f in sorted(files_in_staging) if f.lower().endswith(previewable_exts) and not f.startswith('.')]
+                
+                if preview_files:
+                    preview_file = st.selectbox("选择文件预览", ["(点击选择...)"] + preview_files, key=f"{key_prefix}_preview_sel")
+                    if preview_file and preview_file != "(点击选择...)":
+                        f_path = os.path.join(target_dir, preview_file)
+                        try:
+                            # 根据扩展名决定渲染方式
+                            ext = os.path.splitext(preview_file)[1].lower()
+                            
+                            if ext == '.csv':
+                                import pandas as pd
+                                try:
+                                    df = pd.read_csv(f_path, nrows=50)
+                                except UnicodeDecodeError:
+                                    df = pd.read_csv(f_path, nrows=50, encoding='gbk')
+                                st.caption(f"📊 CSV 预览 (前 50 行)")
+                                st.dataframe(df, height=250, use_container_width=True)
+                            
+                            elif ext in ['.json']:
+                                import json
+                                with open(f_path, 'r', encoding='utf-8') as f:
+                                    st.json(json.load(f), expanded=False)
+                            
+                            else: # txt, md, log, sql
+                                with open(f_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                    content = f.read(2000) # 限制预览长度
+                                    if len(content) >= 2000: content += "\n...(截断)..."
+                                    if ext == '.md':
+                                        st.markdown(content)
+                                    elif ext == '.sql':
+                                        st.code(content, language='sql')
+                                    else:
+                                        st.code(content)
+                                        
+                        except Exception as e:
+                            st.error(f"❌ 预览失败: {str(e)}")
+                else:
+                    st.caption("ℹ️ 暂存区无可预览的文本/数据文件")
+
             else:
                 st.markdown("#### 📦 暂存区资产清单")
                 st.info("暂存区为空")

@@ -6,6 +6,13 @@ import json
 import glob
 import re
 from src.ui.unified_ingestion import render_omni_ingestion_tabs, render_staging_area
+from src.ui.auto_scroll import enable_auto_scroll
+
+# DEBUG: Show message count on load
+import streamlit as st
+if 'messages' in st.session_state:
+    print(f"DEBUG: Start app. Messages count: {len(st.session_state.messages)}")
+    # st.toast(f"🐛 Init: Msgs={len(st.session_state.messages)} | ID={st.session_state.get('current_session_id')}")
 
 # 提前导入并行执行核心 (v6.9.7)
 from src.utils.parallel_executor import get_global_executor
@@ -657,6 +664,7 @@ perf_monitor = get_monitor()
 
 # 查询改写 (v1.6)
 from src.query.query_rewriter import QueryRewriter
+from src.query.mention_router import MentionRouter
 
 # 知识库名称优化器
 from src.utils.kb_name_optimizer import KBNameOptimizer, sanitize_filename
@@ -1826,8 +1834,14 @@ if __name__ == "__main__":
                             current_kb_name = k
                             break
 
-                # 如果知识库切换了，或者当前没有加载消息
-                if st.session_state.get('last_loaded_kb') != current_kb_name or not st.session_state.get('messages'):
+                # 如果知识库切换了，或者当前没有加载消息且没有会话ID (防止覆盖新建的空会话)
+                # [v9.9.0 Fix] 增加 just_routed 检查，防止跨域引用 Rerun 后被重置
+                should_reload = st.session_state.get('last_loaded_kb') != current_kb_name or (not st.session_state.get('messages') and st.session_state.current_session_id is None)
+                
+                # 消费标记 (Consuming flag)
+                is_just_routed = st.session_state.pop('just_routed', False)
+                
+                if should_reload and not is_just_routed:
                     from src.chat.history_manager import HistoryManager
                     st.session_state.current_kb_id = current_kb_name
                     sessions = HistoryManager.list_sessions(current_kb_name)
@@ -6614,6 +6628,228 @@ if __name__ == "__main__":
         # 消费掉任务标记 (转移到局部变量)
         del st.session_state.current_active_query
     
+        # [v9.9.0] 跨域引用路由 (Cross-Context Mentions)
+        # 允许用户通过 @KB名称 临时调用其他知识库
+        import importlib
+        import src.query.mention_router
+        importlib.reload(src.query.mention_router)
+        from src.query.mention_router import MentionRouter
+        
+        router = MentionRouter()
+        c_user = st.session_state.get('user', 'guest')
+        c_role = st.session_state.get('role', 'guest')
+        candidates, routed_query = router.parse_mention(final_prompt, c_user, c_role)
+        
+        # 统一处理逻辑：确定唯一的 target_kbs
+        target_kbs = []
+        
+        if candidates:
+            if len(candidates) == 1:
+                target_kbs = [candidates[0]]
+            else:
+                # [歧义处理] 渲染多选器 (升级版)
+                st.session_state.messages.append({"role": "user", "content": final_prompt})
+                display_user_message_safe(final_prompt)
+                
+                with st.chat_message("assistant", avatar="🤖"):
+                    st.markdown(f"🔍 发现了 **{len(candidates)}** 个匹配的知识库，请选择引用源（支持多选）：")
+                    
+                    with st.form("mention_multi_form"):
+                        selected_targets = st.multiselect("候选知识库", candidates, default=[candidates[0]], label_visibility="collapsed")
+                        submitted = st.form_submit_button("🚀 确认引用")
+                        
+                        if submitted and selected_targets:
+                            # 构造多目标内部指令
+                            combined = "|".join(selected_targets)
+                            st.session_state.current_active_query = f"@MULTI:{combined} {routed_query}"
+                            st.session_state.is_processing = True
+                            st.rerun()
+                
+                st.session_state.is_processing = False
+                st.stop()
+
+        # 触发路由条件: 识别到目标KB列表，且目标有效
+        if target_kbs:
+            logger.info(f"🔀 [Router] 激活跨域引用: {target_kbs}")
+            
+            # 1. 记录用户提问 (显示原始带@的问题)
+            st.session_state.messages.append({"role": "user", "content": final_prompt})
+            if active_kb_name: 
+                HistoryManager.save_session(active_kb_name, st.session_state.messages, st.session_state.get('current_session_id'))
+            
+            display_user_message_safe(final_prompt)
+            
+            with st.chat_message("assistant", avatar="🤖"):
+                
+                # --- 多库融合处理 (Multi-Source Fusion) ---
+                if len(target_kbs) > 1:
+                    with st.status(f"🔗 正在并发连接 {len(target_kbs)} 个知识库...", expanded=False) as status:
+                        from src.query.multi_kb_query_engine import MultiKBQueryEngine
+                        multi_engine = MultiKBQueryEngine()
+                        
+                        # 执行并发查询
+                        status.write("🚀 并发检索中 (多进程加速)...")
+                        # 过滤无效路径
+                        valid_kbs = [k for k in target_kbs if os.path.exists(os.path.join(output_base, k))]
+                        
+                        results = multi_engine.query_multiple_kbs(valid_kbs, routed_query, top_k_per_kb=3)
+                        
+                        if not results['success']:
+                            st.error("多库查询全盘失败")
+                            st.session_state.is_processing = False
+                            st.stop()
+                            
+                        # 结果整合
+                        status.write("🧠 正在进行 LLM 深度融合...")
+                        # 构造融合 Prompt
+                        context_text = ""
+                        for kb, res in results['results'].items():
+                            if res['success']:
+                                # 提取并精简答案
+                                ans_text = res.get('answer', '')[:800] # 限制长度防止Context溢出
+                                context_text += f"\n=== 来源: {kb} ===\n{ans_text}\n"
+                                
+                        synthesis_prompt = f"请根据以下来自不同知识库的检索结果，综合回答问题：'{routed_query}'。\n如果结果中有冲突，请予以指出。\n\n{context_text}"
+                        
+                        # 使用全局 LLM 生成最终回答
+                        from llama_index.core import Settings
+                        response_stream = Settings.llm.stream_complete(synthesis_prompt)
+                        
+                        status.update(label="✅ 多库融合完成", state="complete")
+                        
+                    # 流式输出
+                    st.caption(f"🔗 融合引用: **{' | '.join(target_kbs)}**")
+                    msg_placeholder = st.empty()
+                    full_resp = ""
+                    
+                    from src.ui.auto_scroll import enable_auto_scroll
+                    enable_auto_scroll()
+                    
+                    for token in response_stream:
+                        chunk = token.delta if hasattr(token, 'delta') else str(token)
+                        full_resp += chunk
+                        msg_placeholder.markdown(full_resp + "▌")
+                    msg_placeholder.markdown(full_resp)
+                    
+                    # 保存融合结果
+                    st.session_state.messages.append({
+                        "role": "assistant", 
+                        "content": full_resp,
+                        "router_source": f"MULTI:{'|'.join(target_kbs)}"
+                    })
+                    
+                    # 持久化
+                    if active_kb_name: 
+                        HistoryManager.save_session(active_kb_name, st.session_state.messages, st.session_state.get('current_session_id'))
+
+                # --- 单库标准处理 (Single-Source) ---
+                else:
+                    target_kb = target_kbs[0]
+                    # 检查路径有效性
+                    if not os.path.exists(os.path.join(output_base, target_kb)):
+                        st.error(f"目标知识库不存在: {target_kb}")
+                        st.session_state.is_processing = False
+                        st.stop()
+                        
+                    # [Fix] 禁止加载纯对话虚拟库
+                    if "pure_chat" in target_kb:
+                        st.error(f"不支持引用纯对话历史: {target_kb}")
+                        st.session_state.is_processing = False
+                        st.stop()
+
+                    # 2. 动态加载目标引擎 (JIT Loading)
+                    temp_chat_engine = None
+                    with st.status(f"🔗 正在建立跨域连接: **{target_kb}**...", expanded=False) as status:
+                        try:
+                            from src.kb.kb_loader import KnowledgeBaseLoader
+                            u_conf = ConfigLoader.load()
+                            kb_loader = KnowledgeBaseLoader(output_base)
+                            # [Fix] load_knowledge_base returns 3 values (engine, error, index)
+                            temp_chat_engine, err, _ = kb_loader.load_knowledge_base(
+                                target_kb, 
+                                u_conf.get('embed_provider', 'HuggingFace (本地/极速)'),
+                                u_conf.get('embed_model_hf', 'sentence-transformers/all-MiniLM-L6-v2'),
+                                u_conf.get('embed_key', ''),
+                                u_conf.get('embed_url', '')
+                            )
+                            if not temp_chat_engine:
+                                raise Exception(err)
+                            status.update(label=f"✅ 已连接知识库: {target_kb}", state="complete")
+                        except Exception as e:
+                            status.update(label=f"❌ 连接失败: {target_kb}", state="error")
+                            st.error(f"无法加载目标知识库: {e}")
+                            st.session_state.is_processing = False
+                            st.stop()
+
+                    # 3. 执行查询
+                    st.caption(f"🔗 引用来源: **{target_kb}**")
+                    msg_placeholder = st.empty()
+                    full_resp = ""
+                    
+                    try:
+                        # 使用提取后的纯净问题
+                        response = temp_chat_engine.stream_chat(routed_query)
+                        
+                        # 激活自动滚动
+                        from src.ui.auto_scroll import enable_auto_scroll
+                        enable_auto_scroll()
+                        
+                        # 兼容性流式处理
+                        stream_gen = response.response_gen if hasattr(response, 'response_gen') else response
+                        for token in stream_gen:
+                            full_resp += token
+                            msg_placeholder.markdown(full_resp + "▌")
+                        
+                        msg_placeholder.markdown(full_resp)
+                        
+                        # 4. 保存结果 (带元数据)
+                        # 提取 source nodes
+                        sources = []
+                        if hasattr(response, 'source_nodes'):
+                            for n in response.source_nodes:
+                                try:
+                                    # 安全提取文本
+                                    content = ""
+                                    if hasattr(n, 'node') and hasattr(n.node, 'get_text'):
+                                        content = n.node.get_text()
+                                    elif hasattr(n, 'get_text'):
+                                        content = n.get_text()
+                                    else:
+                                        content = str(n)
+                                        
+                                    # 安全提取元数据
+                                    meta = {}
+                                    if hasattr(n, 'node') and hasattr(n.node, 'metadata'):
+                                        meta = n.node.metadata
+                                    elif hasattr(n, 'metadata'):
+                                        meta = n.metadata
+                                        
+                                    sources.append({
+                                        'text': content[:200], 
+                                        'score': getattr(n, 'score', 0.0), 
+                                        'file_name': meta.get('file_name', 'unknown')
+                                    })
+                                except: pass
+
+                        st.session_state.messages.append({
+                            "role": "assistant", 
+                            "content": full_resp,
+                            "sources": sources, # 暂存引用以便渲染
+                            "router_source": target_kb # 标记该消息来自其他库
+                        })
+                        
+                        # 5. 持久化到当前会话
+                        if active_kb_name: 
+                            HistoryManager.save_session(active_kb_name, st.session_state.messages, st.session_state.get('current_session_id'))
+                            
+                    except Exception as e:
+                        st.error(f"跨域查询异常: {e}")
+            
+            # [Fix] 防止 Rerun 后被自动加载逻辑覆盖
+            st.session_state.just_routed = True
+            st.session_state.is_processing = False
+            st.rerun()
+
         # [审计] 记录用户提问行为
         from src.auth.audit_logger import AuditLogger
         AuditLogger.log(st.session_state.get('user', 'unknown'), "USER_QUERY", f"问: {final_prompt[:100]}", status="success")
@@ -7234,6 +7470,9 @@ if __name__ == "__main__":
                             # [Robust] 兼容 Generator 和 StreamingResponse 对象
                             response_stream = response.response_gen if hasattr(response, 'response_gen') else response
 
+                            # [v9.9.0] 激活自动滚动 (解决流式输出不跟随问题)
+                            enable_auto_scroll()
+
                             for token in response_stream:
                                 # 🛑 检查停止信号
                                 if st.session_state.get('stop_generation'):
@@ -7420,7 +7659,9 @@ if __name__ == "__main__":
                         # 整体处理完成反馈
                         st.toast("✅ 回答生成完毕", icon="🎉")
                     
-                        st.rerun()
+                        # [Fix] 防止 Rerun 后被自动加载逻辑覆盖
+                        st.session_state.just_routed = True
+                        st.rerun() # [Debug] Re-enable rerun to ensure proper state cycle
                 
                     except Exception as e: 
                         # [v5.9.4] 错误诊断增强：禁止静默闪退，显式抛出异常详情

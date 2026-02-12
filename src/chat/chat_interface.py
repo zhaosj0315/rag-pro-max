@@ -3,6 +3,7 @@
 """
 
 import streamlit as st
+from src.ui.auto_scroll import enable_auto_scroll
 
 
 class ChatInterface:
@@ -158,6 +159,7 @@ class ChatInterface:
                 response = chat_engine.stream_chat(prompt)
                 
                 full_response = ""
+                enable_auto_scroll() # [v9.9.0] 激活自动滚动
                 for token in response.response_gen:
                     # 检查停止信号
                     if st.session_state.get('stop_generation'):

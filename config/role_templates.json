@@ -1,15 +1,15 @@
 {
     "admin": {
-        "name": "超级管理员",
-        "description": "全系统最高权限，不受任何配额限制",
+        "name": "\u8d85\u7ea7\u7ba1\u7406\u5458",
+        "description": "\u5168\u7cfb\u7edf\u6700\u9ad8\u6743\u9650\uff0c\u4e0d\u53d7\u4efb\u4f55\u914d\u989d\u9650\u5236",
         "permissions": [
             "*"
         ],
         "default_quota_mb": -1
     },
     "creator": {
-        "name": "知识专家",
-        "description": "专注内容采集与深度构建，支持爬虫",
+        "name": "\u77e5\u8bc6\u4e13\u5bb6",
+        "description": "\u4e13\u6ce8\u5185\u5bb9\u91c7\u96c6\u4e0e\u6df1\u5ea6\u6784\u5efa\uff0c\u652f\u6301\u722c\u866b",
         "permissions": [
             "chat",
             "kb_create",
@@ -32,12 +32,15 @@
         "default_quota_mb": 1024
     },
     "standard_user": {
-        "name": "标准用户",
-        "description": "日常文档构建、数据分析与资产下载",
+        "name": "\u6807\u51c6\u7528\u6237",
+        "description": "\u65e5\u5e38\u6587\u6863\u6784\u5efa\u3001\u6570\u636e\u5206\u6790\u4e0e\u8d44\u4ea7\u4e0b\u8f7d",
         "permissions": [
             "chat",
             "kb_create",
+            "kb_append",
             "kb_delete_own",
+            "kb_rename",
+            "kb_rebuild_index",
             "upload_files",
             "paste_text",
             "use_crawler",
@@ -53,8 +56,8 @@
         "default_quota_mb": 200
     },
     "analyst": {
-        "name": "数据分析师",
-        "description": "专注已有知识库的深度对话与资产导出",
+        "name": "\u6570\u636e\u5206\u6790\u5e08",
+        "description": "\u4e13\u6ce8\u5df2\u6709\u77e5\u8bc6\u5e93\u7684\u6df1\u5ea6\u5bf9\u8bdd\u4e0e\u8d44\u4ea7\u5bfc\u51fa",
         "permissions": [
             "chat",
             "kb_append",
@@ -70,8 +73,8 @@
         "default_quota_mb": 50
     },
     "guest": {
-        "name": "访客",
-        "description": "临时预览，支持基础构建与对话",
+        "name": "\u8bbf\u5ba2",
+        "description": "\u4e34\u65f6\u9884\u89c8\uff0c\u652f\u6301\u57fa\u7840\u6784\u5efa\u4e0e\u5bf9\u8bdd",
         "permissions": [
             "chat",
             "kb_create",
